@@ -1,0 +1,4 @@
+ISSUE: HIGH_CPU_UTILIZATION. 
+The symptoms are high pod CPU usage (over 80% of request limit) and slow response times. 
+JFR analysis will show the top consuming method (e.g., CpuResource.triggerCpuSpike) and CPU time spent in RUNNABLE state. 
+The fix is to scale the application or introduce a kill switch/limit on the offending loop.
