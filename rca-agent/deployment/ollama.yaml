@@ -49,3 +49,4 @@ spec:
         - name: ollama-data
           persistentVolumeClaim:
             claimName: ollama-data
+            
