@@ -1,4 +1,0 @@
-ISSUE: JVM_OOM_LEAK. 
-The symptoms are high heap usage (approaching 100% of -Xmx) and the presence of "java.lang.OutOfMemoryError: Java heap space" 
-in logs. JFR will show high allocation rates and low free memory. The fix involves identifying the class causing 
-the leak (e.g., MemoryResource) and then increasing the pod's memory request/limit or the JVM's -Xmx flag.
