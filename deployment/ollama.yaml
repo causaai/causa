@@ -49,4 +49,22 @@ spec:
         - name: ollama-data
           persistentVolumeClaim:
             claimName: ollama-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama
+  namespace: default
+  labels:
+    app: ollama
+spec:
+  type: ClusterIP
+  selector:
+    app: ollama
+  ports:
+    - name: http
+      port: 11434
+      targetPort: 11434
+      protocol: TCP
+
             
