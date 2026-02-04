@@ -1,3 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-rca-to-prometheus
+  namespace: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: prometheus
+      app.kubernetes.io/instance: k8s
+      app.kubernetes.io/name: prometheus
+      app.kubernetes.io/part-of: kube-prometheus
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: default
+    ports:
+    - protocol: TCP
+      port: 9090
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -17,7 +40,7 @@ spec:
       serviceAccountName: rca-agent-sa
       containers:
       - name: rca-agent
-        image: quay.io/rh-ee-shesaxen/rca-agent:poc19
+        image: quay.io/rh-ee-shesaxen/rca-agent:pocarm
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
