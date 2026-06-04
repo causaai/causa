@@ -80,20 +80,22 @@ causa_rca_analysis_available
 
 **Required Labels:**
 
-| Label       | Description                    | Example                           |
-|-------------|--------------------------------|-----------------------------------|
-| analysis_id | Unique RCA analysis identifier | "2178940"                         |
-| namespace   | Namespace where issue occurred | "causa-datadog"                   |
-| workload    | Workload name                  | "auth-cache"                      |
-| pod         | Affected pod                   | "fake-causa-app-6c5744b7dd-44lhd" |
-| issue_type  | Issue category                 | "high_memory"                     |
-| severity    | Severity level                 | "critical", "warning", "info"     |
-| status      | Analysis status                | "triggered", "completed", "failed"|
+| Label        | Description                    | Example                           |
+|--------------|--------------------------------|-----------------------------------|
+| analysis_id  | Unique RCA analysis identifier | "2178940"                         |
+| analysis_url | Direct URL to RCA analysis     | "https://irb.causa.com/analysis/2178940" |
+| namespace    | Namespace where issue occurred | "causa-datadog"                   |
+| workload     | Workload name                  | "auth-cache"                      |
+| pod          | Affected pod                   | "fake-causa-app-6c5744b7dd-44lhd" |
+| issue_type   | Issue category                 | "high_memory"                     |
+| severity     | Severity level                 | "critical", "warning", "info"     |
+| status       | Analysis status                | "triggered", "completed", "failed"|
 
 **Example:**
 ```
 causa_rca_analysis_available{
   analysis_id="2178940",
+  analysis_url="https://irb.causa.com/analysis/2178940",
   namespace="causa-datadog",
   workload="auth-cache",
   pod="fake-causa-app-6c5744b7dd-44lhd",
