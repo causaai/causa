@@ -34,15 +34,95 @@ deployment/kubernetes/
 - `kustomize` installed (or kubectl 1.14+)
 - Access to a Kubernetes cluster
 
-### For Kind
+### For Kind (Local Development)
 - [kind](https://kind.sigs.kubernetes.io/) installed
 - NGINX Ingress Controller
+- For Vertex AI: `gcloud` CLI installed
 
-### For OpenShift
+### For OpenShift (Production)
 - `oc` CLI installed
 - Access to an OpenShift cluster
+- For Vertex AI: `gcloud` CLI installed
 
-## Quick Start
+## LLM Setup (Required First)
+
+Causa Backend requires LLM (Claude/ Ollama/ BoB) integration. You **must** create secrets **before** deploying.
+
+**IMPORTANT:** Secrets are managed **separately** from kustomize. Never add secrets to kustomization.yaml.
+
+Refer to [Secrets Setup](../../deployment/kubernetes/secrets/README.md) for more details.
+
+---
+
+### CASE 1: Direct Anthropic API (Simplest)
+
+#### Step 1: Create Secret
+
+```bash
+# Recommended: Create secret directly with kubectl
+kubectl create secret generic causa-llm-secrets \
+  --from-literal=LLM_API_KEY=sk-ant-api03-xxxxxxxx \
+  -n diagnostics-tool
+```
+
+**Alternative:** Use template from `deployment/kubernetes/secrets/anthropic-secret.yaml`
+
+#### Step 2: Update ConfigMap
+
+Edit `deployment/kubernetes/base/configmap.yaml`:
+```yaml
+data:
+  LLM_PROVIDER: "anthropic"
+  LLM_MODEL_NAME: "claude-sonnet-4-6"
+```
+
+**Done!** Proceed to deployment steps below.
+
+---
+
+### CASE 2: Claude via Google Vertex AI
+
+#### Automated Setup (Recommended)
+
+**For Local (Kind):**
+```bash
+./scripts/llm/setup-vertex-ai.sh --env local --project YOUR_GCP_PROJECT_ID
+```
+
+**For Production (OpenShift):**
+```bash
+./scripts/llm/setup-vertex-ai.sh --env production --project YOUR_GCP_PROJECT_ID
+```
+
+The script will:
+- Enable Vertex AI API
+- Create/configure GCP service account (production only)
+- Set up Application Default Credentials (local only)
+- **Create Kubernetes secrets automatically**
+- Update ConfigMap
+- Generate deployment patches (production only)
+
+**Done!** Proceed to deployment steps below.
+
+#### Manual Setup
+
+**For Local (Kind):** See [vertex-ai-local-setup.md](../llm/vertex-ai-local-setup.md)  
+**For Production (OpenShift):** See [vertex-ai-openshift-setup.md](../llm/vertex-ai-openshift-setup.md)
+
+---
+
+### Secret Templates
+
+Template files with placeholders are available in `deployment/kubernetes/secrets/`:
+- `[anthropic-secret.yaml](../../deployment/kubernetes/secrets/anthropic-secret.yaml)` - Anthropic API key
+- `[vertex-ai-secret.yaml](../../deployment/kubernetes/secrets/vertex-ai-secret.yaml)` - Vertex AI project ID
+- `[gcp-sa-key-secret.yaml](../../deployment/kubernetes/secrets/gcp-sa-key-secret.yaml)` - GCP service account key (production only)
+
+**See** `[Secret Templates](../../deployment/kubernetes/secrets/README.md)` for detailed instructions.
+
+---
+
+## Quick Start Deployment
 
 ### 1. Deploy to Kind (Local Development)
 
@@ -82,6 +162,8 @@ kubectl wait --namespace ingress-nginx \
 
 #### Deploy Causa
 ```bash
+# IMPORTANT: Complete LLM Setup first (see above)
+
 # From repository root
 kubectl apply -k deployment/kubernetes/overlays/kind
 
@@ -100,7 +182,6 @@ echo "127.0.0.1 causa.local" | sudo tee -a /etc/hosts
 # Access endpoints
 curl http://causa.local/q/health/live
 curl http://causa.local/q/health/ready
-curl http://causa.local/swagger-ui
 
 # Or use localhost
 curl http://localhost/q/health/live
@@ -136,7 +217,6 @@ ROUTE_URL=$(oc get route -n diagnostics-tool ocp-causa-backend -o jsonpath='{.sp
 # Access endpoints (HTTPS)
 curl https://$ROUTE_URL/q/health/live
 curl https://$ROUTE_URL/q/health/ready
-curl https://$ROUTE_URL/swagger-ui
 ```
 
 ## Configuration
