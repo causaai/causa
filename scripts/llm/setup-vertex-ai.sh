@@ -310,7 +310,7 @@ generate_apply_script() {
 
     if [ "$ENV_TYPE" = "openshift" ]; then
         cmd="oc"
-        deployment_name="ocp-causa-backend"
+        deployment_name="causa-backend"
     fi
 
     cat > "$output_dir/apply.sh" << EOFAPPLY
@@ -481,12 +481,12 @@ setup_openshift() {
     log_info "     oc apply -k ../../overlays/openshift           # Deploy base first"
     log_info "     oc apply -f causa-llm-secrets.yaml"
     log_info "     oc apply -f gcp-adc-credentials.yaml"
-    log_info "     oc patch deployment ocp-causa-backend -n $K8S_NAMESPACE \\"
+    log_info "     oc patch deployment causa-backend -n $K8S_NAMESPACE \\"
     log_info "       --patch-file deployment-adc-patch.yaml"
-    log_info "     oc rollout restart deployment/ocp-causa-backend -n $K8S_NAMESPACE"
+    log_info "     oc rollout restart deployment/causa-backend -n $K8S_NAMESPACE"
     log_info ""
     log_info "  3. Verify:"
-    log_info "     oc logs -f deployment/ocp-causa-backend -n $K8S_NAMESPACE | grep LLM"
+    log_info "     oc logs -f deployment/causa-backend -n $K8S_NAMESPACE | grep LLM"
     log_info ""
 }
 

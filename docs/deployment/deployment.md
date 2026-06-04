@@ -36,7 +36,6 @@ deployment/kubernetes/
 
 ### For Kind (Local Development)
 - [kind](https://kind.sigs.kubernetes.io/) installed
-- NGINX Ingress Controller
 - For Vertex AI: `gcloud` CLI installed
 
 ### For OpenShift (Production)
@@ -125,36 +124,11 @@ A template file with placeholders is available in `deployment/kubernetes/secrets
 
 #### Create Kind Cluster (if needed)
 ```bash
-# Create cluster with ingress support
-cat <<EOF | kind create cluster --config=-
-kind: Cluster
-apiVersion: kind.x-kubernetes.io/v1alpha4
-name: causa-dev
-nodes:
-- role: control-plane
-  kubeadmConfigPatches:
-  - |
-    kind: InitConfiguration
-    nodeRegistration:
-      kubeletExtraArgs:
-        node-labels: "ingress-ready=true"
-  extraPortMappings:
-  - containerPort: 80
-    hostPort: 80
-    protocol: TCP
-  - containerPort: 443
-    hostPort: 443
-    protocol: TCP
-EOF
+# Create simple KIND cluster (no ingress needed)
+kind create cluster --name causa-dev
 
-# Install NGINX Ingress
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
-
-# Wait for ingress to be ready
-kubectl wait --namespace ingress-nginx \
-  --for=condition=ready pod \
-  --selector=app.kubernetes.io/component=controller \
-  --timeout=90s
+# Verify cluster
+kubectl cluster-info --context kind-causa-dev
 ```
 
 #### Deploy Causa
@@ -204,16 +178,26 @@ kubectl logs -n diagnostics-tool -l app.kubernetes.io/name=causa-backend -f
 ```
 
 #### Access Application
+
+**Using Port-Forward:**
 ```bash
-# Add to /etc/hosts
-echo "127.0.0.1 causa.local" | sudo tee -a /etc/hosts
+# Forward service port to localhost
+kubectl port-forward -n diagnostics-tool svc/causa-backend 8080:8080
 
-# Access endpoints
-curl http://causa.local/q/health/live
-curl http://causa.local/q/health/ready
+# In another terminal, access endpoints
+curl http://localhost:8080/q/health/live
+curl http://localhost:8080/q/health/ready
 
-# Or use localhost
-curl http://localhost/q/health/live
+# Check LLM health specifically
+curl http://localhost:8080/q/health/ready | jq '.checks[] | select(.name=="llm")'
+```
+
+**Keep port-forward running in background:**
+```bash
+# Run in background
+kubectl port-forward -n diagnostics-tool svc/causa-backend 8080:8080 &
+
+# Stop later with: fg then Ctrl+C
 ```
 
 ### 2. Deploy to OpenShift

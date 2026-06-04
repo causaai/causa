@@ -9,8 +9,6 @@ metadata:
 # Override base namespace
 namespace: diagnostics-tool
 
-namePrefix: ocp-
-
 commonLabels:
   environment: openshift
   platform: openshift

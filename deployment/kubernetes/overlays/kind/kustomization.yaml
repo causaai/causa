@@ -9,8 +9,6 @@ metadata:
 # Override base namespace
 namespace: diagnostics-tool
 
-namePrefix: kind-
-
 commonLabels:
   environment: kind
   cluster: kind-cluster
@@ -18,8 +16,8 @@ commonLabels:
 bases:
   - ../../base
 
-resources:
-  - ingress.yaml
+# Removed ingress.yaml - use port-forward for local access instead
+# kubectl port-forward -n diagnostics-tool svc/causa-backend 8080:8080
 
 patches:
   - path: configmap-patch.yaml
