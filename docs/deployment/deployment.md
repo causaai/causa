@@ -50,7 +50,7 @@ Causa Backend requires LLM (Claude/ Ollama/ BoB) integration. You **must** creat
 
 **IMPORTANT:** Secrets are managed **separately** from kustomize. Never add secrets to kustomization.yaml.
 
-Refer to [Secrets Setup](../../deployment/kubernetes/secrets/README.md) for more details.
+Refer to [Kubernetes Secrets Guide](kubernetes-secrets.md) for more details.
 
 ---
 
@@ -65,7 +65,7 @@ kubectl create secret generic causa-llm-secrets \
   -n diagnostics-tool
 ```
 
-**Alternative:** Use template from `deployment/kubernetes/secrets/anthropic-secret.yaml`
+**Alternative:** Use template from `deployment/kubernetes/secrets/secret.yaml`
 
 #### Step 2: Update ConfigMap
 
@@ -82,44 +82,41 @@ data:
 
 ### CASE 2: Claude via Google Vertex AI
 
+⚠️ **IMPORTANT: Vertex AI requires a specific deployment order!**
+
 #### Automated Setup (Recommended)
 
-**For Local (Kind):**
+**Generate Configuration**
 ```bash
-./scripts/llm/setup-vertex-ai.sh --env local --project YOUR_GCP_PROJECT_ID
+./scripts/llm/setup-vertex-ai.sh --env [kind|openshift] --project YOUR_GCP_PROJECT_ID
 ```
 
-**For Production (OpenShift):**
-```bash
-./scripts/llm/setup-vertex-ai.sh --env production --project YOUR_GCP_PROJECT_ID
-```
+This generates deployment files in `deployment/kubernetes/vertex-ai/generated/`
 
-The script will:
-- Enable Vertex AI API
-- Create/configure GCP service account (production only)
-- Set up Application Default Credentials (local only)
-- **Create Kubernetes secrets automatically**
-- Update ConfigMap
-- Generate deployment patches (production only)
 
-**Done!** Proceed to deployment steps below.
+**See detailed guides:**
+- **Development/POC:** [Vertex AI Non-Production Guide](../llm/vertex-ai-non-production-guide.md)
+- **Production:** [Vertex AI Production Guide](../llm/vertex-ai-production-guide.md)
 
 #### Manual Setup
 
-**For Local (Kind):** See [vertex-ai-local-setup.md](../llm/vertex-ai-local-setup.md)  
-**For Production (OpenShift):** See [vertex-ai-openshift-setup.md](../llm/vertex-ai-openshift-setup.md)
+**For Development (Local/KIND/OpenShift):** See [Vertex AI Development Guide](../llm/vertex-ai-development-guide.md)
+**For Production:** See [Vertex AI Production Guide](../llm/vertex-ai-production-guide.md)
 
 ---
 
 ### Secret Templates
 
-Template files with placeholders are available in `deployment/kubernetes/secrets/`:
-- `[anthropic-secret.yaml](../../deployment/kubernetes/secrets/anthropic-secret.yaml)` - Anthropic API key
-- `[vertex-ai-secret.yaml](../../deployment/kubernetes/secrets/vertex-ai-secret.yaml)` - Vertex AI project ID
-- `[gcp-sa-key-secret.yaml](../../deployment/kubernetes/secrets/gcp-sa-key-secret.yaml)` - GCP service account key (production only)
+A template file with placeholders is available in `deployment/kubernetes/secrets/`:
+- [secret.yaml](../../deployment/kubernetes/secrets/secret.yaml) - LLM API key template
 
-**See** `[Secret Templates](../../deployment/kubernetes/secrets/README.md)` for detailed instructions.
+**For Vertex AI:** Use the automated setup script instead:
+```bash
+./scripts/llm/setup-vertex-ai.sh --env [local|kind|openshift] --project <GCP_PROJECT_ID>
+```
 
+**See:**
+- [Kubernetes Secrets Guide](kubernetes-secrets.md) for Anthropic secrets
 ---
 
 ## Quick Start Deployment
@@ -161,8 +158,40 @@ kubectl wait --namespace ingress-nginx \
 ```
 
 #### Deploy Causa
+
+**If using Vertex AI:**
 ```bash
-# IMPORTANT: Complete LLM Setup first (see above)
+# Use the generated apply script
+cd deployment/kubernetes/vertex-ai/generated
+./apply.sh
+
+# This handles the correct deployment order automatically
+
+
+"OR"
+
+
+# 1. Deploy base deployment FIRST (if not already deployed)
+kubectl apply -k deployment/kubernetes/overlays/kind  # or overlays/openshift
+
+# 2. Apply ADC secrets
+cd deployment/kubernetes/vertex-ai/generated
+kubectl apply -f causa-llm-secrets.yaml
+kubectl apply -f gcp-adc-credentials.yaml
+
+# 3. Patch deployment to mount secrets
+kubectl patch deployment causa-backend -n diagnostics-tool \
+  --patch-file deployment-adc-patch.yaml
+
+# 4. Restart deployment to pick up changes
+kubectl rollout restart deployment/causa-backend -n diagnostics-tool
+kubectl rollout status deployment/causa-backend -n diagnostics-tool
+
+```
+
+**If using Anthropic Direct API:**
+```bash
+# IMPORTANT: Create secrets first (see LLM Setup above)
 
 # From repository root
 kubectl apply -k deployment/kubernetes/overlays/kind
@@ -195,7 +224,41 @@ oc login --server=https://api.your-cluster.com:6443
 ```
 
 #### Deploy Causa
+
+**If using Vertex AI:**
 ```bash
+# Use the generated apply script
+cd deployment/kubernetes/vertex-ai/generated
+./apply.sh
+
+# This handles the correct deployment order automatically
+
+
+"OR"
+
+
+# 1. Deploy base deployment FIRST (if not already deployed)
+kubectl apply -k deployment/kubernetes/overlays/openshift  # or overlays/openshift
+
+# 2. Apply ADC secrets
+cd deployment/kubernetes/vertex-ai/generated
+kubectl apply -f causa-llm-secrets.yaml
+kubectl apply -f gcp-adc-credentials.yaml
+
+# 3. Patch deployment to mount secrets
+kubectl patch deployment causa-backend -n diagnostics-tool \
+  --patch-file deployment-adc-patch.yaml
+
+# 4. Restart deployment to pick up changes
+kubectl rollout restart deployment/causa-backend -n diagnostics-tool
+kubectl rollout status deployment/causa-backend -n diagnostics-tool
+
+```
+
+**If using Anthropic Direct API:**
+```bash
+# IMPORTANT: Create secrets first (see LLM Setup above)
+
 # From repository root
 oc apply -k deployment/kubernetes/overlays/openshift
 
@@ -311,26 +374,23 @@ Override in `deployment/kubernetes/overlays/openshift/deployment-patch.yaml`:
 
 ## Health Checks
 
-The deployment includes three types of health probes:
+The deployment includes two types of health probes:
 
 ### Liveness Probe
 - **Path**: `/q/health/live`
 - **Purpose**: Determines if pod should be restarted
 - **Initial Delay**: 30s
 - **Period**: 10s
+- **Timeout**: 3s
+- **Failure Threshold**: 3
 
 ### Readiness Probe
 - **Path**: `/q/health/ready`
 - **Purpose**: Determines if pod should receive traffic
 - **Initial Delay**: 30s
 - **Period**: 5s
-
-### Startup Probe
-- **Path**: `/q/health/started`
-- **Purpose**: Determines if application has started
-- **Initial Delay**: 5s
-- **Period**: 5s
-- **Failure Threshold**: 30 (max 150s startup time)
+- **Timeout**: 3s
+- **Failure Threshold**: 3
 
 ## Monitoring
 

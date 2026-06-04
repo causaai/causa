@@ -1,19 +1,25 @@
 #!/usr/bin/env bash
 #
-# setup-vertex-ai.sh - Automated Vertex AI Setup for Causa Backend
+# setup-vertex-ai.sh - Vertex AI ADC Setup for Development
 #
-# This script automates the setup of Google Vertex AI authentication for
-# Causa Backend on OpenShift or Kind clusters.
+# This script sets up Google Vertex AI authentication using Application Default
+# Credentials (ADC) for LOCAL, KIND, and OPENSHIFT development environments.
+#
+# ⚠️  FOR DEVELOPMENT/POC ONLY - DO NOT USE IN PRODUCTION
+# For production, see: docs/llm/vertex-ai-production-guide.md
 #
 # Usage:
-#   ./scripts/llm/setup-vertex-ai.sh --env [local|production] --project <gcp-project-id>
+#   ./scripts/llm/setup-vertex-ai.sh --env [local|kind|openshift] --project <gcp-project-id>
 #
 # Examples:
-#   # Local development (Kind) - uses ADC
+#   # Local development (no Kubernetes)
 #   ./scripts/llm/setup-vertex-ai.sh --env local --project my-gcp-project
 #
-#   # Production (OpenShift) - creates service account key
-#   ./scripts/llm/setup-vertex-ai.sh --env production --project my-gcp-project
+#   # KIND cluster development
+#   ./scripts/llm/setup-vertex-ai.sh --env kind --project my-gcp-project
+#
+#   # OpenShift development
+#   ./scripts/llm/setup-vertex-ai.sh --env openshift --project my-gcp-project
 #
 
 set -euo pipefail
@@ -25,21 +31,23 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 DEPLOYMENT_DIR="$PROJECT_ROOT/deployment/kubernetes"
+VERTEX_AI_DIR="$DEPLOYMENT_DIR/vertex-ai"
 
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Defaults
 ENV_TYPE=""
 GCP_PROJECT_ID=""
 K8S_NAMESPACE="diagnostics-tool"
-GCP_SA_NAME="causa-backend"
-VERTEX_LOCATION="global"
+VERTEX_LOCATION="us-east5"
 LLM_MODEL="claude-sonnet-4-6"
+ADC_FILE=""
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Functions
@@ -50,44 +58,93 @@ log_info() {
 }
 
 log_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $*"
+    echo -e "${GREEN}[✓]${NC} $*"
 }
 
 log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $*"
+    echo -e "${YELLOW}[⚠]${NC} $*"
 }
 
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $*" >&2
+    echo -e "${RED}[✗]${NC} $*" >&2
+}
+
+log_step() {
+    echo -e "${CYAN}[STEP]${NC} $*"
 }
 
 show_usage() {
     cat << EOF
-Usage: $0 --env <local|production> --project <gcp-project-id> [OPTIONS]
+Usage: $0 --env <local|kind|openshift> --project <gcp-project-id> [OPTIONS]
 
 Required Arguments:
-  --env          Environment type: 'local' (Kind) or 'production' (OpenShift)
+  --env          Environment: 'local', 'kind', or 'openshift'
   --project      Google Cloud Project ID
 
 Optional Arguments:
   --namespace    Kubernetes namespace (default: diagnostics-tool)
-  --sa-name      GCP service account name (default: causa-backend)
-  --location     Vertex AI location (default: global)
+  --location     Vertex AI location (default: us-east5)
   --model        Claude model name (default: claude-sonnet-4-6)
   --help         Show this help message
 
 Examples:
-  # Local development setup
+  # Local development (no Kubernetes)
   $0 --env local --project my-gcp-project
 
-  # Production setup with custom namespace
-  $0 --env production --project my-gcp-project --namespace my-namespace
+  # KIND cluster (generates YAMLs in deployment/kubernetes/vertex-ai/)
+  $0 --env kind --project my-gcp-project
+
+  # OpenShift development (generates YAMLs in deployment/kubernetes/vertex-ai/)
+  $0 --env openshift --project my-gcp-project
 
 EOF
 }
 
+detect_adc_file() {
+    log_step "Detecting Application Default Credentials..."
+
+    # Detect OS and set ADC path
+    case "$(uname -s)" in
+        Darwin|Linux)
+            ADC_FILE="$HOME/.config/gcloud/application_default_credentials.json"
+            ;;
+        CYGWIN*|MINGW*|MSYS*)
+            ADC_FILE="$APPDATA/gcloud/application_default_credentials.json"
+            ;;
+        *)
+            log_error "Unsupported OS: $(uname -s)"
+            exit 1
+            ;;
+    esac
+
+    if [ ! -f "$ADC_FILE" ]; then
+        log_error "ADC file not found: $ADC_FILE"
+        log_error ""
+        log_error "Please run: gcloud auth application-default login"
+        log_error "Then try this script again."
+        exit 1
+    fi
+
+    log_success "ADC file found: $ADC_FILE"
+}
+
+validate_adc_credentials() {
+    log_step "Validating ADC credentials..."
+
+    if ! gcloud auth application-default print-access-token &> /dev/null; then
+        log_error "ADC credentials are invalid or expired"
+        log_error ""
+        log_error "Please re-authenticate:"
+        log_error "  gcloud auth application-default login"
+        log_error "  gcloud auth application-default set-quota-project $GCP_PROJECT_ID"
+        exit 1
+    fi
+
+    log_success "ADC credentials are valid"
+}
+
 check_prerequisites() {
-    log_info "Checking prerequisites..."
+    log_step "Checking prerequisites..."
 
     local missing_tools=()
 
@@ -95,8 +152,13 @@ check_prerequisites() {
         missing_tools+=("gcloud")
     fi
 
-    if ! command -v kubectl &> /dev/null; then
-        missing_tools+=("kubectl")
+    if [ "$ENV_TYPE" != "local" ]; then
+        if ! command -v kubectl &> /dev/null && ! command -v oc &> /dev/null; then
+            missing_tools+=("kubectl or oc")
+        fi
+        if ! command -v base64 &> /dev/null; then
+            missing_tools+=("base64")
+        fi
     fi
 
     if ! command -v jq &> /dev/null; then
@@ -105,7 +167,6 @@ check_prerequisites() {
 
     if [ ${#missing_tools[@]} -gt 0 ]; then
         log_error "Missing required tools: ${missing_tools[*]}"
-        log_error "Please install them and try again"
         exit 1
     fi
 
@@ -113,7 +174,7 @@ check_prerequisites() {
 }
 
 validate_gcp_project() {
-    log_info "Validating GCP project: $GCP_PROJECT_ID"
+    log_step "Validating GCP project: $GCP_PROJECT_ID"
 
     if ! gcloud projects describe "$GCP_PROJECT_ID" &> /dev/null; then
         log_error "GCP project '$GCP_PROJECT_ID' not found or no access"
@@ -125,9 +186,10 @@ validate_gcp_project() {
 }
 
 check_vertex_ai_api() {
-    log_info "Checking Vertex AI API status..."
+    log_step "Checking Vertex AI API..."
 
-    if ! gcloud services list --enabled --project="$GCP_PROJECT_ID" --filter="name:aiplatform.googleapis.com" --format="value(name)" | grep -q aiplatform; then
+    if ! gcloud services list --enabled --project="$GCP_PROJECT_ID" \
+         --filter="name:aiplatform.googleapis.com" --format="value(name)" | grep -q aiplatform; then
         log_warn "Vertex AI API not enabled"
         log_info "Enabling Vertex AI API..."
 
@@ -138,42 +200,16 @@ check_vertex_ai_api() {
             exit 1
         fi
     else
-        log_success "Vertex AI API already enabled"
+        log_success "Vertex AI API is enabled"
     fi
 }
 
-setup_local_adc() {
-    log_info "Setting up Application Default Credentials for local development..."
+grant_user_permissions() {
+    log_step "Checking user permissions..."
 
-    # Check if ADC is already configured
-    if [ -f "$HOME/.config/gcloud/application_default_credentials.json" ]; then
-        log_warn "ADC already configured"
-        read -p "Do you want to re-authenticate? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            log_info "Skipping ADC setup"
-            return 0
-        fi
-    fi
-
-    log_info "Running: gcloud auth application-default login"
-    log_info "A browser window will open for authentication..."
-
-    if ! gcloud auth application-default login; then
-        log_error "ADC authentication failed"
-        exit 1
-    fi
-
-    log_info "Setting quota project..."
-    if gcloud auth application-default set-quota-project "$GCP_PROJECT_ID"; then
-        log_success "ADC configured successfully"
-    else
-        log_warn "Failed to set quota project (non-fatal)"
-    fi
-
-    # Grant user aiplatform.user role
     local user_email
-    user_email=$(gcloud config get-value account)
+    user_email=$(gcloud config get-value account 2>/dev/null)
+
     log_info "Granting aiplatform.user role to $user_email..."
 
     if gcloud projects add-iam-policy-binding "$GCP_PROJECT_ID" \
@@ -183,123 +219,12 @@ setup_local_adc() {
         &> /dev/null; then
         log_success "Permissions granted"
     else
-        log_warn "Failed to grant permissions (you may need project admin access)"
-    fi
-}
-
-create_gcp_service_account() {
-    log_info "Creating GCP service account: $GCP_SA_NAME..."
-
-    local sa_email="$GCP_SA_NAME@$GCP_PROJECT_ID.iam.gserviceaccount.com"
-
-    # Check if service account already exists
-    if gcloud iam service-accounts describe "$sa_email" --project="$GCP_PROJECT_ID" &> /dev/null; then
-        log_warn "Service account already exists: $sa_email"
-        return 0
-    fi
-
-    if gcloud iam service-accounts create "$GCP_SA_NAME" \
-        --display-name="Causa Backend LLM (Production)" \
-        --description="Service account for Causa Backend Vertex AI access on OpenShift" \
-        --project="$GCP_PROJECT_ID"; then
-        log_success "Service account created: $sa_email"
-    else
-        log_error "Failed to create service account"
-        exit 1
-    fi
-}
-
-grant_vertex_ai_permissions() {
-    log_info "Granting Vertex AI permissions..."
-
-    local sa_email="$GCP_SA_NAME@$GCP_PROJECT_ID.iam.gserviceaccount.com"
-
-    if gcloud projects add-iam-policy-binding "$GCP_PROJECT_ID" \
-        --member="serviceAccount:$sa_email" \
-        --role="roles/aiplatform.user" \
-        --condition=None \
-        &> /dev/null; then
-        log_success "Permissions granted to $sa_email"
-    else
-        log_error "Failed to grant permissions"
-        exit 1
-    fi
-}
-
-download_service_account_key() {
-    log_info "Downloading service account key..."
-
-    local sa_email="$GCP_SA_NAME@$GCP_PROJECT_ID.iam.gserviceaccount.com"
-    local key_file="$PROJECT_ROOT/causa-backend-sa-key.json"
-
-    if [ -f "$key_file" ]; then
-        log_warn "Key file already exists: $key_file"
-        read -p "Overwrite? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            log_info "Using existing key file"
-            return 0
-        fi
-    fi
-
-    if gcloud iam service-accounts keys create "$key_file" \
-        --iam-account="$sa_email" \
-        --project="$GCP_PROJECT_ID"; then
-        log_success "Service account key downloaded: $key_file"
-        log_warn "SECURITY: This file contains sensitive credentials!"
-        log_warn "DO NOT commit to Git. Delete after creating K8s secret."
-    else
-        log_error "Failed to download service account key"
-        exit 1
-    fi
-}
-
-create_k8s_secrets() {
-    log_info "Creating Kubernetes secrets in namespace: $K8S_NAMESPACE..."
-
-    # Check if namespace exists
-    if ! kubectl get namespace "$K8S_NAMESPACE" &> /dev/null; then
-        log_warn "Namespace '$K8S_NAMESPACE' does not exist"
-        log_info "Creating namespace..."
-        kubectl create namespace "$K8S_NAMESPACE"
-    fi
-
-    # Secret 1: Vertex Project ID
-    log_info "Creating secret: causa-llm-secrets"
-    if kubectl create secret generic causa-llm-secrets \
-        --from-literal=VERTEX_PROJECT_ID="$GCP_PROJECT_ID" \
-        -n "$K8S_NAMESPACE" \
-        --dry-run=client -o yaml | kubectl apply -f -; then
-        log_success "Secret created: causa-llm-secrets"
-    else
-        log_error "Failed to create causa-llm-secrets"
-        exit 1
-    fi
-
-    # Secret 2: GCP Service Account Key (production only)
-    if [ "$ENV_TYPE" = "production" ]; then
-        local key_file="$PROJECT_ROOT/causa-backend-sa-key.json"
-
-        if [ ! -f "$key_file" ]; then
-            log_error "Key file not found: $key_file"
-            exit 1
-        fi
-
-        log_info "Creating secret: gcp-sa-key"
-        if kubectl create secret generic gcp-sa-key \
-            --from-file=key.json="$key_file" \
-            -n "$K8S_NAMESPACE" \
-            --dry-run=client -o yaml | kubectl apply -f -; then
-            log_success "Secret created: gcp-sa-key"
-        else
-            log_error "Failed to create gcp-sa-key"
-            exit 1
-        fi
+        log_warn "Failed to grant permissions (may already exist or insufficient access)"
     fi
 }
 
 update_configmap() {
-    log_info "Updating ConfigMap..."
+    log_step "Updating ConfigMap..."
 
     local configmap_file="$DEPLOYMENT_DIR/base/configmap.yaml"
 
@@ -309,121 +234,260 @@ update_configmap() {
     fi
 
     # Backup original
-    cp "$configmap_file" "$configmap_file.bak"
+    cp "$configmap_file" "$configmap_file.bak.$(date +%Y%m%d_%H%M%S)"
 
-    # Update values using sed (portable)
+    # Update values
     sed -i.tmp "s|LLM_PROVIDER:.*|LLM_PROVIDER: \"vertex-ai-anthropic\"|" "$configmap_file"
     sed -i.tmp "s|LLM_MODEL_NAME:.*|LLM_MODEL_NAME: \"$LLM_MODEL\"|" "$configmap_file"
     sed -i.tmp "s|VERTEX_LOCATION:.*|VERTEX_LOCATION: \"$VERTEX_LOCATION\"|" "$configmap_file"
     rm -f "$configmap_file.tmp"
 
-    log_success "ConfigMap updated: $configmap_file"
+    log_success "ConfigMap updated"
 }
 
-create_deployment_patch() {
-    if [ "$ENV_TYPE" != "production" ]; then
-        return 0
-    fi
+generate_secret_yamls() {
+    log_step "Generating secret YAMLs..."
 
-    log_info "Creating deployment patch for service account key mount..."
+    local output_dir="$VERTEX_AI_DIR/generated"
+    mkdir -p "$output_dir"
 
-    local overlay_dir="$DEPLOYMENT_DIR/overlays/openshift"
-    local patch_file="$overlay_dir/deployment-vertex-patch.yaml"
-
-    mkdir -p "$overlay_dir"
-
-    cat > "$patch_file" << 'EOF'
-apiVersion: apps/v1
-kind: Deployment
+    # Generate project ID secret
+    cat > "$output_dir/causa-llm-secrets.yaml" << EOFYAML
+apiVersion: v1
+kind: Secret
 metadata:
-  name: causa-backend
-spec:
-  template:
-    spec:
-      containers:
-      - name: causa-backend
-        env:
-        - name: GOOGLE_APPLICATION_CREDENTIALS
-          value: /var/secrets/google/key.json
-        volumeMounts:
-        - name: gcp-sa-key
-          mountPath: /var/secrets/google
-          readOnly: true
-      volumes:
-      - name: gcp-sa-key
-        secret:
-          secretName: gcp-sa-key
-          items:
-          - key: key.json
-            path: key.json
-EOF
+  name: causa-llm-secrets
+  namespace: $K8S_NAMESPACE
+  labels:
+    app.kubernetes.io/name: causa-backend
+    app.kubernetes.io/component: secret
+type: Opaque
+stringData:
+  VERTEX_PROJECT_ID: "$GCP_PROJECT_ID"
+EOFYAML
 
-    log_success "Patch created: $patch_file"
+    log_success "Created: $output_dir/causa-llm-secrets.yaml"
 
-    # Update kustomization.yaml
-    local kustomization_file="$overlay_dir/kustomization.yaml"
+    # Generate ADC secret
+    local adc_base64
+    adc_base64=$(base64 < "$ADC_FILE" | tr -d '\n')
 
-    if [ -f "$kustomization_file" ]; then
-        if ! grep -q "deployment-vertex-patch.yaml" "$kustomization_file"; then
-            log_info "Adding patch to kustomization.yaml..."
-            # Add to patchesStrategicMerge if not already there
-            if grep -q "patchesStrategicMerge:" "$kustomization_file"; then
-                sed -i.tmp '/patchesStrategicMerge:/a\
-  - deployment-vertex-patch.yaml' "$kustomization_file"
-            else
-                echo "" >> "$kustomization_file"
-                echo "patchesStrategicMerge:" >> "$kustomization_file"
-                echo "  - deployment-vertex-patch.yaml" >> "$kustomization_file"
-            fi
-            rm -f "$kustomization_file.tmp"
-            log_success "Kustomization updated"
-        fi
-    fi
+    cat > "$output_dir/gcp-adc-credentials.yaml" << EOFYAML
+apiVersion: v1
+kind: Secret
+metadata:
+  name: gcp-adc-credentials
+  namespace: $K8S_NAMESPACE
+  labels:
+    app.kubernetes.io/name: causa-backend
+    app.kubernetes.io/component: secret
+    causa.dev/auth-type: adc
+    causa.dev/purpose: development
+type: Opaque
+data:
+  application_default_credentials.json: $adc_base64
+EOFYAML
+
+    log_success "Created: $output_dir/gcp-adc-credentials.yaml"
 }
 
-show_summary() {
-    echo ""
-    log_success "══════════════════════════════════════════════════════════════"
-    log_success "  Vertex AI Setup Complete!"
-    log_success "══════════════════════════════════════════════════════════════"
-    echo ""
-    log_info "Configuration:"
-    log_info "  Environment:     $ENV_TYPE"
-    log_info "  GCP Project:     $GCP_PROJECT_ID"
-    log_info "  Namespace:       $K8S_NAMESPACE"
-    log_info "  Model:           $LLM_MODEL"
-    log_info "  Location:        $VERTEX_LOCATION"
-    echo ""
+generate_patch_yaml() {
+    log_step "Generating deployment patch..."
 
-    if [ "$ENV_TYPE" = "local" ]; then
-        log_info "Next steps (Local):"
-        log_info "  1. Run locally:"
-        log_info "     export VERTEX_PROJECT_ID=$GCP_PROJECT_ID"
-        log_info "     export LLM_PROVIDER=vertex-ai-anthropic"
-        log_info "     ./mvnw quarkus:dev"
-        echo ""
-        log_info "  2. Or deploy to Kind:"
-        log_info "     kubectl apply -k deployment/kubernetes/overlays/kind"
-    else
-        log_info "Next steps (Production):"
-        log_info "  1. Deploy to OpenShift:"
-        log_info "     oc apply -k deployment/kubernetes/overlays/openshift"
-        echo ""
-        log_info "  2. Watch rollout:"
-        log_info "     oc rollout status deployment/causa-backend -n $K8S_NAMESPACE"
-        echo ""
-        log_info "  3. Check logs:"
-        log_info "     oc logs -f deployment/causa-backend -n $K8S_NAMESPACE | grep LLM"
-        echo ""
-        log_warn "  4. SECURITY: Delete local key file after deployment:"
-        log_warn "     shred -u $PROJECT_ROOT/causa-backend-sa-key.json"
+    local output_dir="$VERTEX_AI_DIR/generated"
+
+    # Copy deployment patch
+    cp "$VERTEX_AI_DIR/deployment-adc-patch.yaml" "$output_dir/deployment-adc-patch.yaml"
+    log_success "Created: $output_dir/deployment-adc-patch.yaml"
+}
+
+generate_apply_script() {
+    log_step "Generating apply script..."
+
+    local output_dir="$VERTEX_AI_DIR/generated"
+    local cmd="kubectl"
+    local deployment_name="causa-backend"
+
+    if [ "$ENV_TYPE" = "openshift" ]; then
+        cmd="oc"
+        deployment_name="ocp-causa-backend"
     fi
 
-    echo ""
-    log_info "Documentation:"
-    log_info "  Local Setup:      docs/llm/vertex-ai-local-setup.md"
-    log_info "  Production Setup: docs/llm/vertex-ai-openshift-setup.md"
-    echo ""
+    cat > "$output_dir/apply.sh" << EOFAPPLY
+#!/usr/bin/env bash
+#
+# Apply Vertex AI ADC configuration to $ENV_TYPE cluster
+#
+# This script:
+# 1. Ensures base deployment exists
+# 2. Applies ADC secrets
+# 3. Patches deployment to mount secrets
+# 4. Restarts deployment
+#
+
+set -euo pipefail
+
+NAMESPACE="$K8S_NAMESPACE"
+CMD="$cmd"
+DEPLOYMENT_NAME="$deployment_name"
+
+echo "Applying Vertex AI ADC configuration..."
+
+# Step 1: Check if base deployment exists, if not deploy it
+if ! \$CMD get deployment \$DEPLOYMENT_NAME -n \$NAMESPACE &> /dev/null; then
+    echo "Base deployment not found, deploying from overlay..."
+    \$CMD apply -k ../../overlays/$ENV_TYPE
+    echo "Waiting for deployment to be created..."
+    sleep 5
+fi
+
+# Step 2: Apply secrets
+echo "Applying secrets..."
+\$CMD apply -f causa-llm-secrets.yaml
+\$CMD apply -f gcp-adc-credentials.yaml
+
+# Step 3: Patch deployment
+echo "Patching deployment with ADC configuration..."
+\$CMD patch deployment \$DEPLOYMENT_NAME -n \$NAMESPACE --patch-file deployment-adc-patch.yaml
+
+# Step 4: Restart deployment
+echo "Restarting deployment..."
+\$CMD rollout restart deployment/\$DEPLOYMENT_NAME -n \$NAMESPACE
+
+# Step 5: Wait for rollout
+echo "Waiting for rollout to complete..."
+\$CMD rollout status deployment/\$DEPLOYMENT_NAME -n \$NAMESPACE --timeout=3m
+
+echo "✓ Vertex AI ADC configuration applied successfully!"
+echo ""
+echo "Verify deployment:"
+echo "  \$CMD get pods -n \$NAMESPACE"
+echo "  \$CMD logs -f deployment/\$DEPLOYMENT_NAME -n \$NAMESPACE | grep LLM"
+EOFAPPLY
+
+    chmod +x "$output_dir/apply.sh"
+    log_success "Created: $output_dir/apply.sh"
+}
+
+setup_local() {
+    log_info ""
+    log_info "═══════════════════════════════════════════════════════════"
+    log_info "  LOCAL DEVELOPMENT SETUP"
+    log_info "═══════════════════════════════════════════════════════════"
+    log_info ""
+
+    detect_adc_file
+    validate_adc_credentials
+    grant_user_permissions
+    update_configmap
+
+    log_info ""
+    log_success "Local development setup complete!"
+    log_info ""
+    log_info "Next steps:"
+    log_info "  1. Export environment variables:"
+    log_info "     export VERTEX_PROJECT_ID=$GCP_PROJECT_ID"
+    log_info "     export LLM_PROVIDER=vertex-ai-anthropic"
+    log_info ""
+    log_info "  2. Run locally:"
+    log_info "     ./mvnw quarkus:dev"
+    log_info ""
+}
+
+setup_kind() {
+    log_info ""
+    log_info "═══════════════════════════════════════════════════════════"
+    log_info "  KIND CLUSTER SETUP"
+    log_info "═══════════════════════════════════════════════════════════"
+    log_info ""
+
+    detect_adc_file
+    validate_adc_credentials
+    grant_user_permissions
+    update_configmap
+    generate_secret_yamls
+    generate_patch_yaml
+    generate_apply_script
+
+    log_info ""
+    log_success "Configuration files generated successfully!"
+    log_info ""
+    log_info "Generated files in: deployment/kubernetes/vertex-ai/generated/"
+    log_info "  - causa-llm-secrets.yaml         (Vertex project ID)"
+    log_info "  - gcp-adc-credentials.yaml       (Your ADC credentials)"
+    log_info "  - deployment-adc-patch.yaml      (Deployment patch)"
+    log_info "  - apply.sh                       (Deployment script)"
+    log_info ""
+    log_info "Next steps:"
+    log_info ""
+    log_info "  1. Review the generated files:"
+    log_info "     cd deployment/kubernetes/vertex-ai/generated"
+    log_info "     cat causa-llm-secrets.yaml"
+    log_info "     cat deployment-adc-patch.yaml"
+    log_info ""
+    log_info "  2. Deploy to KIND:"
+    log_info "     cd deployment/kubernetes/vertex-ai/generated"
+    log_info "     ./apply.sh"
+    log_info ""
+    log_info "     Or manually:"
+    log_info "     kubectl apply -k ../../overlays/kind            # Deploy base first"
+    log_info "     kubectl apply -f causa-llm-secrets.yaml"
+    log_info "     kubectl apply -f gcp-adc-credentials.yaml"
+    log_info "     kubectl patch deployment causa-backend -n $K8S_NAMESPACE \\"
+    log_info "       --patch-file deployment-adc-patch.yaml"
+    log_info "     kubectl rollout restart deployment/causa-backend -n $K8S_NAMESPACE"
+    log_info ""
+    log_info "  3. Verify:"
+    log_info "     kubectl logs -f deployment/causa-backend -n $K8S_NAMESPACE | grep LLM"
+    log_info ""
+}
+
+setup_openshift() {
+    log_info ""
+    log_info "═══════════════════════════════════════════════════════════"
+    log_info "  OPENSHIFT CLUSTER SETUP"
+    log_info "═══════════════════════════════════════════════════════════"
+    log_info ""
+
+    detect_adc_file
+    validate_adc_credentials
+    grant_user_permissions
+    update_configmap
+    generate_secret_yamls
+    generate_patch_yaml
+    generate_apply_script
+
+    log_info ""
+    log_success "Configuration files generated successfully!"
+    log_info ""
+    log_info "Generated files in: deployment/kubernetes/vertex-ai/generated/"
+    log_info "  - causa-llm-secrets.yaml         (Vertex project ID)"
+    log_info "  - gcp-adc-credentials.yaml       (Your ADC credentials)"
+    log_info "  - deployment-adc-patch.yaml      (Deployment patch)"
+    log_info "  - apply.sh                       (Deployment script)"
+    log_info ""
+    log_info "Next steps:"
+    log_info ""
+    log_info "  1. Review the generated files:"
+    log_info "     cd deployment/kubernetes/vertex-ai/generated"
+    log_info "     cat causa-llm-secrets.yaml"
+    log_info "     cat deployment-adc-patch.yaml"
+    log_info ""
+    log_info "  2. Deploy to OpenShift:"
+    log_info "     cd deployment/kubernetes/vertex-ai/generated"
+    log_info "     ./apply.sh"
+    log_info ""
+    log_info "     Or manually:"
+    log_info "     oc apply -k ../../overlays/openshift           # Deploy base first"
+    log_info "     oc apply -f causa-llm-secrets.yaml"
+    log_info "     oc apply -f gcp-adc-credentials.yaml"
+    log_info "     oc patch deployment ocp-causa-backend -n $K8S_NAMESPACE \\"
+    log_info "       --patch-file deployment-adc-patch.yaml"
+    log_info "     oc rollout restart deployment/ocp-causa-backend -n $K8S_NAMESPACE"
+    log_info ""
+    log_info "  3. Verify:"
+    log_info "     oc logs -f deployment/ocp-causa-backend -n $K8S_NAMESPACE | grep LLM"
+    log_info ""
 }
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -444,10 +508,6 @@ main() {
                 ;;
             --namespace)
                 K8S_NAMESPACE="$2"
-                shift 2
-                ;;
-            --sa-name)
-                GCP_SA_NAME="$2"
                 shift 2
                 ;;
             --location)
@@ -477,30 +537,39 @@ main() {
         exit 1
     fi
 
-    if [ "$ENV_TYPE" != "local" ] && [ "$ENV_TYPE" != "production" ]; then
+    if [[ ! "$ENV_TYPE" =~ ^(local|kind|openshift)$ ]]; then
         log_error "Invalid environment type: $ENV_TYPE"
-        log_error "Must be 'local' or 'production'"
+        log_error "Must be 'local', 'kind', or 'openshift'"
         exit 1
     fi
 
-    # Run setup
+    # Show configuration
+    log_info ""
+    log_info "Configuration:"
+    log_info "  Environment:     $ENV_TYPE"
+    log_info "  GCP Project:     $GCP_PROJECT_ID"
+    log_info "  Namespace:       $K8S_NAMESPACE"
+    log_info "  Vertex Location: $VERTEX_LOCATION"
+    log_info "  Model:           $LLM_MODEL"
+    log_info ""
+
+    # Run prerequisites
     check_prerequisites
     validate_gcp_project
     check_vertex_ai_api
 
-    if [ "$ENV_TYPE" = "local" ]; then
-        setup_local_adc
-    else
-        create_gcp_service_account
-        grant_vertex_ai_permissions
-        download_service_account_key
-    fi
-
-    create_k8s_secrets
-    update_configmap
-    create_deployment_patch
-
-    show_summary
+    # Run environment-specific setup
+    case $ENV_TYPE in
+        local)
+            setup_local
+            ;;
+        kind)
+            setup_kind
+            ;;
+        openshift)
+            setup_openshift
+            ;;
+    esac
 }
 
 main "$@"

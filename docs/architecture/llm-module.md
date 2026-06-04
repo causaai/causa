@@ -198,7 +198,7 @@ sequenceDiagram
 |---------|---------|---------|-------------------|
 | **LangChain4J Core** | 1.15.1 | AI orchestration framework, unified ChatModel interface | `dev.langchain4j:langchain4j:1.15.1` |
 | **LangChain4J Anthropic** | 1.15.1 | Direct Anthropic API integration (uses HTTP + API key) | `dev.langchain4j:langchain4j-anthropic:1.15.1` |
-| **LangChain4J Vertex AI Anthropic** | 1.11.0-beta19 | Google Cloud Vertex AI integration for Claude (uses Google ADC) | `dev.langchain4j:langchain4j-vertex-ai-anthropic:1.11.0-beta19` |
+| **LangChain4J Vertex AI Anthropic** | 1.15.1-beta25 | Google Cloud Vertex AI integration for Claude (uses Google ADC) | `dev.langchain4j:langchain4j-vertex-ai-anthropic:1.15.1-beta25` |
 | **Quarkus SmallRye Config** | 3.36.1 | Type-safe configuration via @ConfigMapping | Built-in to Quarkus platform |
 | **Quarkus SmallRye Health** | 3.36.1 | MicroProfile Health checks for readiness probes | Built-in to Quarkus platform |
 
@@ -233,7 +233,7 @@ Causa Backend reads configuration from **two sources** with strict separation of
    ├─> LLM_MODEL_NAME=claude-sonnet-4-6
    ├─> LLM_TEMPERATURE=0.1
    ├─> LLM_MAX_TOKENS=4096
-   └─> VERTEX_LOCATION=global
+   └─> VERTEX_LOCATION=us-east5
 
 2. Kubernetes Secret (causa-llm-secrets)
    ├─> LLM_API_KEY=sk-ant-...          (for anthropic provider)

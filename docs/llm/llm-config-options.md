@@ -234,26 +234,26 @@ gcloud projects list
 
 **Type:** String
 
-**Default:** `global`
+**Default:** `us-east5`
 
-**Script Default:** `global` (in `scripts/llm/setup-vertex-ai.sh`)
+**Script Default:** `us-east5` (in `scripts/llm/setup-vertex-ai.sh`)
 
 **Valid Values:**
-- `global` — Global endpoint (recommended, used by setup script)
-- `us-east5` — US East (South Carolina)
+- `us-east5` — US East (South Carolina) ✅ **Recommended, default**
 - `us-central1` — US Central (Iowa)
 - `europe-west1` — Europe West (Belgium)
 - `asia-southeast1` — Asia Southeast (Singapore)
 
 **Example:**
 ```bash
-export VERTEX_LOCATION=global
+export VERTEX_LOCATION=us-east5
 ```
 
 **Notes:**
-- `global` provides best availability with no price premium
-- Regional endpoints useful for data residency requirements
-- Multi-region (`us`, `eu`) available but 10% price premium
+- ⚠️ **`global` is NOT a valid location for Claude on Vertex AI** (will return 404 errors)
+- Regional endpoints required for Claude models
+- Choose region closest to your deployment for lower latency
+- All regions have same pricing for Claude via Vertex AI
 
 ---
 
@@ -263,22 +263,22 @@ export VERTEX_LOCATION=global
 
 **Authentication methods (in order of precedence):**
 
-1. **Application Default Credentials (ADC)** — For local development
+1. **Application Default Credentials (ADC)** — For development (local/KIND/OpenShift)
    ```bash
    gcloud auth application-default login
    gcloud auth application-default set-quota-project <PROJECT_ID>
    ```
-   📖 **See:** [Vertex AI Local Setup Guide](vertex-ai-local-setup.md) for detailed ADC configuration
+   📖 **See:** [Vertex AI Non-Production Guide](vertex-ai-non-production-guide.md) for detailed ADC configuration
 
 2. **Service Account Key File** — For production (OpenShift/Kubernetes)
    ```bash
    export GOOGLE_APPLICATION_CREDENTIALS=/var/secrets/google/key.json
    ```
-   📖 **See:** [Vertex AI OpenShift Setup Guide](vertex-ai-openshift-setup.md) for production deployment
+   📖 **See:** [Vertex AI Production Guide](vertex-ai-production-guide.md) for production deployment (reference only, not yet fully tested)
 
 **Quick Setup:**
-- **Automated Script:** Use `[setup-vertex-ai.sh](../../scripts/llm/setup-vertex-ai.sh)]` for both local and production setups
-- **Manual Setup:** Follow the detailed guides linked above
+- **Automated Script:** Use [setup-vertex-ai.sh](../../scripts/llm/setup-vertex-ai.sh) for development setups (local/kind/openshift)
+- **Manual Setup:** Follow the [Vertex AI Non-Production Guide](vertex-ai-non-production-guide.md)
 
 ---
 
@@ -441,7 +441,7 @@ LLM_TIMEOUT_SECONDS=60
 - Google Cloud credentials configured (ADC or service account)
 
 **Optional:**
-- `VERTEX_LOCATION` (default: `global`)
+- `VERTEX_LOCATION` (default: `us-east5`)
 - `LLM_MODEL_NAME` (default: `claude-sonnet-4-6`)
 - `LLM_TEMPERATURE` (default: `0.1`)
 - `LLM_MAX_TOKENS` (default: `4096`)
@@ -451,7 +451,7 @@ LLM_TIMEOUT_SECONDS=60
 ```bash
 LLM_PROVIDER=vertex-ai-anthropic
 VERTEX_PROJECT_ID=my-gcp-project-123456
-VERTEX_LOCATION=global
+VERTEX_LOCATION=us-east5
 LLM_MODEL_NAME=claude-sonnet-4-6
 ```
 
