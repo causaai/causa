@@ -22,7 +22,9 @@ data:
   LLM_CHAT_MEMORY_SIZE: "25"
 
   # Vertex AI Configuration (Public settings)
-  VERTEX_LOCATION: "global"
+  # Valid regions: us-east5, us-central1, europe-west1, asia-southeast1
+  # Note: 'global' is NOT valid for Claude on Vertex AI
+  VERTEX_LOCATION: "us-east5"
 
   # Optional overrides (leave empty to use defaults)
   LLM_BASE_URL: ""

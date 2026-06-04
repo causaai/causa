@@ -1,0 +1,30 @@
+# Vertex AI ADC Deployment Patch Template
+#
+# This patch is applied dynamically by setup-vertex-ai.sh script.
+# DO NOT apply manually or add to kustomization.yaml
+#
+# The script uses kubectl patch or oc patch to apply this configuration.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: causa-backend
+spec:
+  template:
+    spec:
+      containers:
+      - name: causa-backend
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /var/secrets/google/application_default_credentials.json
+        volumeMounts:
+        - name: gcp-adc-credentials
+          mountPath: /var/secrets/google
+          readOnly: true
+      volumes:
+      - name: gcp-adc-credentials
+        secret:
+          secretName: gcp-adc-credentials
+          items:
+          - key: application_default_credentials.json
+            path: application_default_credentials.json

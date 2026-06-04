@@ -28,7 +28,7 @@ patches:
 images:
   - name: quay.io/rh-ee-shesaxen/causa-backend
     newName: quay.io/rh-ee-shesaxen/causa-backend
-    newTag: shekhar_t1
+    newTag: shekhar_t2
 
 replicas:
   - name: causa-backend
