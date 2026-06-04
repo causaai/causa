@@ -49,7 +49,7 @@ Causa is built as a Java-based microservice, utilizing an event-driven architect
 
 ## 🤝 Contributing
 
-📖 **[Contribution Guide](docs/development/contribution-guide.md)**
+📖 **[Getting Started Guide](docs/development/getting-started.md)**
 
 ---
 

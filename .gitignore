@@ -60,3 +60,25 @@ temp/
 *.tmp
 *.swp
 *~
+
+# Secrets and Credentials
+*.pem
+*.key
+*.p12
+*.pfx
+*-key.json
+sa-key.json
+causa-backend-sa-key.json
+service-account*.json
+.env
+.env.*
+!.env.example
+
+# GCP Application Default Credentials
+gcloud/
+.config/gcloud/application_default_credentials.json
+
+# Kubernetes Secrets (real values)
+deployment/kubernetes/secrets/*-secret-real.yaml
+deployment/kubernetes/secrets/my-*.yaml
+deployment/kubernetes/vertex-ai/generated/
