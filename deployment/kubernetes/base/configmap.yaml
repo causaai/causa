@@ -7,18 +7,27 @@ metadata:
     app.kubernetes.io/component: config
 data:
   # Application Configuration
-  CAUSA_PORT: "8080"
   CAUSA_LOG_LEVEL: "INFO"
-
-  # Swagger/OpenAPI Configuration
-  CAUSA_SWAGGER_UI_PATH: "/swagger-ui"
 
   # Database Configuration
   CAUSA_DB_URL: "jdbc:postgresql://diagnostics-tool-db-rw.diagnostics-tool.svc.cluster.local:5432/diagnostics-tool-db"
 
-  # LLM Configuration (placeholder)
-  # CAUSA_LLM_PROVIDER: "anthropic"
-  # CAUSA_LLM_MODEL: "claude-3-5-sonnet-20241022"
+  # LLM Configuration (Public settings - non-sensitive)
+  # Provider: anthropic (direct API) | vertex-ai-anthropic (Google Cloud) | ibm-bob (future) | ollama (future)
+  LLM_PROVIDER: "vertex-ai-anthropic"
+  LLM_MODEL_NAME: "claude-sonnet-4-6"
+  LLM_TEMPERATURE: "0.1"
+  LLM_MAX_TOKENS: "8192"
+  LLM_TIMEOUT_SECONDS: "60"
+  LLM_CHAT_MEMORY_SIZE: "25"
+
+  # Vertex AI Configuration (Public settings)
+  VERTEX_LOCATION: "global"
+
+  # Optional overrides (leave empty to use defaults)
+  LLM_BASE_URL: ""
+  LLM_AUTH_TYPE: ""
+  LLM_CUSTOM_HEADERS: ""
 
   # MCP Configuration (placeholder)
   # CAUSA_MCP_SERVERS: "kruize,cryostat,kubernetes"
