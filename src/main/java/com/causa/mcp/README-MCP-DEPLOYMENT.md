@@ -28,14 +28,14 @@ The Kubernetes MCP Server is a tool that provides a standardized interface for A
      ```
 
 2. **Access to OpenShift Cluster**
-   - Cluster API: `https://api.cluster-n7mbm.n7mbm.sandbox983.opentlc.com:6443`
+   - Cluster API: `https://api.<your-cluster>.opentlc.com:6443`
    - Namespace: `diagnostics-tool`
    - Cluster-admin access required
 
 ### Cluster Information
 
 ```
-OpenShift Console: https://console-openshift-console.apps.cluster-n7mbm.n7mbm.sandbox983.opentlc.com
+OpenShift Console: `https://console-openshift-console.apps.<your-cluster>.opentlc.com`
 API Server: https://api.cluster-n7mbm.n7mbm.sandbox983.opentlc.com:6443
 Namespace: diagnostics-tool
 ```
