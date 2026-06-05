@@ -26,6 +26,12 @@ OPENSHIFT_CONSOLE="https://console-openshift-console.apps.<your-cluster-domain>"
 # The namespace where MCP server will be deployed
 NAMESPACE="diagnostics-tool"
 
+# TLS Verification
+# Set to "true" to skip TLS certificate verification (NOT recommended for production)
+# Only use this for local/development clusters without proper CA certificates
+# Default: false (TLS verification enabled)
+SKIP_TLS_VERIFY="${SKIP_TLS_VERIFY:-false}"
+
 ##############################################################################
 # Usage Instructions:
 #

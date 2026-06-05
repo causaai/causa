@@ -92,6 +92,22 @@ check_prerequisites() {
         exit 1
     fi
     print_success "Deployment file found"
+    
+    # Validate required configuration variables
+    if [ -z "$OPENSHIFT_API" ]; then
+        print_error "OPENSHIFT_API is not set. Please configure it in mcp-config.local.sh/mcp-config.sh"
+        echo "Example: OPENSHIFT_API=\"https://api.your-cluster.example.com:6443\""
+        exit 1
+    fi
+    print_success "OPENSHIFT_API is configured"
+    
+    if [ -z "$OPENSHIFT_TOKEN" ]; then
+        print_error "OPENSHIFT_TOKEN is not set. Please set it as an environment variable"
+        echo "Example: export OPENSHIFT_TOKEN=\"your-token-here\""
+        echo "Or get a token: oc create token cluster-admin -n openshift-config --duration=24h"
+        exit 1
+    fi
+    print_success "OPENSHIFT_TOKEN is configured"
 }
 
 login_to_openshift() {
@@ -99,7 +115,19 @@ login_to_openshift() {
     
     print_info "Logging in to: $OPENSHIFT_API"
     
-    if oc login --server="$OPENSHIFT_API" --token="$OPENSHIFT_TOKEN" --insecure-skip-tls-verify=true; then
+    # Configure TLS verification behavior for oc login.
+    # By default, TLS verification is enforced. To skip verification (e.g. for
+    # local/non-production clusters without a proper CA bundle), set SKIP_TLS_VERIFY=true.
+    local oc_login_args=(--server="$OPENSHIFT_API" --token="$OPENSHIFT_TOKEN")
+    
+    if [ "${SKIP_TLS_VERIFY:-false}" = "true" ]; then
+        print_warning "SKIP_TLS_VERIFY=true - proceeding with insecure TLS (certificate verification disabled)"
+        oc_login_args+=(--insecure-skip-tls-verify=true)
+    else
+        print_info "TLS certificate verification enabled (use SKIP_TLS_VERIFY=true to disable for non-production)"
+    fi
+    
+    if oc login "${oc_login_args[@]}"; then
         print_success "Successfully logged into OpenShift cluster"
     else
         print_error "Failed to login to OpenShift cluster"

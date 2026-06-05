@@ -46,19 +46,21 @@ cp mcp-config.sh mcp-config.local.sh
 nano mcp-config.local.sh  # or use your preferred editor
 ```
 
-#### **Step 2: Update These 4 Variables in `mcp-config.local.sh`**
+#### **Step 2: Update These Variables in `mcp-config.local.sh`**
 
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `OPENSHIFT_API` | Your cluster API URL | `https://api.cluster-abc123.example.com:6443` |
-| `OPENSHIFT_TOKEN` | Authentication token (use env var) | Set via: `export OPENSHIFT_TOKEN="your-token"` |
-| `OPENSHIFT_CONSOLE` | Console URL (for reference) | `https://console-openshift-console.apps.cluster-abc123.example.com` |
-| `NAMESPACE` | Target namespace | `diagnostics-tool` |
+| Variable | Description | Example | Required |
+|----------|-------------|---------|----------|
+| `OPENSHIFT_API` | Your cluster API URL | `https://api.cluster-abc123.example.com:6443` | ✅ Yes |
+| `OPENSHIFT_TOKEN` | Authentication token (use env var) | Set via: `export OPENSHIFT_TOKEN="your-token"` | ✅ Yes |
+| `OPENSHIFT_CONSOLE` | Console URL (for reference) | `https://console-openshift-console.apps.cluster-abc123.example.com` | ℹ️ Optional |
+| `NAMESPACE` | Target namespace | `diagnostics-tool` | ℹ️ Optional |
+| `SKIP_TLS_VERIFY` | Skip TLS certificate verification | `false` (default) or `true` | ℹ️ Optional |
 
-**Security Note:**
+**Security Notes:**
 - ✅ `mcp-config.local.sh` is gitignored - safe for local use
 - ✅ Never commit real tokens to git
 - ✅ Use environment variables for sensitive data: `export OPENSHIFT_TOKEN="your-token"`
+- ⚠️ **TLS Verification:** By default, TLS certificate verification is **enabled** (secure). Only set `SKIP_TLS_VERIFY=true` for local/development clusters without proper CA certificates. **Never use this in production!**
 
 #### **Configuration File Locations:**
 
@@ -74,6 +76,25 @@ nano mcp-config.local.sh  # or use your preferred editor
 
 # Option 2: Create a temporary token (24 hours)
 oc create token cluster-admin -n openshift-config --duration=24h
+
+
+### TLS Certificate Verification
+
+By default, the deployment script enforces TLS certificate verification for secure connections to your OpenShift cluster. This is the **recommended setting for production environments**.
+
+**For Development/Local Clusters:**
+
+If you're using a local or development cluster without proper CA certificates, you can disable TLS verification:
+
+```bash
+# In mcp-config.local.sh
+SKIP_TLS_VERIFY="true"
+
+# Or as environment variable
+export SKIP_TLS_VERIFY="true"
+```
+
+**⚠️ Security Warning:** Never use `SKIP_TLS_VERIFY=true` in production environments as it disables certificate verification and makes your connection vulnerable to man-in-the-middle attacks.
 
 # Option 3: Use existing login
 oc whoami -t
