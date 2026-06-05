@@ -42,17 +42,20 @@ public record LlmRequest(
         enableCaching = enableCaching != null ? enableCaching : Optional.empty();
         maxTokens = maxTokens != null ? maxTokens : Optional.empty();
         temperature = temperature != null ? temperature : Optional.empty();
-        
-        validateLlmRequest();
+
+        // Validate using the normalized parameters
+        validateLlmRequest(temperature, maxTokens);
     }
 
     /**
      * Validates LLM request parameters.
      * Centralized validation method for easy extension in the future.
-     *
+     *  
+     * @param temperature the temperature parameter to validate
+     * @param maxTokens the maxTokens parameter to validate
      * @throws LlmException if any parameter is invalid
      */
-    private void validateLlmRequest() {
+    private static void validateLlmRequest(Optional<Double> temperature, Optional<Integer> maxTokens) {
         // Validate temperature range
         temperature.ifPresent(t -> {
             if (t < LlmConstants.Validation.MIN_TEMPERATURE || t > LlmConstants.Validation.MAX_TEMPERATURE) {
@@ -62,7 +65,7 @@ public record LlmRequest(
                 );
             }
         });
-        
+
         // Validate maxTokens range
         maxTokens.ifPresent(tokens -> {
             if (tokens < LlmConstants.Validation.MIN_MAX_TOKENS) {

@@ -12,6 +12,8 @@ import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
+import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.request.ChatRequestParameters;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -67,8 +69,11 @@ public class LangChainPromptSender implements PromptSender {
             // Build chat message list
             List<ChatMessage> messages = buildMessages(request);
 
-            // Call the LLM
-            ChatResponse response = chatModel.chat(messages);
+            // Build chat request with per-request parameter overrides
+            ChatRequest chatRequest = buildChatRequest(messages, request);
+
+            // Call the LLM with the configured request
+            ChatResponse response = chatModel.chat(chatRequest);
 
             long latencyMs = (System.nanoTime() - startNanos) / 1_000_000;
 
@@ -173,6 +178,34 @@ public class LangChainPromptSender implements PromptSender {
             sb.append(ctx);
         });
         return sb.toString();
+    }
+
+    /**
+     * Builds a ChatRequest with per-request parameter overrides.
+     *
+     * <p>Applies optional parameters from {@link LlmRequest} (maxTokens, temperature).
+     * If not specified, the underlying model's configured defaults are used.
+     *
+     * <p><b>Note on enableCaching:</b> Prompt caching is provider-specific and typically
+     * configured at the model level (e.g., Anthropic's prompt caching). The enableCaching
+     * flag in LlmRequest is informational and logged for observability, but does not
+     * directly control ChatRequestParameters as LangChain4J handles caching at the
+     * provider layer.
+     *
+     * @param messages the chat messages
+     * @param request the LLM request containing optional parameter overrides
+     * @return a configured ChatRequest
+     */
+    private ChatRequest buildChatRequest(List<ChatMessage> messages, LlmRequest request) {
+        ChatRequestParameters parameters = ChatRequestParameters.builder()
+                .maxOutputTokens(request.maxTokens().orElse(null))
+                .temperature(request.temperature().orElse(null))
+                .build();
+
+        return ChatRequest.builder()
+                .messages(messages)
+                .parameters(parameters)
+                .build();
     }
 
     /**
