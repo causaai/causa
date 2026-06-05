@@ -250,7 +250,7 @@ Causa Backend reads configuration from **two sources** with strict separation of
 6. ChatModelFactory uses LlmConfig to build ChatModel
 ```
 
-See [deployment/llm-config-options.md](../../deployment/llm-config-options.md) for complete configuration reference.
+See [LLM Configuration Options](../llm/llm-config-options.md) for complete configuration reference.
 
 
 ## Health Checks

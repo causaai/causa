@@ -99,7 +99,7 @@ This generates deployment files in `deployment/kubernetes/vertex-ai/generated/`
 
 #### Manual Setup
 
-**For Development (Local/KIND/OpenShift):** See [Vertex AI Development Guide](../llm/vertex-ai-development-guide.md)
+**For Development (Local/KIND/OpenShift):** See [Vertex AI Non-Production Guide](../llm/vertex-ai-non-production-guide.md)
 **For Production:** See [Vertex AI Production Guide](../llm/vertex-ai-production-guide.md)
 
 ---

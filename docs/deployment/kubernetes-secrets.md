@@ -2,7 +2,7 @@
 
 **CRITICAL: Secrets are managed separately from kustomize deployments.**
 
-This secret directory in deployment folder contains **TEMPLATE FILES ONLY** with placeholder values. Never commit real secrets to Git.
+This secrets directory in the deployment folder contains **TEMPLATE FILES ONLY** with placeholder values. Never commit real secrets to Git.
 
 ---
 
