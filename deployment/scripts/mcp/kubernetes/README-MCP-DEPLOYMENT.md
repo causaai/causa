@@ -28,23 +28,65 @@ The Kubernetes MCP Server is a tool that provides a standardized interface for A
      ```
 
 2. **Access to OpenShift Cluster**
-   - Cluster API: `https://api.<your-cluster>.opentlc.com:6443`
-   - Namespace: `diagnostics-tool`
+   - Cluster API: `https://api.<your-cluster-domain>:6443`
+   - Namespace: `diagnostics-tool` (or your preferred namespace)
    - Cluster-admin access required
 
-### Cluster Information
+### ⚠️ IMPORTANT: Configuration Required
 
+**Before deploying, you MUST configure your cluster-specific values in a configuration file.**
+
+#### **Step 1: Create Your Configuration File**
+
+```bash
+# Copy the template configuration file
+cp mcp-config.sh mcp-config.local.sh
+
+# Edit with your cluster details
+nano mcp-config.local.sh  # or use your preferred editor
 ```
-OpenShift Console: `https://console-openshift-console.apps.<your-cluster>.opentlc.com`
-API Server: https://api.cluster-n7mbm.n7mbm.sandbox983.opentlc.com:6443
-Namespace: diagnostics-tool
+
+#### **Step 2: Update These 4 Variables in `mcp-config.local.sh`**
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `OPENSHIFT_API` | Your cluster API URL | `https://api.cluster-abc123.example.com:6443` |
+| `OPENSHIFT_TOKEN` | Authentication token (use env var) | Set via: `export OPENSHIFT_TOKEN="your-token"` |
+| `OPENSHIFT_CONSOLE` | Console URL (for reference) | `https://console-openshift-console.apps.cluster-abc123.example.com` |
+| `NAMESPACE` | Target namespace | `diagnostics-tool` |
+
+**Security Note:**
+- ✅ `mcp-config.local.sh` is gitignored - safe for local use
+- ✅ Never commit real tokens to git
+- ✅ Use environment variables for sensitive data: `export OPENSHIFT_TOKEN="your-token"`
+
+#### **Configuration File Locations:**
+
+- **`mcp-config.sh`** - Template with placeholders (committed to git)
+- **`mcp-config.example.sh`** - Example with sample values (committed to git)
+- **`mcp-config.local.sh`** - Your actual config (gitignored, create this!)
+
+### How to Get Your Token
+
+```bash
+# Option 1: From OpenShift Console
+# Go to: User Menu → Copy Login Command → Display Token
+
+# Option 2: Create a temporary token (24 hours)
+oc create token cluster-admin -n openshift-config --duration=24h
+
+# Option 3: Use existing login
+oc whoami -t
 ```
 
 ## Files Included
 
 1. **openshift-mcp-server-diagnostics-tool.yaml** - Kubernetes manifests for deployment
 2. **deploy-mcp-server.sh** - Automated deployment script
-3. **README-MCP-DEPLOYMENT.md** - This documentation
+3. **test-mcp-server.sh** - Comprehensive testing script
+4. **mcp-config.sh** - Configuration template
+5. **mcp-config.example.sh** - Configuration example
+6. **README-MCP-DEPLOYMENT.md** - This documentation
 
 ## Deployment Methods
 
@@ -52,23 +94,49 @@ Namespace: diagnostics-tool
 
 The automated script handles all deployment steps including login, namespace verification, deployment, and health checks.
 
-```bash
-# Make the script executable
-chmod +x deploy-mcp-server.sh
+#### **Quick Start:**
 
-# Run the deployment script
+```bash
+# Step 1: Create your configuration file
+cp mcp-config.sh mcp-config.local.sh
+
+# Step 2: Edit with your cluster details
+nano mcp-config.local.sh
+# Update: OPENSHIFT_API, OPENSHIFT_CONSOLE, NAMESPACE
+# Set token via: export OPENSHIFT_TOKEN="your-token"
+
+# Step 3: Make scripts executable
+chmod +x deploy-mcp-server.sh test-mcp-server.sh
+
+# Step 4: Run the deployment
 ./deploy-mcp-server.sh
 ```
 
-The script will:
-1. ✓ Check prerequisites (oc CLI)
-2. ✓ Login to OpenShift cluster
-3. ✓ Verify/create namespace
-4. ✓ Deploy MCP server
-5. ✓ Wait for deployment to be ready
-6. ✓ Display deployment information
-7. ✓ Test server health
-8. ✓ Provide next steps
+The deployment script will:
+1. ✓ Load configuration from `mcp-config.local.sh`
+2. ✓ Check prerequisites (oc CLI)
+3. ✓ Login to OpenShift cluster
+4. ✓ Verify/create namespace
+5. ✓ Deploy MCP server
+6. ✓ Wait for deployment to be ready
+7. ✓ Display deployment information
+8. ✓ Test server health
+9. ✓ Provide next steps
+
+#### **Testing the Deployment:**
+
+```bash
+# Run comprehensive tests
+./test-mcp-server.sh
+```
+
+The test script validates:
+- ✓ Deployment and pod status
+- ✓ Service and route configuration
+- ✓ Health endpoints
+- ✓ Internal connectivity
+- ✓ RBAC permissions
+- ✓ Resource usage
 
 ### Method 2: Manual Deployment
 

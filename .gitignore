@@ -60,3 +60,6 @@ temp/
 *.tmp
 *.swp
 *~
+
+# MCP Configuration - Local files with sensitive data
+deployment/scripts/mcp/kubernetes/mcp-config.local.sh

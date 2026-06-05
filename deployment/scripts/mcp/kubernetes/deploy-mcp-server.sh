@@ -2,7 +2,7 @@
 
 ##############################################################################
 # Kubernetes MCP Server Deployment Script for OpenShift
-# 
+#
 # This script deploys the Kubernetes MCP Server to an OpenShift cluster
 # in the 'diagnostics-tool' namespace.
 #
@@ -10,9 +10,30 @@
 # - oc CLI installed and configured
 # - Access to OpenShift cluster with cluster-admin privileges
 # - Network connectivity to OpenShift API server
+# - Configuration file: mcp-config.local.sh (copy from mcp-config.sh)
+#
+# Usage:
+#   1. Create your config: cp mcp-config.sh mcp-config.local.sh
+#   2. Update mcp-config.local.sh with your cluster details
+#   3. Run: ./deploy-mcp-server.sh
 ##############################################################################
 
 set -e  # Exit on any error
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Load configuration from local config file if it exists
+if [ -f "$SCRIPT_DIR/mcp-config.local.sh" ]; then
+    source "$SCRIPT_DIR/mcp-config.local.sh"
+    echo "✓ Loaded configuration from mcp-config.local.sh"
+elif [ -f "$SCRIPT_DIR/mcp-config.sh" ]; then
+    source "$SCRIPT_DIR/mcp-config.sh"
+    echo "⚠ Using default mcp-config.sh - please create mcp-config.local.sh with your values"
+else
+    echo "✗ Configuration file not found. Please create mcp-config.local.sh"
+    exit 1
+fi
 
 # Color codes for output
 RED='\033[0;31m'
@@ -21,13 +42,11 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Configuration
-NAMESPACE="diagnostics-tool"
+# Configuration (can be overridden by config file)
+NAMESPACE="${NAMESPACE:-diagnostics-tool}"
 DEPLOYMENT_FILE="openshift-mcp-server-diagnostics-tool.yaml"
 MCP_SERVER_NAME="kubernetes-mcp-server"
-
-# OpenShift cluster details (update these with your cluster info)
-OPENSHIFT_API="${OPENSHIFT_API:-https://api.your-cluster.example.com:6443}"
+OPENSHIFT_API="${OPENSHIFT_API:-}"
 OPENSHIFT_TOKEN="${OPENSHIFT_TOKEN:-}"
 
 ##############################################################################

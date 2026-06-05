@@ -2,12 +2,29 @@
 
 ##############################################################################
 # Kubernetes MCP Server Testing Script
-# 
+#
 # This script performs comprehensive testing of the deployed MCP server
 # to verify it's working correctly.
+#
+# Prerequisites:
+# - Configuration file: mcp-config.local.sh (copy from mcp-config.sh)
+#
+# Usage:
+#   1. Ensure mcp-config.local.sh exists with your cluster details
+#   2. Run: ./test-mcp-server.sh
 ##############################################################################
 
 set -e
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Load configuration from local config file if it exists
+if [ -f "$SCRIPT_DIR/mcp-config.local.sh" ]; then
+    source "$SCRIPT_DIR/mcp-config.local.sh"
+elif [ -f "$SCRIPT_DIR/mcp-config.sh" ]; then
+    source "$SCRIPT_DIR/mcp-config.sh"
+fi
 
 # Color codes
 RED='\033[0;31m'
@@ -16,7 +33,8 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-NAMESPACE="diagnostics-tool"
+# Configuration (can be overridden by config file)
+NAMESPACE="${NAMESPACE:-diagnostics-tool}"
 MCP_SERVER_NAME="kubernetes-mcp-server"
 
 print_header() {
