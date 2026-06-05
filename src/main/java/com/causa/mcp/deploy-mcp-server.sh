@@ -28,7 +28,7 @@ MCP_SERVER_NAME="kubernetes-mcp-server"
 
 # OpenShift cluster details (update these with your cluster info)
 OPENSHIFT_API="https://api.cluster-n7mbm.n7mbm.sandbox983.opentlc.com:6443"
-OPENSHIFT_TOKEN="***REMOVED***"
+OPENSHIFT_TOKEN="${OPENSHIFT_TOKEN:-}"
 
 ##############################################################################
 # Helper Functions
