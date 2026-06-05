@@ -1,6 +1,8 @@
 package com.causa.config;
 
+import com.causa.common.utils.JsonUtils;
 import io.smallrye.config.ConfigMapping;
+import io.smallrye.config.WithConverter;
 import io.smallrye.config.WithDefault;
 import io.smallrye.config.WithName;
 
@@ -54,10 +56,14 @@ public interface LlmConfig {
 
     /**
      * Custom HTTP headers as a JSON object for gateway routing or proxy handshakes.
+     * <p>
+     * Expects a JSON string (e.g., {@code {"X-Gateway":"ibm-bob","X-Tenant":"prod"}}).
+     * Returns an empty map if not provided or parsing fails.
      *
      * @return custom headers map
      */
     @WithName("custom-headers")
+    @WithConverter(JsonUtils.JsonMapConverter.class)
     Map<String, String> customHeaders();
 
     /**
