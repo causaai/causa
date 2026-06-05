@@ -1,5 +1,8 @@
 package com.causa.core.domain;
 
+import com.causa.common.constants.LlmConstants;
+import com.causa.common.exceptions.LlmException;
+
 import java.util.Optional;
 
 /**
@@ -39,6 +42,36 @@ public record LlmRequest(
         enableCaching = enableCaching != null ? enableCaching : Optional.empty();
         maxTokens = maxTokens != null ? maxTokens : Optional.empty();
         temperature = temperature != null ? temperature : Optional.empty();
+        
+        validateLlmRequest();
+    }
+
+    /**
+     * Validates LLM request parameters.
+     * Centralized validation method for easy extension in the future.
+     *
+     * @throws LlmException if any parameter is invalid
+     */
+    private void validateLlmRequest() {
+        // Validate temperature range
+        temperature.ifPresent(t -> {
+            if (t < LlmConstants.Validation.MIN_TEMPERATURE || t > LlmConstants.Validation.MAX_TEMPERATURE) {
+                throw new LlmException(
+                    LlmConstants.ErrorMessages.TEMPERATURE_RANGE_MESSAGE,
+                    LlmConstants.ErrorTypes.INVALID_REQUEST_PARAMETERS
+                );
+            }
+        });
+        
+        // Validate maxTokens range
+        maxTokens.ifPresent(tokens -> {
+            if (tokens < LlmConstants.Validation.MIN_MAX_TOKENS) {
+                throw new LlmException(
+                    LlmConstants.ErrorMessages.MAX_TOKENS_RANGE_MESSAGE,
+                    LlmConstants.ErrorTypes.INVALID_REQUEST_PARAMETERS
+                );
+            }
+        });
     }
 
     /**

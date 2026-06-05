@@ -90,6 +90,7 @@ public final class LlmConstants {
         public static final String MISSING_CONFIGURATION = "MissingConfiguration";
         public static final String MODEL_NOT_READY = "ModelNotReady";
         public static final String LLM_REQUEST_FAILED = "LlmRequestFailed";
+        public static final String INVALID_REQUEST_PARAMETERS = "InvalidRequestParameters";
     }
 
     /**
@@ -103,6 +104,8 @@ public final class LlmConstants {
         public static final String VERTEX_PROJECT_ID_REQUIRED = "VERTEX_PROJECT_ID is required for provider: ";
         public static final String MODEL_NOT_AVAILABLE = "LLM chat model not available";
         public static final String REQUEST_FAILED_TEMPLATE = "LLM request failed: %s";
+        public static final String TEMPERATURE_RANGE_MESSAGE = "temperature must be between 0.0 and 1.0 inclusive";
+        public static final String MAX_TOKENS_RANGE_MESSAGE = "maxTokens must be greater than 0";
     }
 
     /**
@@ -124,6 +127,17 @@ public final class LlmConstants {
 
         public static final String API_KEY = "API_KEY";
         public static final String ADC = "ADC";
+    }
+
+    /**
+     * Validation constraints for LLM parameters.
+     */
+    public static final class Validation {
+        private Validation() {}
+
+        public static final double MIN_TEMPERATURE = 0.0;
+        public static final double MAX_TEMPERATURE = 1.0;
+        public static final int MIN_MAX_TOKENS = 1;
     }
 
     /**
