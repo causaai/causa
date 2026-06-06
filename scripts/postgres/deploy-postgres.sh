@@ -12,9 +12,13 @@ NC='\033[0m'
 DEFAULT_IMAGE="quay.io/rh-ee-shesaxen/postgres-pgvector:17"
 DEFAULT_OPERATOR_VERSION="1.29.1"
 <<<<<<< HEAD
+<<<<<<< HEAD
 DEFAULT_OPERATOR_RELEASE_BRANCH="release-1.29"
 =======
 >>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
+=======
+DEFAULT_OPERATOR_RELEASE_BRANCH="release-1.29"
+>>>>>>> 36db7aa (adding validation checks for operator version in script)
 DEFAULT_CLUSTER_TYPE="kind"
 NAMESPACE="diagnostics-tool"
 
@@ -49,7 +53,6 @@ validate_operator_version() {
     fi
 }
 
-
 # Print functions
 print_info() { echo -e "${GREEN}[INFO]${NC} $1"; }
 print_warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
@@ -74,13 +77,19 @@ Options:
   -h          Show this help
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 36db7aa (adding validation checks for operator version in script)
 Environment Variables:
   OPERATOR_VERSION          CloudNativePG operator version (default: $DEFAULT_OPERATOR_VERSION)
   OPERATOR_RELEASE_BRANCH   Release branch (default: $DEFAULT_OPERATOR_RELEASE_BRANCH)
                             Must match the version's major.minor (e.g., release-1.29 for 1.29.x)
 
+<<<<<<< HEAD
 =======
 >>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
+=======
+>>>>>>> 36db7aa (adding validation checks for operator version in script)
 Examples:
   # Deploy on Kind cluster
   $0 -c kind
@@ -92,6 +101,9 @@ Examples:
   $0 -c kind -i quay.io/myorg/postgres-pgvector:17
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 36db7aa (adding validation checks for operator version in script)
   # Deploy with specific operator version (branch auto-validated)
   OPERATOR_VERSION=1.29.2 $0 -c kind
 
@@ -104,11 +116,14 @@ Examples:
 Note: The script validates that OPERATOR_VERSION matches OPERATOR_RELEASE_BRANCH
       to prevent 404 errors from version/branch mismatches.
 
+<<<<<<< HEAD
 =======
   # Terminate everything
   $0 -t
 
 >>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
+=======
+>>>>>>> 36db7aa (adding validation checks for operator version in script)
 EOF
     exit "${1:-0}"
 }
@@ -147,13 +162,19 @@ print_info "✓ Connected to cluster"
 echo ""
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 36db7aa (adding validation checks for operator version in script)
 # Validate operator version matches release branch (skip in terminate mode)
 if [ "$TERMINATE_MODE" = false ]; then
     validate_operator_version "$OPERATOR_VERSION" "$OPERATOR_RELEASE_BRANCH"
 fi
 
+<<<<<<< HEAD
 =======
 >>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
+=======
+>>>>>>> 36db7aa (adding validation checks for operator version in script)
 # Handle terminate mode
 if [ "$TERMINATE_MODE" = true ]; then
     print_header "Terminate Mode - Cleaning Up PostgreSQL Resources"
@@ -181,10 +202,14 @@ if [ "$TERMINATE_MODE" = true ]; then
     else
         # Delete direct installation
 <<<<<<< HEAD
+<<<<<<< HEAD
         OPERATOR_URL="https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/${OPERATOR_RELEASE_BRANCH}/releases/cnpg-${OPERATOR_VERSION}.yaml"
 =======
         OPERATOR_URL="https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.29/releases/cnpg-${OPERATOR_VERSION}.yaml"
 >>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
+=======
+        OPERATOR_URL="https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/${OPERATOR_RELEASE_BRANCH}/releases/cnpg-${OPERATOR_VERSION}.yaml"
+>>>>>>> 36db7aa (adding validation checks for operator version in script)
         kubectl delete -f "${OPERATOR_URL}" --ignore-not-found=true --wait=false
     fi
     
@@ -263,10 +288,14 @@ else
     print_info "Installing operator v${OPERATOR_VERSION} for Kind..."
     
 <<<<<<< HEAD
+<<<<<<< HEAD
     OPERATOR_URL="https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/${OPERATOR_RELEASE_BRANCH}/releases/cnpg-${OPERATOR_VERSION}.yaml"
 =======
     OPERATOR_URL="https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.29/releases/cnpg-${OPERATOR_VERSION}.yaml"
 >>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
+=======
+    OPERATOR_URL="https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/${OPERATOR_RELEASE_BRANCH}/releases/cnpg-${OPERATOR_VERSION}.yaml"
+>>>>>>> 36db7aa (adding validation checks for operator version in script)
     
     # Check if operator already exists and cleanup if needed
     if kubectl get namespace cnpg-system &> /dev/null; then
