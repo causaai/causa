@@ -342,6 +342,7 @@ print_header "Waiting for PostgreSQL Cluster"
 CLUSTER_NAME="diagnostics-tool-db"
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 # Wait for pod to be created (20 attempts x 6 seconds = 120 seconds)
 print_info "Waiting for pod to be created..."
 for i in {1..20}; do
@@ -350,28 +351,42 @@ for i in {1..20}; do
 print_info "Waiting for pod to be created..."
 for i in {1..15}; do
 >>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
+=======
+# Wait for pod to be created (20 attempts x 6 seconds = 120 seconds)
+print_info "Waiting for pod to be created..."
+for i in {1..20}; do
+>>>>>>> 3d9d186 (fixing retry count value mismatch in logs and commands)
     if kubectl get pod "${CLUSTER_NAME}-1" -n "${NAMESPACE}" &> /dev/null; then
         print_info "✓ Pod ${CLUSTER_NAME}-1 created"
         break
     fi
 <<<<<<< HEAD
+<<<<<<< HEAD
     print_info "Attempt $i/20: Waiting for pod..."
 =======
     print_info "Attempt $i/10: Waiting for pod..."
 >>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
+=======
+    print_info "Attempt $i/20: Waiting for pod..."
+>>>>>>> 3d9d186 (fixing retry count value mismatch in logs and commands)
     sleep 6
 done
 
 if ! kubectl get pod "${CLUSTER_NAME}-1" -n "${NAMESPACE}" &> /dev/null; then
 <<<<<<< HEAD
+<<<<<<< HEAD
     print_error "Pod not created after 120 seconds"
 =======
     print_error "Pod not created after 60 seconds"
 >>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
+=======
+    print_error "Pod not created after 120 seconds"
+>>>>>>> 3d9d186 (fixing retry count value mismatch in logs and commands)
     print_error "Check: kubectl get cluster -n ${NAMESPACE}"
     exit 1
 fi
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 # Wait for pod to be ready (20 attempts x 6 seconds = 120 seconds)
 print_info "Waiting for pod to be ready..."
@@ -381,6 +396,11 @@ for i in {1..20}; do
 print_info "Waiting for pod to be ready..."
 for i in {1..10}; do
 >>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
+=======
+# Wait for pod to be ready (20 attempts x 6 seconds = 120 seconds)
+print_info "Waiting for pod to be ready..."
+for i in {1..20}; do
+>>>>>>> 3d9d186 (fixing retry count value mismatch in logs and commands)
     POD_STATUS=$(kubectl get pod "${CLUSTER_NAME}-1" -n "${NAMESPACE}" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
     if [ "$POD_STATUS" = "True" ]; then
         print_info "✓ Pod is ready"
@@ -388,19 +408,27 @@ for i in {1..10}; do
     fi
     PHASE=$(kubectl get pod "${CLUSTER_NAME}-1" -n "${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
 <<<<<<< HEAD
+<<<<<<< HEAD
     print_info "Attempt $i/20: Pod phase - $PHASE"
 =======
     print_info "Attempt $i/10: Pod phase - $PHASE"
 >>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
+=======
+    print_info "Attempt $i/20: Pod phase - $PHASE"
+>>>>>>> 3d9d186 (fixing retry count value mismatch in logs and commands)
     sleep 6
 done
 
 if [ "$POD_STATUS" != "True" ]; then
 <<<<<<< HEAD
+<<<<<<< HEAD
     print_warn "Pod not ready after 120 seconds"
 =======
     print_warn "Pod not ready after 60 seconds"
 >>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
+=======
+    print_warn "Pod not ready after 120 seconds"
+>>>>>>> 3d9d186 (fixing retry count value mismatch in logs and commands)
     print_warn "Check: kubectl get pods -n ${NAMESPACE}"
 fi
 echo ""
