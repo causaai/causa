@@ -1,27 +1,28 @@
 package com.causa.llm;
 
+import com.causa.common.constants.AppConstants;
 import com.causa.common.constants.LlmConstants;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
 import com.causa.config.LlmConfig;
 import com.causa.core.domain.LlmRequest;
 import com.causa.core.domain.LlmResponse;
-import io.quarkus.runtime.Startup;
-import jakarta.annotation.PostConstruct;
+import io.quarkus.runtime.StartupEvent;
+import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 
 /**
  * LLM Startup Handler
  *
- * <p>Eagerly initialized at application startup to verify LLM connectivity and log
+ * <p>Observes application startup to verify LLM connectivity and log
  * provider configuration. Non-fatal on failure — the application starts but the
  * health check reports DOWN.
  *
  * @since 0.0.1
  */
 @ApplicationScoped
-@Startup
 public class LlmStartup {
 
     private static final CausaLogger log = CausaLogger.getLogger(LlmStartup.class);
@@ -35,8 +36,7 @@ public class LlmStartup {
         this.config = config;
     }
 
-    @PostConstruct
-    void initialize() {
+    void onStartup(@Observes @Priority(AppConstants.StartupConstants.LLM_PRIORITY) StartupEvent event) {
         log.info(LogMessages.Llm.CONNECTIVITY_CHECK_START)
             .field(LlmConstants.Fields.PROVIDER, config.provider())
             .field(LlmConstants.Fields.MODEL, config.modelName())
