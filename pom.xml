@@ -53,6 +53,24 @@
             <artifactId>quarkus-rest</artifactId>
         </dependency>
 
+        <!-- PostgreSQL JDBC Driver + Agroal Connection Pool -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-jdbc-postgresql</artifactId>
+        </dependency>
+
+        <!-- Hibernate ORM with Panache -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-hibernate-orm-panache</artifactId>
+        </dependency>
+
+        <!-- Hibernate Validator -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-hibernate-validator</artifactId>
+        </dependency>
+
         <!-- Container Image Build (Jib) -->
         <dependency>
             <groupId>io.quarkus</groupId>
