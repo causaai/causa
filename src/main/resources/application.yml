@@ -63,9 +63,15 @@ quarkus:
   # Hibernate ORM Configuration
   hibernate-orm:
     database:
-      generation: update
+      generation: validate
+      # Use update to always update the schema on startup in development environments
+      # generation: update 
     log:
       sql: true
+    # Fix for Jackson date serialization compatibility
+    mapping:
+      format:
+        global: ignore
 
 
 # Custom Application Configuration (TO BE ADDED LATER)
