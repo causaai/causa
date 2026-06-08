@@ -12,7 +12,7 @@ This guide covers the PostgreSQL database connection pool setup for Causa Backen
 - [Kubernetes Deployment](#kubernetes-deployment)
 - [Embedding Strategy](#embedding-strategy)
 - [Connection Pool Tuning](#connection-pool-tuning)
-- [Troubleshooting](#troubleshooting)
+
 
 ---
 
