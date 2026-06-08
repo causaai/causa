@@ -49,6 +49,22 @@ spec:
             configMapKeyRef:
               name: causa-config
               key: CAUSA_SWAGGER_UI_PATH
+        # Database Configuration
+        - name: CAUSA_DB_URL
+          valueFrom:
+            configMapKeyRef:
+              name: causa-config
+              key: CAUSA_DB_URL
+        - name: CAUSA_DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: diagnostics-tool-db-app
+              key: username
+        - name: CAUSA_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: diagnostics-tool-db-app
+              key: password
         resources:
           requests:
             cpu: 100m

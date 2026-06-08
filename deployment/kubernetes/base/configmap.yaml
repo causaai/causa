@@ -13,10 +13,8 @@ data:
   # Swagger/OpenAPI Configuration
   CAUSA_SWAGGER_UI_PATH: "/swagger-ui"
 
-  # Database Configuration (placeholder)
-  # CAUSA_DB_HOST: "postgres"
-  # CAUSA_DB_PORT: "5432"
-  # CAUSA_DB_NAME: "causa"
+  # Database Configuration
+  CAUSA_DB_URL: "jdbc:postgresql://diagnostics-tool-db-rw.diagnostics-tool.svc.cluster.local:5432/diagnostics-tool-db"
 
   # LLM Configuration (placeholder)
   # CAUSA_LLM_PROVIDER: "anthropic"
