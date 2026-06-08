@@ -31,4 +31,15 @@ public final class DatabaseConstants {
 
     /** The database kind value. */
     public static final String DB_KIND_VALUE = "postgresql";
+
+    /**
+     * Database Health check constants.
+     */
+    public static final class Health {
+        private Health() {}
+
+        public static final String DB_HEALTH_NAME = "database";
+        public static final String DB_UP_MESSAGE = "Database is ready";
+        public static final String DB_DOWN_MESSAGE = "Database is not ready";
+    }
 }
