@@ -47,7 +47,7 @@ public class SystemHealthHistoryEntity extends BaseEntity {
     /**
      * Overall system health status.
      *
-     * <p>Stored as VARCHAR in database using enum name (HEALTHY, UNHEALTHY).
+     * <p>Stored as VARCHAR in database using enum name (UP, DOWN).
      */
     @NotNull(message = "Overall status cannot be null")
     @Enumerated(EnumType.STRING)

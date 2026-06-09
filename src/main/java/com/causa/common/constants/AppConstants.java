@@ -36,11 +36,11 @@ public final class AppConstants {
         /**
          * System or component is operating normally.
          */
-        HEALTHY,
+        UP,
 
         /**
          * System or component is experiencing issues or unavailable.
          */
-        UNHEALTHY
+        DOWN
     }
 }

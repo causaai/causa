@@ -114,7 +114,7 @@ public class SystemHealthHistoryEntity extends BaseEntity {
 // Active Record pattern (methods on entity)
 SystemHealthHistoryEntity history = new SystemHealthHistoryEntity();
 history.timestamp = LocalDateTime.now();
-history.overallStatus = AppConstants.HealthStatus.HEALTHY;
+history.overallStatus = AppConstants.HealthStatus.UP;
 history.persist();
 
 // Query examples
