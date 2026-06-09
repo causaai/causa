@@ -21,7 +21,28 @@ public final class AppConstants {
     public static final class StartupConstants {
         private StartupConstants() {}
 
+        /** Database connection pool initialization priority. */
+        public static final int DATABASE_PRIORITY = 20;
         /** LLM initialization priority. */
         public static final int LLM_PRIORITY = 10;
+    }
+
+    /**
+     * Health Status Enum
+     *
+     * <p>Represents the overall health status of the system or a component.
+     *
+     * @since 1.0.0
+     */
+    public enum HealthStatus {
+        /**
+         * System or component is operating normally.
+         */
+        HEALTHY,
+
+        /**
+         * System or component is experiencing issues or unavailable.
+         */
+        UNHEALTHY
     }
 }

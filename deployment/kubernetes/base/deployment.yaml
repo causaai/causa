@@ -33,6 +33,38 @@ spec:
         - name: management
           containerPort: 9000
           protocol: TCP
+        env:
+        - name: CAUSA_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: causa-config
+              key: CAUSA_PORT
+        - name: CAUSA_LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: causa-config
+              key: CAUSA_LOG_LEVEL
+        - name: CAUSA_SWAGGER_UI_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: causa-config
+              key: CAUSA_SWAGGER_UI_PATH
+        # Database Configuration
+        - name: CAUSA_DB_URL
+          valueFrom:
+            configMapKeyRef:
+              name: causa-config
+              key: CAUSA_DB_URL
+        - name: CAUSA_DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: diagnostics-tool-db-app
+              key: username
+        - name: CAUSA_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: diagnostics-tool-db-app
+              key: password
         envFrom:
         # Public configuration (non-sensitive)
         # Loads ALL keys from ConfigMap as environment variables

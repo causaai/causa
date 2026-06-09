@@ -47,4 +47,19 @@ public final class LogMessages {
         public static final String MISSING_CONFIGURATION = "Missing required LLM configuration";
         public static final String MODEL_NOT_AVAILABLE = "LLM chat model not available";
     }
+
+    /**
+     * Database connection and pool log messages.
+     *
+     * @since 1.0.0
+     */
+    public static final class Database {
+        private Database() {}
+
+        public static final String CONNECTION_VERIFYING = "Verifying database connection on startup";
+        public static final String CONNECTION_SUCCESS = "Database connection pool initialized successfully";
+        public static final String CONNECTION_FAILED = "Database connection verification failed";
+        public static final String READINESS_CHECK_PASSED = "Database readiness check passed";
+        public static final String READINESS_CHECK_FAILED = "Database readiness check failed";
+    }
 }
