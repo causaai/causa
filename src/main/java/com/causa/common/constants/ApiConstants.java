@@ -5,12 +5,21 @@ package com.causa.common.constants;
  *
  * <p>Contains API response keys and health-check constants.
  *
- * @since 1.0.0
+ * @since 0.0.1
  */
 public final class ApiConstants {
 
     private ApiConstants() {
         // Prevent instantiation
+    }
+
+    /**
+     * API endpoint paths.
+     */
+    public static final class Endpoints {
+        private Endpoints() {}
+
+        public static final String HEALTH = "/api/health";
     }
 
     /**
@@ -47,5 +56,28 @@ public final class ApiConstants {
         public static final String LIVENESS_UP_MESSAGE = "Causa is alive and running";
         public static final String READINESS_UP_MESSAGE = "Causa is ready to accept requests";
         public static final String READINESS_DOWN_MESSAGE = "Causa is not ready to accept requests";
+    }
+
+    /**
+     * Health check response field keys.
+     */
+    public static final class HealthCheckResponse {
+        private HealthCheckResponse() {}
+
+        public static final String TIMESTAMP_KEY = "timestamp";
+        public static final String VERSION_KEY = "version";
+        public static final String COMPONENTS_KEY = "components";
+        public static final String LATENCY_MS_KEY = "latency_ms";
+    }
+
+    /**
+     * Log field keys.
+     */
+    public static final class LogFields {
+        private LogFields() {}
+
+        public static final String STATUS = "status";
+        public static final String HTTP_STATUS = "http_status";
+        public static final String LATENCY_MS = "latency_ms";
     }
 }

@@ -30,17 +30,42 @@ public final class AppConstants {
      *
      * <p>Represents the overall health status of the system or a component.
      *
-     * @since 1.0.0
+     * @since 0.0.1
      */
     public enum HealthStatus {
         /**
-         * System or component is operating normally.
+         * System or component is fully operational.
          */
-        HEALTHY,
+        UP("UP"),
 
         /**
-         * System or component is experiencing issues or unavailable.
+         * System or component is not operational.
          */
-        UNHEALTHY
+        DOWN("DOWN"),
+
+        /**
+         * System is operational but some non-critical components are down.
+         */
+        DEGRADED("DEGRADED");
+
+        private final String value;
+
+        HealthStatus(String value) {
+            this.value = value;
+        }
+
+        /**
+         * Get the string value of the status.
+         *
+         * @return the status value
+         */
+        public String getValue() {
+            return value;
+        }
+
+        @Override
+        public String toString() {
+            return value;
+        }
     }
 }

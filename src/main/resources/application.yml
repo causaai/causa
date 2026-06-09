@@ -63,9 +63,9 @@ quarkus:
   # Hibernate ORM Configuration
   hibernate-orm:
     database:
-      generation: validate
-      # Use update to always update the schema on startup in development environments
-      # generation: update 
+      # Use 'update' for local development to auto-create/update schema
+      # Use 'validate' in production to ensure schema matches entities
+      generation: ${CAUSA_DB_GENERATION:update}
     log:
       sql: true
     # Fix for Jackson date serialization compatibility
@@ -74,8 +74,21 @@ quarkus:
         global: ignore
 
 
-# Custom Application Configuration (TO BE ADDED LATER)
-# causa:
+# Custom Application Configuration
+causa:
+  # MCP Configuration
+  mcp:
+    kubernetes:
+      endpoint: ${CAUSA_MCP_K8S_ENDPOINT}
+      health-path: ${CAUSA_MCP_K8S_HEALTH_PATH}
+      timeout-ms: ${CAUSA_MCP_K8S_TIMEOUT}
+#     cryostat:
+#       endpoint: ${CAUSA_MCP_CRYOSTAT_ENDPOINT}
+#       timeout-ms: ${CAUSA_MCP_CRYOSTAT_TIMEOUT}
+#     kruize:
+#       endpoint: ${CAUSA_MCP_KRUIZE_ENDPOINT}
+#       timeout-ms: ${CAUSA_MCP_KRUIZE_TIMEOUT}
+
 #   # Feature Flags (Runtime configurable)
 #   features:
 #     rag-enabled: ${CAUSA_FEATURE_RAG:false}
@@ -89,16 +102,6 @@ quarkus:
 #     temperature: ${CAUSA_LLM_TEMPERATURE:0.1}
 #     max-tokens: ${CAUSA_LLM_MAX_TOKENS:2048}
 #     timeout-seconds: ${CAUSA_LLM_TIMEOUT:60}
-
-#   # MCP Configuration
-#   mcp:
-#     kubernetes:
-#       endpoint: ${CAUSA_MCP_K8S_ENDPOINT:http://k8s-mcp.causa.svc.cluster.local:8080}
-#       timeout-ms: ${CAUSA_MCP_K8S_TIMEOUT:5000}
-#     cryostat:
-#       endpoint: ${CAUSA_MCP_CRYOSTAT_ENDPOINT:http://cryostat-mcp.causa.svc:8181}
-#     kruize:
-#       endpoint: ${CAUSA_MCP_KRUIZE_ENDPOINT:http://kruize.monitoring.svc:8080}
 
 #   # Alert Configuration
 #   alerts:

@@ -16,9 +16,14 @@ data:
   # Database Configuration
   CAUSA_DB_URL: "jdbc:postgresql://diagnostics-tool-db-rw.diagnostics-tool.svc.cluster.local:5432/diagnostics-tool-db"
 
+  # MCP Kubernetes Configuration
+  CAUSA_MCP_K8S_ENDPOINT: "http://kubernetes-mcp-server.diagnostics-tool.svc.cluster.local:8080"
+  CAUSA_MCP_K8S_HEALTH_PATH: "/health"
+  CAUSA_MCP_K8S_TIMEOUT: "5000"
+
   # LLM Configuration (placeholder)
   # CAUSA_LLM_PROVIDER: "anthropic"
   # CAUSA_LLM_MODEL: "claude-3-5-sonnet-20241022"
 
-  # MCP Configuration (placeholder)
-  # CAUSA_MCP_SERVERS: "kruize,cryostat,kubernetes"
+  # MCP Configuration (placeholder for other servers)
+    # CAUSA_MCP_SERVERS: "kruize,cryostat"
