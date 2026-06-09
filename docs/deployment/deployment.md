@@ -34,54 +34,139 @@ deployment/kubernetes/
 - `kustomize` installed (or kubectl 1.14+)
 - Access to a Kubernetes cluster
 
-### For Kind
+### For Kind (Local Development)
 - [kind](https://kind.sigs.kubernetes.io/) installed
-- NGINX Ingress Controller
+- For Vertex AI: `gcloud` CLI installed
 
-### For OpenShift
+### For OpenShift (Production)
 - `oc` CLI installed
 - Access to an OpenShift cluster
+- For Vertex AI: `gcloud` CLI installed
 
-## Quick Start
+## LLM Setup (Required First)
+
+Causa Backend requires LLM (Claude/ Ollama/ BoB) integration. You **must** create secrets **before** deploying.
+
+**IMPORTANT:** Secrets are managed **separately** from kustomize. Never add secrets to kustomization.yaml.
+
+Refer to [Kubernetes Secrets Guide](kubernetes-secrets.md) for more details.
+
+---
+
+### CASE 1: Direct Anthropic API (Simplest)
+
+#### Step 1: Create Secret
+
+```bash
+# Recommended: Create secret directly with kubectl
+kubectl create secret generic causa-llm-secrets \
+  --from-literal=LLM_API_KEY=sk-ant-api03-xxxxxxxx \
+  -n diagnostics-tool
+```
+
+**Alternative:** Use template from `deployment/kubernetes/secrets/secret.yaml`
+
+#### Step 2: Update ConfigMap
+
+Edit `deployment/kubernetes/base/configmap.yaml`:
+```yaml
+data:
+  LLM_PROVIDER: "anthropic"
+  LLM_MODEL_NAME: "claude-sonnet-4-6"
+```
+
+**Done!** Proceed to deployment steps below.
+
+---
+
+### CASE 2: Claude via Google Vertex AI
+
+⚠️ **IMPORTANT: Vertex AI requires a specific deployment order!**
+
+#### Automated Setup (Recommended)
+
+**Generate Configuration**
+```bash
+./scripts/llm/setup-vertex-ai.sh --env [kind|openshift] --project YOUR_GCP_PROJECT_ID
+```
+
+This generates deployment files in `deployment/kubernetes/vertex-ai/generated/`
+
+
+**See detailed guides:**
+- **Development/POC:** [Vertex AI Non-Production Guide](../llm/vertex-ai-non-production-guide.md)
+- **Production:** [Vertex AI Production Guide](../llm/vertex-ai-production-guide.md)
+
+#### Manual Setup
+
+**For Development (Local/KIND/OpenShift):** See [Vertex AI Non-Production Guide](../llm/vertex-ai-non-production-guide.md)
+**For Production:** See [Vertex AI Production Guide](../llm/vertex-ai-production-guide.md)
+
+---
+
+### Secret Templates
+
+A template file with placeholders is available in `deployment/kubernetes/secrets/`:
+- [secret.yaml](../../deployment/kubernetes/secrets/secret.yaml) - LLM API key template
+
+**For Vertex AI:** Use the automated setup script instead:
+```bash
+./scripts/llm/setup-vertex-ai.sh --env [local|kind|openshift] --project <GCP_PROJECT_ID>
+```
+
+**See:**
+- [Kubernetes Secrets Guide](kubernetes-secrets.md) for Anthropic secrets
+---
+
+## Quick Start Deployment
 
 ### 1. Deploy to Kind (Local Development)
 
 #### Create Kind Cluster (if needed)
 ```bash
-# Create cluster with ingress support
-cat <<EOF | kind create cluster --config=-
-kind: Cluster
-apiVersion: kind.x-kubernetes.io/v1alpha4
-name: causa-dev
-nodes:
-- role: control-plane
-  kubeadmConfigPatches:
-  - |
-    kind: InitConfiguration
-    nodeRegistration:
-      kubeletExtraArgs:
-        node-labels: "ingress-ready=true"
-  extraPortMappings:
-  - containerPort: 80
-    hostPort: 80
-    protocol: TCP
-  - containerPort: 443
-    hostPort: 443
-    protocol: TCP
-EOF
+# Create simple KIND cluster (no ingress needed)
+kind create cluster --name causa-dev
 
-# Install NGINX Ingress
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
-
-# Wait for ingress to be ready
-kubectl wait --namespace ingress-nginx \
-  --for=condition=ready pod \
-  --selector=app.kubernetes.io/component=controller \
-  --timeout=90s
+# Verify cluster
+kubectl cluster-info --context kind-causa-dev
 ```
 
 #### Deploy Causa
+
+**If using Vertex AI:**
 ```bash
+# Use the generated apply script
+cd deployment/kubernetes/vertex-ai/generated
+./apply.sh
+
+# This handles the correct deployment order automatically
+
+
+"OR"
+
+
+# 1. Deploy base deployment FIRST (if not already deployed)
+kubectl apply -k deployment/kubernetes/overlays/kind  # or overlays/openshift
+
+# 2. Apply ADC secrets
+cd deployment/kubernetes/vertex-ai/generated
+kubectl apply -f causa-llm-secrets.yaml
+kubectl apply -f gcp-adc-credentials.yaml
+
+# 3. Patch deployment to mount secrets
+kubectl patch deployment causa-backend -n diagnostics-tool \
+  --patch-file deployment-adc-patch.yaml
+
+# 4. Restart deployment to pick up changes
+kubectl rollout restart deployment/causa-backend -n diagnostics-tool
+kubectl rollout status deployment/causa-backend -n diagnostics-tool
+
+```
+
+**If using Anthropic Direct API:**
+```bash
+# IMPORTANT: Create secrets first (see LLM Setup above)
+
 # From repository root
 kubectl apply -k deployment/kubernetes/overlays/kind
 
@@ -93,17 +178,26 @@ kubectl logs -n diagnostics-tool -l app.kubernetes.io/name=causa-backend -f
 ```
 
 #### Access Application
+
+**Using Port-Forward:**
 ```bash
-# Add to /etc/hosts
-echo "127.0.0.1 causa.local" | sudo tee -a /etc/hosts
+# Forward service port to localhost
+kubectl port-forward -n diagnostics-tool svc/causa-backend 8080:8080
 
-# Access endpoints
-curl http://causa.local/q/health/live
-curl http://causa.local/q/health/ready
-curl http://causa.local/swagger-ui
+# In another terminal, access endpoints
+curl http://localhost:8080/q/health/live
+curl http://localhost:8080/q/health/ready
 
-# Or use localhost
-curl http://localhost/q/health/live
+# Check LLM health specifically
+curl http://localhost:8080/q/health/ready | jq '.checks[] | select(.name=="llm")'
+```
+
+**Keep port-forward running in background:**
+```bash
+# Run in background
+kubectl port-forward -n diagnostics-tool svc/causa-backend 8080:8080 &
+
+# Stop later with: fg then Ctrl+C
 ```
 
 ### 2. Deploy to OpenShift
@@ -114,7 +208,41 @@ oc login --server=https://api.your-cluster.com:6443
 ```
 
 #### Deploy Causa
+
+**If using Vertex AI:**
 ```bash
+# Use the generated apply script
+cd deployment/kubernetes/vertex-ai/generated
+./apply.sh
+
+# This handles the correct deployment order automatically
+
+
+"OR"
+
+
+# 1. Deploy base deployment FIRST (if not already deployed)
+kubectl apply -k deployment/kubernetes/overlays/openshift  # or overlays/openshift
+
+# 2. Apply ADC secrets
+cd deployment/kubernetes/vertex-ai/generated
+kubectl apply -f causa-llm-secrets.yaml
+kubectl apply -f gcp-adc-credentials.yaml
+
+# 3. Patch deployment to mount secrets
+kubectl patch deployment causa-backend -n diagnostics-tool \
+  --patch-file deployment-adc-patch.yaml
+
+# 4. Restart deployment to pick up changes
+kubectl rollout restart deployment/causa-backend -n diagnostics-tool
+kubectl rollout status deployment/causa-backend -n diagnostics-tool
+
+```
+
+**If using Anthropic Direct API:**
+```bash
+# IMPORTANT: Create secrets first (see LLM Setup above)
+
 # From repository root
 oc apply -k deployment/kubernetes/overlays/openshift
 
@@ -136,7 +264,6 @@ ROUTE_URL=$(oc get route -n diagnostics-tool ocp-causa-backend -o jsonpath='{.sp
 # Access endpoints (HTTPS)
 curl https://$ROUTE_URL/q/health/live
 curl https://$ROUTE_URL/q/health/ready
-curl https://$ROUTE_URL/swagger-ui
 ```
 
 ## Configuration
@@ -231,26 +358,23 @@ Override in `deployment/kubernetes/overlays/openshift/deployment-patch.yaml`:
 
 ## Health Checks
 
-The deployment includes three types of health probes:
+The deployment includes two types of health probes:
 
 ### Liveness Probe
 - **Path**: `/q/health/live`
 - **Purpose**: Determines if pod should be restarted
 - **Initial Delay**: 30s
 - **Period**: 10s
+- **Timeout**: 3s
+- **Failure Threshold**: 3
 
 ### Readiness Probe
 - **Path**: `/q/health/ready`
 - **Purpose**: Determines if pod should receive traffic
 - **Initial Delay**: 30s
 - **Period**: 5s
-
-### Startup Probe
-- **Path**: `/q/health/started`
-- **Purpose**: Determines if application has started
-- **Initial Delay**: 5s
-- **Period**: 5s
-- **Failure Threshold**: 30 (max 150s startup time)
+- **Timeout**: 3s
+- **Failure Threshold**: 3
 
 ## Monitoring
 

@@ -23,6 +23,8 @@ public final class AppConstants {
 
         /** Database connection pool initialization priority. */
         public static final int DATABASE_PRIORITY = 20;
+        /** LLM initialization priority. */
+        public static final int LLM_PRIORITY = 10;
     }
 
     /**

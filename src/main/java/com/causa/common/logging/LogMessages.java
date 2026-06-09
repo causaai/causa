@@ -21,6 +21,31 @@ public final class LogMessages {
         public static final String LIVENESS_CHECK_CALLED = "Liveness check called";
         public static final String READINESS_CHECK_PASSED = "Readiness check passed";
         public static final String READINESS_CHECK_FAILED = "Readiness check failed";
+        public static final String LLM_READINESS_PASSED = "LLM readiness check passed";
+        public static final String LLM_READINESS_FAILED = "LLM readiness check failed";
+    }
+
+    public static final class Llm {
+        private Llm() {}
+
+        // Startup
+        public static final String LLM_FACTORY_INITIALIZING = "Initializing LLM chat model factory";
+        public static final String LLM_PROVIDER_DETECTED = "LLM provider detected";
+        public static final String LLM_READY = "LLM ready";
+        public static final String LLM_STARTUP_FAILED = "LLM startup failed";
+        public static final String CONNECTIVITY_CHECK_START = "Verifying LLM connectivity";
+        public static final String CONNECTIVITY_CHECK_SUCCESS = "LLM connectivity verified";
+        public static final String CONNECTIVITY_CHECK_FAILED = "LLM connectivity check failed";
+
+        // Prompt operations
+        public static final String PROMPT_SEND_START = "Sending prompt to LLM";
+        public static final String PROMPT_SEND_SUCCESS = "Prompt sent successfully";
+
+        // Errors
+        public static final String LLM_ERROR = "LLM error occurred";
+        public static final String UNSUPPORTED_PROVIDER = "Unsupported LLM provider";
+        public static final String MISSING_CONFIGURATION = "Missing required LLM configuration";
+        public static final String MODEL_NOT_AVAILABLE = "LLM chat model not available";
     }
 
     /**

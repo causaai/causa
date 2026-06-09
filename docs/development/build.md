@@ -4,7 +4,7 @@ This guide explains how to build and push multi-architecture Docker images for c
 
 ## Overview
 
-The `scripts/dev/build_and_push.sh` script provides a comprehensive solution for building and pushing Docker images with support for:
+The `scripts/development/build_and_push.sh` script provides a comprehensive solution for building and pushing Docker images with support for:
 
 - ✅ Custom image names and tags
 - ✅ Multi-architecture builds (AMD64 and ARM64)

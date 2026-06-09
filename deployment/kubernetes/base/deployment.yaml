@@ -24,7 +24,7 @@ spec:
       serviceAccountName: causa-backend
       containers:
       - name: causa-backend
-        image: quay.io/rh-ee-shesaxen/causa-backend:shekhar_t1
+        image: quay.io/rh-ee-shesaxen/causa-backend:shekhar_t2
         imagePullPolicy: Always
         ports:
         - name: http
@@ -65,6 +65,16 @@ spec:
             secretKeyRef:
               name: diagnostics-tool-db-app
               key: password
+        envFrom:
+        # Public configuration (non-sensitive)
+        # Loads ALL keys from ConfigMap as environment variables
+        - configMapRef:
+            name: causa-config
+        # Secrets (API keys, credentials)
+        # Loads ALL keys from Secret as environment variables
+        - secretRef:
+            name: causa-llm-secrets
+            optional: true  # Allow deployment without secrets for non-LLM features
         resources:
           requests:
             cpu: 100m
@@ -92,11 +102,3 @@ spec:
           timeoutSeconds: 3
           successThreshold: 1
           failureThreshold: 3
-        volumeMounts:
-        - name: config
-          mountPath: /deployments/config
-          readOnly: true
-      volumes:
-      - name: config
-        configMap:
-          name: causa-config
