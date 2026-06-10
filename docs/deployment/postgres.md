@@ -268,15 +268,8 @@ postgresql://causa_backend:PASSWORD@diagnostics-tool-db-rw.diagnostics-tool.svc.
 jdbc:postgresql://diagnostics-tool-db-rw.diagnostics-tool.svc.cluster.local:5432/diagnostics-tool-db
 ```
 
-<<<<<<< HEAD
-<<<<<<< HEAD
+
 ## Directory Structure
-=======
-## Files Structure
->>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
-=======
-## Directory Structure
->>>>>>> 396e8d8 (updating docs typo suggestion)
 
 ```
 deployment/
