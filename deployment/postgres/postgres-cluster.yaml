@@ -1,0 +1,18 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: diagnostics-tool-db
+spec:
+  instances: 1
+  imageName: quay.io/rh-ee-shesaxen/postgres-pgvector:17
+  
+  bootstrap:
+    initdb:
+      database: diagnostics-tool-db
+      owner: causa_backend
+      postInitSQL:
+        - CREATE EXTENSION IF NOT EXISTS vector;
+  
+  storage:
+    size: 10Gi
+

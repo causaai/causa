@@ -43,6 +43,36 @@ quarkus:
     enabled: true
     path: banner.txt
 
+  # ============================================================
+  # Database Configuration (PostgreSQL + Agroal Connection Pool)
+  # ============================================================
+  datasource:
+    db-kind: postgresql
+    username: ${CAUSA_DB_USERNAME:causa_backend}
+    password: ${CAUSA_DB_PASSWORD:}
+    jdbc:
+      url: ${CAUSA_DB_URL:jdbc:postgresql://diagnostics-tool-db-rw.diagnostics-tool.svc.cluster.local:5432/diagnostics-tool-db}
+      min-size: ${CAUSA_DB_POOL_MIN_SIZE:2}
+      max-size: ${CAUSA_DB_POOL_MAX_SIZE:10}
+      idle-removal-interval: ${CAUSA_DB_POOL_IDLE_REMOVAL:PT2M}
+      max-lifetime: ${CAUSA_DB_POOL_MAX_LIFETIME:PT10M}
+      acquisition-timeout: ${CAUSA_DB_POOL_ACQUISITION_TIMEOUT:PT5S}
+      background-validation-interval: ${CAUSA_DB_POOL_VALIDATION_INTERVAL:PT2M}
+      new-connection-sql: SELECT 1
+
+  # Hibernate ORM Configuration
+  hibernate-orm:
+    database:
+      generation: validate
+      # Use update to always update the schema on startup in development environments
+      # generation: update 
+    log:
+      sql: true
+    # Fix for Jackson date serialization compatibility
+    mapping:
+      format:
+        global: ignore
+
 
 # Custom Application Configuration (TO BE ADDED LATER)
 # causa:
