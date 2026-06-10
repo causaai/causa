@@ -6,9 +6,14 @@ import com.causa.common.constants.ApiConstants;
 import com.causa.common.constants.AppConstants;
 import com.causa.common.constants.DatabaseConstants;
 import com.causa.common.constants.HealthCheckConstants;
+import com.causa.common.constants.LlmConstants;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
+import com.causa.config.LlmConfig;
+import com.causa.core.domain.LlmRequest;
+import com.causa.core.domain.LlmResponse;
 import com.causa.infrastructure.persistence.DatabaseConnectionService;
+import com.causa.llm.LangChainPromptSender;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -50,6 +55,8 @@ public class HealthCheckService {
     private final String mcpK8sEndpoint;
     private final String mcpK8sHealthPath;
     private final int mcpK8sTimeout;
+    private final LangChainPromptSender llmPromptSender;
+    private final LlmConfig llmConfig;
 
     @Inject
     public HealthCheckService(
@@ -58,13 +65,17 @@ public class HealthCheckService {
             @ConfigProperty(name = "quarkus.application.version") String applicationVersion,
             @ConfigProperty(name = "causa.mcp.kubernetes.endpoint") String mcpK8sEndpoint,
             @ConfigProperty(name = "causa.mcp.kubernetes.health-path") String mcpK8sHealthPath,
-            @ConfigProperty(name = "causa.mcp.kubernetes.timeout-ms") int mcpK8sTimeout) {
+            @ConfigProperty(name = "causa.mcp.kubernetes.timeout-ms") int mcpK8sTimeout,
+            LangChainPromptSender llmPromptSender,
+            LlmConfig llmConfig) {
         this.databaseConnectionService = databaseConnectionService;
         this.dataSource = dataSource;
         this.applicationVersion = applicationVersion;
         this.mcpK8sEndpoint = mcpK8sEndpoint;
         this.mcpK8sHealthPath = mcpK8sHealthPath;
         this.mcpK8sTimeout = mcpK8sTimeout;
+        this.llmPromptSender = llmPromptSender;
+        this.llmConfig = llmConfig;
     }
 
     /**
@@ -101,9 +112,9 @@ public class HealthCheckService {
         ComponentHealthDto mcpK8sHealth = checkMcpKubernetesHealth();
         responseBuilder.addComponent(HealthCheckConstants.ComponentNames.MCP_KUBERNETES, mcpK8sHealth);
 
-        // TODO: Add LLM provider health check
-        // ComponentHealthDto llmHealth = checkLlmProviderHealth();
-        // responseBuilder.addComponent(HealthCheckConstants.ComponentNames.LLM_PROVIDER, llmHealth);
+        // Check LLM provider health
+        ComponentHealthDto llmHealth = checkLlmProviderHealth();
+        responseBuilder.addComponent(HealthCheckConstants.ComponentNames.LLM_PROVIDER, llmHealth);
 
         // TODO: Add MCP Cryostat health check
         // ComponentHealthDto mcpCryostatHealth = checkMcpCryostatHealth();
@@ -114,7 +125,7 @@ public class HealthCheckService {
         // responseBuilder.addComponent(HealthCheckConstants.ComponentNames.MCP_KRUIZE, mcpKruizeHealth);
 
         // Determine overall system status
-        AppConstants.HealthStatus overallStatus = determineOverallStatus(databaseHealth, mcpK8sHealth);
+        AppConstants.HealthStatus overallStatus = determineOverallStatus(databaseHealth, mcpK8sHealth, llmHealth);
         responseBuilder.status(overallStatus.getValue());
 
         HealthCheckResponseDto response = responseBuilder.build();
@@ -146,6 +157,7 @@ public class HealthCheckService {
             return ComponentHealthDto.builder()
                     .status(AppConstants.HealthStatus.DOWN.getValue())
                     .message(DatabaseConstants.Health.DB_NOT_AVAILABLE_MESSAGE)
+                    .latencyMs(0L)
                     .build();
         }
 
@@ -249,29 +261,101 @@ public class HealthCheckService {
     }
 
     /**
+     * Checks the health of the LLM provider.
+     * Verifies LLM readiness and measures response latency.
+     *
+     * @return Component health DTO with LLM status and latency
+     */
+    private ComponentHealthDto checkLlmProviderHealth() {
+        long startTime = System.currentTimeMillis();
+
+        try {
+            log.info(LogMessages.HealthCheck.LLM_CHECK_STARTED);
+
+            // Check if LLM is ready
+            boolean isReady = llmPromptSender.isReady();
+
+            if (!isReady) {
+                log.warn(LogMessages.HealthCheck.LLM_CHECK_FAILED);
+                return ComponentHealthDto.builder()
+                        .status(AppConstants.HealthStatus.DOWN.getValue())
+                        .message(LlmConstants.Messages.LLM_NOT_READY)
+                        .latencyMs(System.currentTimeMillis() - startTime)
+                        .build();
+            }
+
+            // Send a test prompt to verify connectivity
+            LlmRequest testRequest = LlmRequest.builder(LlmConstants.TestData.CONNECTIVITY_TEST_PROMPT)
+                    .maxTokens(LlmConstants.TestData.CONNECTIVITY_TEST_MAX_TOKENS)
+                    .build();
+            
+            LlmResponse testResponse = llmPromptSender.send(testRequest);
+
+            if (testResponse == null || testResponse.responseText() == null || testResponse.responseText().trim().isEmpty()) {
+                log.warn(LogMessages.HealthCheck.LLM_CHECK_FAILED);
+                return ComponentHealthDto.builder()
+                        .status(AppConstants.HealthStatus.DOWN.getValue())
+                        .message(LlmConstants.Messages.LLM_CONNECTIVITY_FAILED)
+                        .latencyMs(System.currentTimeMillis() - startTime)
+                        .build();
+            }
+
+            long latency = System.currentTimeMillis() - startTime;
+            String message = String.format(LlmConstants.Messages.LLM_CONNECTED_FORMAT,
+                    llmConfig.modelName());
+
+            log.info(LogMessages.HealthCheck.LLM_CHECK_PASSED)
+                .field(ApiConstants.LogFields.LATENCY_MS, latency)
+                .log();
+
+            return ComponentHealthDto.builder()
+                    .status(AppConstants.HealthStatus.UP.getValue())
+                    .message(message)
+                    .latencyMs(latency)
+                    .build();
+
+        } catch (Exception e) {
+            long latency = System.currentTimeMillis() - startTime;
+            log.error(LogMessages.HealthCheck.LLM_CHECK_FAILED)
+                .exception(e)
+                .log();
+
+            return ComponentHealthDto.builder()
+                    .status(AppConstants.HealthStatus.DOWN.getValue())
+                    .message(String.format(LlmConstants.Messages.LLM_ERROR_FORMAT, e.getMessage()))
+                    .latencyMs(latency)
+                    .build();
+        }
+    }
+
+    /**
      * Determine overall system status based on component health.
      *
      * <p>Currently, the database is considered a critical component,
      * so if it's down, the entire system is considered down.
-     * MCP Kubernetes is considered non-critical, so if it's down but
+     * MCP Kubernetes and LLM are considered non-critical, so if they're down but
      * database is up, the system status is DEGRADED.
      *
      * @param databaseHealth the database component health
      * @param mcpK8sHealth the MCP Kubernetes component health
+     * @param llmHealth the LLM provider component health
      * @return overall system status (UP, DOWN, or DEGRADED)
      */
     private AppConstants.HealthStatus determineOverallStatus(
             ComponentHealthDto databaseHealth,
-            ComponentHealthDto mcpK8sHealth) {
+            ComponentHealthDto mcpK8sHealth,
+            ComponentHealthDto llmHealth) {
         
         // Database is a critical component
         if (!AppConstants.HealthStatus.UP.getValue().equals(databaseHealth.getStatus())) {
             return AppConstants.HealthStatus.DOWN;
         }
 
-        // If database is UP but MCP Kubernetes is DOWN -> DEGRADED
-        if (mcpK8sHealth != null &&
-            !AppConstants.HealthStatus.UP.getValue().equals(mcpK8sHealth.getStatus())) {
+        // If database is UP but any non-critical component is DOWN -> DEGRADED
+        if ((mcpK8sHealth != null &&
+             !AppConstants.HealthStatus.UP.getValue().equals(mcpK8sHealth.getStatus())) ||
+            (llmHealth != null &&
+             !AppConstants.HealthStatus.UP.getValue().equals(llmHealth.getStatus()))) {
             return AppConstants.HealthStatus.DEGRADED;
         }
 
@@ -279,9 +363,8 @@ public class HealthCheckService {
         return AppConstants.HealthStatus.UP;
     }
 
-    // TODO: Implement LLM provider health check
-    // private ComponentHealthDto checkLlmProviderHealth() {
-    //     // Check LangChain4J connection to gpt-4-turbo
+    // TODO: Implement MCP Cryostat health check
+    // private ComponentHealthDto checkMcpCryostatHealth() {
     //     // Measure latency of a simple API call
     //     // Return ComponentHealthDto with status and latency
     // }
