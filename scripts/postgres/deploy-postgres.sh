@@ -401,3 +401,4 @@ print_info "  kubectl get pods -n ${NAMESPACE}"
 echo ""
 
 exit 0
+
