@@ -65,16 +65,6 @@ spec:
             secretKeyRef:
               name: diagnostics-tool-db-app
               key: password
-        envFrom:
-        # Public configuration (non-sensitive)
-        # Loads ALL keys from ConfigMap as environment variables
-        - configMapRef:
-            name: causa-config
-        # Secrets (API keys, credentials)
-        # Loads ALL keys from Secret as environment variables
-        - secretRef:
-            name: causa-llm-secrets
-            optional: true  # Allow deployment without secrets for non-LLM features
         resources:
           requests:
             cpu: 100m

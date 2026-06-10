@@ -9,9 +9,7 @@ This guide covers deploying PostgreSQL 17 with pgvector extension using CloudNat
 - [Quick Start](#quick-start)
 - [Platform-Specific Details](#platform-specific-details)
 - [Connection Information](#connection-information)
-- [Verification](#verification)
-- [Troubleshooting](#troubleshooting)
-- [Maintenance](#maintenance)
+
 
 ## Overview
 

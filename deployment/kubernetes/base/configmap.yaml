@@ -13,10 +13,8 @@ data:
   # Swagger/OpenAPI Configuration
   CAUSA_SWAGGER_UI_PATH: "/swagger-ui"
 
-  # Database Configuration (placeholder)
-  # CAUSA_DB_HOST: "postgres"
-  # CAUSA_DB_PORT: "5432"
-  # CAUSA_DB_NAME: "causa"
+  # Database Configuration
+  CAUSA_DB_URL: "jdbc:postgresql://diagnostics-tool-db-rw.diagnostics-tool.svc.cluster.local:5432/diagnostics-tool-db"
 
   # MCP Kubernetes Configuration
   CAUSA_MCP_K8S_ENDPOINT: "http://kubernetes-mcp-server.diagnostics-tool.svc.cluster.local:8080"
