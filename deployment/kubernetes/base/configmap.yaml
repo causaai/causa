@@ -31,5 +31,15 @@ data:
   LLM_AUTH_TYPE: ""
   LLM_CUSTOM_HEADERS: ""
 
+  # Alert Configuration
+  # Minimum alert severity to trigger diagnostic pipeline (critical, warning, info)
+  CAUSA_ALERT_SEVERITY: "critical"
+
+  # Time to wait (minutes) before analyzing repeat alerts for same pod to prevent LLM spam
+  CAUSA_ALERT_COOLDOWN: "15"
+
+  # Comma-separated list of namespaces to ignore (e.g., system namespaces)
+  CAUSA_ALERT_IGNORE_NS: "kube-system,istio-system"
+
   # MCP Configuration (placeholder)
   # CAUSA_MCP_SERVERS: "kruize,cryostat,kubernetes"
