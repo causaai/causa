@@ -11,14 +11,7 @@ NC='\033[0m'
 # Defaults
 DEFAULT_IMAGE="quay.io/rh-ee-shesaxen/postgres-pgvector:17"
 DEFAULT_OPERATOR_VERSION="1.29.1"
-<<<<<<< HEAD
-<<<<<<< HEAD
 DEFAULT_OPERATOR_RELEASE_BRANCH="release-1.29"
-=======
->>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
-=======
-DEFAULT_OPERATOR_RELEASE_BRANCH="release-1.29"
->>>>>>> 36db7aa (adding validation checks for operator version in script)
 DEFAULT_CLUSTER_TYPE="kind"
 NAMESPACE="diagnostics-tool"
 
@@ -76,20 +69,11 @@ Options:
   -t          Terminate mode - remove all PostgreSQL and operator resources
   -h          Show this help
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 36db7aa (adding validation checks for operator version in script)
 Environment Variables:
   OPERATOR_VERSION          CloudNativePG operator version (default: $DEFAULT_OPERATOR_VERSION)
   OPERATOR_RELEASE_BRANCH   Release branch (default: $DEFAULT_OPERATOR_RELEASE_BRANCH)
                             Must match the version's major.minor (e.g., release-1.29 for 1.29.x)
 
-<<<<<<< HEAD
-=======
->>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
-=======
->>>>>>> 36db7aa (adding validation checks for operator version in script)
 Examples:
   # Deploy on Kind cluster
   $0 -c kind
@@ -100,10 +84,6 @@ Examples:
   # Deploy with custom image
   $0 -c kind -i quay.io/myorg/postgres-pgvector:17
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 36db7aa (adding validation checks for operator version in script)
   # Deploy with specific operator version (branch auto-validated)
   OPERATOR_VERSION=1.29.2 $0 -c kind
 
@@ -116,14 +96,6 @@ Examples:
 Note: The script validates that OPERATOR_VERSION matches OPERATOR_RELEASE_BRANCH
       to prevent 404 errors from version/branch mismatches.
 
-<<<<<<< HEAD
-=======
-  # Terminate everything
-  $0 -t
-
->>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
-=======
->>>>>>> 36db7aa (adding validation checks for operator version in script)
 EOF
     exit "${1:-0}"
 }
@@ -161,20 +133,11 @@ fi
 print_info "✓ Connected to cluster"
 echo ""
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 36db7aa (adding validation checks for operator version in script)
 # Validate operator version matches release branch (skip in terminate mode)
 if [ "$TERMINATE_MODE" = false ]; then
     validate_operator_version "$OPERATOR_VERSION" "$OPERATOR_RELEASE_BRANCH"
 fi
 
-<<<<<<< HEAD
-=======
->>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
-=======
->>>>>>> 36db7aa (adding validation checks for operator version in script)
 # Handle terminate mode
 if [ "$TERMINATE_MODE" = true ]; then
     print_header "Terminate Mode - Cleaning Up PostgreSQL Resources"
@@ -201,15 +164,7 @@ if [ "$TERMINATE_MODE" = true ]; then
         kubectl delete csv -n openshift-operators -l operators.coreos.com/cloudnative-pg.openshift-operators --ignore-not-found=true
     else
         # Delete direct installation
-<<<<<<< HEAD
-<<<<<<< HEAD
         OPERATOR_URL="https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/${OPERATOR_RELEASE_BRANCH}/releases/cnpg-${OPERATOR_VERSION}.yaml"
-=======
-        OPERATOR_URL="https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.29/releases/cnpg-${OPERATOR_VERSION}.yaml"
->>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
-=======
-        OPERATOR_URL="https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/${OPERATOR_RELEASE_BRANCH}/releases/cnpg-${OPERATOR_VERSION}.yaml"
->>>>>>> 36db7aa (adding validation checks for operator version in script)
         kubectl delete -f "${OPERATOR_URL}" --ignore-not-found=true --wait=false
     fi
     
@@ -287,15 +242,7 @@ else
     # Kind/Kubernetes: Use direct manifest installation
     print_info "Installing operator v${OPERATOR_VERSION} for Kind..."
     
-<<<<<<< HEAD
-<<<<<<< HEAD
     OPERATOR_URL="https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/${OPERATOR_RELEASE_BRANCH}/releases/cnpg-${OPERATOR_VERSION}.yaml"
-=======
-    OPERATOR_URL="https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.29/releases/cnpg-${OPERATOR_VERSION}.yaml"
->>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
-=======
-    OPERATOR_URL="https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/${OPERATOR_RELEASE_BRANCH}/releases/cnpg-${OPERATOR_VERSION}.yaml"
->>>>>>> 36db7aa (adding validation checks for operator version in script)
     
     # Check if operator already exists and cleanup if needed
     if kubectl get namespace cnpg-system &> /dev/null; then
@@ -370,94 +317,38 @@ echo ""
 print_header "Waiting for PostgreSQL Cluster"
 CLUSTER_NAME="diagnostics-tool-db"
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 # Wait for pod to be created (20 attempts x 6 seconds = 120 seconds)
 print_info "Waiting for pod to be created..."
 for i in {1..20}; do
-=======
-# Wait for pod to be created (15 attempts x 6 seconds = 150 seconds)
-print_info "Waiting for pod to be created..."
-for i in {1..15}; do
->>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
-=======
-# Wait for pod to be created (20 attempts x 6 seconds = 120 seconds)
-print_info "Waiting for pod to be created..."
-for i in {1..20}; do
->>>>>>> 3d9d186 (fixing retry count value mismatch in logs and commands)
     if kubectl get pod "${CLUSTER_NAME}-1" -n "${NAMESPACE}" &> /dev/null; then
         print_info "✓ Pod ${CLUSTER_NAME}-1 created"
         break
     fi
-<<<<<<< HEAD
-<<<<<<< HEAD
     print_info "Attempt $i/20: Waiting for pod..."
-=======
-    print_info "Attempt $i/10: Waiting for pod..."
->>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
-=======
-    print_info "Attempt $i/20: Waiting for pod..."
->>>>>>> 3d9d186 (fixing retry count value mismatch in logs and commands)
     sleep 6
 done
 
 if ! kubectl get pod "${CLUSTER_NAME}-1" -n "${NAMESPACE}" &> /dev/null; then
-<<<<<<< HEAD
-<<<<<<< HEAD
     print_error "Pod not created after 120 seconds"
-=======
-    print_error "Pod not created after 60 seconds"
->>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
-=======
-    print_error "Pod not created after 120 seconds"
->>>>>>> 3d9d186 (fixing retry count value mismatch in logs and commands)
     print_error "Check: kubectl get cluster -n ${NAMESPACE}"
     exit 1
 fi
 
-<<<<<<< HEAD
-<<<<<<< HEAD
 # Wait for pod to be ready (20 attempts x 6 seconds = 120 seconds)
 print_info "Waiting for pod to be ready..."
 for i in {1..20}; do
-=======
-# Wait for pod to be ready (10 attempts x 6 seconds = 60 seconds)
-print_info "Waiting for pod to be ready..."
-for i in {1..10}; do
->>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
-=======
-# Wait for pod to be ready (20 attempts x 6 seconds = 120 seconds)
-print_info "Waiting for pod to be ready..."
-for i in {1..20}; do
->>>>>>> 3d9d186 (fixing retry count value mismatch in logs and commands)
     POD_STATUS=$(kubectl get pod "${CLUSTER_NAME}-1" -n "${NAMESPACE}" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
     if [ "$POD_STATUS" = "True" ]; then
         print_info "✓ Pod is ready"
         break
     fi
     PHASE=$(kubectl get pod "${CLUSTER_NAME}-1" -n "${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
-<<<<<<< HEAD
-<<<<<<< HEAD
     print_info "Attempt $i/20: Pod phase - $PHASE"
-=======
-    print_info "Attempt $i/10: Pod phase - $PHASE"
->>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
-=======
-    print_info "Attempt $i/20: Pod phase - $PHASE"
->>>>>>> 3d9d186 (fixing retry count value mismatch in logs and commands)
     sleep 6
 done
 
 if [ "$POD_STATUS" != "True" ]; then
-<<<<<<< HEAD
-<<<<<<< HEAD
     print_warn "Pod not ready after 120 seconds"
-=======
-    print_warn "Pod not ready after 60 seconds"
->>>>>>> 48b9797 (adding support for postgres installation with cnpg operator)
-=======
-    print_warn "Pod not ready after 120 seconds"
->>>>>>> 3d9d186 (fixing retry count value mismatch in logs and commands)
     print_warn "Check: kubectl get pods -n ${NAMESPACE}"
 fi
 echo ""
@@ -510,4 +401,3 @@ print_info "  kubectl get pods -n ${NAMESPACE}"
 echo ""
 
 exit 0
-
