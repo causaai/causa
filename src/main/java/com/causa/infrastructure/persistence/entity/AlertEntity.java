@@ -16,32 +16,59 @@ import java.time.Instant;
 @Table(name = "alerts")
 public class AlertEntity extends BaseEntity {
 
+    // Database column name constants
+    public static final class Columns {
+        private Columns() {}
+
+        public static final String ALERT_ID = "alert_id";
+        public static final String TIMESTAMP = "timestamp";
+        public static final String ALERT_NAME = "alert_name";
+        public static final String SEVERITY = "severity";
+        public static final String POD_NAME = "pod_name";
+        public static final String CONTAINER_NAME = "container_name";
+        public static final String NAMESPACE = "namespace";
+        public static final String STATUS = "status";
+        public static final String HAS_DIAGNOSTICS = "has_diagnostics";
+    }
+
+    // Field name constants for Panache queries
+    public static final class Fields {
+        private Fields() {}
+
+        public static final String ALERT_ID = "alertId";
+        public static final String TIMESTAMP = "timestamp";
+        public static final String CONTAINER_NAME = "containerName";
+        public static final String NAMESPACE = "namespace";
+        public static final String SEVERITY = "severity";
+        public static final String HAS_DIAGNOSTICS = "hasDiagnostics";
+    }
+
     @Id
-    @Column(name = "alert_id", nullable = false, length = 512)
+    @Column(name = Columns.ALERT_ID, nullable = false, length = 512)
     private String alertId;
 
-    @Column(name = "timestamp", nullable = false)
+    @Column(name = Columns.TIMESTAMP, nullable = false)
     private Instant timestamp;
 
-    @Column(name = "alert_name", nullable = false, length = 255)
+    @Column(name = Columns.ALERT_NAME, nullable = false, length = 255)
     private String alertName;
 
-    @Column(name = "severity", nullable = false, length = 20)
+    @Column(name = Columns.SEVERITY, nullable = false, length = 20)
     private String severity;
 
-    @Column(name = "pod_name", length = 255)
+    @Column(name = Columns.POD_NAME, length = 255)
     private String podName;
 
-    @Column(name = "container_name", nullable = false, length = 255)
+    @Column(name = Columns.CONTAINER_NAME, nullable = false, length = 255)
     private String containerName;
 
-    @Column(name = "namespace", nullable = false, length = 255)
+    @Column(name = Columns.NAMESPACE, nullable = false, length = 255)
     private String namespace;
 
-    @Column(name = "status", nullable = false, length = 20)
+    @Column(name = Columns.STATUS, nullable = false, length = 20)
     private String status;
 
-    @Column(name = "has_diagnostics", nullable = false)
+    @Column(name = Columns.HAS_DIAGNOSTICS, nullable = false)
     private Boolean hasDiagnostics = false;
 
     // Getters and Setters

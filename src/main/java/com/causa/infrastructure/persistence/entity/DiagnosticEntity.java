@@ -20,28 +20,53 @@ import java.time.Instant;
 @Table(name = "diagnostics")
 public class DiagnosticEntity extends BaseEntity {
 
+    // Database column name constants
+    public static final class Columns {
+        private Columns() {}
+
+        public static final String DIAGNOSTIC_ID = "diagnostic_id";
+        public static final String ALERT_ID = "alert_id";
+        public static final String STATUS = "status";
+        public static final String GENERATED_AT = "generated_at";
+        public static final String CONFIDENCE_SCORE = "confidence_score";
+        public static final String FAULT_DOMAIN = "fault_domain";
+        public static final String ROOT_CAUSE_ANALYSIS = "root_cause_analysis";
+    }
+
+    // Field name constants for Panache queries
+    public static final class Fields {
+        private Fields() {}
+
+        public static final String DIAGNOSTIC_ID = "diagnosticId";
+        public static final String ALERT = "alert";
+        public static final String ALERT_ID = "alert.alertId";
+        public static final String STATUS = "status";
+        public static final String GENERATED_AT = "generatedAt";
+        public static final String FAULT_DOMAIN = "faultDomain";
+    }
+
     @Id
-    @Column(name = "diagnostic_id", nullable = false, length = 512)
+    @Column(name = Columns.DIAGNOSTIC_ID, nullable = false, length = 512)
     private String diagnosticId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "alert_id", nullable = false, foreignKey = @ForeignKey(name = "fk_diagnostic_alert"))
+    @JoinColumn(name = Columns.ALERT_ID, nullable = false, foreignKey = @ForeignKey(name = "fk_diagnostic_alert"))
     private AlertEntity alert;
 
-    @Column(name = "status", nullable = false, length = 20)
+    @Column(name = Columns.STATUS, nullable = false, length = 20)
     private String status;
 
-    @Column(name = "generated_at", nullable = false)
+    @Column(name = Columns.GENERATED_AT, nullable = false)
     private Instant generatedAt;
 
-    @Column(name = "confidence_score")
+    @Column(name = Columns.CONFIDENCE_SCORE)
     private Float confidenceScore;
 
-    @Column(name = "fault_domain", length = 20)
+    @Column(name = Columns.FAULT_DOMAIN, length = 20)
     private String faultDomain;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "root_cause_analysis", columnDefinition = "jsonb")
+    @Column(name = Columns.ROOT_CAUSE_ANALYSIS, columnDefinition = "jsonb")
     private JsonNode rootCauseAnalysis;
 
     // Getters and Setters
