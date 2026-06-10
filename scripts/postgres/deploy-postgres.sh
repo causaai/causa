@@ -159,7 +159,7 @@ if [ "$TERMINATE_MODE" = true ]; then
     else
         print_warn "Cluster CRD not found, skipping cluster deletion"
         # Still try to delete PVCs by label
-        print_info "Checking for PostgreSQL PVCs..."
+        print_info "Deleting PostgreSQL PVCs ..."
         kubectl delete pvc -l cnpg.io/cluster="${CLUSTER_NAME}" -n "${NAMESPACE}" --ignore-not-found=true 2>/dev/null || true
     fi
     
@@ -171,9 +171,9 @@ if [ "$TERMINATE_MODE" = true ]; then
         kubectl delete subscription cloudnative-pg -n openshift-operators --ignore-not-found=true
         kubectl delete csv -n openshift-operators -l operators.coreos.com/cloudnative-pg.openshift-operators --ignore-not-found=true
         
-        # Wait a bit for cleanup
+        # Wait for CSV to be deleted
         print_info "Waiting for operator cleanup..."
-        sleep 5
+        kubectl wait --for=delete csv -n openshift-operators -l operators.coreos.com/cloudnative-pg.openshift-operators --timeout=120s 2>/dev/null || true
         
         # Check if CRDs still exist and remove them
         print_info "Checking for CloudNativePG CRDs..."
@@ -319,19 +319,19 @@ echo ""
 # Wait for CRDs to be available
 print_info "Waiting for CloudNativePG CRDs to be available..."
 CRD_FOUND=false
-for i in {1..30}; do
+for i in {1..20}; do
     if kubectl get crd clusters.postgresql.cnpg.io &> /dev/null; then
         CRD_FOUND=true
         print_info "✓ CloudNativePG CRDs are available"
         break
     fi
     echo -n "."
-    sleep 2
+    sleep 6
 done
 echo ""
 
 if [ "$CRD_FOUND" = false ]; then
-    print_error "CloudNativePG CRDs not found after 60 seconds"
+    print_error "CloudNativePG CRDs not found after 120 seconds"
     print_error "The operator may not have installed correctly"
     print_error "Check operator status:"
     print_error "  kubectl get pods -n ${OPERATOR_NS}"
