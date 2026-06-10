@@ -1,0 +1,13 @@
+{
+  "name": "Causa RCA Generation Failure",
+  "type": "metric alert",
+  "query": "sum(last_5m):sum:causa_rca_analysis_failed.count{*} by {reason,analysis_type,namespace} >= 1",
+  "message": "🚨 Causa RCA generation failure detected\n\nReason: {{reason.name}}\nAnalysis Type: {{analysis_type.name}}\nNamespace: {{namespace.name}}\n\nOne or more RCA generations failed in the last 5 minutes.\nInvestigate the Causa backend and RCA generation pipeline.",
+  "tags": ["causa", "rca", "failure", "openmetrics", "datadog"],
+  "options": {
+    "include_tags": true,
+    "notify_no_data": false,
+    "require_full_window": false,
+    "renotify_interval": 0
+  }
+}

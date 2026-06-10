@@ -1,0 +1,12 @@
+{
+  "name": "Causa RCA Success Rate Low",
+  "type": "metric alert",
+  "query": "sum(last_15m):sum:causa_rca_analysis_failed.count{*} > 0",
+  "message": "One or more RCA generations failed in the last 15 minutes.\n\nInvestigate RCA generation failures and backend health.",
+  "tags": ["causa", "rca", "success-rate", "openmetrics", "datadog"],
+  "options": {
+    "include_tags": true,
+    "notify_no_data": false,
+    "require_full_window": false
+  }
+}
