@@ -43,6 +43,6 @@ public final class DatabaseConstants {
         public static final String DB_DOWN_MESSAGE = "Database is not ready";
         public static final String DB_CONNECTED_MESSAGE = "Connected to PostgreSQL";
         public static final String DB_NOT_AVAILABLE_MESSAGE = "Database connection not available";
-        public static final String DB_CONNECTION_FAILED_MESSAGE = "Failed to connect to PostgreSQL";
+        public static final String DB_CONNECTION_FAILED_MESSAGE = "Connection failed to PostgreSQL";
     }
 }

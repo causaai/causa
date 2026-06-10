@@ -3,6 +3,7 @@ package com.causa.api.dto;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -84,22 +85,18 @@ public class HealthCheckResponseDto {
         this.version = version;
     }
 
+    /**
+     * Get an unmodifiable view of the components map.
+     * This ensures immutability of the DTO after construction.
+     *
+     * @return unmodifiable map of component health statuses
+     */
     public Map<String, ComponentHealthDto> getComponents() {
-        return components;
+        return Collections.unmodifiableMap(components);
     }
 
     public void setComponents(Map<String, ComponentHealthDto> components) {
         this.components = components;
-    }
-
-    /**
-     * Add a component health status to the response
-     *
-     * @param componentName the name of the component
-     * @param componentHealth the health status of the component
-     */
-    public void addComponent(String componentName, ComponentHealthDto componentHealth) {
-        this.components.put(componentName, componentHealth);
     }
 
     /**

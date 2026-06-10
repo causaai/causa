@@ -83,5 +83,8 @@ public final class LogMessages {
         public static final String MCP_K8S_CHECK_PASSED = "MCP Kubernetes server health check passed";
         public static final String MCP_K8S_CHECK_FAILED = "MCP Kubernetes server health check failed";
         public static final String MCP_K8S_DISABLED = "MCP Kubernetes health check is disabled";
+        public static final String LLM_CHECK_STARTED = "Checking LLM provider health";
+        public static final String LLM_CHECK_PASSED = "LLM provider health check passed";
+        public static final String LLM_CHECK_FAILED = "LLM provider health check failed";
     }
 }
