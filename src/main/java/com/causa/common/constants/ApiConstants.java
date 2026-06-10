@@ -48,4 +48,62 @@ public final class ApiConstants {
         public static final String READINESS_UP_MESSAGE = "Causa is ready to accept requests";
         public static final String READINESS_DOWN_MESSAGE = "Causa is not ready to accept requests";
     }
+
+    /**
+     * API version constants.
+     */
+    public static final class Version {
+        private Version() {}
+
+        public static final String API_V1 = "/api/v1";
+    }
+
+    /**
+     * API endpoint paths organized by resource.
+     */
+    public static final class Paths {
+        private Paths() {}
+
+        /**
+         * Webhook endpoints for external system integrations.
+         */
+        public static final class Webhooks {
+            private Webhooks() {}
+
+            public static final String BASE = Version.API_V1 + "/webhooks";
+            public static final String ALERTS = BASE + "/alerts";
+        }
+
+        /**
+         * Alert query and management endpoints.
+         */
+        public static final class Alerts {
+            private Alerts() {}
+
+            public static final String BASE = Version.API_V1 + "/alerts";
+            public static final String BY_ID = BASE + "/{alertId}";
+            public static final String BY_CONTAINER = Version.API_V1 + "/containers/{containerName}/alerts";
+        }
+
+        /**
+         * Diagnostic query endpoints.
+         */
+        public static final class Diagnostics {
+            private Diagnostics() {}
+
+            public static final String BASE = Version.API_V1 + "/diagnostics";
+            public static final String BY_ALERT_ID = Version.API_V1 + "/alerts/{alertId}/diagnostics";
+        }
+
+        /**
+         * Health check paths.
+         */
+        public static final class Health {
+            private Health() {}
+
+            public static final String LIVENESS = "/q/health/live";
+            public static final String READINESS = "/q/health/ready";
+        }
+    }
+
 }
