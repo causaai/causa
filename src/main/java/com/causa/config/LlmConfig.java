@@ -20,7 +20,7 @@ import java.util.Optional;
  * @since 0.0.1
  */
 @ConfigMapping(prefix = "causa.llm")
-public interface LlmConfig {
+public interface LLMConfig {
 
     /**
      * LLM provider to use (anthropic, vertex-ai-anthropic, openai, ollama).
@@ -63,7 +63,7 @@ public interface LlmConfig {
      * @return custom headers map
      */
     @WithName("custom-headers")
-    @WithConverter(JsonUtils.JsonMapConverter.class)
+    @WithConverter(JsonUtils.ConfigPropertyJsonConverter.class)
     Map<String, String> customHeaders();
 
     /**

@@ -8,9 +8,9 @@ package com.causa.common.constants;
  *
  * @since 0.0.1
  */
-public final class LlmConstants {
+public final class LLMConstants {
 
-    private LlmConstants() {
+    private LLMConstants() {
         // Prevent instantiation
     }
 
@@ -89,7 +89,7 @@ public final class LlmConstants {
         public static final String UNSUPPORTED_PROVIDER = "UnsupportedProvider";
         public static final String MISSING_CONFIGURATION = "MissingConfiguration";
         public static final String MODEL_NOT_READY = "ModelNotReady";
-        public static final String LLM_REQUEST_FAILED = "LlmRequestFailed";
+        public static final String LLM_REQUEST_FAILED = "LLMRequestFailed";
         public static final String INVALID_REQUEST_PARAMETERS = "InvalidRequestParameters";
     }
 

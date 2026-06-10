@@ -15,7 +15,7 @@ package com.causa.core.domain;
  * @param latencyMs End-to-end latency in milliseconds
  * @since 0.0.1
  */
-public record LlmResponse(
+public record LLMResponse(
     String responseText,
     String modelUsed,
     long inputTokens,

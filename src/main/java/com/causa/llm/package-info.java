@@ -24,8 +24,8 @@
  * <ul>
  *   <li>{@link com.causa.llm.ChatModelFactory} - Produces ChatLanguageModel based on provider</li>
  *   <li>{@link com.causa.llm.LangChainPromptSender} - Implements PromptSender port using LangChain4J</li>
- *   <li>{@link com.causa.llm.LlmStartup} - Verifies connectivity at startup</li>
- *   <li>{@link com.causa.llm.LlmHealthCheck} - MicroProfile readiness check</li>
+ *   <li>{@link com.causa.llm.LLMStartup} - Verifies connectivity at startup</li>
+ *   <li>{@link com.causa.llm.LLMHealthCheck} - MicroProfile readiness check</li>
  * </ul>
  *
  * @since 0.0.1

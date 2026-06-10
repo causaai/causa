@@ -25,8 +25,8 @@ public final class LogMessages {
         public static final String LLM_READINESS_FAILED = "LLM readiness check failed";
     }
 
-    public static final class Llm {
-        private Llm() {}
+    public static final class LLM {
+        private LLM() {}
 
         // Startup
         public static final String LLM_FACTORY_INITIALIZING = "Initializing LLM chat model factory";
