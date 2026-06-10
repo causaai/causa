@@ -62,127 +62,85 @@ Future:
 
 ---
 
-## Required RCA Metrics
+## Monitors Implemented
 
-### 1. RCA Analysis Available
+### 1. Causa RCA Generation Failure
 
-**Metric:**
-```
-causa_rca_analysis_available
-```
+**Purpose:**
+Triggers when RCA generation failures are observed.
 
-**Type:** Gauge
+**Details:**
+- Uses failure metrics and surfaces failure reason and analysis type
+- Intended to catch backend, data collection, or processing issues
 
-**Value:**
-```
-1 = RCA analysis available
-```
-
-**Required Labels:**
-
-| Label        | Description                    | Example                           |
-|--------------|--------------------------------|-----------------------------------|
-| analysis_id  | Unique RCA analysis identifier | "2178940"                         |
-| analysis_url | Direct URL to RCA analysis     | "https://irb.causa.com/analysis/2178940" |
-| namespace    | Namespace where issue occurred | "causa-datadog"                   |
-| workload     | Workload name                  | "auth-cache"                      |
-| pod          | Affected pod                   | "fake-causa-app-6c5744b7dd-44lhd" |
-| issue_type   | Issue category                 | "high_memory"                     |
-| severity     | Severity level                 | "critical", "warning", "info"     |
-| status       | Analysis status                | "triggered", "completed", "failed"|
-
-**Example:**
-```
-causa_rca_analysis_available{
-  analysis_id="2178940",
-  analysis_url="https://irb.causa.com/analysis/2178940",
-  namespace="causa-datadog",
-  workload="auth-cache",
-  pod="fake-causa-app-6c5744b7dd-44lhd",
-  issue_type="high_memory",
-  severity="critical",
-  status="triggered"
-} 1
-```
+**Configuration:**
+`src/main/java/com/causa/observability/datadog/monitors/failure/monitor-config.json`
 
 ---
 
-### 2. RCA Analysis Duration
-
-**Metric:**
-```
-causa_rca_analysis_duration_seconds
-```
-
-**Type:** Histogram
+### 2. Causa RCA Generation Latency High
 
 **Purpose:**
-- Detect slow RCA generation
-- Monitor RCA performance
-- Track P50, P95, P99 latencies
+Triggers when RCA generation duration exceeds the configured threshold.
 
-**Labels:**
-- `analysis_type`
-- `status`
-- `namespace`
+**Details:**
+- Intended to identify performance degradation in RCA generation
 
-**Example:**
-```
-causa_rca_analysis_duration_seconds_bucket{analysis_type="high_memory",status="completed",namespace="causa-datadog",le="0.5"} 10
-causa_rca_analysis_duration_seconds_bucket{analysis_type="high_memory",status="completed",namespace="causa-datadog",le="1.0"} 25
-causa_rca_analysis_duration_seconds_sum{analysis_type="high_memory",status="completed",namespace="causa-datadog"} 45.2
-causa_rca_analysis_duration_seconds_count{analysis_type="high_memory",status="completed",namespace="causa-datadog"} 30
-```
+**Configuration:**
+`src/main/java/com/causa/observability/datadog/monitors/latency/monitor-config.json`
 
 ---
 
-### 3. RCA Analysis Failures
-
-**Metric:**
-```
-causa_rca_analysis_failed_total
-```
-
-**Type:** Counter
+### 3. Causa RCA - High Failure Rate
 
 **Purpose:**
-- Detect RCA generation failures
-- Track failure reasons
+Tracks the overall volume/rate of RCA generation failures.
 
-**Labels:**
-- `reason` (e.g., "timeout", "data_unavailable", "llm_error")
-- `analysis_type`
-- `namespace`
+**Details:**
+- Useful for identifying systemic issues rather than individual failures
 
-**Example:**
-```
-causa_rca_analysis_failed_total{reason="timeout",analysis_type="high_memory",namespace="causa-datadog"} 3
-```
+**Configuration:**
+`src/main/java/com/causa/observability/datadog/monitors/high-failure-rate/monitor-config.json`
 
 ---
 
-### 4. RCA Analysis Completed
-
-**Metric:**
-```
-causa_rca_analysis_completed_total
-```
-
-**Type:** Counter
+### 4. Causa RCA - No Analysis Generated
 
 **Purpose:**
-- Track successful RCA generation
-- Calculate success rate
+Alerts when no RCA analyses are generated within a defined time window.
 
-**Labels:**
-- `analysis_type`
-- `severity`
-- `namespace`
+**Details:**
+- Intended to detect pipeline outages, ingestion failures, or backend issues
 
-**Example:**
-```
-causa_rca_analysis_completed_total{analysis_type="high_memory",severity="critical",namespace="causa-datadog"} 42
-```
+**Configuration:**
+`src/main/java/com/causa/observability/datadog/monitors/no-rca-generated/monitor-config.json`
+
+---
+
+### 5. Causa RCA - Slow Analysis Trend
+
+**Purpose:**
+Detects increasing RCA generation duration trends over time.
+
+**Details:**
+- Intended as an early warning for performance degradation
+
+**Configuration:**
+`src/main/java/com/causa/observability/datadog/monitors/slow-rca-trend/monitor-config.json`
+
+---
+
+### 6. Causa RCA Success Rate Low
+
+**Purpose:**
+Triggers when the RCA success rate falls below the configured threshold.
+
+**Details:**
+- Helps identify an increase in RCA generation failures relative to successful analyses
+- Intended to detect reliability issues in the RCA generation pipeline and backend services
+
+**Configuration:**
+`src/main/java/com/causa/observability/datadog/monitors/success-rate/monitor-config.json`
 
 ---
 
@@ -231,7 +189,7 @@ causa_rca_analysis_available > 0
 - Namespace
 - Workload
 - Pod
-- Issue Type
+- Analysis Type
 - Severity
 
 **Action:** Navigate to RCA analysis page using analysis_id
@@ -289,7 +247,7 @@ histogram_quantile(0.95, causa_rca_analysis_duration_seconds) > 30
 
 **Trigger:**
 ```
-causa_rca_analysis_available{issue_type="high_memory"} > 0
+causa_rca_analysis_available{analysis_type="high_memory"} > 0
 ```
 
 **Alert includes:**
@@ -307,7 +265,7 @@ causa_rca_analysis_available{issue_type="high_memory"} > 0
 
 **Trigger:**
 ```
-causa_rca_analysis_available{issue_type="cpu_throttling"} > 0
+causa_rca_analysis_available{analysis_type="cpu_throttling"} > 0
 ```
 
 **Alert includes:**
@@ -325,7 +283,7 @@ causa_rca_analysis_available{issue_type="cpu_throttling"} > 0
 
 **Trigger:**
 ```
-causa_rca_analysis_available{issue_type="oom_kill",severity="critical"} > 0
+causa_rca_analysis_available{analysis_type="oom_kill",severity="critical"} > 0
 ```
 
 **Alert includes:**
@@ -343,7 +301,7 @@ causa_rca_analysis_available{issue_type="oom_kill",severity="critical"} > 0
 
 **Trigger:**
 ```
-causa_rca_analysis_available{issue_type="crash_loop_backoff",severity="critical"} > 0
+causa_rca_analysis_available{analysis_type="crash_loop_backoff",severity="critical"} > 0
 ```
 
 **Alert includes:**
@@ -361,7 +319,7 @@ causa_rca_analysis_available{issue_type="crash_loop_backoff",severity="critical"
 
 **Trigger:**
 ```
-causa_rca_analysis_available{issue_type="high_error_rate"} > 0
+causa_rca_analysis_available{analysis_type="high_error_rate"} > 0
 ```
 
 **Alert includes:**
@@ -378,7 +336,7 @@ causa_rca_analysis_available{issue_type="high_error_rate"} > 0
 
 **Trigger:**
 ```
-causa_rca_analysis_available{issue_type="network_latency"} > 0
+causa_rca_analysis_available{analysis_type="network_latency"} > 0
 ```
 
 **Alert includes:**
@@ -395,7 +353,7 @@ causa_rca_analysis_available{issue_type="network_latency"} > 0
 
 **Trigger:**
 ```
-causa_rca_analysis_available{issue_type="disk_space_critical",severity="critical"} > 0
+causa_rca_analysis_available{analysis_type="disk_space_critical",severity="critical"} > 0
 ```
 
 **Alert includes:**
@@ -412,7 +370,7 @@ causa_rca_analysis_available{issue_type="disk_space_critical",severity="critical
 
 **Trigger:**
 ```
-causa_rca_analysis_available{issue_type="pod_eviction"} > 0
+causa_rca_analysis_available{analysis_type="pod_eviction"} > 0
 ```
 
 **Alert includes:**
@@ -429,7 +387,7 @@ causa_rca_analysis_available{issue_type="pod_eviction"} > 0
 
 **Trigger:**
 ```
-causa_rca_analysis_available{issue_type="service_unavailable",severity="critical"} > 0
+causa_rca_analysis_available{analysis_type="service_unavailable",severity="critical"} > 0
 ```
 
 **Alert includes:**
@@ -446,7 +404,7 @@ causa_rca_analysis_available{issue_type="service_unavailable",severity="critical
 
 **Trigger:**
 ```
-causa_rca_analysis_available{issue_type="db_connection_pool_exhausted"} > 0
+causa_rca_analysis_available{analysis_type="db_connection_pool_exhausted"} > 0
 ```
 
 **Alert includes:**
@@ -463,7 +421,7 @@ causa_rca_analysis_available{issue_type="db_connection_pool_exhausted"} > 0
 
 **Trigger:**
 ```
-causa_rca_analysis_available{issue_type="dependency_failure"} > 0
+causa_rca_analysis_available{analysis_type="dependency_failure"} > 0
 ```
 
 **Alert includes:**
