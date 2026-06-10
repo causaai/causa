@@ -159,7 +159,7 @@ if [ "$TERMINATE_MODE" = true ]; then
     else
         print_warn "Cluster CRD not found, skipping cluster deletion"
         # Still try to delete PVCs by label
-        print_info "Deleting PostgreSQL PVCs ..."
+        print_info "Deleting PostgreSQL PVCs ... "
         kubectl delete pvc -l cnpg.io/cluster="${CLUSTER_NAME}" -n "${NAMESPACE}" --ignore-not-found=true 2>/dev/null || true
     fi
     
