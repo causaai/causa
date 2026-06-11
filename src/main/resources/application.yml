@@ -76,21 +76,6 @@ quarkus:
       format:
         global: ignore
 
-
-  # Hibernate ORM Configuration
-  hibernate-orm:
-    database:
-      # Use 'update' for local development to auto-create/update schema
-      # Use 'validate' in production to ensure schema matches entities
-      generation: ${CAUSA_DB_GENERATION:update}
-    log:
-      sql: true
-    # Fix for Jackson date serialization compatibility
-    mapping:
-      format:
-        global: ignore
-
-
 # Custom Application Configuration
 causa:
 # MCP Configuration
@@ -132,28 +117,6 @@ causa:
 #     kruize:
 #       endpoint: ${CAUSA_MCP_KRUIZE_ENDPOINT}
 #       timeout-ms: ${CAUSA_MCP_KRUIZE_TIMEOUT}
-
-  # LLM Configuration (LangChain4J)
-  llm:
-    provider: ${LLM_PROVIDER:vertex-ai-anthropic}
-    model-name: ${LLM_MODEL_NAME:claude-sonnet-4-6}
-    base-url: ${LLM_BASE_URL:}
-    auth-type: ${LLM_AUTH_TYPE:}
-    custom-headers: ${LLM_CUSTOM_HEADERS:\{\}}
-    temperature: ${LLM_TEMPERATURE:0.1}
-    max-tokens: ${LLM_MAX_TOKENS:4096}
-    api-key: ${LLM_API_KEY:}
-    timeout-seconds: ${LLM_TIMEOUT_SECONDS:60}
-    chat-memory-size: ${LLM_CHAT_MEMORY_SIZE:10}
-    vertex:
-      project-id: ${VERTEX_PROJECT_ID:itpc-gcp-cp-pe-eng-claude}
-      location: ${VERTEX_LOCATION:us-east5}
-
-# Feature Flags (TO BE ADDED LATER)
-#   features:
-#     rag-enabled: ${CAUSA_FEATURE_RAG:false}
-#     validation-enabled: ${CAUSA_FEATURE_VALIDATION:true}
-#     notifications-enabled: ${CAUSA_FEATURE_NOTIFICATIONS:false}
 
 #   # Alert Configuration
 #   alerts:

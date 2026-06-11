@@ -63,5 +63,3 @@ public final class LogMessages {
         public static final String READINESS_CHECK_FAILED = "Database readiness check failed";
     }
 }
-
-// Made with Bob
