@@ -52,6 +52,7 @@ public class AlertMapper {
      *
      * <p>Validation ensures container and namespace are always present.
      * <p>Severity defaults to configured value if missing.
+     * <p>Uses Prometheus fingerprint as alert ID for global uniqueness and idempotency.
      *
      * @param item the alert item from the webhook payload
      * @return the domain Alert object
@@ -70,7 +71,12 @@ public class AlertMapper {
         String severityStr = labels.getOrDefault(AlertConstants.Labels.SEVERITY, defaultSeverity);
 
         Instant timestamp = parseTimestamp(item.getStartsAt());
-        String alertId = Alert.generateAlertId(container, timestamp);
+
+        // Use Prometheus fingerprint as alert ID (globally unique, deterministic)
+        // Fallback to generated ID if fingerprint is missing (shouldn't happen with Alertmanager v4)
+        String alertId = (item.getFingerprint() != null && !item.getFingerprint().isBlank())
+            ? item.getFingerprint()
+            : Alert.generateAlertId(container, timestamp);
 
         return Alert.builder()
             .alertId(alertId)
