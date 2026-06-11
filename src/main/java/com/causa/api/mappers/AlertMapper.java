@@ -4,7 +4,10 @@ import com.causa.api.dto.request.AlertWebhookRequest;
 import com.causa.common.constants.AlertConstants;
 import com.causa.common.constants.AlertConstants.AlertSeverity;
 import com.causa.common.constants.AlertConstants.AlertStatus;
+import com.causa.config.AlertConfig;
 import com.causa.core.domain.Alert;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
 import java.time.Instant;
 import java.util.List;
@@ -18,10 +21,14 @@ import java.util.Map;
  *
  * @since 0.0.1
  */
-public final class AlertMapper {
+@ApplicationScoped
+public class AlertMapper {
 
-    private AlertMapper() {
-        // Prevent instantiation
+    private final String defaultSeverity;
+
+    @Inject
+    public AlertMapper(AlertConfig alertConfig) {
+        this.defaultSeverity = alertConfig.filterSeverity();
     }
 
     /**
@@ -30,35 +37,37 @@ public final class AlertMapper {
      * @param request the webhook request
      * @return list of domain Alert objects
      */
-    public static List<Alert> toDomainList(AlertWebhookRequest request) {
+    public List<Alert> toDomainList(AlertWebhookRequest request) {
         if (request == null || request.getAlerts() == null) {
             return List.of();
         }
 
         return request.getAlerts().stream()
-            .map(AlertMapper::toDomain)
+            .map(this::toDomain)
             .toList();
     }
 
     /**
      * Maps a single Alertmanager alert item to a domain Alert.
      *
+     * <p>Validation ensures container and namespace are always present.
+     * <p>Severity defaults to configured value if missing.
+     *
      * @param item the alert item from the webhook payload
      * @return the domain Alert object
      */
-    public static Alert toDomain(AlertWebhookRequest.AlertItem item) {
+    public Alert toDomain(AlertWebhookRequest.AlertItem item) {
         Map<String, String> labels = item.getLabels();
         Map<String, String> annotations = item.getAnnotations();
 
-        String alertName = getLabel(labels, AlertConstants.Labels.ALERT_NAME, "unknown");
-        String container = getLabel(labels, AlertConstants.Labels.CONTAINER,
-                                      AlertConstants.Defaults.UNKNOWN_CONTAINER);
-        String pod = getLabel(labels, AlertConstants.Labels.POD, null);
-        String namespace = getLabelWithFallback(labels, annotations,
-                                                 AlertConstants.Labels.NAMESPACE,
-                                                 AlertConstants.Defaults.DEFAULT_NAMESPACE);
-        String severityStr = getLabel(labels, AlertConstants.Labels.SEVERITY,
-                                       AlertConstants.Defaults.DEFAULT_SEVERITY_FILTER);
+        // Required fields (validated before this is called)
+        String alertName = labels.get(AlertConstants.Labels.ALERT_NAME);
+        String container = labels.get(AlertConstants.Labels.CONTAINER);
+        String namespace = getLabelWithFallback(labels, annotations, AlertConstants.Labels.NAMESPACE);
+
+        // Optional fields
+        String pod = labels.get(AlertConstants.Labels.POD);
+        String severityStr = labels.getOrDefault(AlertConstants.Labels.SEVERITY, defaultSeverity);
 
         Instant timestamp = parseTimestamp(item.getStartsAt());
         String alertId = Alert.generateAlertId(container, timestamp);
@@ -77,21 +86,6 @@ public final class AlertMapper {
     }
 
     /**
-     * Extracts a label value from the labels map with a default fallback.
-     *
-     * @param labels the labels map
-     * @param key the label key
-     * @param defaultValue default value if key not found
-     * @return the label value or default
-     */
-    private static String getLabel(Map<String, String> labels, String key, String defaultValue) {
-        if (labels == null) {
-            return defaultValue;
-        }
-        return labels.getOrDefault(key, defaultValue);
-    }
-
-    /**
      * Extracts a label with fallback to annotations if not found in labels.
      *
      * <p>Some Alertmanager configurations put namespace/pod in annotations rather than labels.
@@ -99,23 +93,21 @@ public final class AlertMapper {
      * @param labels the labels map
      * @param annotations the annotations map
      * @param key the key to search for
-     * @param defaultValue default value if not found anywhere
-     * @return the value from labels, annotations, or default
+     * @return the value from labels or annotations
      */
-    private static String getLabelWithFallback(Map<String, String> labels,
-                                                Map<String, String> annotations,
-                                                String key,
-                                                String defaultValue) {
-        String value = getLabel(labels, key, null);
+    private String getLabelWithFallback(Map<String, String> labels,
+                                        Map<String, String> annotations,
+                                        String key) {
+        String value = labels.get(key);
         if (value != null) {
             return value;
         }
 
         if (annotations != null) {
-            return annotations.getOrDefault(key, defaultValue);
+            return annotations.get(key);
         }
 
-        return defaultValue;
+        return null;
     }
 
     /**
@@ -126,7 +118,7 @@ public final class AlertMapper {
      * @param isoTimestamp the ISO timestamp string
      * @return the parsed Instant, or current time if parsing fails
      */
-    private static Instant parseTimestamp(String isoTimestamp) {
+    private Instant parseTimestamp(String isoTimestamp) {
         if (isoTimestamp == null || isoTimestamp.isBlank()) {
             return Instant.now();
         }

@@ -41,14 +41,17 @@ public class AlertWebhookController {
     private final AlertService alertService;
     private final DiagnosticService diagnosticService;
     private final AlertRepository alertRepository;
+    private final AlertMapper alertMapper;
 
     @Inject
     public AlertWebhookController(AlertService alertService,
                                    DiagnosticService diagnosticService,
-                                   AlertRepository alertRepository) {
+                                   AlertRepository alertRepository,
+                                   AlertMapper alertMapper) {
         this.alertService = alertService;
         this.diagnosticService = diagnosticService;
         this.alertRepository = alertRepository;
+        this.alertMapper = alertMapper;
     }
 
     /**
@@ -83,7 +86,7 @@ public class AlertWebhookController {
         }
 
         // Map DTO to domain
-        List<Alert> domainAlerts = AlertMapper.toDomainList(request);
+        List<Alert> domainAlerts = alertMapper.toDomainList(request);
 
         // Process through service (filtering, cooldown, persistence)
         List<Alert> accepted = alertService.processAlerts(domainAlerts);

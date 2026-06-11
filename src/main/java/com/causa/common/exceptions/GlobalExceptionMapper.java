@@ -14,13 +14,51 @@ import org.jboss.resteasy.reactive.server.ServerExceptionMapper;
  * Global Exception Mapper
  *
  * <p>Application-wide exception handler for all exceptions.
- * <p>Returns structured error responses for both HTTP exceptions (400, 404, 405) and unexpected errors.
+ * <p>Handles domain exceptions (Alert, Diagnostic), HTTP exceptions (400, 404, 405), and unexpected errors.
  *
  * @since 0.0.1
  */
 public class GlobalExceptionMapper {
 
     private static final CausaLogger log = CausaLogger.getLogger(GlobalExceptionMapper.class);
+
+    /**
+     * Handles AlertException with proper logging and error response.
+     *
+     * @param exception the alert exception
+     * @return HTTP 500 response with error details
+     */
+    @ServerExceptionMapper
+    public Response handleAlertException(AlertException exception) {
+        log.error(LogMessages.Alert.ALERT_PROCESSING_ERROR)
+            .field("errorType", exception.getErrorType())
+            .field("message", exception.getMessage())
+            .exception(exception)
+            .log();
+
+        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+            .entity(ErrorResponse.of(500, "Alert Processing Error", exception.getMessage()))
+            .build();
+    }
+
+    /**
+     * Handles DiagnosticException with proper logging and error response.
+     *
+     * @param exception the diagnostic exception
+     * @return HTTP 500 response with error details
+     */
+    @ServerExceptionMapper
+    public Response handleDiagnosticException(DiagnosticException exception) {
+        log.error(LogMessages.Diagnostic.DIAGNOSTIC_FAILED)
+            .field("errorType", exception.getErrorType())
+            .field("message", exception.getMessage())
+            .exception(exception)
+            .log();
+
+        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+            .entity(ErrorResponse.of(500, "Diagnostic Processing Error", exception.getMessage()))
+            .build();
+    }
 
     /**
      * Handles 404 Not Found exceptions.

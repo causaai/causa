@@ -26,18 +26,6 @@ public final class AlertConstants {
         public static final String CONTAINER = "container";
     }
 
-    /**
-     * Default values for alert processing.
-     */
-    public static final class Defaults {
-        private Defaults() {}
-
-        public static final String DEFAULT_SEVERITY_FILTER = "critical";
-        public static final int DEFAULT_COOLDOWN_MINUTES = 15;
-        public static final String DEFAULT_IGNORE_NAMESPACES = "kube-system,istio-system";
-        public static final String UNKNOWN_CONTAINER = "unknown";
-        public static final String DEFAULT_NAMESPACE = "default";
-    }
 
     /**
      * Alertmanager webhook constants.

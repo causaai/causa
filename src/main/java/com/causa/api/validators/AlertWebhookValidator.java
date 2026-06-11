@@ -76,9 +76,23 @@ public final class AlertWebhookValidator {
 
         if (item.getLabels() == null || item.getLabels().isEmpty()) {
             errors.add("alerts[" + index + "].labels is required");
-        } else if (!item.getLabels().containsKey(AlertConstants.Labels.ALERT_NAME)) {
+            return;
+        }
+
+        // Validate required labels
+        if (!item.getLabels().containsKey(AlertConstants.Labels.ALERT_NAME)) {
             errors.add("alerts[" + index + "].labels must contain '"
                 + AlertConstants.Labels.ALERT_NAME + "'");
+        }
+
+        if (!item.getLabels().containsKey(AlertConstants.Labels.CONTAINER)) {
+            errors.add("alerts[" + index + "].labels must contain '"
+                + AlertConstants.Labels.CONTAINER + "'");
+        }
+
+        if (!item.getLabels().containsKey(AlertConstants.Labels.NAMESPACE)) {
+            errors.add("alerts[" + index + "].labels must contain '"
+                + AlertConstants.Labels.NAMESPACE + "'");
         }
     }
 }

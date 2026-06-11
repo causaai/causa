@@ -67,14 +67,15 @@ public final class DiagnosticConstants {
     /**
      * Fault Domain
      *
-     * <p>Categorizes the root cause domain for a memory/GC issue.
+     * <p>Specific memory-related diagnostic categories for alert classification.
      */
     public enum FaultDomain {
 
-        APP_CODE("APP_CODE"),
-        K8S_CONFIG("K8S_CONFIG"),
-        JVM_CONFIG("JVM_CONFIG"),
-        UNKNOWN("UNKNOWN");
+        OOM_KILLED("OOM_KILLED"),
+        HIGH_MEMORY_PRESSURE("HIGH_MEMORY_PRESSURE"),
+        POSSIBLE_OOM_KILLED("POSSIBLE_OOM_KILLED"),
+        POSSIBLE_HIGH_MEMORY_PRESSURE("POSSIBLE_HIGH_MEMORY_PRESSURE"),
+        POSSIBLE_GC_PAUSE("POSSIBLE_GC_PAUSE");
 
         private final String value;
 
