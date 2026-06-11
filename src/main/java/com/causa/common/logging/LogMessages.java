@@ -15,6 +15,9 @@ public final class LogMessages {
         // Prevent instantiation
     }
 
+    // Global messages
+    public static final String UNEXPECTED_ERROR = "Unexpected error occurred";
+
     public static final class Health {
         private Health() {}
 
@@ -79,6 +82,13 @@ public final class LogMessages {
         public static final String ALERT_PROCESSING_ERROR = "Error processing alert webhook";
         public static final String COOLDOWN_CACHE_CLEANUP = "Cooldown cache cleanup completed";
         public static final String ALERT_PERSISTED = "Alert persisted to database";
+
+        // Exception messages
+        public static final String ALERT_PERSIST_FAILED = "Failed to persist alert";
+        public static final String ALERT_QUERY_FAILED = "Failed to query alerts";
+        public static final String ALERT_QUERY_BY_CONTAINER_FAILED = "Failed to find alerts for container";
+        public static final String ALERT_UPDATE_FAILED = "Failed to update alert";
+        public static final String ALERT_NOT_FOUND = "Alert not found";
     }
 
     /**
@@ -94,5 +104,12 @@ public final class LogMessages {
         public static final String RCA_VALIDATION_STARTED = "RCA validation started";
         public static final String DIAGNOSTIC_COMPLETED = "Diagnostic completed";
         public static final String DIAGNOSTIC_FAILED = "Diagnostic failed";
+
+        // Exception messages
+        public static final String DIAGNOSTIC_PERSIST_FAILED = "Failed to persist diagnostic";
+        public static final String DIAGNOSTIC_QUERY_FAILED = "Failed to query diagnostic";
+        public static final String DIAGNOSTIC_QUERY_BY_ALERT_FAILED = "Failed to find diagnostic for alert";
+        public static final String DIAGNOSTIC_UPDATE_FAILED = "Failed to update diagnostic";
+        public static final String DIAGNOSTIC_NOT_FOUND = "Diagnostic not found";
     }
 }
