@@ -76,9 +76,14 @@ quarkus:
       format:
         global: ignore
 
-
 # Custom Application Configuration
 causa:
+# MCP Configuration
+  mcp:
+    kubernetes:
+      endpoint: ${CAUSA_MCP_K8S_ENDPOINT}
+      health-path: ${CAUSA_MCP_K8S_HEALTH_PATH}
+      timeout-ms: ${CAUSA_MCP_K8S_TIMEOUT}
   # LLM Configuration (LangChain4J)
   llm:
     provider: ${LLM_PROVIDER:vertex-ai-anthropic}
@@ -113,7 +118,9 @@ causa:
 #       endpoint: ${CAUSA_MCP_K8S_ENDPOINT:http://k8s-mcp.causa.svc.cluster.local:8080}
 #       timeout-ms: ${CAUSA_MCP_K8S_TIMEOUT:5000}
 #     cryostat:
-#       endpoint: ${CAUSA_MCP_CRYOSTAT_ENDPOINT:http://cryostat-mcp.causa.svc:8181}
+#       endpoint: ${CAUSA_MCP_CRYOSTAT_ENDPOINT}
+#       timeout-ms: ${CAUSA_MCP_CRYOSTAT_TIMEOUT}
 #     kruize:
-#       endpoint: ${CAUSA_MCP_KRUIZE_ENDPOINT:http://kruize.monitoring.svc:8080}
+#       endpoint: ${CAUSA_MCP_KRUIZE_ENDPOINT}
+#       timeout-ms: ${CAUSA_MCP_KRUIZE_TIMEOUT}
 
