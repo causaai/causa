@@ -8,9 +8,9 @@ package com.causa.common.constants;
  *
  * @since 0.0.1
  */
-public final class LlmConstants {
+public final class LLMConstants {
 
-    private LlmConstants() {
+    private LLMConstants() {
         // Prevent instantiation
     }
 
@@ -89,7 +89,7 @@ public final class LlmConstants {
         public static final String UNSUPPORTED_PROVIDER = "UnsupportedProvider";
         public static final String MISSING_CONFIGURATION = "MissingConfiguration";
         public static final String MODEL_NOT_READY = "ModelNotReady";
-        public static final String LLM_REQUEST_FAILED = "LlmRequestFailed";
+        public static final String LLM_REQUEST_FAILED = "LLMRequestFailed";
         public static final String INVALID_REQUEST_PARAMETERS = "InvalidRequestParameters";
     }
 
@@ -148,17 +148,5 @@ public final class LlmConstants {
 
         public static final String CONNECTIVITY_TEST_PROMPT = "Respond with OK";
         public static final int CONNECTIVITY_TEST_MAX_TOKENS = 10;
-    }
-
-    /**
-     * Health check messages for LLM provider.
-     */
-    public static final class Messages {
-        private Messages() {}
-
-        public static final String LLM_NOT_READY = "LLM provider is not ready";
-        public static final String LLM_CONNECTIVITY_FAILED = "LLM connectivity test failed";
-        public static final String LLM_CONNECTED_FORMAT = "Connected to LangChain4J with %s";
-        public static final String LLM_ERROR_FORMAT = "LLM health check failed: %s";
     }
 }

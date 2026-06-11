@@ -1,7 +1,7 @@
 package com.causa.core.domain;
 
-import com.causa.common.constants.LlmConstants;
-import com.causa.common.exceptions.LlmException;
+import com.causa.common.constants.LLMConstants;
+import com.causa.common.exceptions.LLMException;
 
 import java.util.Optional;
 
@@ -20,7 +20,7 @@ import java.util.Optional;
  * @param temperature Sampling temperature 0.0-1.0 (optional, defaults to config)
  * @since 0.0.1
  */
-public record LlmRequest(
+public record LLMRequest(
     String prompt,
     Optional<String> systemPrompt,
     Optional<String> context,
@@ -32,7 +32,7 @@ public record LlmRequest(
     /**
      * Compact constructor with validation.
      */
-    public LlmRequest {
+    public LLMRequest {
         if (prompt == null || prompt.isBlank()) {
             throw new IllegalArgumentException("Prompt must not be null or blank");
         }
@@ -44,7 +44,7 @@ public record LlmRequest(
         temperature = temperature != null ? temperature : Optional.empty();
 
         // Validate using the normalized parameters
-        validateLlmRequest(temperature, maxTokens);
+        validateLLMRequest(temperature, maxTokens);
     }
 
     /**
@@ -53,25 +53,25 @@ public record LlmRequest(
      *  
      * @param temperature the temperature parameter to validate
      * @param maxTokens the maxTokens parameter to validate
-     * @throws LlmException if any parameter is invalid
+     * @throws LLMException if any parameter is invalid
      */
-    private static void validateLlmRequest(Optional<Double> temperature, Optional<Integer> maxTokens) {
+    private static void validateLLMRequest(Optional<Double> temperature, Optional<Integer> maxTokens) {
         // Validate temperature range
         temperature.ifPresent(t -> {
-            if (t < LlmConstants.Validation.MIN_TEMPERATURE || t > LlmConstants.Validation.MAX_TEMPERATURE) {
-                throw new LlmException(
-                    LlmConstants.ErrorMessages.TEMPERATURE_RANGE_MESSAGE,
-                    LlmConstants.ErrorTypes.INVALID_REQUEST_PARAMETERS
+            if (t < LLMConstants.Validation.MIN_TEMPERATURE || t > LLMConstants.Validation.MAX_TEMPERATURE) {
+                throw new LLMException(
+                    LLMConstants.ErrorMessages.TEMPERATURE_RANGE_MESSAGE,
+                    LLMConstants.ErrorTypes.INVALID_REQUEST_PARAMETERS
                 );
             }
         });
 
         // Validate maxTokens range
         maxTokens.ifPresent(tokens -> {
-            if (tokens < LlmConstants.Validation.MIN_MAX_TOKENS) {
-                throw new LlmException(
-                    LlmConstants.ErrorMessages.MAX_TOKENS_RANGE_MESSAGE,
-                    LlmConstants.ErrorTypes.INVALID_REQUEST_PARAMETERS
+            if (tokens < LLMConstants.Validation.MIN_MAX_TOKENS) {
+                throw new LLMException(
+                    LLMConstants.ErrorMessages.MAX_TOKENS_RANGE_MESSAGE,
+                    LLMConstants.ErrorTypes.INVALID_REQUEST_PARAMETERS
                 );
             }
         });
@@ -81,15 +81,15 @@ public record LlmRequest(
      * Creates a minimal request with only a prompt.
      *
      * @param prompt the user prompt
-     * @return a new LlmRequest
+     * @return a new LLMRequest
      */
-    public static LlmRequest of(String prompt) {
-        return new LlmRequest(prompt, Optional.empty(), Optional.empty(), Optional.empty(),
+    public static LLMRequest of(String prompt) {
+        return new LLMRequest(prompt, Optional.empty(), Optional.empty(), Optional.empty(),
                 Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     /**
-     * Creates a builder for constructing an LlmRequest.
+     * Creates a builder for constructing an LLMRequest.
      *
      * @param prompt the user prompt (required)
      * @return a new Builder
@@ -99,7 +99,7 @@ public record LlmRequest(
     }
 
     /**
-     * Builder for ergonomic LlmRequest construction.
+     * Builder for ergonomic LLMRequest construction.
      */
     public static final class Builder {
         private final String prompt;
@@ -144,8 +144,8 @@ public record LlmRequest(
             return this;
         }
 
-        public LlmRequest build() {
-            return new LlmRequest(prompt, systemPrompt, context, modelOverride,
+        public LLMRequest build() {
+            return new LLMRequest(prompt, systemPrompt, context, modelOverride,
                     enableCaching, maxTokens, temperature);
         }
     }
