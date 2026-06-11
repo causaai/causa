@@ -14,7 +14,7 @@ Environment Variables (LLM_*)
     ↓
 application.yml (causa.llm.*)
     ↓
-LlmConfig.java (@ConfigMapping)
+LLMConfig.java (@ConfigMapping)
     ↓
 Injected into ChatModelFactory & LangChainPromptSender
 ```
@@ -49,7 +49,7 @@ LLM_PROVIDER: "anthropic"
 
 **Notes:**
 - Case-insensitive (converted to lowercase in `ChatModelFactory`)
-- Unsupported values throw `LlmException` at startup
+- Unsupported values throw `LLMException` at startup
 - Determines which `ChatModel` implementation is created
 
 ---

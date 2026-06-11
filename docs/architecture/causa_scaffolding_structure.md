@@ -240,7 +240,7 @@ core/
 │   ├── Recommendation.java      # Value object
 │   ├── EvidenceAssertion.java   # Value object
 │   ├── SystemHealth.java
-│   ├── LlmAnalysis.java
+│   ├── LLMAnalysis.java
 │   ├── ValidationResult.java
 │   └── enums/
 │       ├── AlertSeverity.java   # critical, warning, info
@@ -248,7 +248,7 @@ core/
 │       ├── FaultDomain.java     # APP_CODE, K8S_CONFIG, JVM_CONFIG
 │       ├── DiagnosticStatus.java
 │       ├── ComponentStatus.java
-│       ├── LlmProviderType.java # CLAUDE, OLLAMA, BOB
+│       ├── LLMProviderType.java # CLAUDE, OLLAMA, BOB
 │       └── EvidenceSource.java
 │
 ├── services/                    # PRIMARY PORTS (Use Case interfaces)
@@ -267,7 +267,7 @@ core/
     │   └── SettingsRepository.java
     │
     ├── llm/                     # LLM provider ports
-    │   ├── LlmProvider.java     # Interface for all LLM providers
+    │   ├── LLMProvider.java     # Interface for all LLM providers
     │   └── ChatMemoryStore.java
     │
     ├── mcp/                     # MCP client ports
@@ -360,13 +360,13 @@ llm/
 │   ├── RagPipeline.java
 │   └── ChatPipeline.java
 │
-├── providers/                   # Implements core.ports.llm.LlmProvider
+├── providers/                   # Implements core.ports.llm.LLMProvider
 │   ├── ClaudeProvider.java      # @ApplicationScoped (SINGLETON)
 │   ├── OllamaProvider.java      # @ApplicationScoped (SINGLETON)
 │   ├── BobProvider.java         # @ApplicationScoped (SINGLETON)
-│   ├── AbstractLlmProvider.java # Base class
+│   ├── AbstractLLMProvider.java # Base class
 │   └── factory/
-│       └── LlmProviderFactory.java  # Factory pattern
+│       └── LLMProviderFactory.java  # Factory pattern
 │
 ├── prompts/                     # Prompt engineering
 │   ├── PromptTemplateLoader.java
@@ -394,7 +394,7 @@ llm/
 ```java
 // Adding new LLM provider (e.g., OpenAI)
 @ApplicationScoped
-public class OpenAiProvider implements LlmProvider {
+public class OpenAiProvider implements LLMProvider {
     @Override
     public boolean supports(String providerName) {
         return "openai".equalsIgnoreCase(providerName);
@@ -570,14 +570,14 @@ config/
 │                                 # Aggregates: DB + K8s Secrets + ConfigMaps + Env
 │
 ├── DatabaseConfig.java
-├── LlmConfig.java
+├── LLMConfig.java
 ├── McpConfig.java
 ├── AlertConfig.java
 ├── SecurityConfig.java
 ├── CacheConfig.java
 │
 ├── properties/                  # ConfigMapping POJOs
-│   ├── LlmProperties.java       # Maps LLM_* environment variables
+│   ├── LLMProperties.java       # Maps LLM_* environment variables
 │   ├── McpProperties.java       # Maps MCP_* environment variables
 │   ├── AlertProperties.java
 │   ├── DatabaseProperties.java
@@ -590,7 +590,7 @@ config/
 │   └── EnvironmentConfigLoader.java # Loads from env vars
 │
 └── validators/
-    ├── LlmConfigValidator.java
+    ├── LLMConfigValidator.java
     └── McpConfigValidator.java
 ```
 
@@ -656,7 +656,7 @@ common/
 │   ├── ErrorConstants.java      # Error codes, messages
 │   ├── ConfigConstants.java     # Configuration keys
 │   ├── DatabaseConstants.java   # Table/column names
-│   ├── LlmConstants.java        # LLM defaults
+│   ├── LLMConstants.java        # LLM defaults
 │   ├── McpConstants.java        # MCP identifiers
 │   └── ValidationConstants.java # Thresholds, rules
 │
@@ -671,7 +671,7 @@ common/
 └── exceptions/                  # Custom exception hierarchy
     ├── CausaException.java      # Base checked exception
     ├── CausaRuntimeException.java
-    ├── LlmProviderException.java
+    ├── LLMProviderException.java
     ├── McpConnectionException.java
     ├── ValidationException.java
     ├── ConfigurationException.java

@@ -1,10 +1,10 @@
 package com.causa.llm;
 
-import com.causa.common.constants.LlmConstants;
-import com.causa.common.exceptions.LlmException;
+import com.causa.common.constants.LLMConstants;
+import com.causa.common.exceptions.LLMException;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
-import com.causa.config.LlmConfig;
+import com.causa.config.LLMConfig;
 import dev.langchain4j.model.anthropic.AnthropicChatModel;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.vertexai.anthropic.VertexAiAnthropicChatModel;
@@ -39,10 +39,10 @@ public class ChatModelFactory {
 
     private static final CausaLogger log = CausaLogger.getLogger(ChatModelFactory.class);
 
-    private final LlmConfig config;
+    private final LLMConfig config;
 
     @Inject
-    public ChatModelFactory(LlmConfig config) {
+    public ChatModelFactory(LLMConfig config) {
         this.config = config;
     }
 
@@ -50,28 +50,28 @@ public class ChatModelFactory {
      * Produces the ChatModel bean based on the configured provider.
      *
      * @return the chat model
-     * @throws LlmException if the provider is unsupported or configuration is missing
+     * @throws LLMException if the provider is unsupported or configuration is missing
      */
     @Produces
     @ApplicationScoped
     public ChatModel chatModel() {
-        log.info(LogMessages.Llm.LLM_FACTORY_INITIALIZING)
-            .field(LlmConstants.Fields.PROVIDER, config.provider())
+        log.info(LogMessages.LLM.LLM_FACTORY_INITIALIZING)
+            .field(LLMConstants.Fields.PROVIDER, config.provider())
             .log();
 
         return switch (config.provider().toLowerCase()) {
-            case LlmConstants.Provider.ANTHROPIC -> buildAnthropicModel();
-            case LlmConstants.Provider.VERTEX_AI_ANTHROPIC -> buildVertexAiAnthropicModel();
+            case LLMConstants.Provider.ANTHROPIC -> buildAnthropicModel();
+            case LLMConstants.Provider.VERTEX_AI_ANTHROPIC -> buildVertexAiAnthropicModel();
             // Future providers:
-            // case LlmConstants.Provider.IBM_BOB -> buildIbmBobModel();  // OpenAI-compatible interface
-            // case LlmConstants.Provider.OLLAMA -> buildOllamaModel();
+            // case LLMConstants.Provider.IBM_BOB -> buildIbmBobModel();  // OpenAI-compatible interface
+            // case LLMConstants.Provider.OLLAMA -> buildOllamaModel();
             default -> {
-                log.error(LogMessages.Llm.UNSUPPORTED_PROVIDER)
-                    .field(LlmConstants.Fields.PROVIDER, config.provider())
+                log.error(LogMessages.LLM.UNSUPPORTED_PROVIDER)
+                    .field(LLMConstants.Fields.PROVIDER, config.provider())
                     .log();
-                throw new LlmException(
-                    String.format(LlmConstants.ErrorMessages.UNSUPPORTED_PROVIDER_TEMPLATE, config.provider()),
-                    LlmConstants.ErrorTypes.UNSUPPORTED_PROVIDER
+                throw new LLMException(
+                    String.format(LLMConstants.ErrorMessages.UNSUPPORTED_PROVIDER_TEMPLATE, config.provider()),
+                    LLMConstants.ErrorTypes.UNSUPPORTED_PROVIDER
                 );
             }
         };
@@ -81,27 +81,27 @@ public class ChatModelFactory {
      * Builds an AnthropicChatModel for direct Anthropic API access.
      *
      * @return the Anthropic chat model
-     * @throws LlmException if API key is missing
+     * @throws LLMException if API key is missing
      */
     private ChatModel buildAnthropicModel() {
         String apiKey = config.apiKey().orElseThrow(() -> {
-            log.error(LogMessages.Llm.MISSING_CONFIGURATION)
-                .field(LlmConstants.Fields.PROVIDER, LlmConstants.Provider.ANTHROPIC)
-                .field(LlmConstants.ConfigKeys.MISSING_CONFIG, LlmConstants.ConfigKeys.LLM_API_KEY)
+            log.error(LogMessages.LLM.MISSING_CONFIGURATION)
+                .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.ANTHROPIC)
+                .field(LLMConstants.ConfigKeys.MISSING_CONFIG, LLMConstants.ConfigKeys.LLM_API_KEY)
                 .log();
-            return new LlmException(
-                LlmConstants.ErrorMessages.API_KEY_REQUIRED + LlmConstants.Provider.ANTHROPIC,
-                LlmConstants.ErrorTypes.MISSING_CONFIGURATION
+            return new LLMException(
+                LLMConstants.ErrorMessages.API_KEY_REQUIRED + LLMConstants.Provider.ANTHROPIC,
+                LLMConstants.ErrorTypes.MISSING_CONFIGURATION
             );
         });
 
-        log.info(LogMessages.Llm.LLM_PROVIDER_DETECTED)
-            .field(LlmConstants.Fields.PROVIDER, LlmConstants.Provider.ANTHROPIC)
-            .field(LlmConstants.Fields.AUTH_TYPE, LlmConstants.AuthModes.API_KEY)
-            .field(LlmConstants.Fields.MODEL, config.modelName())
-            .field(LlmConstants.Fields.TEMPERATURE, config.temperature())
-            .field(LlmConstants.Fields.MAX_TOKENS, config.maxTokens())
-            .field(LlmConstants.Fields.CACHE_ENABLED, true)
+        log.info(LogMessages.LLM.LLM_PROVIDER_DETECTED)
+            .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.ANTHROPIC)
+            .field(LLMConstants.Fields.AUTH_TYPE, LLMConstants.AuthModes.API_KEY)
+            .field(LLMConstants.Fields.MODEL, config.modelName())
+            .field(LLMConstants.Fields.TEMPERATURE, config.temperature())
+            .field(LLMConstants.Fields.MAX_TOKENS, config.maxTokens())
+            .field(LLMConstants.Fields.CACHE_ENABLED, true)
             .log();
 
         return AnthropicChatModel.builder()
@@ -120,30 +120,30 @@ public class ChatModelFactory {
      * Builds a VertexAiAnthropicChatModel for Google Cloud Vertex AI access.
      *
      * @return the Vertex AI Anthropic chat model
-     * @throws LlmException if project ID is missing
+     * @throws LLMException if project ID is missing
      */
     private ChatModel buildVertexAiAnthropicModel() {
         String projectId = config.vertex().projectId().orElseThrow(() -> {
-            log.error(LogMessages.Llm.MISSING_CONFIGURATION)
-                .field(LlmConstants.Fields.PROVIDER, LlmConstants.Provider.VERTEX_AI_ANTHROPIC)
-                .field(LlmConstants.ConfigKeys.MISSING_CONFIG, LlmConstants.ConfigKeys.VERTEX_PROJECT_ID)
+            log.error(LogMessages.LLM.MISSING_CONFIGURATION)
+                .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.VERTEX_AI_ANTHROPIC)
+                .field(LLMConstants.ConfigKeys.MISSING_CONFIG, LLMConstants.ConfigKeys.VERTEX_PROJECT_ID)
                 .log();
-            return new LlmException(
-                LlmConstants.ErrorMessages.VERTEX_PROJECT_ID_REQUIRED + LlmConstants.Provider.VERTEX_AI_ANTHROPIC,
-                LlmConstants.ErrorTypes.MISSING_CONFIGURATION
+            return new LLMException(
+                LLMConstants.ErrorMessages.VERTEX_PROJECT_ID_REQUIRED + LLMConstants.Provider.VERTEX_AI_ANTHROPIC,
+                LLMConstants.ErrorTypes.MISSING_CONFIGURATION
             );
         });
 
         String location = config.vertex().location();
 
-        log.info(LogMessages.Llm.LLM_PROVIDER_DETECTED)
-            .field(LlmConstants.Fields.PROVIDER, LlmConstants.Provider.VERTEX_AI_ANTHROPIC)
-            .field(LlmConstants.Fields.AUTH_TYPE, LlmConstants.AuthModes.ADC)
-            .field(LlmConstants.Fields.MODEL, config.modelName())
-            .field(LlmConstants.Fields.VERTEX_PROJECT_ID, projectId)
-            .field(LlmConstants.Fields.VERTEX_LOCATION, location)
-            .field(LlmConstants.Fields.TEMPERATURE, config.temperature())
-            .field(LlmConstants.Fields.MAX_TOKENS, config.maxTokens())
+        log.info(LogMessages.LLM.LLM_PROVIDER_DETECTED)
+            .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.VERTEX_AI_ANTHROPIC)
+            .field(LLMConstants.Fields.AUTH_TYPE, LLMConstants.AuthModes.ADC)
+            .field(LLMConstants.Fields.MODEL, config.modelName())
+            .field(LLMConstants.Fields.VERTEX_PROJECT_ID, projectId)
+            .field(LLMConstants.Fields.VERTEX_LOCATION, location)
+            .field(LLMConstants.Fields.TEMPERATURE, config.temperature())
+            .field(LLMConstants.Fields.MAX_TOKENS, config.maxTokens())
             .log();
 
         return VertexAiAnthropicChatModel.builder()

@@ -31,18 +31,17 @@ public final class JsonUtils {
     }
 
     /**
-     * Parses a JSON string into a {@code Map<String, String>}.
+     * Converts a JSON string into a {@code Map<String, String>} for programmatic use.
      *
      * <p>Returns an empty map if the input is null, blank, or {@code "{}"}.
      * Logs a warning and returns an empty map if parsing fails.
      *
-     * <p><b>Use Case:</b> Parsing environment variables like
-     * {@code LLM_CUSTOM_HEADERS='{"X-Gateway":"ibm-bob","X-Tenant":"prod"}'}.
+     * <p><b>Use Cases:</b> Manual JSON parsing in code (API responses, user input, dynamic config, testing).
      *
-     * @param json the JSON string to parse
+     * @param json the JSON string to convert
      * @return a map of key-value pairs, or an empty map if parsing fails
      */
-    public static Map<String, String> parseJsonToMap(String json) {
+    public static Map<String, String> convertJsonStringToMap(String json) {
         if (json == null || json.isBlank() || json.equals("{}")) {
             return Collections.emptyMap();
         }
@@ -59,20 +58,22 @@ public final class JsonUtils {
     }
 
     /**
-     * SmallRye Config converter for parsing JSON strings into {@code Map<String, String>}.
+     * MicroProfile Config converter for automatic JSON-to-Map conversion in configuration properties.
      *
      * <p>Enables binding environment variables like {@code LLM_CUSTOM_HEADERS='{"X-Gateway":"ibm-bob"}'}
      * directly to {@code Map<String, String>} configuration properties.
      *
-     * <p>Delegates to {@link #parseJsonToMap(String)} for parsing logic.
+     * <p><b>Use Cases:</b> Declarative config injection (env vars, application.yml, ConfigMaps, Secrets).
+     *
+     * <p>Delegates to {@link #convertJsonStringToMap(String)} for parsing logic.
      *
      * @since 0.0.1
      */
-    public static class JsonMapConverter implements Converter<Map<String, String>> {
+    public static class ConfigPropertyJsonConverter implements Converter<Map<String, String>> {
 
         @Override
         public Map<String, String> convert(String value) throws IllegalArgumentException {
-            return parseJsonToMap(value);
+            return convertJsonStringToMap(value);
         }
     }
 }

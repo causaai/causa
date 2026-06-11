@@ -7,11 +7,7 @@ metadata:
     app.kubernetes.io/component: config
 data:
   # Application Configuration
-  CAUSA_PORT: "8080"
   CAUSA_LOG_LEVEL: "INFO"
-
-  # Swagger/OpenAPI Configuration
-  CAUSA_SWAGGER_UI_PATH: "/swagger-ui"
 
   # Database Configuration
   CAUSA_DB_URL: "jdbc:postgresql://diagnostics-tool-db-rw.diagnostics-tool.svc.cluster.local:5432/diagnostics-tool-db"
@@ -20,6 +16,24 @@ data:
   CAUSA_MCP_K8S_ENDPOINT: "http://kubernetes-mcp-server.diagnostics-tool.svc.cluster.local:8080"
   CAUSA_MCP_K8S_HEALTH_PATH: "/health"
   CAUSA_MCP_K8S_TIMEOUT: "5000"
+  # LLM Configuration (Public settings - non-sensitive)
+  # Provider: anthropic (direct API) | vertex-ai-anthropic (Google Cloud) | ibm-bob (future) | ollama (future)
+  LLM_PROVIDER: "vertex-ai-anthropic"
+  LLM_MODEL_NAME: "claude-sonnet-4-6"
+  LLM_TEMPERATURE: "0.1"
+  LLM_MAX_TOKENS: "8192"
+  LLM_TIMEOUT_SECONDS: "60"
+  LLM_CHAT_MEMORY_SIZE: "25"
+
+  # Vertex AI Configuration (Public settings)
+  # Valid regions: us-east5, us-central1, europe-west1, asia-southeast1
+  # Note: 'global' is NOT valid for Claude on Vertex AI
+  VERTEX_LOCATION: "us-east5"
+
+  # Optional overrides (leave empty to use defaults)
+  LLM_BASE_URL: ""
+  LLM_AUTH_TYPE: ""
+  LLM_CUSTOM_HEADERS: ""
 
   # LLM Configuration (Public settings - non-sensitive)
   # Provider: anthropic (direct API) | vertex-ai-anthropic (Google Cloud) | ibm-bob (future) | ollama (future)

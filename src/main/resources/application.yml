@@ -12,7 +12,7 @@ quarkus:
     port: ${CAUSA_PORT:8080}
     host: ${CAUSA_HOST:0.0.0.0}
     cors:
-      ~: true
+      enabled: true
       origins: ${CAUSA_CORS_ORIGINS:*}
       methods: ${CAUSA_CORS_METHODS:GET,POST,PUT,DELETE,OPTIONS}
       headers: ${CAUSA_CORS_HEADERS:*}
@@ -33,10 +33,13 @@ quarkus:
     console:
       enable: true
       format: "%d{yyyy-MM-dd HH:mm:ss,SSS} %-5p [%c{3.}] (%t) %s%e%n"
-      color: true
     category:
       "com.causa":
         level: ${CAUSA_APP_LOG_LEVEL:INFO}
+  
+  # Console Configuration
+  console:
+    color: true
 
   # Banner
   banner:
@@ -96,6 +99,33 @@ causa:
       endpoint: ${CAUSA_MCP_K8S_ENDPOINT}
       health-path: ${CAUSA_MCP_K8S_HEALTH_PATH}
       timeout-ms: ${CAUSA_MCP_K8S_TIMEOUT}
+  # LLM Configuration (LangChain4J)
+  llm:
+    provider: ${LLM_PROVIDER:vertex-ai-anthropic}
+    model-name: ${LLM_MODEL_NAME:claude-sonnet-4-6}
+    base-url: ${LLM_BASE_URL:}
+    auth-type: ${LLM_AUTH_TYPE:}
+    custom-headers: ${LLM_CUSTOM_HEADERS:{}}
+    temperature: ${LLM_TEMPERATURE:0.1}
+    max-tokens: ${LLM_MAX_TOKENS:4096}
+    api-key: ${LLM_API_KEY:}
+    timeout-seconds: ${LLM_TIMEOUT_SECONDS:60}
+    chat-memory-size: ${LLM_CHAT_MEMORY_SIZE:10}
+    vertex:
+      project-id: ${VERTEX_PROJECT_ID:}
+      location: ${VERTEX_LOCATION:us-east5}
+
+# Feature Flags (TO BE ADDED LATER)
+#   features:
+#     rag-enabled: ${CAUSA_FEATURE_RAG:false}
+#     validation-enabled: ${CAUSA_FEATURE_VALIDATION:true}
+#     notifications-enabled: ${CAUSA_FEATURE_NOTIFICATIONS:false}
+
+#   # MCP Configuration
+#   mcp:
+#     kubernetes:
+#       endpoint: ${CAUSA_MCP_K8S_ENDPOINT:http://k8s-mcp.causa.svc.cluster.local:8080}
+#       timeout-ms: ${CAUSA_MCP_K8S_TIMEOUT:5000}
 #     cryostat:
 #       endpoint: ${CAUSA_MCP_CRYOSTAT_ENDPOINT}
 #       timeout-ms: ${CAUSA_MCP_CRYOSTAT_TIMEOUT}

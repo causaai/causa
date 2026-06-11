@@ -29,7 +29,7 @@ PromptSender (interface)
 2. **Single code path** — business logic calls ONE `PromptSender` implementation regardless of provider
 3. **MCP tool support** — LangChain4J has built-in Model Context Protocol integration
 4. **Extensibility** — adding a new provider = 1 case in factory + 1 dependency
-5. **Consistent error handling** — all provider errors normalized to `LlmException`
+5. **Consistent error handling** — all provider errors normalized to `LLMException`
 
 ---
 
@@ -81,17 +81,17 @@ flowchart LR
 ```mermaid
 sequenceDiagram
     participant Q as Quarkus CDI Container
-    participant C as LlmConfig
+    participant C as LLMConfig
     participant F as ChatModelFactory
     participant M as VertexAiAnthropicChatModel
     participant P as LangChainPromptSender
-    participant S as LlmStartup
+    participant S as LLMStartup
     participant V as Google Vertex AI
 
     Q->>C: Bind application.yml + env vars
     Note over C: provider=vertex-ai-anthropic<br/>model=claude-sonnet-4-6<br/>projectId=my-gcp-project
 
-    Q->>F: Inject LlmConfig
+    Q->>F: Inject LLMConfig
 
     F->>F: Validate configuration
     F->>F: Select provider via switch()
@@ -102,7 +102,7 @@ sequenceDiagram
     M-->>F: ChatModel instance
     F-->>Q: @Produces ChatModel bean
 
-    Q->>P: Inject ChatModel + LlmConfig
+    Q->>P: Inject ChatModel + LLMConfig
     P-->>Q: PromptSender bean ready
 
     Q->>S: Create Startup Bean
@@ -114,7 +114,7 @@ sequenceDiagram
 
     S->>P: send('Respond with OK')
 
-    P->>P: Convert LlmRequest → UserMessage
+    P->>P: Convert LLMRequest → UserMessage
 
     P->>M: chat(messages)
 
@@ -125,7 +125,7 @@ sequenceDiagram
 
     M-->>P: ChatResponse
 
-    P-->>S: LlmResponse("OK")
+    P-->>S: LLMResponse("OK")
 
     alt Connectivity Successful
         S->>P: setReady(true)
@@ -147,7 +147,7 @@ sequenceDiagram
     participant V as Google Vertex AI
     participant C as Claude Sonnet 4.6
 
-    D->>P: send(LlmRequest)
+    D->>P: send(LLMRequest)
 
     Note over D: Prompt: Analyze this OutOfMemoryError stack trace<br/>System: Java diagnostic expert<br/>Context: Known memory leak patterns...
 
@@ -177,12 +177,12 @@ sequenceDiagram
 
     L->>L: Extract response text
     L->>L: Calculate latency
-    L->>L: Build LlmResponse
+    L->>L: Build LLMResponse
 
     Note over L: inputTokens=1523<br/>outputTokens=847<br/>latency=2400ms
 
-    L-->>P: LlmResponse
-    P-->>D: LlmResponse
+    L-->>P: LLMResponse
+    P-->>D: LLMResponse
 
     D->>D: Store diagnostic report
     D->>D: Return analysis to user
@@ -245,9 +245,9 @@ Causa Backend reads configuration from **two sources** with strict separation of
 
 4. application.yml reads ${LLM_*} env vars
 
-5. LlmConfig (@ConfigMapping) binds to Java interface
+5. LLMConfig (@ConfigMapping) binds to Java interface
 
-6. ChatModelFactory uses LlmConfig to build ChatModel
+6. ChatModelFactory uses LLMConfig to build ChatModel
 ```
 
 See [LLM Configuration Options](../llm/llm-config-options.md) for complete configuration reference.
@@ -255,7 +255,7 @@ See [LLM Configuration Options](../llm/llm-config-options.md) for complete confi
 
 ## Health Checks
 
-The `LlmHealthCheck` class implements MicroProfile `@Readiness`:
+The `LLMHealthCheck` class implements MicroProfile `@Readiness`:
 
 ```
 GET /q/health/ready
@@ -278,8 +278,8 @@ GET /q/health/ready
 Kubernetes uses this to decide whether to route traffic to the pod.
 
 **Status logic:**
-- `UP` — `LlmStartup` connectivity check succeeded
-- `DOWN` — `LlmStartup` connectivity check failed (non-fatal, app still runs)
+- `UP` — `LLMStartup` connectivity check succeeded
+- `DOWN` — `LLMStartup` connectivity check failed (non-fatal, app still runs)
 
 ---
 

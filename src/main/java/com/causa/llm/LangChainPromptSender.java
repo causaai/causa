@@ -1,12 +1,12 @@
 package com.causa.llm;
 
-import com.causa.common.constants.LlmConstants;
-import com.causa.common.exceptions.LlmException;
+import com.causa.common.constants.LLMConstants;
+import com.causa.common.exceptions.LLMException;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
-import com.causa.config.LlmConfig;
-import com.causa.core.domain.LlmRequest;
-import com.causa.core.domain.LlmResponse;
+import com.causa.config.LLMConfig;
+import com.causa.core.domain.LLMRequest;
+import com.causa.core.domain.LLMResponse;
 import com.causa.core.ports.llm.PromptSender;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
@@ -37,30 +37,30 @@ public class LangChainPromptSender implements PromptSender {
     private static final CausaLogger log = CausaLogger.getLogger(LangChainPromptSender.class);
 
     private final ChatModel chatModel;
-    private final LlmConfig config;
+    private final LLMConfig config;
     private final AtomicBoolean ready = new AtomicBoolean(false);
 
     @Inject
-    public LangChainPromptSender(ChatModel chatModel, LlmConfig config) {
+    public LangChainPromptSender(ChatModel chatModel, LLMConfig config) {
         this.chatModel = chatModel;
         this.config = config;
     }
 
     @Override
-    public LlmResponse send(LlmRequest request) {
+    public LLMResponse send(LLMRequest request) {
         if (!isReady()) {
-            log.error(LogMessages.Llm.MODEL_NOT_AVAILABLE)
-                .field(LlmConstants.Fields.PROVIDER, config.provider())
+            log.error(LogMessages.LLM.MODEL_NOT_AVAILABLE)
+                .field(LLMConstants.Fields.PROVIDER, config.provider())
                 .log();
-            throw new LlmException(
-                LlmConstants.ErrorMessages.MODEL_NOT_AVAILABLE,
-                LlmConstants.ErrorTypes.MODEL_NOT_READY
+            throw new LLMException(
+                LLMConstants.ErrorMessages.MODEL_NOT_AVAILABLE,
+                LLMConstants.ErrorTypes.MODEL_NOT_READY
             );
         }
 
-        log.info(LogMessages.Llm.PROMPT_SEND_START)
-            .field(LlmConstants.Fields.PROVIDER, config.provider())
-            .field(LlmConstants.Fields.MODEL, resolveModel(request))
+        log.info(LogMessages.LLM.PROMPT_SEND_START)
+            .field(LLMConstants.Fields.PROVIDER, config.provider())
+            .field(LLMConstants.Fields.MODEL, resolveModel(request))
             .log();
 
         long startNanos = System.nanoTime();
@@ -92,7 +92,7 @@ public class LangChainPromptSender implements PromptSender {
             long cacheCreationTokens = 0;
             long cacheReadTokens = 0;
 
-            LlmResponse llmResponse = new LlmResponse(
+            LLMResponse llmResponse = new LLMResponse(
                 responseText,
                 resolveModel(request),
                 inputTokens,
@@ -102,28 +102,28 @@ public class LangChainPromptSender implements PromptSender {
                 latencyMs
             );
 
-            log.info(LogMessages.Llm.PROMPT_SEND_SUCCESS)
-                .field(LlmConstants.Fields.MODEL, llmResponse.modelUsed())
-                .field(LlmConstants.Fields.INPUT_TOKENS, llmResponse.inputTokens())
-                .field(LlmConstants.Fields.OUTPUT_TOKENS, llmResponse.outputTokens())
-                .field(LlmConstants.Fields.CACHE_HIT, llmResponse.wasCacheHit())
-                .field(LlmConstants.Fields.CACHE_READ_TOKENS, llmResponse.cacheReadTokens())
-                .field(LlmConstants.Fields.CACHE_CREATION_TOKENS, llmResponse.cacheCreationTokens())
-                .field(LlmConstants.Fields.LATENCY_MS, llmResponse.latencyMs())
+            log.info(LogMessages.LLM.PROMPT_SEND_SUCCESS)
+                .field(LLMConstants.Fields.MODEL, llmResponse.modelUsed())
+                .field(LLMConstants.Fields.INPUT_TOKENS, llmResponse.inputTokens())
+                .field(LLMConstants.Fields.OUTPUT_TOKENS, llmResponse.outputTokens())
+                .field(LLMConstants.Fields.CACHE_HIT, llmResponse.wasCacheHit())
+                .field(LLMConstants.Fields.CACHE_READ_TOKENS, llmResponse.cacheReadTokens())
+                .field(LLMConstants.Fields.CACHE_CREATION_TOKENS, llmResponse.cacheCreationTokens())
+                .field(LLMConstants.Fields.LATENCY_MS, llmResponse.latencyMs())
                 .log();
 
             return llmResponse;
 
         } catch (Exception e) {
             long latencyMs = (System.nanoTime() - startNanos) / 1_000_000;
-            log.error(LogMessages.Llm.LLM_ERROR)
-                .field(LlmConstants.Fields.ERROR_TYPE, e.getClass().getSimpleName())
-                .field(LlmConstants.Fields.LATENCY_MS, latencyMs)
+            log.error(LogMessages.LLM.LLM_ERROR)
+                .field(LLMConstants.Fields.ERROR_TYPE, e.getClass().getSimpleName())
+                .field(LLMConstants.Fields.LATENCY_MS, latencyMs)
                 .exception(e)
                 .log();
-            throw new LlmException(
-                String.format(LlmConstants.ErrorMessages.REQUEST_FAILED_TEMPLATE, e.getMessage()),
-                LlmConstants.ErrorTypes.LLM_REQUEST_FAILED,
+            throw new LLMException(
+                String.format(LLMConstants.ErrorMessages.REQUEST_FAILED_TEMPLATE, e.getMessage()),
+                LLMConstants.ErrorTypes.LLM_REQUEST_FAILED,
                 e
             );
         }
@@ -135,19 +135,19 @@ public class LangChainPromptSender implements PromptSender {
     }
 
     /**
-     * Marks the prompt sender as ready. Called by LlmStartup after successful connectivity check.
+     * Marks the prompt sender as ready. Called by LLMStartup after successful connectivity check.
      */
     void setReady(boolean ready) {
         this.ready.set(ready);
     }
 
     /**
-     * Builds the chat message list from an LlmRequest.
+     * Builds the chat message list from an LLMRequest.
      *
      * @param request the LLM request
      * @return the list of chat messages
      */
-    private List<ChatMessage> buildMessages(LlmRequest request) {
+    private List<ChatMessage> buildMessages(LLMRequest request) {
         List<ChatMessage> messages = new ArrayList<>();
 
         // System message (if present)
@@ -168,7 +168,7 @@ public class LangChainPromptSender implements PromptSender {
      * @param request the LLM request
      * @return the combined system text
      */
-    private String buildSystemText(LlmRequest request) {
+    private String buildSystemText(LLMRequest request) {
         StringBuilder sb = new StringBuilder();
         request.systemPrompt().ifPresent(sb::append);
         request.context().ifPresent(ctx -> {
@@ -183,12 +183,12 @@ public class LangChainPromptSender implements PromptSender {
     /**
      * Builds a ChatRequest with per-request parameter overrides.
      *
-     * <p>Applies optional parameters from {@link LlmRequest} (maxTokens, temperature).
+     * <p>Applies optional parameters from {@link LLMRequest} (maxTokens, temperature).
      * If not specified, the underlying model's configured defaults are used.
      *
      * <p><b>Note on enableCaching:</b> Prompt caching is provider-specific and typically
      * configured at the model level (e.g., Anthropic's prompt caching). The enableCaching
-     * flag in LlmRequest is informational and logged for observability, but does not
+     * flag in LLMRequest is informational and logged for observability, but does not
      * directly control ChatRequestParameters as LangChain4J handles caching at the
      * provider layer.
      *
@@ -196,7 +196,7 @@ public class LangChainPromptSender implements PromptSender {
      * @param request the LLM request containing optional parameter overrides
      * @return a configured ChatRequest
      */
-    private ChatRequest buildChatRequest(List<ChatMessage> messages, LlmRequest request) {
+    private ChatRequest buildChatRequest(List<ChatMessage> messages, LLMRequest request) {
         ChatRequestParameters parameters = ChatRequestParameters.builder()
                 .maxOutputTokens(request.maxTokens().orElse(null))
                 .temperature(request.temperature().orElse(null))
@@ -214,7 +214,7 @@ public class LangChainPromptSender implements PromptSender {
      * @param request the LLM request
      * @return the model name
      */
-    private String resolveModel(LlmRequest request) {
+    private String resolveModel(LLMRequest request) {
         return request.modelOverride().orElse(config.modelName());
     }
 }

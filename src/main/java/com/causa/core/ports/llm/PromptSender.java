@@ -1,7 +1,7 @@
 package com.causa.core.ports.llm;
 
-import com.causa.core.domain.LlmRequest;
-import com.causa.core.domain.LlmResponse;
+import com.causa.core.domain.LLMRequest;
+import com.causa.core.domain.LLMResponse;
 
 /**
  * Prompt Sender Port
@@ -22,9 +22,9 @@ public interface PromptSender {
      *
      * @param request the LLM request containing prompt, system instructions, and parameters
      * @return the LLM response with text, token usage, and latency
-     * @throws com.causa.common.exceptions.LlmException if the LLM call fails
+     * @throws com.causa.common.exceptions.LLMException if the LLM call fails
      */
-    LlmResponse send(LlmRequest request);
+    LLMResponse send(LLMRequest request);
 
     /**
      * Returns whether the underlying LLM client is initialized and ready to accept requests.

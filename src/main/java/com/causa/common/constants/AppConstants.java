@@ -5,7 +5,7 @@ package com.causa.common.constants;
  *
  * <p>Contains application-wide constants.
  *
- * @since 1.0.0
+ * @since 0.0.1
  */
 public final class AppConstants {
 
@@ -20,6 +20,9 @@ public final class AppConstants {
      */
     public static final class StartupConstants {
         private StartupConstants() {}
+
+        /** LLM initialization priority. */
+        public static final int LLM_PRIORITY = 10;
 
         /** Database connection pool initialization priority. */
         public static final int DATABASE_PRIORITY = 20;
