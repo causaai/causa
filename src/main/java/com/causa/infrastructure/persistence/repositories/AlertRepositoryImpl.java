@@ -6,13 +6,8 @@ import com.causa.core.domain.Alert;
 import com.causa.core.ports.AlertRepository;
 import com.causa.infrastructure.persistence.entity.AlertEntity;
 import com.causa.infrastructure.persistence.mappers.AlertEntityMapper;
-import io.quarkus.hibernate.orm.panache.PanacheQuery;
-import io.quarkus.panache.common.Sort;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
-
-import java.util.List;
-import java.util.Optional;
 
 /**
  * Alert Repository Implementation
@@ -34,39 +29,6 @@ public class AlertRepositoryImpl implements AlertRepository {
             return alert;
         } catch (Exception e) {
             throw new AlertException(LogMessages.Alert.ALERT_PERSIST_FAILED + ": " + alert.getAlertId(), "PersistenceError", e);
-        }
-    }
-
-    @Override
-    public Optional<Alert> findById(String alertId) {
-        return AlertEntity.findByIdOptional(alertId)
-            .map(entity -> AlertEntityMapper.toDomain((AlertEntity) entity));
-    }
-
-    @Override
-    public List<Alert> findByContainerName(String containerName) {
-        try {
-            return AlertEntity.<AlertEntity>find(
-                    AlertEntity.Fields.CONTAINER_NAME,
-                    Sort.descending(AlertEntity.Fields.TIMESTAMP),
-                    containerName)
-                .stream()
-                .map(AlertEntityMapper::toDomain)
-                .toList();
-        } catch (Exception e) {
-            throw new AlertException(LogMessages.Alert.ALERT_QUERY_BY_CONTAINER_FAILED + ": " + containerName, "QueryError", e);
-        }
-    }
-
-    @Override
-    public List<Alert> findAll() {
-        try {
-            return AlertEntity.<AlertEntity>listAll(Sort.descending(AlertEntity.Fields.TIMESTAMP))
-                .stream()
-                .map(AlertEntityMapper::toDomain)
-                .toList();
-        } catch (Exception e) {
-            throw new AlertException(LogMessages.Alert.ALERT_QUERY_FAILED, "QueryError", e);
         }
     }
 

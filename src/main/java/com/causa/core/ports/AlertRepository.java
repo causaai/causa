@@ -2,9 +2,6 @@ package com.causa.core.ports;
 
 import com.causa.core.domain.Alert;
 
-import java.util.List;
-import java.util.Optional;
-
 /**
  * Alert Repository - Secondary Port
  *
@@ -22,29 +19,6 @@ public interface AlertRepository {
      * @return the saved alert
      */
     Alert save(Alert alert);
-
-    /**
-     * Finds an alert by its ID.
-     *
-     * @param alertId the alert ID
-     * @return Optional containing the alert if found
-     */
-    Optional<Alert> findById(String alertId);
-
-    /**
-     * Finds all alerts for a specific container.
-     *
-     * @param containerName the container name
-     * @return list of alerts
-     */
-    List<Alert> findByContainerName(String containerName);
-
-    /**
-     * Finds all alerts.
-     *
-     * @return list of all alerts
-     */
-    List<Alert> findAll();
 
     /**
      * Updates the has_diagnostics flag for an alert.

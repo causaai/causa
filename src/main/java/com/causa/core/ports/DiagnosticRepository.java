@@ -2,8 +2,6 @@ package com.causa.core.ports;
 
 import com.causa.core.domain.Diagnostic;
 
-import java.util.Optional;
-
 /**
  * Diagnostic Repository - Secondary Port
  *
@@ -21,22 +19,6 @@ public interface DiagnosticRepository {
      * @return the saved diagnostic
      */
     Diagnostic save(Diagnostic diagnostic);
-
-    /**
-     * Finds a diagnostic by its ID.
-     *
-     * @param diagnosticId the diagnostic ID
-     * @return Optional containing the diagnostic if found
-     */
-    Optional<Diagnostic> findById(String diagnosticId);
-
-    /**
-     * Finds a diagnostic by alert ID.
-     *
-     * @param alertId the alert ID
-     * @return Optional containing the diagnostic if found
-     */
-    Optional<Diagnostic> findByAlertId(String alertId);
 
     /**
      * Updates an existing diagnostic.

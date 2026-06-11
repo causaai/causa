@@ -70,29 +70,7 @@ public final class ApiConstants {
         public static final class Webhooks {
             private Webhooks() {}
 
-            public static final String BASE = Version.API_V1 + "/webhooks";
-            public static final String ALERTS = BASE + "/alerts";
-        }
-
-        /**
-         * Alert query and management endpoints.
-         */
-        public static final class Alerts {
-            private Alerts() {}
-
-            public static final String BASE = Version.API_V1 + "/alerts";
-            public static final String BY_ID = BASE + "/{alertId}";
-            public static final String BY_CONTAINER = Version.API_V1 + "/containers/{containerName}/alerts";
-        }
-
-        /**
-         * Diagnostic query endpoints.
-         */
-        public static final class Diagnostics {
-            private Diagnostics() {}
-
-            public static final String BASE = Version.API_V1 + "/diagnostics";
-            public static final String BY_ALERT_ID = Version.API_V1 + "/alerts/{alertId}/diagnostics";
+            public static final String ALERTS = Version.API_V1 + "/webhooks/alerts";
         }
 
         /**

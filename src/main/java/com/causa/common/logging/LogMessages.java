@@ -85,8 +85,6 @@ public final class LogMessages {
 
         // Exception messages
         public static final String ALERT_PERSIST_FAILED = "Failed to persist alert";
-        public static final String ALERT_QUERY_FAILED = "Failed to query alerts";
-        public static final String ALERT_QUERY_BY_CONTAINER_FAILED = "Failed to find alerts for container";
         public static final String ALERT_UPDATE_FAILED = "Failed to update alert";
         public static final String ALERT_NOT_FOUND = "Alert not found";
     }
@@ -107,9 +105,6 @@ public final class LogMessages {
 
         // Exception messages
         public static final String DIAGNOSTIC_PERSIST_FAILED = "Failed to persist diagnostic";
-        public static final String DIAGNOSTIC_QUERY_FAILED = "Failed to query diagnostic";
-        public static final String DIAGNOSTIC_QUERY_BY_ALERT_FAILED = "Failed to find diagnostic for alert";
         public static final String DIAGNOSTIC_UPDATE_FAILED = "Failed to update diagnostic";
-        public static final String DIAGNOSTIC_NOT_FOUND = "Diagnostic not found";
     }
 }

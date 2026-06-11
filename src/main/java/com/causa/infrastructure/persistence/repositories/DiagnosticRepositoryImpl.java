@@ -6,11 +6,8 @@ import com.causa.core.domain.Diagnostic;
 import com.causa.core.ports.DiagnosticRepository;
 import com.causa.infrastructure.persistence.entity.DiagnosticEntity;
 import com.causa.infrastructure.persistence.mappers.DiagnosticEntityMapper;
-import io.quarkus.panache.common.Sort;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
-
-import java.util.Optional;
 
 /**
  * Diagnostic Repository Implementation
@@ -32,26 +29,6 @@ public class DiagnosticRepositoryImpl implements DiagnosticRepository {
             return diagnostic;
         } catch (Exception e) {
             throw new DiagnosticException(LogMessages.Diagnostic.DIAGNOSTIC_PERSIST_FAILED + ": " + diagnostic.getDiagnosticId(), "PersistenceError", e);
-        }
-    }
-
-    @Override
-    public Optional<Diagnostic> findById(String diagnosticId) {
-        return DiagnosticEntity.findByIdOptional(diagnosticId)
-            .map(entity -> DiagnosticEntityMapper.toDomain((DiagnosticEntity) entity));
-    }
-
-    @Override
-    public Optional<Diagnostic> findByAlertId(String alertId) {
-        try {
-            return DiagnosticEntity.<DiagnosticEntity>find(
-                    DiagnosticEntity.Fields.ALERT_ID,
-                    Sort.descending(DiagnosticEntity.Fields.GENERATED_AT),
-                    alertId)
-                .firstResultOptional()
-                .map(DiagnosticEntityMapper::toDomain);
-        } catch (Exception e) {
-            throw new DiagnosticException(LogMessages.Diagnostic.DIAGNOSTIC_QUERY_BY_ALERT_FAILED + ": " + alertId, "QueryError", e);
         }
     }
 
