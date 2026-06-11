@@ -62,4 +62,28 @@ public final class LogMessages {
         public static final String READINESS_CHECK_PASSED = "Database readiness check passed";
         public static final String READINESS_CHECK_FAILED = "Database readiness check failed";
     }
+
+    /**
+     * Health check log messages.
+     *
+     * @since 0.0.1
+     */
+    public static final class HealthCheck {
+        private HealthCheck() {}
+
+        public static final String ENDPOINT_CALLED = "Health check endpoint called";
+        public static final String ENDPOINT_RESPONSE_PREPARED = "Health check response prepared";
+        public static final String ENDPOINT_FAILED = "Health check endpoint failed";
+        public static final String SYSTEM_CHECK_STARTED = "System health check started";
+        public static final String SYSTEM_CHECK_COMPLETED = "System health check completed";
+        public static final String DB_CHECK_PASSED = "Database health check passed";
+        public static final String DB_CHECK_FAILED = "Database health check failed";
+        public static final String DB_LATENCY_MEASUREMENT_FAILED = "Database latency measurement failed";
+        public static final String MCP_K8S_CHECK_STARTED = "MCP Kubernetes health check started";
+        public static final String MCP_K8S_CHECK_PASSED = "MCP Kubernetes health check passed";
+        public static final String MCP_K8S_CHECK_FAILED = "MCP Kubernetes health check failed";
+        public static final String LLM_CHECK_STARTED = "LLM health check started";
+        public static final String LLM_CHECK_PASSED = "LLM health check passed";
+        public static final String LLM_CHECK_FAILED = "LLM health check failed";
+    }
 }

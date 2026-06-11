@@ -4,9 +4,9 @@ import com.causa.api.dto.ComponentHealthDto;
 import com.causa.api.dto.HealthCheckResponseDto;
 import com.causa.common.constants.AppConstants;
 import com.causa.common.constants.HealthCheckConstants;
-import com.causa.config.LlmConfig;
-import com.causa.core.domain.LlmRequest;
-import com.causa.core.domain.LlmResponse;
+import com.causa.config.LLMConfig;
+import com.causa.core.domain.LLMRequest;
+import com.causa.core.domain.LLMResponse;
 import com.causa.infrastructure.persistence.DatabaseConnectionService;
 import com.causa.llm.LangChainPromptSender;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,7 +62,7 @@ class HealthCheckServiceTest {
     private LangChainPromptSender llmPromptSender;
 
     @Mock
-    private LlmConfig llmConfig;
+    private LLMConfig llmConfig;
 
     private HealthCheckService healthCheckService;
 
@@ -194,7 +194,7 @@ class HealthCheckServiceTest {
             when(llmPromptSender.isReady()).thenReturn(true);
             when(llmConfig.modelName()).thenReturn("claude-sonnet-4-6");
             
-            LlmResponse mockResponse = new LlmResponse(
+            LLMResponse mockResponse = new LLMResponse(
                     "OK",
                     "claude-sonnet-4-6",
                     11L,
@@ -203,7 +203,7 @@ class HealthCheckServiceTest {
                     0L,
                     100L
             );
-            when(llmPromptSender.send(any(LlmRequest.class))).thenReturn(mockResponse);
+            when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(mockResponse);
 
             // When
             HealthCheckResponseDto response = healthCheckService.getSystemHealth();
@@ -218,7 +218,7 @@ class HealthCheckServiceTest {
             assertTrue(llmHealth.getLatencyMs() >= 0);
 
             verify(llmPromptSender).isReady();
-            verify(llmPromptSender).send(any(LlmRequest.class));
+            verify(llmPromptSender).send(any(LLMRequest.class));
         }
 
         @Test
@@ -238,7 +238,7 @@ class HealthCheckServiceTest {
             assertEquals(AppConstants.HealthStatus.DOWN.getValue(), llmHealth.getStatus());
 
             verify(llmPromptSender).isReady();
-            verify(llmPromptSender, never()).send(any(LlmRequest.class));
+            verify(llmPromptSender, never()).send(any(LLMRequest.class));
         }
 
         @Test
@@ -247,7 +247,7 @@ class HealthCheckServiceTest {
             // Given
             when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(true);
-            when(llmPromptSender.send(any(LlmRequest.class)))
+            when(llmPromptSender.send(any(LLMRequest.class)))
                     .thenThrow(new RuntimeException("LLM request failed"));
 
             // When
@@ -268,7 +268,7 @@ class HealthCheckServiceTest {
             when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(true);
             
-            LlmResponse emptyResponse = new LlmResponse(
+            LLMResponse emptyResponse = new LLMResponse(
                     "",
                     "claude-sonnet-4-6",
                     11L,
@@ -277,7 +277,7 @@ class HealthCheckServiceTest {
                     0L,
                     100L
             );
-            when(llmPromptSender.send(any(LlmRequest.class))).thenReturn(emptyResponse);
+            when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(emptyResponse);
 
             // When
             HealthCheckResponseDto response = healthCheckService.getSystemHealth();
@@ -295,7 +295,7 @@ class HealthCheckServiceTest {
             // Given
             when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(true);
-            when(llmPromptSender.send(any(LlmRequest.class))).thenReturn(null);
+            when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(null);
 
             // When
             HealthCheckResponseDto response = healthCheckService.getSystemHealth();
@@ -324,8 +324,8 @@ class HealthCheckServiceTest {
             // Given - LLM UP
             when(llmPromptSender.isReady()).thenReturn(true);
             when(llmConfig.modelName()).thenReturn("claude-sonnet-4-6");
-            LlmResponse mockResponse = new LlmResponse("OK", "claude-sonnet-4-6", 11L, 4L, 0L, 0L, 100L);
-            when(llmPromptSender.send(any(LlmRequest.class))).thenReturn(mockResponse);
+            LLMResponse mockResponse = new LLMResponse("OK", "claude-sonnet-4-6", 11L, 4L, 0L, 0L, 100L);
+            when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(mockResponse);
 
             // When
             HealthCheckResponseDto response = healthCheckService.getSystemHealth();
@@ -345,8 +345,8 @@ class HealthCheckServiceTest {
             // Given - LLM UP
             when(llmPromptSender.isReady()).thenReturn(true);
             when(llmConfig.modelName()).thenReturn("claude-sonnet-4-6");
-            LlmResponse mockResponse = new LlmResponse("OK", "claude-sonnet-4-6", 11L, 4L, 0L, 0L, 100L);
-            when(llmPromptSender.send(any(LlmRequest.class))).thenReturn(mockResponse);
+            LLMResponse mockResponse = new LLMResponse("OK", "claude-sonnet-4-6", 11L, 4L, 0L, 0L, 100L);
+            when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(mockResponse);
 
             // When
             HealthCheckResponseDto response = healthCheckService.getSystemHealth();

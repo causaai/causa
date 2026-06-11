@@ -6,12 +6,12 @@ import com.causa.common.constants.ApiConstants;
 import com.causa.common.constants.AppConstants;
 import com.causa.common.constants.DatabaseConstants;
 import com.causa.common.constants.HealthCheckConstants;
-import com.causa.common.constants.LlmConstants;
+import com.causa.common.constants.LLMConstants;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
-import com.causa.config.LlmConfig;
-import com.causa.core.domain.LlmRequest;
-import com.causa.core.domain.LlmResponse;
+import com.causa.config.LLMConfig;
+import com.causa.core.domain.LLMRequest;
+import com.causa.core.domain.LLMResponse;
 import com.causa.infrastructure.persistence.DatabaseConnectionService;
 import com.causa.llm.LangChainPromptSender;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -56,7 +56,7 @@ public class HealthCheckService {
     private final String mcpK8sHealthPath;
     private final int mcpK8sTimeout;
     private final LangChainPromptSender llmPromptSender;
-    private final LlmConfig llmConfig;
+    private final LLMConfig llmConfig;
 
     @Inject
     public HealthCheckService(
@@ -67,7 +67,7 @@ public class HealthCheckService {
             @ConfigProperty(name = "causa.mcp.kubernetes.health-path") String mcpK8sHealthPath,
             @ConfigProperty(name = "causa.mcp.kubernetes.timeout-ms") int mcpK8sTimeout,
             LangChainPromptSender llmPromptSender,
-            LlmConfig llmConfig) {
+            LLMConfig llmConfig) {
         this.databaseConnectionService = databaseConnectionService;
         this.dataSource = dataSource;
         this.applicationVersion = applicationVersion;
@@ -279,29 +279,29 @@ public class HealthCheckService {
                 log.warn(LogMessages.HealthCheck.LLM_CHECK_FAILED);
                 return ComponentHealthDto.builder()
                         .status(AppConstants.HealthStatus.DOWN.getValue())
-                        .message(LlmConstants.Messages.LLM_NOT_READY)
+                        .message(LLMConstants.Messages.LLM_NOT_READY)
                         .latencyMs(System.currentTimeMillis() - startTime)
                         .build();
             }
 
             // Send a test prompt to verify connectivity
-            LlmRequest testRequest = LlmRequest.builder(LlmConstants.TestData.CONNECTIVITY_TEST_PROMPT)
-                    .maxTokens(LlmConstants.TestData.CONNECTIVITY_TEST_MAX_TOKENS)
+            LLMRequest testRequest = LLMRequest.builder(LLMConstants.TestData.CONNECTIVITY_TEST_PROMPT)
+                    .maxTokens(LLMConstants.TestData.CONNECTIVITY_TEST_MAX_TOKENS)
                     .build();
             
-            LlmResponse testResponse = llmPromptSender.send(testRequest);
+            LLMResponse testResponse = llmPromptSender.send(testRequest);
 
             if (testResponse == null || testResponse.responseText() == null || testResponse.responseText().trim().isEmpty()) {
                 log.warn(LogMessages.HealthCheck.LLM_CHECK_FAILED);
                 return ComponentHealthDto.builder()
                         .status(AppConstants.HealthStatus.DOWN.getValue())
-                        .message(LlmConstants.Messages.LLM_CONNECTIVITY_FAILED)
+                        .message(LLMConstants.Messages.LLM_CONNECTIVITY_FAILED)
                         .latencyMs(System.currentTimeMillis() - startTime)
                         .build();
             }
 
             long latency = System.currentTimeMillis() - startTime;
-            String message = String.format(LlmConstants.Messages.LLM_CONNECTED_FORMAT,
+            String message = String.format(LLMConstants.Messages.LLM_CONNECTED_FORMAT,
                     llmConfig.modelName());
 
             log.info(LogMessages.HealthCheck.LLM_CHECK_PASSED)
@@ -322,7 +322,7 @@ public class HealthCheckService {
 
             return ComponentHealthDto.builder()
                     .status(AppConstants.HealthStatus.DOWN.getValue())
-                    .message(String.format(LlmConstants.Messages.LLM_ERROR_FORMAT, e.getMessage()))
+                    .message(String.format(LLMConstants.Messages.LLM_ERROR_FORMAT, e.getMessage()))
                     .latencyMs(latency)
                     .build();
         }
