@@ -104,4 +104,18 @@ public final class ApiConstants {
         public static final String LATENCY_MS_KEY = "latency_ms";
     }
 
+    /**
+     * Structured logging field names.
+     */
+    public static final class LogFields {
+        private LogFields() {}
+
+        public static final String COMPONENT = "component";
+        public static final String STATUS = "status";
+        public static final String LATENCY_MS = "latency_ms";
+        public static final String ERROR = "error";
+        public static final String ENDPOINT = "endpoint";
+        public static final String HTTP_STATUS = "http_status";
+    }
+
 }

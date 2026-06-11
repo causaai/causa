@@ -27,16 +27,13 @@ public final class HealthCheckConstants {
     }
 
     /**
-     * Messages for future MCP and LLM components.
+     * Messages for MCP and LLM components.
+     * Note: LLM-specific messages are defined in LLMConstants.Messages
      */
     public static final class Messages {
         private Messages() {}
 
-        // LLM provider messages (future use)
-        public static final String LLM_CONNECTED = "LangChain4J connected to gpt-4-turbo";
-        public static final String LLM_NOT_AVAILABLE = "LLM provider not available";
-
-        // MCP messages (future use)
+        // MCP messages
         public static final String MCP_CONNECTED = "Connected successfully";
         public static final String MCP_NOT_AVAILABLE = "MCP server not available";
     }

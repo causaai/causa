@@ -26,6 +26,16 @@ When all components are healthy:
       "status": "UP",
       "message": "Connected to PostgreSQL",
       "latency_ms": 12
+    },
+    "llm_provider": {
+      "status": "UP",
+      "message": "Connected to LangChain4J with claude-sonnet-4-6",
+      "latency_ms": 245
+    },
+    "mcp_kubernetes": {
+      "status": "UP",
+      "message": "Connected successfully",
+      "latency_ms": 89
     }
   }
 }
@@ -82,16 +92,20 @@ When critical components are down:
    - Measures query latency
    - Critical component (failure causes 503)
 
-### Future Components (TODO)
-
 2. **LLM Provider**
-   - Provider: gpt-4-turbo via LangChain4J
-   - Checks API connectivity
+   - Provider: Configurable via LangChain4J (Anthropic Claude, Vertex AI, IBM Bob, Ollama)
+   - Default model: claude-sonnet-4-6
+   - Checks API connectivity with test prompt
    - Measures response latency
+   - Non-critical component (failure causes DEGRADED status)
 
 3. **MCP Kubernetes**
    - Checks k8s-mcp-server connectivity on OpenShift
+   - Verifies MCP tool availability
    - Measures response latency
+   - Non-critical component (failure causes DEGRADED status)
+
+### Future Components (TODO)
 
 4. **MCP Cryostat**
    - Checks Cryostat MCP server connectivity
@@ -192,6 +206,16 @@ Expected output:
       "status": "UP",
       "message": "Connected to PostgreSQL",
       "latency_ms": 8
+    },
+    "llm_provider": {
+      "status": "UP",
+      "message": "Connected to LangChain4J with claude-sonnet-4-6",
+      "latency_ms": 245
+    },
+    "mcp_kubernetes": {
+      "status": "UP",
+      "message": "Connected successfully",
+      "latency_ms": 89
     }
   }
 }
@@ -224,7 +248,7 @@ Expected output:
 
 - **UP**: All components are healthy
 - **DOWN**: Critical components (database) are down
-- **DEGRADED**: Non-critical components are down (future use)
+- **DEGRADED**: Non-critical components (LLM provider, MCP servers) are down but database is up
 
 ## Monitoring Integration
 

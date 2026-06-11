@@ -66,9 +66,8 @@ quarkus:
   hibernate-orm:
     # Use 'update' to automatically create/update schema in development
     # For production, use 'validate' with proper Flyway migrations
-    schema-generation:
-      database:
-        action: update
+    database:
+      generation: update
     log:
       sql: true
     # Fix for Jackson date serialization compatibility
@@ -98,7 +97,7 @@ causa:
   # Alert Configuration
   alerts:
     filter-severity: ${CAUSA_ALERT_SEVERITY:critical}
-    cooldown-minutes: ${CAUSA_ALERT_COOLDOWN:15m}
+    cooldown-minutes: ${CAUSA_ALERT_COOLDOWN:15}
     ignore-namespaces: ${CAUSA_ALERT_IGNORE_NS:kube-system,istio-system}
     cooldown-cleanup-interval: ${CAUSA_ALERT_COOLDOWN_CLEANUP_INTERVAL:5m}
 
