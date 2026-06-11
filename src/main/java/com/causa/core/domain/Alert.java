@@ -4,6 +4,8 @@ import com.causa.common.constants.AlertConstants.AlertSeverity;
 import com.causa.common.constants.AlertConstants.AlertStatus;
 
 import java.time.Instant;
+import java.util.Collections;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -25,6 +27,8 @@ public final class Alert {
     private final String namespace;
     private final AlertStatus status;
     private final boolean hasDiagnostics;
+    private final Map<String, String> labels;
+    private final Map<String, String> annotations;
 
     private Alert(Builder builder) {
         this.alertId = Objects.requireNonNull(builder.alertId, "alertId cannot be null");
@@ -36,6 +40,8 @@ public final class Alert {
         this.namespace = Objects.requireNonNull(builder.namespace, "namespace cannot be null");
         this.status = Objects.requireNonNull(builder.status, "status cannot be null");
         this.hasDiagnostics = builder.hasDiagnostics;
+        this.labels = builder.labels != null ? Collections.unmodifiableMap(builder.labels) : Map.of();
+        this.annotations = builder.annotations != null ? Collections.unmodifiableMap(builder.annotations) : Map.of();
     }
 
     // Getters
@@ -74,6 +80,14 @@ public final class Alert {
 
     public boolean hasDiagnostics() {
         return hasDiagnostics;
+    }
+
+    public Map<String, String> getLabels() {
+        return labels;
+    }
+
+    public Map<String, String> getAnnotations() {
+        return annotations;
     }
 
     /**
@@ -126,6 +140,8 @@ public final class Alert {
         private String namespace;
         private AlertStatus status;
         private boolean hasDiagnostics = false;
+        private Map<String, String> labels;
+        private Map<String, String> annotations;
 
         private Builder() {}
 
@@ -171,6 +187,16 @@ public final class Alert {
 
         public Builder hasDiagnostics(boolean hasDiagnostics) {
             this.hasDiagnostics = hasDiagnostics;
+            return this;
+        }
+
+        public Builder labels(Map<String, String> labels) {
+            this.labels = labels;
+            return this;
+        }
+
+        public Builder annotations(Map<String, String> annotations) {
+            this.annotations = annotations;
             return this;
         }
 

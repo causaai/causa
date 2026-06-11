@@ -42,6 +42,19 @@ public interface AlertConfig {
     int cooldownMinutes();
 
     /**
+     * Cooldown cache cleanup interval.
+     *
+     * <p>Determines how often expired cooldown entries are purged from memory.
+     * <p>Default: 5m (5 minutes)
+     * <p>Valid formats: 5m, 10m, 1h, etc.
+     *
+     * @return cleanup interval as a duration string
+     */
+    @WithName("cooldown-cleanup-interval")
+    @WithDefault("5m")
+    String cooldownCleanupInterval();
+
+    /**
      * Comma-separated list of namespaces to ignore.
      *
      * <p>Alerts from these namespaces will be filtered out.

@@ -139,9 +139,10 @@ public class AlertServiceImpl implements AlertService {
     /**
      * Scheduled cleanup of expired cooldown entries.
      *
-     * <p>Runs every 5 minutes to prevent unbounded memory growth.
+     * <p>Interval is configurable via causa.alert.cooldown-cleanup-interval (default: 5m).
+     * <p>Prevents unbounded memory growth by removing expired entries.
      */
-    @Scheduled(every = "5m")
+    @Scheduled(every = "{causa.alert.cooldown-cleanup-interval}")
     void cleanupCooldownCache() {
         int beforeSize = cooldownCache.size();
         long cooldownSeconds = alertConfig.cooldownMinutes() * 60L;

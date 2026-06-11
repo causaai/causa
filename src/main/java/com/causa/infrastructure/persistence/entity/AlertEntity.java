@@ -1,6 +1,9 @@
 package com.causa.infrastructure.persistence.entity;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 
@@ -29,6 +32,8 @@ public class AlertEntity extends BaseEntity {
         public static final String NAMESPACE = "namespace";
         public static final String STATUS = "status";
         public static final String HAS_DIAGNOSTICS = "has_diagnostics";
+        public static final String LABELS = "labels";
+        public static final String ANNOTATIONS = "annotations";
     }
 
     // Field name constants for Panache queries
@@ -41,6 +46,8 @@ public class AlertEntity extends BaseEntity {
         public static final String NAMESPACE = "namespace";
         public static final String SEVERITY = "severity";
         public static final String HAS_DIAGNOSTICS = "hasDiagnostics";
+        public static final String LABELS = "labels";
+        public static final String ANNOTATIONS = "annotations";
     }
 
     @Id
@@ -70,6 +77,14 @@ public class AlertEntity extends BaseEntity {
 
     @Column(name = Columns.HAS_DIAGNOSTICS, nullable = false)
     private Boolean hasDiagnostics = false;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = Columns.LABELS, columnDefinition = "jsonb")
+    private JsonNode labels;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = Columns.ANNOTATIONS, columnDefinition = "jsonb")
+    private JsonNode annotations;
 
     // Getters and Setters
 
@@ -143,5 +158,21 @@ public class AlertEntity extends BaseEntity {
 
     public void setHasDiagnostics(Boolean hasDiagnostics) {
         this.hasDiagnostics = hasDiagnostics;
+    }
+
+    public JsonNode getLabels() {
+        return labels;
+    }
+
+    public void setLabels(JsonNode labels) {
+        this.labels = labels;
+    }
+
+    public JsonNode getAnnotations() {
+        return annotations;
+    }
+
+    public void setAnnotations(JsonNode annotations) {
+        this.annotations = annotations;
     }
 }

@@ -2,6 +2,7 @@ package com.causa.infrastructure.persistence.mappers;
 
 import com.causa.common.constants.AlertConstants.AlertSeverity;
 import com.causa.common.constants.AlertConstants.AlertStatus;
+import com.causa.common.utils.JsonUtils;
 import com.causa.core.domain.Alert;
 import com.causa.infrastructure.persistence.entity.AlertEntity;
 
@@ -9,6 +10,7 @@ import com.causa.infrastructure.persistence.entity.AlertEntity;
  * Alert Entity Mapper
  *
  * <p>Maps between Alert domain model and AlertEntity JPA entity.
+ * <p>Uses JsonUtils for Map&lt;String, String&gt; ↔ JsonNode conversion.
  *
  * @since 0.0.1
  */
@@ -40,6 +42,10 @@ public final class AlertEntityMapper {
         entity.setStatus(alert.getStatus().getValue());
         entity.setHasDiagnostics(alert.hasDiagnostics());
 
+        // Convert Map<String, String> to JsonNode for JSONB storage
+        entity.setLabels(JsonUtils.mapToJsonNode(alert.getLabels()));
+        entity.setAnnotations(JsonUtils.mapToJsonNode(alert.getAnnotations()));
+
         return entity;
     }
 
@@ -64,6 +70,9 @@ public final class AlertEntityMapper {
             .namespace(entity.getNamespace())
             .status(AlertStatus.fromString(entity.getStatus()))
             .hasDiagnostics(entity.getHasDiagnostics())
+            .labels(JsonUtils.jsonNodeToMap(entity.getLabels()))
+            .annotations(JsonUtils.jsonNodeToMap(entity.getAnnotations()))
             .build();
     }
+
 }

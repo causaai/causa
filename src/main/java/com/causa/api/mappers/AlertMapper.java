@@ -82,6 +82,8 @@ public class AlertMapper {
             .namespace(namespace)
             .status(AlertStatus.fromString(item.getStatus()))
             .hasDiagnostics(false)
+            .labels(labels)
+            .annotations(annotations)
             .build();
     }
 
