@@ -1,0 +1,122 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: causa-memory-alerts
+  namespace: openshift-monitoring  # Moved to platform monitoring to see core metrics
+  labels:
+    prometheus: k8s
+    role: alert-rules
+spec:
+  groups:
+  - name: causa-memory-alerts
+    interval: 30s
+    rules:
+    - alert: causa-high-memory
+      expr: |
+        (
+          sum by (namespace, pod, container) (
+            container_memory_working_set_bytes{container!="",container!="POD"}
+          )
+          /
+          sum by (namespace, pod, container) (
+            kube_pod_container_resource_limits{resource="memory",container!="",container!="POD"}
+          )
+        ) > 0.50
+        and
+        on(namespace, pod) kube_pod_labels{label_ibm_java_runtime_intelligence="true"}
+      labels:
+        severity: critical
+        alertname: causa-high-memory
+      annotations:
+        summary: "Java container {{ $labels.container }} in pod {{ $labels.pod }} is using > 50% memory"
+        description: |
+          Container {{ $labels.container }} in pod {{ $labels.pod }} (namespace {{ $labels.namespace }})
+          is currently using {{ $value | humanizePercentage }} of its memory limit.
+        diagnostic_hint: "possible_memory_pressure"
+        container_name: "{{ $labels.container }}"
+        pod_name: "{{ $labels.pod }}"
+        namespace: "{{ $labels.namespace }}"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-main
+  namespace: openshift-monitoring
+type: Opaque
+stringData:
+  alertmanager.yaml: |
+    global:
+      http_config:
+        proxy_from_environment: true
+      resolve_timeout: 5m
+
+    inhibit_rules:
+    - equal:
+      - namespace
+      - alertname
+      source_matchers:
+      - severity = "critical"
+      target_matchers:
+      - severity =~ "warning|info"
+    - equal:
+      - namespace
+      - alertname
+      source_matchers:
+      - severity = "warning"
+      target_matchers:
+      - severity = "info"
+
+    receivers:
+    - name: Default
+    - name: Watchdog
+    - name: Critical
+      webhook_configs:
+      - url: 'http://causa-backend.diagnostics-tool.svc.cluster.local:8080/api/v1/webhooks/alerts'
+        send_resolved: false
+        http_config:
+          follow_redirects: true
+
+    route:
+      group_by:
+      - namespace
+      group_interval: 5m
+      group_wait: 30s
+      receiver: Default
+      repeat_interval: 12h
+      routes:
+      - matchers:
+        - alertname = "Watchdog"
+        receiver: Watchdog
+      - matchers:
+        - alertname =~ "causa-.*"
+        receiver: Critical
+        group_wait: 5s
+        group_interval: 5s
+      - matchers:
+        - severity = "critical"
+        receiver: Critical
+        group_wait: 30s
+        group_interval: 5m
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-alertmanager-to-causa
+  namespace: diagnostics-tool # Deployed where your webhook backend lives
+spec:
+  podSelector:
+    matchLabels:
+      app: causa-backend # Ensure this matches your causa-backend pod labels
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-monitoring
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: openshift-user-workload-monitoring
+    ports:
+    - protocol: TCP
+      port: 8080
