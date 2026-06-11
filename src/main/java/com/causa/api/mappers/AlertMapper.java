@@ -74,9 +74,7 @@ public class AlertMapper {
 
         // Use Prometheus fingerprint as alert ID (globally unique, deterministic)
         // Fallback to generated ID if fingerprint is missing (shouldn't happen with Alertmanager v4)
-        String alertId = (item.getFingerprint() != null && !item.getFingerprint().isBlank())
-            ? item.getFingerprint()
-            : Alert.generateAlertId(container, timestamp);
+        String alertId = Alert.generateAlertId(container, timestamp);
 
         return Alert.builder()
             .alertId(alertId)
