@@ -100,6 +100,7 @@ causa:
     filter-severity: ${CAUSA_ALERT_SEVERITY:critical}
     cooldown-minutes: ${CAUSA_ALERT_COOLDOWN:15}
     ignore-namespaces: ${CAUSA_ALERT_IGNORE_NS:kube-system,istio-system}
+    cooldown-cleanup-interval: ${CAUSA_ALERT_COOLDOWN_CLEANUP_INTERVAL:5}
 
 # Feature Flags (TO BE ADDED LATER)
 #   features:

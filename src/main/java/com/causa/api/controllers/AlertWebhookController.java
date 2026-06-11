@@ -70,6 +70,7 @@ public class AlertWebhookController {
             .field("alertCount", alertCount)
             .field("status", request != null ? request.getStatus() : "null")
             .field("receiver", request != null ? request.getReceiver() : "null")
+            .field("rawPayload", request)
             .log();
 
         // Validate request
