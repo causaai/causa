@@ -5,21 +5,12 @@ package com.causa.common.constants;
  *
  * <p>Contains API response keys and health-check constants.
  *
- * @since 0.0.1
+ * @since 1.0.0
  */
 public final class ApiConstants {
 
     private ApiConstants() {
         // Prevent instantiation
-    }
-
-    /**
-     * API endpoint paths.
-     */
-    public static final class Endpoints {
-        private Endpoints() {}
-
-        public static final String HEALTH = "/api/health";
     }
 
     /**
@@ -59,6 +50,15 @@ public final class ApiConstants {
     }
 
     /**
+     * API endpoint paths.
+     */
+    public static final class Endpoints {
+        private Endpoints() {}
+
+        public static final String HEALTH = "/api/health";
+    }
+
+    /**
      * Health check response field keys.
      */
     public static final class HealthCheckResponse {
@@ -80,4 +80,40 @@ public final class ApiConstants {
         public static final String HTTP_STATUS = "http_status";
         public static final String LATENCY_MS = "latency_ms";
     }
+
+    /**
+     * API version constants.
+     */
+    public static final class Version {
+        private Version() {}
+
+        public static final String API_V1 = "/api/v1";
+    }
+
+    /**
+     * API endpoint paths organized by resource.
+     */
+    public static final class Paths {
+        private Paths() {}
+
+        /**
+         * Webhook endpoints for external system integrations.
+         */
+        public static final class Webhooks {
+            private Webhooks() {}
+
+            public static final String ALERTS = Version.API_V1 + "/webhooks/alerts";
+        }
+
+        /**
+         * Health check paths.
+         */
+        public static final class Health {
+            private Health() {}
+
+            public static final String LIVENESS = "/q/health/live";
+            public static final String READINESS = "/q/health/ready";
+        }
+    }
+
 }

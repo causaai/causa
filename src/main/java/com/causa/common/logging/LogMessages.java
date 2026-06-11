@@ -88,7 +88,9 @@ public final class LogMessages {
         public static final String LLM_CHECK_STARTED = "LLM health check started";
         public static final String LLM_CHECK_PASSED = "LLM health check passed";
         public static final String LLM_CHECK_FAILED = "LLM health check failed";
-     * Alert ingestion log messages.
+    }     
+    
+    /* Alert ingestion log messages.
      */
     public static final class Alert {
         private Alert() {}
