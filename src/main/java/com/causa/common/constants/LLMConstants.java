@@ -149,4 +149,16 @@ public final class LLMConstants {
         public static final String CONNECTIVITY_TEST_PROMPT = "Respond with OK";
         public static final int CONNECTIVITY_TEST_MAX_TOKENS = 10;
     }
+
+    /**
+     * Health check messages for LLM provider.
+     */
+    public static final class Messages {
+        private Messages() {}
+
+        public static final String LLM_NOT_READY = "LLM provider is not ready";
+        public static final String LLM_CONNECTIVITY_FAILED = "LLM connectivity test failed";
+        public static final String LLM_CONNECTED_FORMAT = "Connected to LangChain4J with %s";
+        public static final String LLM_ERROR_FORMAT = "LLM health check failed: %s";
+    }
 }

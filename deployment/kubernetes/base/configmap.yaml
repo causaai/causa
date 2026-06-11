@@ -40,6 +40,14 @@ data:
 
   # Comma-separated list of namespaces to ignore (e.g., system namespaces)
   CAUSA_ALERT_IGNORE_NS: "kube-system,istio-system"
+  # MCP Kubernetes Configuration
+  CAUSA_MCP_K8S_ENDPOINT: "http://kubernetes-mcp-server.diagnostics-tool.svc.cluster.local:8080"
+  CAUSA_MCP_K8S_HEALTH_PATH: "/healthz"
+  CAUSA_MCP_K8S_TIMEOUT: "5000"
 
-  # MCP Configuration (placeholder)
-  # CAUSA_MCP_SERVERS: "kruize,cryostat,kubernetes"
+  # LLM Configuration (placeholder)
+  # CAUSA_LLM_PROVIDER: "anthropic"
+  # CAUSA_LLM_MODEL: "claude-3-5-sonnet-20241022"
+
+  # MCP Configuration (placeholder for other servers)
+    # CAUSA_MCP_SERVERS: "kruize,cryostat"

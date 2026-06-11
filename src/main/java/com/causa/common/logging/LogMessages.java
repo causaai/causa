@@ -68,6 +68,30 @@ public final class LogMessages {
 
     /**
      * Alert ingestion log messages.
+     * Health check log messages.
+     *
+     * @since 0.0.1
+     */
+    public static final class HealthCheck {
+        private HealthCheck() {}
+
+        public static final String ENDPOINT_CALLED = "Health check endpoint called";
+        public static final String ENDPOINT_RESPONSE_PREPARED = "Health check response prepared";
+        public static final String ENDPOINT_FAILED = "Health check endpoint failed";
+        public static final String SYSTEM_CHECK_STARTED = "System health check started";
+        public static final String SYSTEM_CHECK_COMPLETED = "System health check completed";
+        public static final String DB_CHECK_PASSED = "Database health check passed";
+        public static final String DB_CHECK_FAILED = "Database health check failed";
+        public static final String DB_LATENCY_MEASUREMENT_FAILED = "Database latency measurement failed";
+        public static final String MCP_K8S_CHECK_STARTED = "MCP Kubernetes health check started";
+        public static final String MCP_K8S_CHECK_PASSED = "MCP Kubernetes health check passed";
+        public static final String MCP_K8S_CHECK_FAILED = "MCP Kubernetes health check failed";
+        public static final String LLM_CHECK_STARTED = "LLM health check started";
+        public static final String LLM_CHECK_PASSED = "LLM health check passed";
+        public static final String LLM_CHECK_FAILED = "LLM health check failed";
+    }     
+    
+    /* Alert ingestion log messages.
      */
     public static final class Alert {
         private Alert() {}
@@ -106,5 +130,45 @@ public final class LogMessages {
         // Exception messages
         public static final String DIAGNOSTIC_PERSIST_FAILED = "Failed to persist diagnostic";
         public static final String DIAGNOSTIC_UPDATE_FAILED = "Failed to update diagnostic";
+    }
+
+    /**
+     * Database connection and pool log messages.
+     *
+     * @since 0.0.1
+     */
+    public static final class Database {
+        private Database() {}
+
+        public static final String CONNECTION_VERIFYING = "Verifying database connection on startup";
+        public static final String CONNECTION_SUCCESS = "Database connection pool initialized successfully";
+        public static final String CONNECTION_FAILED = "Database connection verification failed";
+        public static final String READINESS_CHECK_PASSED = "Database readiness check passed";
+        public static final String READINESS_CHECK_FAILED = "Database readiness check failed";
+    }
+
+    /**
+     * Health check log messages.
+     *
+     * @since 0.0.1
+     */
+    public static final class HealthCheck {
+        private HealthCheck() {}
+
+        public static final String SYSTEM_CHECK_STARTED = "Performing system health check";
+        public static final String SYSTEM_CHECK_COMPLETED = "System health check completed";
+        public static final String ENDPOINT_CALLED = "Health check endpoint called";
+        public static final String ENDPOINT_RESPONSE_PREPARED = "Health check endpoint response prepared";
+        public static final String ENDPOINT_FAILED = "Health check endpoint failed with exception";
+        public static final String DB_CHECK_PASSED = "Database health check passed";
+        public static final String DB_CHECK_FAILED = "Database health check failed - not ready";
+        public static final String DB_LATENCY_MEASUREMENT_FAILED = "Database health check failed during latency measurement";
+        public static final String MCP_K8S_CHECK_STARTED = "Checking MCP Kubernetes server health";
+        public static final String MCP_K8S_CHECK_PASSED = "MCP Kubernetes server health check passed";
+        public static final String MCP_K8S_CHECK_FAILED = "MCP Kubernetes server health check failed";
+        public static final String MCP_K8S_DISABLED = "MCP Kubernetes health check is disabled";
+        public static final String LLM_CHECK_STARTED = "Checking LLM provider health";
+        public static final String LLM_CHECK_PASSED = "LLM provider health check passed";
+        public static final String LLM_CHECK_FAILED = "LLM provider health check failed";
     }
 }
