@@ -71,7 +71,7 @@ stringData:
     - name: Watchdog
     - name: Critical
       webhook_configs:
-      - url: 'http://causa-backend.diagnostics-tool.svc.cluster.local:8080/api/v1/webhooks/alerts'
+      - url: 'http://causa-backend.openshift-tuning.svc.cluster.local:8080/api/v1/webhooks/alerts'
         send_resolved: false
         http_config:
           follow_redirects: true
