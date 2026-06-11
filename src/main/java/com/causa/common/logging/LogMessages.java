@@ -15,6 +15,9 @@ public final class LogMessages {
         // Prevent instantiation
     }
 
+    // Global messages
+    public static final String UNEXPECTED_ERROR = "Unexpected error occurred";
+
     public static final class Health {
         private Health() {}
 
@@ -85,5 +88,44 @@ public final class LogMessages {
         public static final String LLM_CHECK_STARTED = "LLM health check started";
         public static final String LLM_CHECK_PASSED = "LLM health check passed";
         public static final String LLM_CHECK_FAILED = "LLM health check failed";
+     * Alert ingestion log messages.
+     */
+    public static final class Alert {
+        private Alert() {}
+
+        public static final String WEBHOOK_RECEIVED = "Alert webhook received";
+        public static final String WEBHOOK_PROCESSED = "Alert webhook processed successfully";
+        public static final String ALERT_ACCEPTED = "Alert accepted for processing";
+        public static final String ALERT_FILTERED_SEVERITY = "Alert filtered by severity";
+        public static final String ALERT_FILTERED_NAMESPACE = "Alert filtered by namespace";
+        public static final String ALERT_FILTERED_COOLDOWN = "Alert skipped due to cooldown";
+        public static final String ALERT_VALIDATION_FAILED = "Alert webhook validation failed";
+        public static final String ALERT_PROCESSING_ERROR = "Error processing alert webhook";
+        public static final String COOLDOWN_CACHE_CLEANUP = "Cooldown cache cleanup completed";
+        public static final String ALERT_PERSISTED = "Alert persisted to database";
+
+        // Exception messages
+        public static final String ALERT_PERSIST_FAILED = "Failed to persist alert";
+        public static final String ALERT_UPDATE_FAILED = "Failed to update alert";
+        public static final String ALERT_NOT_FOUND = "Alert not found";
+    }
+
+    /**
+     * Diagnostic pipeline log messages.
+     */
+    public static final class Diagnostic {
+        private Diagnostic() {}
+
+        public static final String DIAGNOSTIC_TRIGGERED = "Diagnostic pipeline triggered";
+        public static final String CONTEXT_COLLECTION_STARTED = "Context collection started";
+        public static final String DIAGNOSIS_TYPE_DETERMINED = "Diagnosis type determined";
+        public static final String ROOT_CAUSE_ANALYSIS_STARTED = "Root cause analysis started";
+        public static final String RCA_VALIDATION_STARTED = "RCA validation started";
+        public static final String DIAGNOSTIC_COMPLETED = "Diagnostic completed";
+        public static final String DIAGNOSTIC_FAILED = "Diagnostic failed";
+
+        // Exception messages
+        public static final String DIAGNOSTIC_PERSIST_FAILED = "Failed to persist diagnostic";
+        public static final String DIAGNOSTIC_UPDATE_FAILED = "Failed to update diagnostic";
     }
 }

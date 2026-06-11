@@ -1,6 +1,6 @@
 package com.causa.infrastructure.persistence.entity;
 
-import io.quarkus.hibernate.orm.panache.PanacheEntity;
+import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.Column;
 import jakarta.persistence.MappedSuperclass;
 import org.hibernate.annotations.CreationTimestamp;
@@ -11,8 +11,8 @@ import java.time.LocalDateTime;
 /**
  * Base Entity
  *
- * <p>Abstract base class for all JPA entities. Extends {@link PanacheEntity} to
- * inherit the auto-generated {@code id} field and provides automatic timestamp
+ * <p>Abstract base class for all JPA entities. Extends {@link PanacheEntityBase} to
+ * allow entities to define their own {@code @Id} fields and provides automatic timestamp
  * tracking for creation and last update.
  *
  * <p>The {@code createdAt} and {@code updatedAt} fields are automatically managed
@@ -21,7 +21,7 @@ import java.time.LocalDateTime;
  * @since 1.0.0
  */
 @MappedSuperclass
-public abstract class BaseEntity extends PanacheEntity {
+public abstract class BaseEntity extends PanacheEntityBase {
 
     /**
      * Timestamp when the entity was created.

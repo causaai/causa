@@ -2,11 +2,7 @@ package com.causa.infrastructure.persistence.entity;
 
 import com.causa.common.constants.AppConstants;
 import com.fasterxml.jackson.databind.JsonNode;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -24,7 +20,6 @@ import java.time.LocalDateTime;
  *
  * <p>Extends {@link BaseEntity} to inherit:
  * <ul>
- *   <li>{@code id} - BIGSERIAL primary key (from PanacheEntity)</li>
  *   <li>{@code createdAt} - automatic creation timestamp</li>
  *   <li>{@code updatedAt} - automatic update timestamp</li>
  * </ul>
@@ -34,6 +29,14 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "system_health_history")
 public class SystemHealthHistoryEntity extends BaseEntity {
+
+    /**
+     * Primary key - auto-generated BIGSERIAL.
+     */
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id", nullable = false)
+    public Long id;
 
     /**
      * Timestamp of the health snapshot.

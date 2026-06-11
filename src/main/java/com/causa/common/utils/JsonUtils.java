@@ -1,11 +1,14 @@
 package com.causa.common.utils;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.eclipse.microprofile.config.spi.Converter;
 import org.jboss.logging.Logger;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -55,6 +58,40 @@ public final class JsonUtils {
                     json, e.getMessage());
             return Collections.emptyMap();
         }
+    }
+
+    /**
+     * Converts Map&lt;String, String&gt; to JsonNode for JSONB database storage.
+     *
+     * @param map the map to convert
+     * @return JsonNode representation, or null if map is null/empty
+     */
+    public static JsonNode mapToJsonNode(Map<String, String> map) {
+        if (map == null || map.isEmpty()) {
+            return null;
+        }
+
+        ObjectNode jsonNode = OBJECT_MAPPER.createObjectNode();
+        map.forEach(jsonNode::put);
+        return jsonNode;
+    }
+
+    /**
+     * Converts JsonNode to Map&lt;String, String&gt; for domain models.
+     *
+     * @param jsonNode the JsonNode to convert
+     * @return Map representation, or empty map if jsonNode is null
+     */
+    public static Map<String, String> jsonNodeToMap(JsonNode jsonNode) {
+        if (jsonNode == null || jsonNode.isNull()) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, String> map = new HashMap<>();
+        jsonNode.fields().forEachRemaining(entry ->
+            map.put(entry.getKey(), entry.getValue().asText())
+        );
+        return map;
     }
 
     /**

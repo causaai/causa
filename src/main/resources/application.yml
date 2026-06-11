@@ -100,6 +100,12 @@ causa:
       project-id: ${VERTEX_PROJECT_ID:}
       location: ${VERTEX_LOCATION:us-east5}
 
+  # Alert Configuration
+  alerts:
+    filter-severity: ${CAUSA_ALERT_SEVERITY:critical}
+    cooldown-minutes: ${CAUSA_ALERT_COOLDOWN:15}
+    ignore-namespaces: ${CAUSA_ALERT_IGNORE_NS:kube-system,istio-system}
+
 # Feature Flags (TO BE ADDED LATER)
 #   features:
 #     rag-enabled: ${CAUSA_FEATURE_RAG:false}
@@ -118,8 +124,3 @@ causa:
 #       endpoint: ${CAUSA_MCP_KRUIZE_ENDPOINT}
 #       timeout-ms: ${CAUSA_MCP_KRUIZE_TIMEOUT}
 
-#   # Alert Configuration
-#   alerts:
-#     filter-severity: ${CAUSA_ALERT_SEVERITY:critical}
-#     cooldown-minutes: ${CAUSA_ALERT_COOLDOWN:15}
-#     ignore-namespaces: ${CAUSA_ALERT_IGNORE_NS:kube-system,istio-system}
