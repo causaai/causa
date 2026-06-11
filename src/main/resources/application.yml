@@ -113,10 +113,9 @@ causa:
 #     validation-enabled: ${CAUSA_FEATURE_VALIDATION:true}
 #     notifications-enabled: ${CAUSA_FEATURE_NOTIFICATIONS:false}
 
-#   # MCP Configuration
-#   mcp:
-#     cryostat:
-#       endpoint: ${CAUSA_MCP_CRYOSTAT_ENDPOINT:http://cryostat-mcp.causa.svc:8181}
-#     kruize:
-#       endpoint: ${CAUSA_MCP_KRUIZE_ENDPOINT:http://kruize.monitoring.svc:8080}
+  # MCP Configuration
+  mcp:
+    kubernetes:
+      endpoint: ${CAUSA_MCP_K8S_ENDPOINT:http://localhost:8081}
+      timeout-ms: ${CAUSA_MCP_K8S_TIMEOUT:5000}
 

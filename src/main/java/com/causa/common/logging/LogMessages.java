@@ -131,4 +131,18 @@ public final class LogMessages {
         public static final String DIAGNOSTIC_PERSIST_FAILED = "Failed to persist diagnostic";
         public static final String DIAGNOSTIC_UPDATE_FAILED = "Failed to update diagnostic";
     }
+
+    /**
+     * MCP integration log messages.
+     */
+    public static final class Mcp {
+        private Mcp() {}
+
+        public static final String MCP_CONTEXT_COLLECTION_START = "MCP context collection started";
+        public static final String MCP_K8S_POD_STATUS = "Kubernetes pod status retrieved";
+        public static final String MCP_K8S_POD_EVENTS = "Kubernetes pod events retrieved";
+        public static final String MCP_K8S_POD_LOGS = "Kubernetes pod logs retrieved";
+        public static final String MCP_CALL_FAILED = "MCP tool call failed";
+        public static final String MCP_SKIPPED_NO_POD = "Skipping Kubernetes MCP calls - no pod name in alert";
+    }
 }

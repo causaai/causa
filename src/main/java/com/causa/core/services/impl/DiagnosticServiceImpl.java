@@ -7,6 +7,7 @@ import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
 import com.causa.core.ports.DiagnosticRepository;
 import com.causa.core.services.DiagnosticService;
+import com.causa.mcp.McpContextCollector;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -25,10 +26,13 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     private static final CausaLogger log = CausaLogger.getLogger(DiagnosticServiceImpl.class);
 
     private final DiagnosticRepository diagnosticRepository;
+    private final McpContextCollector mcpContextCollector;
 
     @Inject
-    public DiagnosticServiceImpl(DiagnosticRepository diagnosticRepository) {
+    public DiagnosticServiceImpl(DiagnosticRepository diagnosticRepository,
+                                  McpContextCollector mcpContextCollector) {
         this.diagnosticRepository = diagnosticRepository;
+        this.mcpContextCollector = mcpContextCollector;
     }
 
     @Override
@@ -86,10 +90,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             .field("alertId", alert.getAlertId())
             .log();
 
-        // TODO: Implement MCP context collection
-        // - Call Kubernetes MCP for logs/events
-        // - Call Cryostat MCP for JFR data
-        // - Call Kruize MCP for recommendations
+        mcpContextCollector.collectAndLogContext(alert);
     }
 
     /**
