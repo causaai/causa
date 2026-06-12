@@ -113,9 +113,4 @@ causa:
 #     validation-enabled: ${CAUSA_FEATURE_VALIDATION:true}
 #     notifications-enabled: ${CAUSA_FEATURE_NOTIFICATIONS:false}
 
-  # MCP Configuration
-  mcp:
-    kubernetes:
-      endpoint: ${CAUSA_MCP_K8S_ENDPOINT:http://localhost:8081}
-      timeout-ms: ${CAUSA_MCP_K8S_TIMEOUT:5000}
 
