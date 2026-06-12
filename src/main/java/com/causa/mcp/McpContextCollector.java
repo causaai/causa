@@ -242,7 +242,7 @@ public class McpContextCollector {
             .header(McpConstants.Headers.CONTENT_TYPE, McpConstants.Headers.CONTENT_TYPE_JSON)
             .header(McpConstants.Headers.ACCEPT, McpConstants.Headers.ACCEPT_VALUE)
             .POST(HttpRequest.BodyPublishers.ofString(initRequest.toString()))
-            .timeout(Duration.ofMillis(5000))
+            .timeout(Duration.ofMillis(mcpConfig.kubernetes().timeoutMs()))
             .build();
 
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -283,7 +283,7 @@ public class McpContextCollector {
             .header(McpConstants.Headers.ACCEPT, McpConstants.Headers.ACCEPT_VALUE)
             .header(McpConstants.Headers.MCP_SESSION_ID, sessionId)
             .POST(HttpRequest.BodyPublishers.ofString(notification.toString()))
-            .timeout(Duration.ofMillis(5000))
+            .timeout(Duration.ofMillis(mcpConfig.kubernetes().timeoutMs()))
             .build();
 
         httpClient.send(request, HttpResponse.BodyHandlers.ofString());
