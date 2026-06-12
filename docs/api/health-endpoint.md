@@ -7,7 +7,7 @@ The health check endpoint provides comprehensive monitoring of all system compon
 ## Endpoint
 
 ```
-GET /api/health
+GET /api/v1/healthz
 ```
 
 ## Response Format
@@ -120,13 +120,13 @@ When critical components are down:
 ### cURL
 
 ```bash
-curl -X GET http://localhost:8080/api/health
+curl -X GET http://localhost:8080/api/v1/healthz
 ```
 
 ### HTTPie
 
 ```bash
-http GET http://localhost:8080/api/health
+http GET http://localhost:8080/api/v1/healthz
 ```
 
 ### Using in Kubernetes
@@ -134,14 +134,14 @@ http GET http://localhost:8080/api/health
 ```yaml
 livenessProbe:
   httpGet:
-    path: /api/health
+    path: /api/v1/healthz
     port: 8080
   initialDelaySeconds: 30
   periodSeconds: 10
 
 readinessProbe:
   httpGet:
-    path: /api/health
+    path: /api/v1/healthz
     port: 8080
   initialDelaySeconds: 5
   periodSeconds: 5
@@ -191,7 +191,7 @@ quarkus:
 ### 4. Test the Health Endpoint
 
 ```bash
-curl http://localhost:8080/api/health | jq
+curl http://localhost:8080/api/v1/healthz | jq
 ```
 
 Expected output:
@@ -259,7 +259,7 @@ The endpoint can be scraped by Prometheus for metrics:
 ```yaml
 scrape_configs:
   - job_name: 'causa-backend'
-    metrics_path: '/api/health'
+    metrics_path: '/api/v1/healthz'
     static_configs:
       - targets: ['causa-backend:8080']
 ```

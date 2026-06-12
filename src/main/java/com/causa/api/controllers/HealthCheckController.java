@@ -30,7 +30,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
  *
  * <h2>Endpoint</h2>
  * <pre>
- * GET /api/health
+ * GET /api/v1/healthz
  * </pre>
  *
  * <h2>Response Format</h2>
@@ -57,7 +57,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
  *
  * @since 0.0.1
  */
-@Path(ApiConstants.Endpoints.HEALTH)
+@Path(ApiConstants.Paths.Health.HEALTHZ)
 @Produces(MediaType.APPLICATION_JSON)
 public class HealthCheckController {
 

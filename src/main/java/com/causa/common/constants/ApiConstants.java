@@ -81,15 +81,8 @@ public final class ApiConstants {
 
             public static final String LIVENESS = "/q/health/live";
             public static final String READINESS = "/q/health/ready";
+            public static final String HEALTHZ = Version.API_V1 + "/healthz";
         }
-    }
-
-     /* API endpoint paths.
-     */
-    public static final class Endpoints {
-        private Endpoints() {}
-
-        public static final String HEALTH = "/api/health";
     }
 
     /**
