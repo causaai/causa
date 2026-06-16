@@ -96,6 +96,12 @@
             <artifactId>quarkus-kubernetes-client</artifactId>
         </dependency>
 
+        <!-- Micrometer Metrics Registry for Prometheus -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-micrometer-registry-prometheus</artifactId>
+        </dependency>
+
         <!-- LangChain4J Core -->
         <dependency>
             <groupId>dev.langchain4j</groupId>
