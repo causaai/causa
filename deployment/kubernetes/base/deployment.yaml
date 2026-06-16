@@ -24,7 +24,7 @@ spec:
       serviceAccountName: causa-backend
       containers:
       - name: causa-backend
-        image: quay.io/rh-ee-shesaxen/causa-backend:shekhar_t2
+        image: quay.io/rh-ee-shesaxen/causa-backend:sprint1_demo
         imagePullPolicy: Always
         ports:
         - name: http
