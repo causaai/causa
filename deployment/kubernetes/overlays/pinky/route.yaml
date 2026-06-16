@@ -1,0 +1,18 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: causa-backend
+  labels:
+    app.kubernetes.io/name: causa-backend
+    app.kubernetes.io/component: backend
+spec:
+  to:
+    kind: Service
+    name: ocp-causa-backend
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None

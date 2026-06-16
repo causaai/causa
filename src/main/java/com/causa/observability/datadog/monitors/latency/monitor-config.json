@@ -1,0 +1,12 @@
+{
+  "name": "Causa RCA Generation Latency High",
+  "type": "metric alert",
+  "query": "avg(last_5m):avg:causa_rca_analysis_duration_seconds.sum{*} by {analysis_type,namespace} > 2",
+  "message": "Causa RCA generation latency is high\n\nAnalysis Type: {{analysis_type.name}}\nNamespace: {{namespace.name}}\n\nInvestigate RCA generation performance degradation.",
+  "tags": ["causa", "rca", "latency", "openmetrics", "datadog"],
+  "options": {
+    "include_tags": true,
+    "notify_no_data": false,
+    "require_full_window": false
+  }
+}

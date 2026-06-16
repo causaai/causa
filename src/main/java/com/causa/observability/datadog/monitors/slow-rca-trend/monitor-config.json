@@ -1,0 +1,12 @@
+{
+  "name": "Causa RCA - Slow Analysis Trend",
+  "type": "metric alert",
+  "query": "avg(last_15m):avg:causa_rca_analysis_duration_seconds.sum{*} > 1",
+  "message": "RCA analysis duration is increasing.\n\nInvestigate RCA generation performance.",
+  "tags": ["causa", "rca", "performance", "openmetrics", "datadog"],
+  "options": {
+    "include_tags": true,
+    "notify_no_data": false,
+    "require_full_window": false
+  }
+}

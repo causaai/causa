@@ -1,0 +1,12 @@
+{
+  "name": "Causa RCA - No Analysis Generated",
+  "type": "metric alert",
+  "query": "sum(last_30m):sum:causa_analysis_count.count{*} < 1",
+  "message": "No RCA analyses have been generated in the last 30 minutes.\n\nPossible causes:\n- Causa backend is unhealthy\n- RCA generation pipeline is stalled\n- Monitoring data is not reaching Causa\n- No issue events are being processed\n\nInvestigate:\n- Causa backend health\n- Event ingestion pipeline\n- Causa logs\n- Data source connectivity",
+  "tags": ["causa", "rca", "health", "openmetrics", "datadog"],
+  "options": {
+    "include_tags": true,
+    "notify_no_data": false,
+    "require_full_window": false
+  }
+}
