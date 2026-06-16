@@ -4,6 +4,8 @@
 
 This document describes the proposed user experience for integrating Causa with observability platforms such as Datadog, Grafana, Instana, Dynatrace, and Prometheus.
 
+**Important:** Causa connects to users' existing observability tools via API. We do NOT install or manage observability agents. Users must have their observability agent (Datadog Agent, Grafana Agent, etc.) already deployed and running in their cluster or infrastructure. Causa only configures monitors, alerts, and dashboards via the observability platform's API.
+
 ---
 
 ## Proposed User Flow
@@ -59,69 +61,84 @@ API Token:
 
 ---
 
-### Step 3: Auto Discovery
+### Step 3: Prerequisites Check
 
-Causa discovers:
+Causa verifies:
 
 ```
-Detected Metrics Endpoint
+Checking Prerequisites
 
-/q/metrics
+✓ API connection successful
+✓ Required permissions granted
+✓ Observability agent detected in cluster (optional check)
+
+Detected Causa Metrics Endpoint:
+✓ /q/metrics
 
 Detected Metrics:
 ✓ causa_rca_analysis_available
 ✓ causa_rca_analysis_failed_total
 ✓ causa_rca_analysis_duration_seconds
 ✓ causa_rca_analysis_completed_total
+
+Note: Ensure your Datadog Agent is configured to scrape /q/metrics
 ```
 
 ---
 
-### Step 4: Installation Summary
+### Step 4: Configuration Summary
 
 **Actions to be performed:**
 
 ```
-✓ Install Datadog Agent
-✓ Configure OpenMetrics Scraping
-✓ Create RCA Monitors
-✓ Create Alert Templates
-✓ Validate Metrics
+✓ Create RCA Monitors via Datadog API
+✓ Configure Alert Notification Channels
+✓ Set up Dashboard Widgets (optional)
+✓ Validate API connectivity
+
+Note: Your existing Datadog Agent will collect metrics from /q/metrics
 ```
 
 ---
 
-### Step 5: Install
+### Step 5: Configure Monitors
 
 ```
-[ Install Integration ]
+[ Configure Monitors ]
 ```
 
 Backend performs:
 
 ```
-POST /api/v1/integrations/install
+POST /api/v1/integrations/configure
 ```
 
-This single endpoint performs all installation steps:
-1. Validates credentials
-2. Installs agent (equivalent to `setup-datadog-agent.sh`)
-3. Creates monitors (equivalent to `create-datadog-resources.sh`)
-4. Validates metrics endpoint
+This endpoint configures monitors in your Datadog account:
+1. Validates API credentials
+2. Creates monitors in Datadog via API
+3. Configures alert thresholds
+4. Returns list of created monitors
+
+**User Responsibility:** Configure your existing Datadog Agent to scrape Causa's /q/metrics endpoint.
 
 ---
 
 ### Step 6: Success
 
 ```
-Datadog Integration Installed
+Datadog Integration Configured
 
-Agent Status: Healthy
-Metrics Discovered: 8
+API Connection: Active
 Monitors Created: 6
+Alert Channels: Configured
 
-[ View Monitors ]
+Next Steps:
+- Ensure your Datadog Agent scrapes /q/metrics endpoint
+- Configure agent with annotation discovery or static config
+
+[ View Monitors in Datadog ]
 [ Send Test RCA Event ]
+[ Agent Configuration Guide ]
 ```
 
 ---
@@ -193,42 +210,50 @@ For **Grafana**:
 
 ---
 
-### 2. Install Integration
+### 2. Configure Monitors
 
 **Endpoint:**
 ```
-POST /api/v1/integrations/install
+POST /api/v1/integrations/configure
 ```
 
 **Request:**
 ```json
 {
   "provider": "datadog",
-  "site": "us5.datadoghq.com",
-  "apiKey": "xxx",
-  "appKey": "yyy"
+  "config": {
+    "site": "us5.datadoghq.com",
+    "apiKey": "xxx",
+    "appKey": "yyy"
+  }
 }
 ```
 
-**This single endpoint performs all installation steps:**
-1. Validates credentials
-2. Installs agent (equivalent to `setup-datadog-agent.sh`)
-3. Creates monitors (equivalent to `create-datadog-resources.sh`)
-4. Validates metrics endpoint
+**What this endpoint does:**
+1. Validates Datadog API credentials
+2. Creates 6 monitors in your Datadog account via API
+3. Configures alert thresholds for RCA metrics
+4. Returns list of created monitors
+
+**What this endpoint does NOT do:**
+- Does NOT install Datadog Agent
+- Does NOT configure agent scraping
+- Does NOT deploy any resources to your cluster
+
+**User must separately:**
+- Ensure their Datadog Agent is running (in same or different cluster)
+- Configure agent to scrape Causa's /q/metrics endpoint
 
 **Response:**
 ```json
 {
   "integrationId": "int-12345",
   "provider": "datadog",
-  "status": "installed",
-  "agentInstalled": true,
-  "agentStatus": "healthy",
+  "status": "configured",
   "monitorsCreated": 6,
-  "metricsDiscovered": 8,
-  "metricsEndpoint": "/q/metrics",
-  "scrapeInterval": "30s",
+  "metricsEndpoint": "http://causa-service.causa-namespace.svc.cluster.local:8080/q/metrics",
   "createdAt": "2026-06-10T10:00:00Z",
+  "notes": "Monitors created successfully. Ensure your Datadog Agent scrapes the metrics endpoint.",
   "monitors": [
     {
       "id": "mon-1",
@@ -278,12 +303,10 @@ GET /api/v1/integrations/{integrationId}/status
 {
   "integrationId": "int-12345",
   "provider": "datadog",
-  "installed": true,
-  "agentHealthy": true,
-  "metricsDiscovered": 8,
+  "configured": true,
+  "apiConnectionHealthy": true,
   "monitorsCreated": 6,
-  "lastScrape": "2026-06-10T10:30:00Z",
-  "scrapeStatus": "success",
+  "metricsEndpoint": "http://causa-service.causa-namespace.svc.cluster.local:8080/q/metrics",
   "monitors": [
     {
       "name": "Causa RCA Generation Failure",
@@ -372,22 +395,39 @@ Frontend (React/Angular)
    v
 Causa Integration APIs
    |
-   +---- OpenShift/Kubernetes APIs
-   |         |
-   |         +---- Install Datadog Agent
-   |         +---- Create ConfigMaps
-   |         +---- Deploy Resources
-   |
-   +---- Datadog APIs
+   +---- Datadog APIs (External)
    |         |
    |         +---- Create Monitors
-   |         +---- Validate Keys
-   |         +---- Configure Alerts
+   |         +---- Validate API Keys
+   |         +---- Configure Alert Channels
+   |         +---- Update Dashboards
    |
-   +---- Grafana APIs
+   +---- Grafana APIs (External)
+   |         |
+   |         +---- Create Dashboards
+   |         +---- Configure Data Sources
+   |         +---- Setup Alerts
+   |
+   +---- Other Provider APIs
              |
-             +---- Create Dashboards
-             +---- Configure Data Sources
+             +---- Platform-specific configuration
+
+
+┌─────────────────────────────────────────────────────────────┐
+│  User's Infrastructure (Same or Different Cluster)         │
+│                                                             │
+│  ┌──────────────────┐         ┌─────────────────┐          │
+│  │ Datadog Agent    │ scrapes │ Causa Service   │          │
+│  │ (User Managed)   │────────>│ /q/metrics      │          │
+│  └──────────────────┘         └─────────────────┘          │
+│         │                                                   │
+│         │ sends metrics                                    │
+│         v                                                   │
+│  ┌──────────────────┐                                      │
+│  │ Datadog Platform │                                      │
+│  │ (SaaS)           │<──── Causa configures monitors       │
+│  └──────────────────┘       via API                        │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -421,24 +461,25 @@ IntegrationProvider (interface)
    |
    +---- DatadogProvider
    |         |
-   |         +---- DatadogAgentInstaller
-   |         +---- DatadogMonitorCreator
-   |         +---- DatadogMetricsValidator
+   |         +---- DatadogApiClient (API connection)
+   |         +---- DatadogMonitorManager (Create/Update monitors)
+   |         +---- DatadogAlertConfigurator (Configure notifications)
    |
    +---- GrafanaProvider
    |         |
-   |         +---- GrafanaDashboardCreator
-   |         +---- GrafanaDataSourceConfig
+   |         +---- GrafanaApiClient
+   |         +---- GrafanaDashboardManager
+   |         +---- GrafanaAlertManager
    |
    +---- InstanaProvider
    |         |
-   |         +---- InstanaAgentInstaller
-   |         +---- InstanaAlertCreator
+   |         +---- InstanaApiClient
+   |         +---- InstanaAlertManager
    |
    +---- DynatraceProvider
              |
-             +---- DynatraceAgentInstaller
-             +---- DynatraceMonitorCreator
+             +---- DynatraceApiClient
+             +---- DynatraceMonitorManager
 ```
 
 All providers consume the same RCA metrics from:
@@ -456,10 +497,10 @@ All providers consume the same RCA metrics from:
 - Consistent workflow regardless of provider
 - Reduced learning curve
 
-### 2. Automated Setup
+### 2. Automated Configuration
 - No manual script execution
-- Single API call for complete installation
-- Automated agent installation and monitor creation
+- Single API call for complete monitor setup
+- Automated monitor and alert creation via API
 - Validation at each step
 
 ### 3. Self-Service
@@ -481,30 +522,32 @@ All providers consume the same RCA metrics from:
 
 ## Implementation Phases
 
-### Phase 1: Core APIs
-- Integration validation endpoint
-- Single installation endpoint
+### Phase 1: Core APIs ✅
+- Credential validation endpoint
+- Monitor configuration endpoint
 - Status endpoints
 
-### Phase 2: Datadog Provider
-- Agent installation logic
-- Monitor creation logic
-- Metrics validation
+### Phase 2: Datadog Provider ✅
+- Monitor creation via API
+- Credential validation
+- Monitor status tracking
 
 ### Phase 3: UI Development
-- Integration wizard
+- Configuration wizard
 - Provider selection
-- Status dashboard
+- Monitor status dashboard
+- Agent configuration guide
 
 ### Phase 4: Additional Providers
 - Grafana
 - Instana
 - Dynatrace
+- Prometheus
 
 ### Phase 5: Advanced Features
-- Multi-provider support
 - Custom monitor templates
 - Alert routing configuration
+- Multi-account support
 
 ---
 

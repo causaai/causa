@@ -50,43 +50,43 @@ public class IntegrationServiceImpl implements IntegrationService {
     }
 
     @Override
-    public InstallationResponse installIntegration(InstallationRequest request) {
-        log.info("Installing integration")
+    public ObservabilityConnectionResponse connectObservability(ObservabilityConnectionRequest request) {
+        log.info("Connecting to observability platform")
             .field("provider", request.getProvider())
             .log();
 
         String integrationId = UUID.randomUUID().toString();
-        
+
         try {
             IntegrationProvider provider = providerFactory.getProvider(request.getProvider());
-            
-            // Install the integration
-            InstallationResponse response = provider.install(request);
+
+            // Connect to platform and configure monitors
+            ObservabilityConnectionResponse response = provider.connect(request);
             response.setIntegrationId(integrationId);
             response.setCreatedAt(Instant.now());
-            
+
             // Store integration data
             IntegrationData data = new IntegrationData();
             data.integrationId = integrationId;
-            data.provider = request.getProvider();
-            data.status = "installed";
+            data.provider = request.getProvider().toString();
+            data.status = "connected";
             data.createdAt = Instant.now();
-            data.config = request.getConfig();
-            
+            data.config = new java.util.HashMap<>(request.getConfig());
+
             integrations.put(integrationId, data);
-            
-            log.info("Integration installed successfully")
+
+            log.info("Connected to observability platform successfully")
                 .field("integrationId", integrationId)
                 .field("provider", request.getProvider())
                 .log();
-            
+
             return response;
         } catch (Exception e) {
-            log.error("Integration installation failed")
+            log.error("Failed to connect to observability platform")
                 .field("provider", request.getProvider())
                 .exception(e)
                 .log();
-            throw new RuntimeException("Installation failed: " + e.getMessage(), e);
+            throw new RuntimeException("Connection failed: " + e.getMessage(), e);
         }
     }
 

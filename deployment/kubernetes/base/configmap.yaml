@@ -46,8 +46,8 @@ data:
   CAUSA_MCP_K8S_TIMEOUT: "5000"
 
   # LLM Configuration (placeholder)
-  # CAUSA_LLM_PROVIDER: "anthropic"
-  # CAUSA_LLM_MODEL: "claude-3-5-sonnet-20241022"
+  CAUSA_LLM_PROVIDER: "anthropic"
+  CAUSA_LLM_MODEL: "claude-3-5-sonnet-20241022"
 
   # MCP Configuration (placeholder for other servers)
     # CAUSA_MCP_SERVERS: "kruize,cryostat"

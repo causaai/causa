@@ -13,7 +13,7 @@ import jakarta.ws.rs.core.Response;
  *
  * @since 1.0.0
  */
-@Path("/api/v1/integrations")
+@Path("/api/config/integration")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public class IntegrationController {
@@ -35,11 +35,11 @@ public class IntegrationController {
     public Response validateCredentials(
             @PathParam("provider") String provider,
             ValidationRequest request) {
-        
+
         log.info("Validating credentials for provider")
             .field("provider", provider)
             .log();
-        
+
         try {
             ValidationResponse response = integrationService.validateCredentials(provider, request);
             return Response.ok(response).build();
@@ -63,35 +63,42 @@ public class IntegrationController {
     }
 
     /**
-     * Install integration for a provider
+     * Establish connection to observability platform and configure monitors.
+     * This does NOT install any agents - only connects to platform API.
      *
-     * @param request installation request with provider details and credentials
-     * @return installation result
+     * <p>Prerequisites: User's observability agent must be running and configured
+     * to scrape Causa's /q/metrics endpoint.</p>
+     *
+     * @param provider the provider type (datadog, grafana, etc.)
+     * @param request connection request with provider API credentials
+     * @return connection result with created monitors
      */
     @POST
-    @Path("/install")
-    public Response installIntegration(InstallationRequest request) {
-        
-        log.info("Installing integration for provider")
-            .field("provider", request.getProvider())
+    @Path("/{provider}/connect")
+    public Response connectObservability(
+            @PathParam("provider") String provider,
+            ObservabilityConnectionRequest request) {
+
+        log.info("Connecting to observability platform")
+            .field("provider", provider)
             .log();
-        
+
         try {
-            InstallationResponse response = integrationService.installIntegration(request);
+            ObservabilityConnectionResponse response = integrationService.connectObservability(request);
             return Response.status(Response.Status.CREATED).entity(response).build();
         } catch (IllegalArgumentException e) {
-            log.error("Invalid installation request")
+            log.error("Invalid connection request")
                 .exception(e)
                 .log();
             return Response.status(Response.Status.BAD_REQUEST)
                     .entity(new ErrorResponse(e.getMessage()))
                     .build();
         } catch (Exception e) {
-            log.error("Error installing integration")
+            log.error("Error connecting to observability platform")
                 .exception(e)
                 .log();
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity(new ErrorResponse("Installation failed: " + e.getMessage()))
+                    .entity(new ErrorResponse("Connection failed: " + e.getMessage()))
                     .build();
         }
     }
@@ -99,17 +106,21 @@ public class IntegrationController {
     /**
      * Get integration status
      *
+     * @param provider the provider type (datadog, grafana, etc.)
      * @param integrationId the integration ID
      * @return integration status
      */
     @GET
-    @Path("/{integrationId}/status")
-    public Response getIntegrationStatus(@PathParam("integrationId") String integrationId) {
-        
+    @Path("/{provider}/{integrationId}/status")
+    public Response getIntegrationStatus(
+            @PathParam("provider") String provider,
+            @PathParam("integrationId") String integrationId) {
+
         log.info("Getting status for integration")
+            .field("provider", provider)
             .field("integrationId", integrationId)
             .log();
-        
+
         try {
             IntegrationStatusResponse response = integrationService.getIntegrationStatus(integrationId);
             return Response.ok(response).build();
@@ -131,15 +142,19 @@ public class IntegrationController {
     }
 
     /**
-     * List all integrations
+     * List all integrations for a specific provider
      *
+     * @param provider the provider type (datadog, grafana, etc.)
      * @return list of integrations
      */
     @GET
-    public Response listIntegrations() {
-        
-        log.info("Listing all integrations").log();
-        
+    @Path("/{provider}")
+    public Response listIntegrations(@PathParam("provider") String provider) {
+
+        log.info("Listing all integrations")
+            .field("provider", provider)
+            .log();
+
         try {
             IntegrationListResponse response = integrationService.listIntegrations();
             return Response.ok(response).build();
@@ -156,17 +171,21 @@ public class IntegrationController {
     /**
      * Delete an integration
      *
+     * @param provider the provider type (datadog, grafana, etc.)
      * @param integrationId the integration ID
      * @return deletion result
      */
     @DELETE
-    @Path("/{integrationId}")
-    public Response deleteIntegration(@PathParam("integrationId") String integrationId) {
-        
+    @Path("/{provider}/{integrationId}")
+    public Response deleteIntegration(
+            @PathParam("provider") String provider,
+            @PathParam("integrationId") String integrationId) {
+
         log.info("Deleting integration")
+            .field("provider", provider)
             .field("integrationId", integrationId)
             .log();
-        
+
         try {
             DeletionResponse response = integrationService.deleteIntegration(integrationId);
             return Response.ok(response).build();
@@ -190,20 +209,23 @@ public class IntegrationController {
     /**
      * Send test RCA event
      *
+     * @param provider the provider type (datadog, grafana, etc.)
      * @param integrationId the integration ID
      * @param request test event request
      * @return test event result
      */
     @POST
-    @Path("/{integrationId}/test-event")
+    @Path("/{provider}/{integrationId}/test-event")
     public Response sendTestEvent(
+            @PathParam("provider") String provider,
             @PathParam("integrationId") String integrationId,
             TestEventRequest request) {
-        
+
         log.info("Sending test event for integration")
+            .field("provider", provider)
             .field("integrationId", integrationId)
             .log();
-        
+
         try {
             TestEventResponse response = integrationService.sendTestEvent(integrationId, request);
             return Response.ok(response).build();

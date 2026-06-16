@@ -19,12 +19,12 @@ public interface IntegrationService {
     ValidationResponse validateCredentials(String provider, ValidationRequest request);
 
     /**
-     * Install integration for a provider
+     * Connect to observability platform and configure monitors
      *
-     * @param request installation request
-     * @return installation response
+     * @param request connection request with API credentials
+     * @return connection response with created monitors
      */
-    InstallationResponse installIntegration(InstallationRequest request);
+    ObservabilityConnectionResponse connectObservability(ObservabilityConnectionRequest request);
 
     /**
      * Get integration status

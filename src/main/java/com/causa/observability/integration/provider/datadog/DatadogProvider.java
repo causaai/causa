@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.Map;
 
 import com.causa.common.logging.CausaLogger;
-import com.causa.observability.integration.dto.InstallationRequest;
-import com.causa.observability.integration.dto.InstallationResponse;
+import com.causa.observability.integration.dto.ObservabilityConnectionRequest;
+import com.causa.observability.integration.dto.ObservabilityConnectionResponse;
 import com.causa.observability.integration.dto.IntegrationStatusResponse;
 import com.causa.observability.integration.dto.MonitorInfo;
 import com.causa.observability.integration.dto.ProviderType;
@@ -22,8 +22,13 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 /**
- * Datadog integration provider implementation
- * Handles Datadog monitor creation for Causa RCA metrics
+ * Datadog integration provider implementation.
+ * Configures Datadog monitors and alerts via Datadog API for Causa RCA metrics.
+ *
+ * <p><b>Important:</b> This provider does NOT install or manage Datadog Agent.
+ * Users must have Datadog Agent already deployed and configured to scrape
+ * Causa's /q/metrics endpoint. The agent can be in the same cluster or a
+ * different cluster as long as it can reach the metrics endpoint.</p>
  *
  * @since 1.0.0
  */
@@ -37,9 +42,6 @@ public class DatadogProvider implements IntegrationProvider {
 
     @Inject
     DatadogMonitorManager monitorManager;
-
-    @Inject
-    DatadogAgentInstaller agentInstaller;
 
     // In-memory storage for integration data (will be replaced with database)
     private final Map<String, Map<String, Object>> integrationData = new HashMap<>();
@@ -113,74 +115,55 @@ public class DatadogProvider implements IntegrationProvider {
     }
 
     @Override
-    public InstallationResponse install(InstallationRequest request) {
-        log.info("Installing Datadog integration").log();
+    public ObservabilityConnectionResponse connect(ObservabilityConnectionRequest request) {
+        log.info("Connecting to Datadog via API").log();
 
         String site = request.getConfigValue("site");
         String apiKey = request.getConfigValue("apiKey");
         String appKey = request.getConfigValue("appKey");
-        String clusterName = request.getConfigValue("clusterName");
-        
-        if (clusterName == null || clusterName.trim().isEmpty()) {
-            clusterName = "causa-cluster";
+        String metricsEndpoint = request.getConfigValue("metricsEndpoint");
+
+        if (metricsEndpoint == null || metricsEndpoint.trim().isEmpty()) {
+            metricsEndpoint = "/q/metrics";
         }
 
-        InstallationResponse response = new InstallationResponse();
+        ObservabilityConnectionResponse response = new ObservabilityConnectionResponse();
         response.setProvider("datadog");
 
         try {
-            // Step 1: Validate credentials
-            log.info("Validating credentials before installation").log();
+            // Step 1: Validate API credentials
+            log.info("Validating Datadog API credentials").log();
             boolean credentialsValid = apiClient.validateCredentials(apiKey, appKey, site);
-            
+
             if (!credentialsValid) {
                 response.setStatus("failed");
-                response.setAgentInstalled(false);
-                response.setAgentStatus("not_installed");
-                response.setMonitorsCreated(0);
-                
-                log.error("Installation failed: Invalid credentials").log();
+                response.setMonitorsCreated(new ArrayList<>());
+                response.setNotes("Invalid Datadog API credentials. Please check your API key and App key.");
+
+                log.error("Connection failed: Invalid API credentials").log();
                 return response;
             }
 
-            // Step 2: Install Datadog Agent
-            log.info("Installing Datadog Agent").log();
-            DatadogAgentInstaller.InstallationResult agentResult = agentInstaller.installAgent(apiKey, appKey, site, clusterName);
-            
-            if (!agentResult.isSuccess()) {
-                response.setStatus("failed");
-                response.setAgentInstalled(false);
-                response.setAgentStatus("installation_failed");
-                response.setMonitorsCreated(0);
-                response.setNotes("Agent installation failed: " + agentResult.getMessage());
-                
-                log.error("Agent installation failed")
-                        .field("error", agentResult.getError())
-                        .log();
-                return response;
-            }
-
-            // Step 3: Create monitors
-            log.info("Creating Datadog monitors")
+            // Step 2: Create monitors via Datadog API
+            log.info("Creating Datadog monitors via API")
                     .field("site", site)
                     .log();
-            
+
             List<MonitorInfo> monitors = monitorManager.createOrUpdateMonitors(apiKey, appKey, site);
-            
+
             if (monitors.isEmpty()) {
-                response.setStatus("partial");
-                response.setAgentInstalled(false);
-                response.setAgentStatus("not_installed");
-                response.setMonitorsCreated(0);
-                
-                log.error("Installation failed: No monitors created").log();
+                response.setStatus("failed");
+                response.setMonitorsCreated(new ArrayList<>());
+                response.setNotes("Failed to create monitors. Please check API permissions.");
+
+                log.error("Connection failed: No monitors created").log();
                 return response;
             }
 
-            // Step 4: Store integration data for future reference
+            // Step 3: Store integration data for future reference
             Map<String, Object> data = new HashMap<>();
             data.put("site", site);
-            data.put("clusterName", clusterName);
+            data.put("metricsEndpoint", metricsEndpoint);
             List<String> monitorIds = new ArrayList<>();
             for (MonitorInfo monitor : monitors) {
                 monitorIds.add(monitor.getId());
@@ -188,35 +171,29 @@ public class DatadogProvider implements IntegrationProvider {
             data.put("monitorIds", monitorIds);
             integrationData.put(request.getProvider().toString(), data);
 
-            // Step 5: Build response
-            response.setStatus("installed");
-            response.setAgentInstalled(true);
-            response.setAgentStatus(agentResult.isAlreadyExists() ? "already_installed" : "installed");
-            response.setMonitorsCreated(monitors.size());
-            response.setMetricsDiscovered(8); // Causa exposes 8 RCA metrics
-            response.setMetricsEndpoint("/q/metrics");
-            response.setScrapeInterval("30s");
+            // Step 4: Build response
+            response.setStatus("connected");
+            response.setMonitorsCreated(monitors);
+            response.setMetricsEndpoint(metricsEndpoint);
             response.setMonitors(monitors);
+            response.setNotes(String.format(
+                "Successfully connected to Datadog and created %d monitors. " +
+                "Ensure your Datadog Agent is configured to scrape: %s",
+                monitors.size(), metricsEndpoint
+            ));
 
-            // Add notes about agent installation
-            if (agentResult.isAlreadyExists()) {
-                response.setNotes("Datadog Agent was already installed. Reused existing installation and created/updated monitors.");
-            } else {
-                response.setNotes("Datadog Agent installed successfully. Created/updated " + monitors.size() + " monitors.");
-            }
-
-            log.info("Datadog integration installed successfully")
+            log.info("Connected to Datadog successfully")
                     .field("monitorsCreated", monitors.size())
                     .field("site", site)
+                    .field("metricsEndpoint", metricsEndpoint)
                     .log();
 
         } catch (Exception e) {
             response.setStatus("failed");
-            response.setAgentInstalled(false);
-            response.setAgentStatus("error");
-            response.setMonitorsCreated(0);
-            
-            log.error("Installation error")
+            response.setMonitorsCreated(new ArrayList<>());
+            response.setNotes("Connection error: " + e.getMessage());
+
+            log.error("Connection error")
                     .field("error", e.getMessage())
                     .exception(e)
                     .log();
@@ -238,34 +215,27 @@ public class DatadogProvider implements IntegrationProvider {
         try {
             // Get stored integration data
             Map<String, Object> data = integrationData.get("DATADOG");
-            
+
             if (data == null) {
                 response.setInstalled(false);
-                response.setAgentHealthy(false);
                 response.setMonitorsCreated(0);
-                response.setScrapeStatus("unknown");
-                
+
                 log.warn("No integration data found")
                         .field("integrationId", integrationId)
                         .log();
-                
+
                 return response;
             }
 
             @SuppressWarnings("unchecked")
             List<String> monitorIds = (List<String>) data.get("monitorIds");
+            String metricsEndpoint = (String) data.get("metricsEndpoint");
 
-            // Check agent status
-            DatadogAgentInstaller.AgentStatus agentStatus = agentInstaller.getAgentStatus();
-            
-            response.setInstalled(agentStatus.isInstalled());
-            response.setAgentHealthy(agentStatus.isHealthy());
-            response.setMetricsDiscovered(8);
-            response.setMonitorsCreated(monitorIds != null ? monitorIds.size() : 0);
-            response.setLastScrape(Instant.now());
-            response.setScrapeStatus(agentStatus.isHealthy() ? "success" : "unhealthy");
+            response.setInstalled(true);
+            response.setMonitorCount(monitorIds != null ? monitorIds.size() : 0);
+            response.setMetricsEndpoint(metricsEndpoint);
 
-            // Add monitor placeholders (would need credentials to get actual status)
+            // Add monitor information
             if (monitorIds != null) {
                 for (String monitorId : monitorIds) {
                     response.getMonitors().add(new MonitorInfo(monitorId, "Monitor " + monitorId, "active"));
@@ -278,8 +248,7 @@ public class DatadogProvider implements IntegrationProvider {
 
         } catch (Exception e) {
             response.setInstalled(false);
-            response.setAgentHealthy(false);
-            
+
             log.error("Status check error")
                     .field("error", e.getMessage())
                     .exception(e)
@@ -298,7 +267,7 @@ public class DatadogProvider implements IntegrationProvider {
         try {
             // Get stored integration data
             Map<String, Object> data = integrationData.get("DATADOG");
-            
+
             if (data == null) {
                 log.warn("No integration data found for cleanup")
                         .field("integrationId", integrationId)
@@ -306,17 +275,14 @@ public class DatadogProvider implements IntegrationProvider {
                 return;
             }
 
-            // Uninstall Datadog Agent
-            boolean agentUninstalled = agentInstaller.uninstallAgent();
-            
-            if (!agentUninstalled) {
-                log.warn("Failed to uninstall Datadog Agent").log();
-            }
+            // Note: We do NOT uninstall the Datadog Agent as it's managed by the user
+            // We only remove our integration configuration from memory
+            // Optionally, we could delete the monitors we created via API if needed
 
             // Remove from memory
             integrationData.remove("DATADOG");
 
-            log.info("Datadog integration cleaned up")
+            log.info("Datadog integration configuration removed")
                     .field("integrationId", integrationId)
                     .log();
 

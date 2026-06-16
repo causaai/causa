@@ -18,8 +18,18 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 /**
- * Handles Datadog Agent installation in Kubernetes/OpenShift cluster
+ * Handles Datadog Agent installation in Kubernetes/OpenShift cluster.
+ *
+ * <p><b>DEPRECATED:</b> This class is no longer used as Datadog Agent installation
+ * is out of scope for Causa. Users must deploy and manage their own Datadog Agent
+ * independently. Causa only configures monitors and alerts via Datadog API.</p>
+ *
+ * <p>This class is retained for backward compatibility but should not be used
+ * in new integrations.</p>
+ *
+ * @deprecated Agent installation is out of scope. Users manage their own agents.
  */
+@Deprecated(since = "1.0.0", forRemoval = true)
 @ApplicationScoped
 public class DatadogAgentInstaller {
 
@@ -33,8 +43,11 @@ public class DatadogAgentInstaller {
     KubernetesClient kubernetesClient;
 
     /**
-     * Check if Datadog Agent is already deployed
+     * Check if Datadog Agent is already deployed.
+     *
+     * @deprecated Agent deployment checking is out of scope
      */
+    @Deprecated(since = "1.0.0", forRemoval = true)
     public boolean isDatadogAgentDeployed() {
         try {
             // Check if DatadogAgent CR exists
@@ -69,8 +82,11 @@ public class DatadogAgentInstaller {
     }
 
     /**
-     * Install Datadog Agent in the cluster
+     * Install Datadog Agent in the cluster.
+     *
+     * @deprecated Agent installation is out of scope. Users manage their own agents.
      */
+    @Deprecated(since = "1.0.0", forRemoval = true)
     public InstallationResult installAgent(String apiKey, String appKey, String site, String clusterName) {
         InstallationResult result = new InstallationResult();
         
@@ -120,8 +136,11 @@ public class DatadogAgentInstaller {
     }
 
     /**
-     * Uninstall Datadog Agent from the cluster
+     * Uninstall Datadog Agent from the cluster.
+     *
+     * @deprecated Agent uninstallation is out of scope. Users manage their own agents.
      */
+    @Deprecated(since = "1.0.0", forRemoval = true)
     public boolean uninstallAgent() {
         try {
             log.info("Uninstalling Datadog Agent")
@@ -161,8 +180,11 @@ public class DatadogAgentInstaller {
     }
 
     /**
-     * Get Datadog Agent status
+     * Get Datadog Agent status.
+     *
+     * @deprecated Agent status checking is out of scope. Users manage their own agents.
      */
+    @Deprecated(since = "1.0.0", forRemoval = true)
     public AgentStatus getAgentStatus() {
         AgentStatus status = new AgentStatus();
         
