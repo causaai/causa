@@ -42,7 +42,6 @@ data:
   CAUSA_ALERT_IGNORE_NS: "kube-system,istio-system"
   # MCP Kubernetes Configuration
   CAUSA_MCP_K8S_ENDPOINT: "http://kubernetes-mcp-server.diagnostics-tool.svc.cluster.local:8080"
-  CAUSA_MCP_K8S_HEALTH_PATH: "/healthz"
   CAUSA_MCP_K8S_TIMEOUT: "5000"
 
   # LLM Configuration (placeholder)

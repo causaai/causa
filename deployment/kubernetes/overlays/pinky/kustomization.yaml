@@ -28,7 +28,7 @@ patches:
 images:
   - name: quay.io/rh-ee-shesaxen/causa-backend
     newName: quay.io/pingupta/irb
-    newTag: causa-mvp-demo-latest
+    newTag: causa-observability-latest
 
 replicas:
   - name: causa-backend

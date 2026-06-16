@@ -35,6 +35,15 @@ public interface McpConfig {
         @WithName("endpoint")
         String endpoint();
 
+         /**
+         * Health check path for the Kubernetes MCP server.
+         *
+         * @return the health check path
+         */
+        @WithName("health-path")
+        @WithDefault("/healthz")
+        String healthPath();
+
         /**
          * HTTP request timeout in milliseconds.
          *
