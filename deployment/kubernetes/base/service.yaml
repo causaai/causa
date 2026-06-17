@@ -6,6 +6,10 @@ metadata:
     app.kubernetes.io/name: causa-backend
     app.kubernetes.io/component: backend
     app.kubernetes.io/part-of: causa
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/q/metrics"
 spec:
   type: ClusterIP
   ports:
