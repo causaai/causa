@@ -50,14 +50,24 @@ Use this skill when:
 **Input Schema**:
 ```json
 {
-  "containerName": "string (required)",
-  "namespace": "string (optional)"
+  "type": "object",
+  "properties": {
+    "containerName": {
+      "type": "string",
+      "description": "Container name"
+    },
+    "namespace": {
+      "type": "string",
+      "description": "Namespace"
+    }
+  },
+  "required": ["containerName"]
 }
 ```
 
-**Key Attributes**:
-- `containerName`: Name of the container to analyze (e.g., "causa-backend")
-- `namespace`: Kubernetes namespace where container runs (e.g., "causa-system")
+**Attributes**:
+- `containerName` (required): Name of the container to analyze (e.g., "app-backend")
+- `namespace` (optional): Kubernetes namespace where container runs (e.g., "default")
 
 **Output Context**:
 - **Recommendation Terms**: short_term (24h), medium_term (7d), long_term (15d)
