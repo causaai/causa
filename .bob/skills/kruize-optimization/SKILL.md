@@ -51,7 +51,7 @@ Use this skill when:
 ```json
 {
   "containerName": "string (required)",
-  "namespace": "string (required)"
+  "namespace": "string (optional)"
 }
 ```
 
@@ -77,7 +77,7 @@ Use this skill when:
 
 ### Tool Output Schema
 
-⚠️ **Note:** Returns large JSON array (200+ lines). Key structure below.
+**Note:** Returns nested JSON array (200+ lines). Key structure below.
 
 **Response Structure:**
 ```json
@@ -121,11 +121,10 @@ Use this skill when:
 ## Best Practices
 
 1. **Always use long_term recommendations** for production analysis (most reliable)
-2. **Check notification codes** for special conditions (idle workloads, missing configs)
+2. **Check notification codes** for special conditions (missing configs)
 3. **Analyze box plots** to understand usage patterns and variability
 4. **Use ONLY getPerformanceOptimizedRecommendations** - do not use cost or idle workload tools
 5. **Validate runtime recommendations** against application requirements
-6**Focus on performance** - this skill is optimized for performance analysis, not cost optimization
 
 ## Limitations
 

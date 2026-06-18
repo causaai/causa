@@ -72,8 +72,8 @@ Each recommendation includes detailed box plots data that visualizes resource us
 ### Resource Configuration
 
 Kruize recommendations include:
-- **Requests**: Minimum guaranteed resources (affects scheduling)
-- **Limits**: Maximum allowed resources (affects throttling)
+- **Requests**: Minimum guaranteed resources
+- **Limits**: Maximum allowed resources
 - **Unified Values**: Request and limit values for both CPU and memory are set to be the same
 - **Box Plots**: Statistical visualization of usage patterns including min, max, median, and quartiles
 - **Runtime Parameters**: JVM and framework configuration recommendations (when applicable)
