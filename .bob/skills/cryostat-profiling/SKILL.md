@@ -1,16 +1,17 @@
 ---
-name: cryostat-diagnostics
+name: cryostat-profiling
 description: Provides Java application diagnostics and profiling using Cryostat MCP server. Analyzes JFR recordings to identify performance issues, memory leaks, thread problems, and resource bottlenecks in containerized Java workloads.
 compatibility: Requires Cryostat MCP server connection. Works with Java applications exposing JFR data.
 metadata:
   mcp_server: cryostat-mcp-server
   primary_tools: get_event_data, get_gc_analysis, get_memory_analysis, get_thread_analysis, get_cpu_analysis
   use_case: performance-diagnostics, memory-analysis, thread-analysis, profiling
+  version: 1.0
 ---
 
-# Cryostat Diagnostics Skill
+# Cryostat Profiling Skill
 
-Review [`references.md`](.bob/skills/cryostat-diagnostics/references.md) for comprehensive background on Cryostat concepts, JFR recordings, and detailed explanations.
+Review [`references.md`](.bob/skills/cryostat-profiling/references.md) for comprehensive background on Cryostat concepts, JFR recordings, and detailed explanations.
 
 ## Overview
 
@@ -228,13 +229,5 @@ All tools return JSON-RPC 2.0 responses:
 ## Troubleshooting
 
 **No recordings**: Verify JFR enabled, check recording creation, validate agent config
-
 **Incomplete results**: Check recording template includes required events, ensure sufficient duration
-
 **Connection failures**: Run `health_check`, verify network connectivity, validate MCP config
-
----
-
-**Skill Version**: 1.0  
-**Last Updated**: 2026-06-19  
-**Maintained By**: causa-backend team

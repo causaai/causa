@@ -7,6 +7,7 @@ metadata:
   primary_tool: getPerformanceOptimizedRecommendations
   allowed_tools: getPerformanceOptimizedRecommendations
   use_case: resource-optimization, performance-analysis
+  version: 1.0
 ---
 
 # Kruize Optimization Skill
@@ -17,13 +18,16 @@ Review [`kruize-reference.md`](.bob/skills/kruize-optimization/kruize-reference.
 
 **ONLY use the `getPerformanceOptimizedRecommendations` tool from Kruize MCP server.**
 
-DO NOT use these tools:
-- ❌ getCostOptimizedRecommendations
-- ❌ getIdleWorkloads
-- ❌ listAllRecommendations
-- ❌ listAllExperiments
+### Prohibited Tools (Available in MCP but NOT for this skill)
 
-This skill is configured to use ONLY performance-optimized recommendations.
+The following tools exist in kruize-mcp-server but are **explicitly excluded** from this skill:
+
+- ❌ `getCostOptimizedRecommendations` - Use separate cost-optimization skill
+- ❌ `getIdleWorkloads` - Use separate idle-detection skill
+- ❌ `listAllRecommendations` - Too broad for focused diagnostics
+- ❌ `listAllExperiments` - Not needed for performance analysis
+
+**Rationale**: This skill focuses exclusively on performance optimization for alert-driven diagnostics.
 
 ## Overview
 
@@ -37,11 +41,9 @@ Use this skill when:
 - Validating resource configurations
 - Understanding resource usage patterns for Java workloads
 
-**Note**: This skill uses ONLY performance-optimized recommendations. For cost optimization or idle workload detection, use separate workflows.
+**Note**: This skill uses ONLY performance-optimized recommendations (see [Tool Usage Restrictions](#-important-tool-usage-restrictions)). For cost optimization or idle workload detection, use separate workflows.
 
 ## Available MCP Tool
-
-**ONLY this tool should be used by causa-backend:**
 
 ### getPerformanceOptimizedRecommendations
 
@@ -54,20 +56,24 @@ Use this skill when:
   "properties": {
     "containerName": {
       "type": "string",
-      "description": "Container name"
+      "description": "Name of the container to optimize",
+      "example": "app-backend"
     },
     "namespace": {
       "type": "string",
-      "description": "Namespace"
+      "description": "Kubernetes namespace where container runs",
+      "example": "app-namesopace"
     }
   },
   "required": ["containerName"]
 }
 ```
 
-**Attributes**:
-- `containerName` (required): Name of the container to analyze (e.g., "app-backend")
-- `namespace` (optional): Kubernetes namespace where container runs (e.g., "default")
+**Properties**:
+- `containerName` (required): Name of the container to optimize
+  - Example: `"app-backend"`
+- `namespace` (optional): Kubernetes namespace where container runs
+  - Example: `"app-namespace"`
 
 **Output Context**:
 - **Recommendation Terms**: short_term (24h), medium_term (7d), long_term (15d)
@@ -133,7 +139,7 @@ Use this skill when:
 1. **Always use long_term recommendations** for production analysis (most reliable)
 2. **Check notification codes** for special conditions (missing configs)
 3. **Analyze box plots** to understand usage patterns and variability
-4. **Use ONLY getPerformanceOptimizedRecommendations** - do not use cost or idle workload tools
+4. **Follow tool restrictions** (see [Tool Usage Restrictions](#-important-tool-usage-restrictions))
 5. **Validate runtime recommendations** against application requirements
 
 ## Limitations
@@ -142,7 +148,6 @@ Use this skill when:
 - Runtime recommendations require proper metric exposure
 - Framework recommendations need specific labels (e.g., Quarkus label)
 - Recommendations based on historical patterns, may not predict future spikes
-
 
 ## MCP Protocol Response
 
@@ -175,8 +180,3 @@ The `text` field contains the JSON array shown in the Tool Output Schema section
 - Verify application exposes runtime metrics
 - Check for required labels (e.g., Quarkus label)
 - Confirm metric endpoints are accessible
----
-
-**Skill Version**: 1.0  
-**Last Updated**: 2026-06-18  
-**Maintained By**: causa-backend team

@@ -6,6 +6,7 @@ metadata:
   mcp_server: kubernetes-mcp-server
   primary_tools: pods_get, pods_log, events_list
   use_case: kubernetes diagnostics, troubleshooting
+  version: 1.0
 ---
 
 # Kubernetes Diagnostics Skill
@@ -174,9 +175,3 @@ Gather Kubernetes diagnostic context for root cause analysis: pod status, events
 - **1**: General error
 - **137**: OOMKilled (SIGKILL)
 - **143**: Terminated (SIGTERM)
-
----
-
-**Version**: 1.0  
-**Updated**: 2026-06-18
-**Maintained By**: causa-backend team
