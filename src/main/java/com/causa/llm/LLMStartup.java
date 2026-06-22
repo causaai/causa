@@ -7,6 +7,7 @@ import com.causa.common.logging.LogMessages;
 import com.causa.config.LLMConfig;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
+import com.causa.core.ports.llm.PromptSender;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -27,11 +28,11 @@ public class LLMStartup {
 
     private static final CausaLogger log = CausaLogger.getLogger(LLMStartup.class);
 
-    private final LangChainPromptSender promptSender;
+    private final PromptSender promptSender;
     private final LLMConfig config;
 
     @Inject
-    public LLMStartup(LangChainPromptSender promptSender, LLMConfig config) {
+    public LLMStartup(PromptSender promptSender, LLMConfig config) {
         this.promptSender = promptSender;
         this.config = config;
     }
@@ -43,7 +44,6 @@ public class LLMStartup {
             .log();
 
         boolean ready = verifyConnectivity();
-        promptSender.setReady(ready);
 
         if (ready) {
             log.info(LogMessages.LLM.LLM_READY)
@@ -68,12 +68,17 @@ public class LLMStartup {
      */
     private boolean verifyConnectivity() {
         try {
+            // Check if provider is ready first
+            if (!promptSender.isReady()) {
+                log.warn("LLM provider not ready during startup check")
+                    .field(LLMConstants.Fields.PROVIDER, config.provider())
+                    .log();
+                return false;
+            }
+
             LLMRequest testRequest = LLMRequest.builder(LLMConstants.TestData.CONNECTIVITY_TEST_PROMPT)
                 .maxTokens(LLMConstants.TestData.CONNECTIVITY_TEST_MAX_TOKENS)
                 .build();
-
-            // Temporarily set ready to true to allow the test request
-            promptSender.setReady(true);
 
             LLMResponse response = promptSender.send(testRequest);
 

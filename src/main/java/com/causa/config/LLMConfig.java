@@ -115,6 +115,14 @@ public interface LLMConfig {
     VertexConfig vertex();
 
     /**
+     * BOB Shell specific configuration.
+     *
+     * @return the BOB Shell config
+     */
+    @WithName("bob")
+    BobConfig bob();
+
+    /**
      * Vertex AI Configuration
      */
     interface VertexConfig {
@@ -133,5 +141,47 @@ public interface LLMConfig {
          */
         @WithName("location")
         String location();
+    }
+
+    /**
+     * BOB Shell Configuration
+     */
+    interface BobConfig {
+        /**
+         * Path to BOB Shell executable.
+         *
+         * @return the shell path (default: "bob" to use system PATH)
+         */
+        @WithName("shell-path")
+        @WithDefault("bob")
+        String shellPath();
+
+        /**
+         * BOB Shell API key for authentication.
+         *
+         * @return the API key, or empty to use BOBSHELL_API_KEY env var
+         */
+        @WithName("api-key")
+        Optional<String> apiKey();
+
+        /**
+         * Timeout for BOB Shell execution in seconds.
+         *
+         * @return the timeout in seconds (default: 180)
+         */
+        @WithName("timeout-seconds")
+        @WithDefault("180")
+        int timeoutSeconds();
+
+        /**
+         * Threshold for large prompts that should be sent via stdin instead of command-line args.
+         * Prompts larger than this threshold (in characters) will be written to stdin to avoid
+         * OS ARG_MAX limitations (typically 128KB-2MB depending on OS).
+         *
+         * @return the threshold in characters (default: 100000 = 100KB)
+         */
+        @WithName("large-prompt-threshold")
+        @WithDefault("100000")
+        int largePromptThreshold();
     }
 }

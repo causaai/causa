@@ -84,6 +84,17 @@ FROM registry.access.redhat.com/ubi9/openjdk-21-runtime:1.24
 
 ENV LANGUAGE='en_US:en'
 
+# Install Node.js and npm for BOB Shell
+USER 0
+RUN microdnf install -y nodejs npm && \
+    microdnf clean all
+
+# Install BOB Shell CLI globally
+RUN npm install -g bob-shell@1.0.4 && \
+    npm cache clean --force
+
+# Verify BOB Shell installation
+RUN bob --version
 
 # We make four distinct layers so if there are application changes the library layers can be re-used
 COPY --chown=185 target/quarkus-app/lib/ /deployments/lib/
