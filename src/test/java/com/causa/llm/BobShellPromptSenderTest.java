@@ -212,9 +212,9 @@ class BobShellPromptSenderTest {
         @Test
         @DisplayName("Should handle large prompts")
         void shouldHandleLargePrompts() {
-            // Given - Create a prompt larger than threshold
+            // Given - Create a large prompt (always uses stdin now)
             StringBuilder largePrompt = new StringBuilder();
-            for (int i = 0; i < LLMConstants.BobShell.LARGE_PROMPT_THRESHOLD + 1000; i++) {
+            for (int i = 0; i < 101000; i++) {
                 largePrompt.append("a");
             }
             
@@ -223,7 +223,7 @@ class BobShellPromptSenderTest {
 
             // Then
             assertNotNull(request);
-            assertTrue(request.prompt().length() > LLMConstants.BobShell.LARGE_PROMPT_THRESHOLD);
+            assertTrue(request.prompt().length() > 100000);
         }
     }
 
@@ -415,12 +415,6 @@ class BobShellPromptSenderTest {
         @DisplayName("Should use correct environment variable name")
         void shouldUseCorrectEnvironmentVariableName() {
             assertEquals("BOBSHELL_API_KEY", LLMConstants.BobShell.ENV_API_KEY);
-        }
-
-        @Test
-        @DisplayName("Should use correct large prompt threshold")
-        void shouldUseCorrectLargePromptThreshold() {
-            assertEquals(100_000, LLMConstants.BobShell.LARGE_PROMPT_THRESHOLD);
         }
 
         @Test

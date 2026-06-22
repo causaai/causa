@@ -11,12 +11,14 @@ Causa Backend
     ↓
 BobShellPromptSender (implements PromptSender)
     ↓
-ProcessBuilder (executes BOB Shell CLI)
+ProcessBuilder (executes BOB Shell CLI via stdin)
     ↓
 BOB Shell (Node.js CLI tool)
     ↓
 IBM BOB AI Service API
 ```
+
+**Key Design Decision:** All prompts are sent via stdin (not command-line arguments) for maximum reliability and to avoid OS-specific ARG_MAX limitations.
 
 ## Prerequisites
 

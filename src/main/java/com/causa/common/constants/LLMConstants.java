@@ -57,12 +57,11 @@ public final class LLMConstants {
      */
     public static final class BobShell {
         private BobShell() {}
+// BOB Shell configuration
+public static final String MODEL_NAME = "bob-shell-1.0.4";
+public static final String DEFAULT_SHELL_PATH = "bob";
+public static final int DEFAULT_TIMEOUT_SECONDS = 180;
 
-        // BOB Shell configuration
-        public static final String MODEL_NAME = "bob-shell-1.0.4";
-        public static final String DEFAULT_SHELL_PATH = "bob";
-        public static final int DEFAULT_TIMEOUT_SECONDS = 180;
-        public static final int LARGE_PROMPT_THRESHOLD = 100_000; // 100KB
         
         // BOB Shell CLI flags
         public static final String FLAG_ACCEPT_LICENSE = "--accept-license";
@@ -90,7 +89,6 @@ public final class LLMConstants {
         // Log field names
         public static final String LOG_FIELD_SHELL_PATH = "shell_path";
         public static final String LOG_FIELD_EXIT_CODE = "exit_code";
-        public static final String LOG_FIELD_PROMPT_SIZE = "prompt_size";
         public static final String LOG_FIELD_OUTPUT = "output";
         public static final String LOG_FIELD_PARTS_COUNT = "parts_count";
         public static final String LOG_FIELD_PROMPT_TOKENS = "promptTokens";
@@ -107,7 +105,6 @@ public final class LLMConstants {
         // Logging messages
         public static final String LOG_VERSION_CHECK_TIMEOUT = "BOB Shell version check timed out";
         public static final String LOG_AVAILABILITY_CHECK_FAILED = "BOB Shell availability check failed";
-        public static final String LOG_USING_STDIN_MODE = "Using stdin mode for large prompt";
         public static final String LOG_SHELL_AVAILABLE = "BOB Shell is available and ready";
         public static final String LOG_SHELL_NOT_AVAILABLE = "BOB Shell is not available";
         public static final String LOG_SHELL_FAILED = "BOB Shell failed";

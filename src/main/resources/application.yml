@@ -97,7 +97,6 @@ causa:
       shell-path: ${BOB_SHELL_PATH:bob}
       api-key: ${BOBSHELL_API_KEY:}
       timeout-seconds: ${BOB_TIMEOUT_SECONDS:180}
-      large-prompt-threshold: ${BOB_LARGE_PROMPT_THRESHOLD:100000}
 
   # Alert Configuration
   alerts:

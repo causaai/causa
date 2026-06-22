@@ -173,15 +173,5 @@ public interface LLMConfig {
         @WithDefault("180")
         int timeoutSeconds();
 
-        /**
-         * Threshold for large prompts that should be sent via stdin instead of command-line args.
-         * Prompts larger than this threshold (in characters) will be written to stdin to avoid
-         * OS ARG_MAX limitations (typically 128KB-2MB depending on OS).
-         *
-         * @return the threshold in characters (default: 100000 = 100KB)
-         */
-        @WithName("large-prompt-threshold")
-        @WithDefault("100000")
-        int largePromptThreshold();
     }
 }

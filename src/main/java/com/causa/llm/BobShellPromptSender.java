@@ -204,34 +204,26 @@ public class BobShellPromptSender implements PromptSender {
     }
 
     /**
-     * Executes BOB Shell CLI with the given prompt.
+     * Executes BOB Shell CLI with the given prompt via stdin.
+     *
+     * <p>Always uses stdin mode for maximum reliability and to avoid ARG_MAX limitations.
+     * This approach:
+     * <ul>
+     *   <li>Eliminates OS-specific command-line argument size limits (ARG_MAX)</li>
+     *   <li>Provides consistent behavior regardless of prompt size</li>
+     *   <li>Simplifies code by removing conditional logic</li>
+     *   <li>Ensures production safety across all environments</li>
+     * </ul>
      */
     private String executeBobShell(String prompt) throws IOException, InterruptedException {
-        boolean useLargePromptMode = prompt.length() > LLMConstants.BobShell.LARGE_PROMPT_THRESHOLD;
-        
-        ProcessBuilder pb;
-        if (useLargePromptMode) {
-            log.info(LLMConstants.BobShell.LOG_USING_STDIN_MODE)
-                .field(LLMConstants.BobShell.LOG_FIELD_PROMPT_SIZE, prompt.length())
-                .log();
-            
-            pb = new ProcessBuilder(
-                bobShellPath,
-                LLMConstants.BobShell.FLAG_ACCEPT_LICENSE,
-                LLMConstants.BobShell.FLAG_YOLO,
-                LLMConstants.BobShell.FLAG_OUTPUT_JSON,
-                LLMConstants.BobShell.OUTPUT_FORMAT_JSON
-            );
-        } else {
-            pb = new ProcessBuilder(
-                bobShellPath,
-                LLMConstants.BobShell.FLAG_ACCEPT_LICENSE,
-                LLMConstants.BobShell.FLAG_YOLO,
-                LLMConstants.BobShell.FLAG_PROMPT, prompt,
-                LLMConstants.BobShell.FLAG_OUTPUT_JSON,
-                LLMConstants.BobShell.OUTPUT_FORMAT_JSON
-            );
-        }
+        // Always use stdin mode for reliability and consistency
+        ProcessBuilder pb = new ProcessBuilder(
+            bobShellPath,
+            LLMConstants.BobShell.FLAG_ACCEPT_LICENSE,
+            LLMConstants.BobShell.FLAG_YOLO,
+            LLMConstants.BobShell.FLAG_OUTPUT_JSON,
+            LLMConstants.BobShell.OUTPUT_FORMAT_JSON
+        );
         
         // Set API key environment variable
         if (apiKey != null && !apiKey.isBlank()) {
@@ -242,13 +234,11 @@ public class BobShellPromptSender implements PromptSender {
         
         Process process = pb.start();
         
-        // Write prompt to stdin if using large prompt mode
-        if (useLargePromptMode) {
-            try (OutputStreamWriter writer = new OutputStreamWriter(
-                    process.getOutputStream(), StandardCharsets.UTF_8)) {
-                writer.write(prompt);
-                writer.flush();
-            }
+        // Write prompt to stdin
+        try (OutputStreamWriter writer = new OutputStreamWriter(
+                process.getOutputStream(), StandardCharsets.UTF_8)) {
+            writer.write(prompt);
+            writer.flush();
         }
         
         // Wait for completion with timeout
