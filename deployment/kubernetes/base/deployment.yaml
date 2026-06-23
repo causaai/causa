@@ -43,6 +43,9 @@ spec:
         - secretRef:
             name: causa-llm-secrets
             optional: true  # Allow deployment without secrets for non-LLM features
+        - secretRef:
+            name: causa-db-secrets
+            optional: true  # Allow deployment without db secrets 
         resources:
           requests:
             cpu: 100m

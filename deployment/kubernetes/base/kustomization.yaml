@@ -6,7 +6,7 @@ metadata:
   annotations:
     config.kubernetes.io/description: "Base Kubernetes resources for Causa Backend"
 
-namespace: diagnostics-tool
+namespace: openshift-tuning
 
 commonLabels:
   app.kubernetes.io/managed-by: kustomize
