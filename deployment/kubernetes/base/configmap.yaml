@@ -20,6 +20,10 @@ data:
   LLM_MAX_TOKENS: "8192"
   LLM_TIMEOUT_SECONDS: "60"
   LLM_CHAT_MEMORY_SIZE: "25"
+  
+  # Skills/Tools Configuration
+  # Enable LangChain4j skills for tool calling (default: true)
+  LLM_SKILLS_ENABLED: "true"
 
   # Vertex AI Configuration (Public settings)
   # Valid regions: us-east5, us-central1, europe-west1, asia-southeast1

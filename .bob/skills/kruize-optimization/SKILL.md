@@ -7,7 +7,6 @@ metadata:
   primary_tool: getPerformanceOptimizedRecommendations
   allowed_tools: getPerformanceOptimizedRecommendations
   use_case: resource-optimization, performance-analysis
-  version: 1.0
 ---
 
 # Kruize Optimization Skill
@@ -172,11 +171,10 @@ The `text` field contains the JSON array shown in the Tool Output Schema section
 ## Troubleshooting
 
 **No recommendations available**:
-- Verify experiment exists for the container
+- Verify container exists
 - Check if 24 hours of data collected
-- Ensure Prometheus metrics are accessible
 
 **Missing runtime recommendations**:
-- Verify application exposes runtime metrics
+- Verify application exposes runtime metrics by user
 - Check for required labels (e.g., Quarkus label)
 - Confirm metric endpoints are accessible

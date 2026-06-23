@@ -107,6 +107,16 @@ public interface LLMConfig {
     int chatMemorySize();
 
     /**
+     * Enable skills/tools integration using Quarkus LangChain4j AI Services.
+     * When enabled, uses DiagnosticAssistant with tool support instead of direct ChatModel.
+     *
+     * @return true if skills are enabled, false otherwise
+     */
+    @WithName("skills-enabled")
+    @WithDefault("true")
+    boolean skillsEnabled();
+
+    /**
      * Vertex AI specific configuration.
      *
      * @return the vertex AI config

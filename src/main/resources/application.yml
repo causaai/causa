@@ -90,6 +90,8 @@ causa:
     api-key: ${LLM_API_KEY:}
     timeout-seconds: ${LLM_TIMEOUT_SECONDS:60}
     chat-memory-size: ${LLM_CHAT_MEMORY_SIZE:10}
+    # Enable skills/tools integration (Quarkus LangChain4j AI Services)
+    skills-enabled: ${LLM_SKILLS_ENABLED:true}
     vertex:
       project-id: ${VERTEX_PROJECT_ID:}
       location: ${VERTEX_LOCATION:us-east5}
