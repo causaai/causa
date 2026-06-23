@@ -76,6 +76,61 @@ public class McpContextCollector {
     }
 
     /**
+     * Collects context from MCP servers and returns as a formatted string.
+     *
+     * <p>This method collects pod status, events, and logs from Kubernetes MCP
+     * and formats them as a structured string for LLM consumption.
+     *
+     * @param alert the alert to collect context for
+     * @return formatted context string for RCA prompt
+     */
+    public String collectContextAsString(Alert alert) {
+        log.info(LogMessages.Mcp.MCP_CONTEXT_COLLECTION_START)
+            .field("alertId", alert.getAlertId())
+            .field("podName", alert.getPodName())
+            .field("namespace", alert.getNamespace())
+            .log();
+
+        StringBuilder contextBuilder = new StringBuilder();
+
+        // Skip Kubernetes calls if no pod name
+        if (alert.getPodName() == null || alert.getPodName().isBlank()) {
+            log.info(LogMessages.Mcp.MCP_SKIPPED_NO_POD)
+                .field("alertId", alert.getAlertId())
+                .log();
+            contextBuilder.append("### POD_STATUS\n");
+            contextBuilder.append("No pod name available for context collection.\n\n");
+            return contextBuilder.toString();
+        }
+
+        // Collect pod status
+        String podStatus = collectKubernetesPodStatusAsString(alert);
+        contextBuilder.append("### 1. POD_STATUS\n");
+        contextBuilder.append(podStatus);
+        contextBuilder.append("\n\n");
+
+        // Collect pod events
+        String podEvents = collectKubernetesPodEventsAsString(alert);
+        contextBuilder.append("### 4. POD_EVENTS\n");
+        contextBuilder.append(podEvents);
+        contextBuilder.append("\n\n");
+
+        // Collect pod logs
+        String podLogs = collectKubernetesPodLogsAsString(alert);
+        contextBuilder.append("### 3. APPLICATION_LOGS\n");
+        contextBuilder.append(podLogs);
+        contextBuilder.append("\n\n");
+
+        // Note about missing signals
+        contextBuilder.append("### MISSING SIGNALS\n");
+        contextBuilder.append("- PROMETHEUS_METRICS: Not yet integrated\n");
+        contextBuilder.append("- JFR_ANALYSIS: Not yet integrated (Cryostat MCP)\n");
+        contextBuilder.append("- KRUIZE_PERFORMANCE_RECOMMENDATIONS: Not yet integrated\n");
+
+        return contextBuilder.toString();
+    }
+
+    /**
      * Calls Kubernetes MCP pods_get tool to retrieve pod status.
      */
     private void collectKubernetesPodStatus(Alert alert) {
@@ -476,6 +531,35 @@ public class McpContextCollector {
         return result_str.isEmpty() ? McpConstants.Defaults.NO_LOGS_AVAILABLE : result_str.trim();
     }
 
+
+    /**
+     * Collects Kubernetes pod status and returns as a formatted string.
+     * TODO: Implement MCP call - for now returns placeholder
+     */
+    private String collectKubernetesPodStatusAsString(Alert alert) {
+        // TODO: Call MCP server and get actual pod status
+        return String.format("Pod: %s\nNamespace: %s\nStatus: [MCP call pending]",
+            alert.getPodName(), alert.getNamespace());
+    }
+
+    /**
+     * Collects Kubernetes pod events and returns as a formatted string.
+     * TODO: Implement MCP call - for now returns placeholder
+     */
+    private String collectKubernetesPodEventsAsString(Alert alert) {
+        // TODO: Call MCP server and get actual pod events
+        return "[MCP call pending - pod events will be collected here]";
+    }
+
+    /**
+     * Collects Kubernetes pod logs and returns as a formatted string.
+     * TODO: Implement MCP call - for now returns placeholder
+     */
+    private String collectKubernetesPodLogsAsString(Alert alert) {
+        // TODO: Call MCP server and get actual pod logs
+        return String.format("Pod: %s | Container: %s\n[MCP call pending - logs will be collected here]",
+            alert.getPodName(), alert.getContainerName() != null ? alert.getContainerName() : "N/A");
+    }
 
     /**
      * Extracts text content from MCP response structure.
