@@ -82,7 +82,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
         // TODO: Replace dummy logic with actual context buildup once MCP integration is merged.
         // NOTE: For internal testing, update the context here as needed and refer to
         // shekhar316/causa-prompts for the expected LLM context format.
-        return "context to be sent for LLM."    
+        return "context to be sent for LLM.";
     }
     
     /**
