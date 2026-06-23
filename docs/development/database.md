@@ -21,7 +21,7 @@ This guide covers the PostgreSQL database connection pool setup for Causa Backen
 Causa Backend uses PostgreSQL 17 with the pgvector extension for data persistence and vector similarity search. The database layer consists of:
 
 - **Connection Pool:** Agroal (Quarkus built-in)
-- **ORM:** Hibernate ORM with Panache 
+- **ORM:** Hibernate ORM with Panache
 - **Schema Management:** Hibernate auto-update (will migrate to Flyway later)
 - **Architecture Layer:** `infrastructure/persistence/` (Secondary Adapter)
 
@@ -178,12 +178,15 @@ docker run -d \
 ```
 
 Set environment variables:
+The `application.yml` defaults to the Kubernetes service URL. For local development, override with environment variables:
 
 ```bash
 export CAUSA_DB_URL="jdbc:postgresql://localhost:5432/diagnostics-tool-db"
 export CAUSA_DB_USERNAME="causa_backend"
 export CAUSA_DB_PASSWORD="dev_password"
 ```
+
+**Note:** For LLM features, also export `VERTEX_PROJECT_ID=<your-gcp-project-id>` before starting.
 
 Start Quarkus dev mode:
 

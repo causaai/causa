@@ -51,7 +51,8 @@ quarkus:
   datasource:
     db-kind: postgresql
     username: ${CAUSA_DB_USERNAME:causa_backend}
-    password: ${CAUSA_DB_PASSWORD:}
+    # Example password added for CAUSA_DB_PASSWORD, will be replaced during runtime configuration
+    password: ${CAUSA_DB_PASSWORD:causa_password}
     jdbc:
       url: ${CAUSA_DB_URL:jdbc:postgresql://diagnostics-tool-db-rw.diagnostics-tool.svc.cluster.local:5432/diagnostics-tool-db}
       min-size: ${CAUSA_DB_POOL_MIN_SIZE:2}
