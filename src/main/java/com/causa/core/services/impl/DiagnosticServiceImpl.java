@@ -65,7 +65,9 @@ public class DiagnosticServiceImpl implements DiagnosticService {
 
         // TODO: Trigger async diagnostic pipeline
         // For now, just call placeholder methods synchronously
+         
         collectContext(alert);
+        String contextForLLM = buildContextForLLM();
         determineDiagnosisType(alert);
         performRootCauseAnalysis(alert);
         validateRca(alert);
@@ -73,6 +75,16 @@ public class DiagnosticServiceImpl implements DiagnosticService {
         return diagnostic;
     }
 
+    /**
+     * Placeholder: Builds context string to be sent to LLM
+     */
+    private String buildContextForLLM() {
+        // TODO: Replace dummy logic with actual context buildup once MCP integration is merged.
+        // NOTE: For internal testing, update the context here as needed and refer to
+        // shekhar316/causa-prompts for the expected LLM context format.
+        return "context to be sent for LLM."    
+    }
+    
     /**
      * Placeholder: Collects context from MCP servers (Kubernetes, Cryostat, Kruize).
      *
