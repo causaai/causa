@@ -51,8 +51,7 @@ quarkus:
   datasource:
     db-kind: postgresql
     username: ${CAUSA_DB_USERNAME:causa_backend}
-    # Example password added for CAUSA_DB_PASSWORD, will be replaced during runtime configuration
-    password: ${CAUSA_DB_PASSWORD:causa_password}
+    password: ${CAUSA_DB_PASSWORD:}
     jdbc:
       url: ${CAUSA_DB_URL:jdbc:postgresql://diagnostics-tool-db-rw.diagnostics-tool.svc.cluster.local:5432/diagnostics-tool-db}
       min-size: ${CAUSA_DB_POOL_MIN_SIZE:2}
@@ -114,4 +113,13 @@ causa:
 #     validation-enabled: ${CAUSA_FEATURE_VALIDATION:true}
 #     notifications-enabled: ${CAUSA_FEATURE_NOTIFICATIONS:false}
 
+# ============================================================
+# Development Profile Configuration
+# ============================================================
+"%dev":
+  quarkus:
+    datasource:
+      # Dev-only password default to avoid build-time DataSource bean creation failure
+      # Production uses Kubernetes secrets via CAUSA_DB_PASSWORD env var
+      password: ${CAUSA_DB_PASSWORD:dev_password}
 
