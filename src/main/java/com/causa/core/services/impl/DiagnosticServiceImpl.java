@@ -17,6 +17,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 
 /**
@@ -121,138 +124,23 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     /**
      * Builds test context for internal testing.
      *
-     * <p>This method provides realistic test context based on examples from
-     * https://github.com/shekhar316/causa-prompts/blob/main/master-prompt-with-signals.txt
+     * <p>Loads test context from classpath resource files in /test-contexts/ directory.
+     * This allows easy modification of test scenarios without recompiling code.
      *
-     * <p>Modify this context as needed for testing different scenarios before MCP is fully integrated.
+     * <p>Based on examples from: https://github.com/shekhar316/causa-prompts
      *
      * @param alert the alert to build context for
-     * @return test context string
+     * @return test context string loaded from resource file
      */
     private String buildTestContext(Alert alert) {
-        // Example context showing OOM scenario with high memory usage
-        return """
-            ## POD STATUS
-            Pod: heap-oom-prom-5785ff66b9-pt87l
-            Namespace: chaos-test
-            Status: Running
-
-            ## KUBERNETES EVENTS (for pod: heap-oom-prom-5785ff66b9-pt87l)
-            [Normal] 2026-06-18 06:40:57 +0000 UTC: AddedInterface - Add eth0 [10.131.0.38/23] from ovn-kubernetes
-            [Normal] 2026-06-18 06:40:57 +0000 UTC: Pulling - Pulling image "quay.io/cryostat/cryostat-agent-init:0.7.0"
-            [Normal] 2026-06-18 06:40:59 +0000 UTC: Pulled - Successfully pulled image "quay.io/cryostat/cryostat-agent-init:0.7.0"
-            [Normal] 2026-06-18 06:40:59 +0000 UTC: Created - Created container: cryostat-agent-init
-            [Normal] 2026-06-18 06:40:59 +0000 UTC: Started - Started container cryostat-agent-init
-            [Normal] 2026-06-18 08:48:15 +0000 UTC: Pulled - Container image "quay.io/causa-ai-hub/quarkus-heap-oom:heap-oom-prom" already present
-            [Normal] 2026-06-18 08:41:44 +0000 UTC: Created - Created container: heap-oom-prom
-            [Normal] 2026-06-18 07:01:57 +0000 UTC: Started - Started container heap-oom-prom
-            [Warning] 2026-06-18 08:51:11 +0000 UTC: BackOff - Back-off restarting failed container heap-oom-prom in pod heap-oom-prom-5785ff66b9-pt87l_chaos-test(0fa217dc-746e-42a4-bd23-4ee98642bf0d)
-
-            ## PROMETHEUS METRICS
-            CPU Usage: 0.071/0.500 cores
-            MEMORY Usage: 478/512 MiB
-            Collected at time of alert.
-
-            ## KRUIZE RECOMMENDATIONS
-            Performance Recommendations:
-              resources:
-                requests:
-                  cpu: 0.435 # +0.185
-                  memory: 948 Mi # +692 Mi
-                limits:
-                  cpu: 0.435 # -0.065
-                  memory: 948 Mi # +436 Mi
-
-            ## POD LOGS
-            Pod: heap-oom-prom-5785ff66b9-dfww8 | Container: heap-oom-prom
-            2026-06-18 09:17:08,004 INFO [ai.causa.scheduler.DiscoveryScheduler] (executor-thread-1) Inserted 95000 targets. Current registry size=95000
-            2026-06-18 09:17:13,005 INFO [ai.causa.scheduler.DiscoveryScheduler] (executor-thread-1) Inserted 100000 targets. Current registry size=100000
-            2026-06-18 09:17:18,006 INFO [ai.causa.scheduler.DiscoveryScheduler] (executor-thread-1) Inserted 105000 targets. Current registry size=105000
-            2026-06-18 09:17:23,007 INFO [ai.causa.scheduler.DiscoveryScheduler] (executor-thread-1) Inserted 110000 targets. Current registry size=110000
-            2026-06-18 09:17:28,008 INFO [ai.causa.scheduler.DiscoveryScheduler] (executor-thread-1) Inserted 115000 targets. Current registry size=115000
-
-            ## JFR CONTAINER ANALYSIS
-            {
-              "status": "RECENT_ARCHIVED_EXISTS",
-              "events": {
-                "jdk.ContainerConfiguration": {
-                  "row_count": 1,
-                  "rows": [{
-                    "containerType": "cgroupv2",
-                    "cpuQuota": "50000000",
-                    "effectiveCpuCount": "1",
-                    "memoryLimit": "536870912",
-                    "hostTotalMemory": "65993228288"
-                  }]
-                }
-              }
+        try (InputStream is = getClass().getResourceAsStream("/test-contexts/heap-oom-scenario.txt")) {
+            if (is == null) {
+                throw new RuntimeException("Test context file not found: /test-contexts/heap-oom-scenario.txt");
             }
-
-            ## JFR GC ANALYSIS
-            {
-              "events": {
-                "jdk.GCHeapSummary": {
-                  "row_count": 2,
-                  "rows": [
-                    {"heapUsed": "21360344", "when": "Before GC"},
-                    {"heapUsed": "17271584", "when": "After GC"}
-                  ]
-                },
-                "jdk.GCHeapMemoryPoolUsage": {
-                  "row_count": 4,
-                  "rows": [
-                    {"name": "Eden Space", "used": "4088760", "committed": "114688000", "max": "114688000"},
-                    {"name": "Survivor Space", "used": "0", "committed": "14680064", "max": "14680064"},
-                    {"name": "Tenured Gen", "used": "17271584", "committed": "286654464", "max": "286654464"}
-                  ]
-                },
-                "jdk.GarbageCollection": {
-                  "row_count": 1,
-                  "rows": [
-                    {"name": "DefNew", "duration": "3292885", "cause": "Allocation Failure", "longestPause": "3292885"}
-                  ]
-                }
-              }
-            }
-
-            ## JFR MEMORY ANALYSIS
-            {
-              "events": {
-                "jdk.JavaMemoryUsage": {
-                  "row_count": 3,
-                  "rows": [
-                    {"memoryType": "Heap", "used": "17271584", "committed": "416022528", "max": "416022528"},
-                    {"memoryType": "Non-heap", "used": "50217176", "committed": "53600256", "max": "-1"}
-                  ]
-                }
-              }
-            }
-
-            ## JFR THREAD ANALYSIS
-            {
-              "events": {
-                "jdk.JavaThreadStatistics": {
-                  "row_count": 1,
-                  "rows": [
-                    {"activeCount": "23", "daemonCount": "19", "accumulatedCount": "29", "peakCount": "24"}
-                  ]
-                }
-              }
-            }
-
-            ## JFR EXCEPTION ANALYSIS
-            {
-              "events": {
-                "jdk.ExceptionStatistics": {
-                  "row_count": 2,
-                  "rows": [
-                    {"throwables": "java.lang.OutOfMemoryError", "count": "1"},
-                    {"throwables": "java.lang.NullPointerException", "count": "3"}
-                  ]
-                }
-              }
-            }
-            """;
+            return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to load test context from classpath", e);
+        }
     }
 
     /**
