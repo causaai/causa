@@ -6,7 +6,6 @@ metadata:
     app.kubernetes.io/name: causa-backend
 data:
   # Application Configuration
-  CAUSA_IMAGE: "quay.io/rh-ee-shesaxen/causa-backend:latest_mvp"
   CAUSA_LOG_LEVEL: "INFO"
 
   # Database Configuration
