@@ -51,7 +51,7 @@ quarkus:
   datasource:
     db-kind: postgresql
     username: ${CAUSA_DB_USERNAME:causa_backend}
-    password: ${CAUSA_DB_PASSWORD:}
+    password: ${CAUSA_DB_PASSWORD:dev_password}
     jdbc:
       url: ${CAUSA_DB_URL:jdbc:postgresql://diagnostics-tool-db-rw.diagnostics-tool.svc.cluster.local:5432/diagnostics-tool-db}
       min-size: ${CAUSA_DB_POOL_MIN_SIZE:2}
@@ -90,6 +90,8 @@ causa:
     api-key: ${LLM_API_KEY:}
     timeout-seconds: ${LLM_TIMEOUT_SECONDS:60}
     chat-memory-size: ${LLM_CHAT_MEMORY_SIZE:10}
+    # Enable SKILL.md loading (manual via SkillLoader.java)
+    skills-enabled: ${LLM_SKILLS_ENABLED:true}
     vertex:
       project-id: ${VERTEX_PROJECT_ID:}
       location: ${VERTEX_LOCATION:us-east5}

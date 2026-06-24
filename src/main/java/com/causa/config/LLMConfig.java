@@ -107,6 +107,15 @@ public interface LLMConfig {
     int chatMemorySize();
 
     /**
+     * Enable SKILL.md loading and integration.
+     *
+     * @return true if skills should be loaded and included in system messages
+     */
+    @WithName("skills-enabled")
+    @WithDefault("true")
+    boolean skillsEnabled();
+
+    /**
      * Vertex AI specific configuration.
      *
      * @return the vertex AI config

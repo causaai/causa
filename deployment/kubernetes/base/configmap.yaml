@@ -21,6 +21,9 @@ data:
   LLM_TIMEOUT_SECONDS: "60"
   LLM_CHAT_MEMORY_SIZE: "25"
 
+  # Enable SKILL.md loading (manual via SkillLoader.java)
+  LLM_SKILLS_ENABLED: "true"
+
   # Vertex AI Configuration (Public settings)
   # Valid regions: us-east5, us-central1, europe-west1, asia-southeast1
   # Note: 'global' is NOT valid for Claude on Vertex AI

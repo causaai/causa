@@ -38,12 +38,14 @@ public class LangChainPromptSender implements PromptSender {
 
     private final ChatModel chatModel;
     private final LLMConfig config;
+    private final SkillLoader skillLoader;
     private final AtomicBoolean ready = new AtomicBoolean(false);
 
     @Inject
-    public LangChainPromptSender(ChatModel chatModel, LLMConfig config) {
+    public LangChainPromptSender(ChatModel chatModel, LLMConfig config, SkillLoader skillLoader) {
         this.chatModel = chatModel;
         this.config = config;
+        this.skillLoader = skillLoader;
     }
 
     @Override
@@ -163,20 +165,48 @@ public class LangChainPromptSender implements PromptSender {
     }
 
     /**
-     * Builds the system message text from system prompt and context.
+     * Builds the system message text from skill content, system prompt, and context.
+     *
+     * <p>Order of inclusion:
+     * <ol>
+     *   <li>Skill content (if skills enabled) - provides LLM with diagnostic patterns</li>
+     *   <li>Custom system prompt (if provided) - task-specific instructions</li>
+     *   <li>Context (if provided) - MCP diagnostic data</li>
+     * </ol>
      *
      * @param request the LLM request
-     * @return the combined system text
+     * @return the combined system text with skill guidance
      */
     private String buildSystemText(LLMRequest request) {
         StringBuilder sb = new StringBuilder();
-        request.systemPrompt().ifPresent(sb::append);
+
+        // Add skill guidance if enabled
+        if (config.skillsEnabled()) {
+            String kubernetesSkill = skillLoader.getKubernetesSkill();
+            if (!kubernetesSkill.isEmpty()) {
+                sb.append(kubernetesSkill);
+                log.debug("Included kubernetes-diagnostics skill in system message")
+                    .field("skillLength", kubernetesSkill.length())
+                    .log();
+            }
+        }
+
+        // Add custom system prompt
+        request.systemPrompt().ifPresent(systemPrompt -> {
+            if (!sb.isEmpty()) {
+                sb.append("\n\n");
+            }
+            sb.append(systemPrompt);
+        });
+
+        // Add context
         request.context().ifPresent(ctx -> {
             if (!sb.isEmpty()) {
                 sb.append("\n\n");
             }
             sb.append(ctx);
         });
+
         return sb.toString();
     }
 
