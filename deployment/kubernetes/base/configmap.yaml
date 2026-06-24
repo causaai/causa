@@ -31,7 +31,6 @@ data:
   LLM_BASE_URL: ""
   LLM_AUTH_TYPE: ""
   LLM_CUSTOM_HEADERS: ""
-  LLM_API_KEY: ""
 
   # Alert Configuration
   # Minimum alert severity to trigger diagnostic pipeline (critical, warning, info)
