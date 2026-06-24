@@ -57,11 +57,11 @@ public final class LLMConstants {
      */
     public static final class BobShell {
         private BobShell() {}
-// BOB Shell configuration
-public static final String MODEL_NAME = "bob-shell-1.0.4";
-public static final String DEFAULT_SHELL_PATH = "bob";
-public static final int DEFAULT_TIMEOUT_SECONDS = 180;
-
+        
+        // BOB Shell configuration
+        public static final String MODEL_NAME = "bob-shell-1.0.4";
+        public static final String DEFAULT_SHELL_PATH = "bob";
+        public static final int DEFAULT_TIMEOUT_SECONDS = 180;
         
         // BOB Shell CLI flags
         public static final String FLAG_ACCEPT_LICENSE = "--accept-license";
@@ -94,25 +94,6 @@ public static final int DEFAULT_TIMEOUT_SECONDS = 180;
         public static final String LOG_FIELD_PROMPT_TOKENS = "promptTokens";
         public static final String LOG_FIELD_COMPLETION_TOKENS = "completionTokens";
         public static final String LOG_FIELD_TOTAL_TOKENS = "totalTokens";
-        
-        // Error messages
-        public static final String ERROR_NOT_AVAILABLE = "BOB Shell is not available";
-        public static final String ERROR_API_KEY_MISSING = "BOBSHELL_API_KEY environment variable not set";
-        public static final String ERROR_TIMEOUT_TEMPLATE = "BOB Shell execution timed out after %d seconds";
-        public static final String ERROR_EXIT_CODE_TEMPLATE = "BOB Shell failed with exit code %d";
-        public static final String ERROR_EMPTY_RESPONSE = "BOB Shell returned empty response";
-        
-        // Logging messages
-        public static final String LOG_VERSION_CHECK_TIMEOUT = "BOB Shell version check timed out";
-        public static final String LOG_AVAILABILITY_CHECK_FAILED = "BOB Shell availability check failed";
-        public static final String LOG_SHELL_AVAILABLE = "BOB Shell is available and ready";
-        public static final String LOG_SHELL_NOT_AVAILABLE = "BOB Shell is not available";
-        public static final String LOG_SHELL_FAILED = "BOB Shell failed";
-        public static final String LOG_OUTPUT_MARKERS_NOT_FOUND = "Could not find ---output--- markers in BOB Shell response";
-        public static final String LOG_EXTRACTED_TOKEN_USAGE = "Extracted token usage from BOB Shell";
-        public static final String LOG_STATS_FIELD_NOT_FOUND = "Stats field not found in BOB Shell output";
-        public static final String LOG_STATS_BLOCK_NOT_FOUND = "Could not find statistics block in BOB Shell output";
-        public static final String LOG_TOKEN_PARSE_FAILED = "Failed to parse token usage from BOB Shell output";
         
         // Output truncation
         public static final int OUTPUT_TRUNCATE_LENGTH = 500;

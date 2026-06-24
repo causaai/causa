@@ -59,7 +59,7 @@ public class BobShellPromptSender implements PromptSender {
         this.apiKey = config.bob().apiKey().orElse(System.getenv(LLMConstants.BobShell.ENV_API_KEY));
         
         if (this.apiKey == null || this.apiKey.isBlank()) {
-            log.warn(LLMConstants.BobShell.ERROR_API_KEY_MISSING)
+            log.warn(LogMessages.LLM.BOB_API_KEY_MISSING)
                 .log();
         }
     }
@@ -161,24 +161,24 @@ public class BobShellPromptSender implements PromptSender {
             
             if (!completed) {
                 process.destroyForcibly();
-                log.warn(LLMConstants.BobShell.LOG_VERSION_CHECK_TIMEOUT).log();
+                log.warn(LogMessages.LLM.BOB_VERSION_CHECK_TIMEOUT).log();
                 return false;
             }
             
             int exitCode = process.exitValue();
             if (exitCode == 0) {
-                log.info(LLMConstants.BobShell.LOG_SHELL_AVAILABLE)
+                log.info(LogMessages.LLM.BOB_SHELL_AVAILABLE)
                     .field(LLMConstants.BobShell.LOG_FIELD_SHELL_PATH, bobShellPath)
                     .log();
                 return true;
             } else {
-                log.warn(LLMConstants.BobShell.LOG_SHELL_NOT_AVAILABLE)
+                log.warn(LogMessages.LLM.BOB_SHELL_NOT_AVAILABLE)
                     .field(LLMConstants.BobShell.LOG_FIELD_EXIT_CODE, exitCode)
                     .log();
                 return false;
             }
         } catch (IOException | InterruptedException e) {
-            log.warn(LLMConstants.BobShell.LOG_AVAILABILITY_CHECK_FAILED)
+            log.warn(LogMessages.LLM.BOB_AVAILABILITY_CHECK_FAILED)
                 .exception(e)
                 .log();
             return false;
@@ -215,74 +215,85 @@ public class BobShellPromptSender implements PromptSender {
      *   <li>Ensures production safety across all environments</li>
      * </ul>
      */
-    private String executeBobShell(String prompt) throws IOException, InterruptedException {
-        // Always use stdin mode for reliability and consistency
-        ProcessBuilder pb = new ProcessBuilder(
-            bobShellPath,
-            LLMConstants.BobShell.FLAG_ACCEPT_LICENSE,
-            LLMConstants.BobShell.FLAG_YOLO,
-            LLMConstants.BobShell.FLAG_OUTPUT_JSON,
-            LLMConstants.BobShell.OUTPUT_FORMAT_JSON
-        );
-        
-        // Set API key environment variable
-        if (apiKey != null && !apiKey.isBlank()) {
-            pb.environment().put(LLMConstants.BobShell.ENV_API_KEY, apiKey);
-        }
-        
-        pb.redirectErrorStream(true);
-        
-        Process process = pb.start();
-        
-        // Write prompt to stdin
-        try (OutputStreamWriter writer = new OutputStreamWriter(
-                process.getOutputStream(), StandardCharsets.UTF_8)) {
-            writer.write(prompt);
-            writer.flush();
-        }
-        
-        // Wait for completion with timeout
-        int timeoutSeconds = config.bob().timeoutSeconds();
-        boolean completed = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
-        
-        if (!completed) {
-            process.destroyForcibly();
-            throw new IOException(String.format(
-                LLMConstants.BobShell.ERROR_TIMEOUT_TEMPLATE,
-                timeoutSeconds
-            ));
-        }
-        
-        // Read output
-        StringBuilder output = new StringBuilder();
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                output.append(line).append(System.lineSeparator());
+    private String executeBobShell(String prompt) throws LLMException, InterruptedException {
+        try {
+            // Always use stdin mode for reliability and consistency
+            ProcessBuilder pb = new ProcessBuilder(
+                bobShellPath,
+                LLMConstants.BobShell.FLAG_ACCEPT_LICENSE,
+                LLMConstants.BobShell.FLAG_YOLO,
+                LLMConstants.BobShell.FLAG_OUTPUT_JSON,
+                LLMConstants.BobShell.OUTPUT_FORMAT_JSON
+            );
+            
+            // Set API key environment variable
+            if (apiKey != null && !apiKey.isBlank()) {
+                pb.environment().put(LLMConstants.BobShell.ENV_API_KEY, apiKey);
             }
+            
+            pb.redirectErrorStream(true);
+            
+            Process process = pb.start();
+            
+            // Write prompt to stdin
+            try (OutputStreamWriter writer = new OutputStreamWriter(
+                    process.getOutputStream(), StandardCharsets.UTF_8)) {
+                writer.write(prompt);
+                writer.flush();
+            }
+            
+            // Wait for completion with timeout
+            int timeoutSeconds = config.bob().timeoutSeconds();
+            boolean completed = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
+            
+            if (!completed) {
+                process.destroyForcibly();
+                throw new LLMException(
+                    String.format(LogMessages.LLM.BOB_TIMEOUT_TEMPLATE, timeoutSeconds),
+                    LLMConstants.ErrorTypes.LLM_REQUEST_FAILED
+                );
+            }
+            
+            // Read output
+            StringBuilder output = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append(System.lineSeparator());
+                }
+            }
+            
+            int exitCode = process.exitValue();
+            String responseText = output.toString().trim();
+            
+            if (exitCode != 0) {
+                log.error(LogMessages.LLM.BOB_SHELL_FAILED)
+                    .field(LLMConstants.BobShell.LOG_FIELD_EXIT_CODE, exitCode)
+                    .field(LLMConstants.BobShell.LOG_FIELD_OUTPUT, responseText.length() > LLMConstants.BobShell.OUTPUT_TRUNCATE_LENGTH ?
+                        responseText.substring(0, LLMConstants.BobShell.OUTPUT_TRUNCATE_LENGTH) : responseText)
+                    .log();
+                throw new LLMException(
+                    String.format(LogMessages.LLM.BOB_EXIT_CODE_TEMPLATE, exitCode),
+                    LLMConstants.ErrorTypes.LLM_REQUEST_FAILED
+                );
+            }
+            
+            if (responseText.isEmpty()) {
+                throw new LLMException(
+                    LogMessages.LLM.BOB_EMPTY_RESPONSE,
+                    LLMConstants.ErrorTypes.LLM_REQUEST_FAILED
+                );
+            }
+            
+            return responseText;
+        } catch (IOException e) {
+            throw new LLMException(
+                String.format(LLMConstants.ErrorMessages.REQUEST_FAILED_TEMPLATE, e.getMessage()),
+                LLMConstants.ErrorTypes.LLM_REQUEST_FAILED,
+                e
+            );
         }
-        
-        int exitCode = process.exitValue();
-        String responseText = output.toString().trim();
-        
-        if (exitCode != 0) {
-            log.error(LLMConstants.BobShell.LOG_SHELL_FAILED)
-                .field(LLMConstants.BobShell.LOG_FIELD_EXIT_CODE, exitCode)
-                .field(LLMConstants.BobShell.LOG_FIELD_OUTPUT, responseText.length() > LLMConstants.BobShell.OUTPUT_TRUNCATE_LENGTH ?
-                    responseText.substring(0, LLMConstants.BobShell.OUTPUT_TRUNCATE_LENGTH) : responseText)
-                .log();
-            throw new IOException(String.format(
-                LLMConstants.BobShell.ERROR_EXIT_CODE_TEMPLATE,
-                exitCode
-            ));
-        }
-        
-        if (responseText.isEmpty()) {
-            throw new IOException(LLMConstants.BobShell.ERROR_EMPTY_RESPONSE);
-        }
-        
-        return responseText;
     }
 
     /**
@@ -322,7 +333,7 @@ public class BobShellPromptSender implements PromptSender {
         }
         
         // Fallback: return full output if markers not found
-        log.warn(LLMConstants.BobShell.LOG_OUTPUT_MARKERS_NOT_FOUND).log();
+        log.warn(LogMessages.LLM.BOB_OUTPUT_MARKERS_NOT_FOUND).log();
         return bobOutput;
     }
 
@@ -352,7 +363,7 @@ public class BobShellPromptSender implements PromptSender {
                     long completionTokens = stats.path(LLMConstants.BobShell.JSON_FIELD_COMPLETION_TOKENS).asLong(0);
                     long totalTokens = stats.path(LLMConstants.BobShell.JSON_FIELD_TOKENS_USED).asLong(0);
                     
-                    log.debug(LLMConstants.BobShell.LOG_EXTRACTED_TOKEN_USAGE)
+                    log.debug(LogMessages.LLM.BOB_EXTRACTED_TOKEN_USAGE)
                         .field(LLMConstants.BobShell.LOG_FIELD_PROMPT_TOKENS, promptTokens)
                         .field(LLMConstants.BobShell.LOG_FIELD_COMPLETION_TOKENS, completionTokens)
                         .field(LLMConstants.BobShell.LOG_FIELD_TOTAL_TOKENS, totalTokens)
@@ -360,15 +371,15 @@ public class BobShellPromptSender implements PromptSender {
                     
                     return new TokenUsage(promptTokens, completionTokens, totalTokens);
                 } else {
-                    log.warn(LLMConstants.BobShell.LOG_STATS_FIELD_NOT_FOUND).log();
+                    log.warn(LogMessages.LLM.BOB_STATS_FIELD_NOT_FOUND).log();
                 }
             } else {
-                log.warn(LLMConstants.BobShell.LOG_STATS_BLOCK_NOT_FOUND)
+                log.warn(LogMessages.LLM.BOB_STATS_BLOCK_NOT_FOUND)
                     .field(LLMConstants.BobShell.LOG_FIELD_PARTS_COUNT, parts.length)
                     .log();
             }
         } catch (Exception e) {
-            log.warn(LLMConstants.BobShell.LOG_TOKEN_PARSE_FAILED)
+            log.warn(LogMessages.LLM.BOB_TOKEN_PARSE_FAILED)
                 .exception(e)
                 .log();
         }

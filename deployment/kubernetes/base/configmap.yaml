@@ -26,6 +26,11 @@ data:
   # Note: 'global' is NOT valid for Claude on Vertex AI
   VERTEX_LOCATION: "us-east5"
 
+  # BOB Shell Configuration (Public settings)
+  # Path to BOB Shell executable (default: 'bob' assumes it's in PATH)
+  BOB_SHELL_PATH: "bob"
+  BOB_TIMEOUT_SECONDS: "180"
+
   # Optional overrides (leave empty to use defaults)
   LLM_BASE_URL: ""
   LLM_AUTH_TYPE: ""

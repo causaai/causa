@@ -66,6 +66,19 @@ causa:
 | `BOB_TIMEOUT_SECONDS` | Timeout for BOB Shell execution | No | `180` |
 | `LLM_PROVIDER` | LLM provider to use | Yes | - |
 
+### Kubernetes ConfigMap
+
+For Kubernetes deployments, BOB Shell configuration can be set in the ConfigMap (`deployment/kubernetes/base/configmap.yaml`):
+
+```yaml
+# BOB Shell Configuration (Public settings)
+# Path to BOB Shell executable (default: 'bob' assumes it's in PATH)
+BOB_SHELL_PATH: "bob"
+BOB_TIMEOUT_SECONDS: "180"
+```
+
+**Note:** The `BOBSHELL_API_KEY` should be stored in a Kubernetes Secret, not in the ConfigMap, as it contains sensitive authentication credentials.
+
 ## Usage
 
 ### Direct Usage (When Switching Logic is Implemented)
