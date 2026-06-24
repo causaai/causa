@@ -56,10 +56,11 @@ public class BobShellPromptSender implements PromptSender {
     public BobShellPromptSender(LLMConfig config) {
         this.config = config;
         this.bobShellPath = config.bob().shellPath();
-        this.apiKey = config.bob().apiKey().orElse(System.getenv(LLMConstants.BobShell.ENV_API_KEY));
+        this.apiKey = config.bob().apiKey().orElse(null);
         
         if (this.apiKey == null || this.apiKey.isBlank()) {
-            log.warn(LogMessages.LLM.BOB_API_KEY_MISSING)
+            log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
+                .field(LLMConstants.ConfigKeys.MISSING_CONFIG, LLMConstants.ConfigKeys.LLM_API_KEY)
                 .log();
         }
     }

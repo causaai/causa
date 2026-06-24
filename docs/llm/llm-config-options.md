@@ -457,7 +457,53 @@ LLM_MODEL_NAME=claude-sonnet-4-6
 
 ---
 
-### IBM Bob (🚧 Planned)
+### BOB Shell (✅ Implemented)
+
+**Required:**
+- `LLM_PROVIDER=bob-shell`
+- `LLM_API_KEY=<bob-api-key>` (BOB Shell authentication key)
+
+**Optional:**
+- `BOB_SHELL_PATH` (default: `bob` - assumes BOB Shell is in PATH)
+- `BOB_TIMEOUT_SECONDS` (default: `180` - 3 minutes for long-running analysis)
+
+**Example `.env`:**
+```bash
+LLM_PROVIDER=bob-shell
+LLM_API_KEY=your-bob-api-key-here
+BOB_SHELL_PATH=bob
+BOB_TIMEOUT_SECONDS=180
+```
+
+**Notes:**
+- BOB Shell must be installed: `npm install -g bob-shell@1.0.4`
+- Uses the same `LLM_API_KEY` as other providers (provider-specific key)
+- Executes BOB Shell CLI directly via ProcessBuilder
+- All prompts sent via stdin for reliability
+- No separate wrapper service required
+
+**In Kubernetes ConfigMap:**
+```yaml
+# BOB Shell Configuration (Public settings)
+BOB_SHELL_PATH: "bob"
+BOB_TIMEOUT_SECONDS: "180"
+```
+
+**In Kubernetes Secret:**
+```yaml
+# Store API key in Secret, NOT ConfigMap
+apiVersion: v1
+kind: Secret
+metadata:
+  name: causa-llm-secrets
+type: Opaque
+stringData:
+  LLM_API_KEY: your-bob-api-key-here
+```
+
+---
+
+### IBM Bob REST API (🚧 Planned)
 
 **Required:**
 - `LLM_PROVIDER=ibm-bob`
@@ -468,7 +514,7 @@ LLM_MODEL_NAME=claude-sonnet-4-6
 - `LLM_MODEL_NAME` (TBD)
 - Standard inference parameters
 
-**Status:** Not yet implemented. Will use `langchain4j-open-ai` with custom base URL.
+**Status:** Not yet implemented. Will use `langchain4j-open-ai` with custom base URL for BOB REST API (when available).
 
 ---
 

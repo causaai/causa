@@ -95,7 +95,7 @@ causa:
       location: ${VERTEX_LOCATION:us-east5}
     bob:
       shell-path: ${BOB_SHELL_PATH:bob}
-      api-key: ${BOBSHELL_API_KEY:}
+      api-key: ${LLM_API_KEY:}
       timeout-seconds: ${BOB_TIMEOUT_SECONDS:180}
 
   # Alert Configuration

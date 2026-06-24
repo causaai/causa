@@ -64,7 +64,6 @@ public final class LogMessages {
         
         // BOB Shell error messages
         public static final String BOB_NOT_AVAILABLE = "BOB Shell is not available";
-        public static final String BOB_API_KEY_MISSING = "BOBSHELL_API_KEY environment variable not set";
         public static final String BOB_TIMEOUT_TEMPLATE = "BOB Shell execution timed out after %d seconds";
         public static final String BOB_EXIT_CODE_TEMPLATE = "BOB Shell failed with exit code %d";
         public static final String BOB_EMPTY_RESPONSE = "BOB Shell returned empty response";

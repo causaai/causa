@@ -36,11 +36,13 @@ The Dockerfile automatically installs BOB Shell during image build.
 
 ### 2. API Key Configuration
 
-Set the `BOBSHELL_API_KEY` environment variable:
+Set the `LLM_API_KEY` environment variable (same as other LLM providers):
 
 ```bash
-export BOBSHELL_API_KEY=your-api-key-here
+export LLM_API_KEY=your-bob-api-key-here
 ```
+
+**Note:** BOB Shell uses the same `LLM_API_KEY` environment variable as other providers (Claude, Vertex AI). The key value is provider-specific.
 
 ## Configuration
 
@@ -50,10 +52,11 @@ export BOBSHELL_API_KEY=your-api-key-here
 causa:
   llm:
     provider: bob-shell  # Set to use BOB Shell
+    api-key: ${LLM_API_KEY:}  # API key (same as other providers)
     timeout-seconds: 180  # BOB Shell timeout
     bob:
       shell-path: bob  # Path to BOB Shell executable (default: "bob")
-      api-key: ${BOBSHELL_API_KEY:}  # API key (or use env var)
+      api-key: ${LLM_API_KEY:}  # Uses LLM_API_KEY
       timeout-seconds: 180  # BOB-specific timeout
 ```
 
@@ -61,10 +64,12 @@ causa:
 
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
-| `BOBSHELL_API_KEY` | BOB Shell API key for authentication | Yes | - |
+| `LLM_API_KEY` | API key for authentication (provider-specific) | Yes | - |
 | `BOB_SHELL_PATH` | Path to BOB Shell executable | No | `bob` |
 | `BOB_TIMEOUT_SECONDS` | Timeout for BOB Shell execution | No | `180` |
 | `LLM_PROVIDER` | LLM provider to use | Yes | - |
+
+**Note:** BOB Shell uses the same `LLM_API_KEY` environment variable as other providers (Claude, Vertex AI). The key value is provider-specific.
 
 ### Kubernetes ConfigMap
 
@@ -77,7 +82,19 @@ BOB_SHELL_PATH: "bob"
 BOB_TIMEOUT_SECONDS: "180"
 ```
 
-**Note:** The `BOBSHELL_API_KEY` should be stored in a Kubernetes Secret, not in the ConfigMap, as it contains sensitive authentication credentials.
+### Kubernetes Secret
+
+The `LLM_API_KEY` should be stored in a Kubernetes Secret, not in the ConfigMap:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: causa-llm-secrets
+type: Opaque
+stringData:
+  LLM_API_KEY: your-bob-api-key-here
+```
 
 ## Usage
 
