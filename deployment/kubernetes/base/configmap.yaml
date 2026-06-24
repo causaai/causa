@@ -4,9 +4,9 @@ metadata:
   name: causa-config
   labels:
     app.kubernetes.io/name: causa-backend
-    app.kubernetes.io/component: config
 data:
   # Application Configuration
+  CAUSA_IMAGE: "quay.io/rh-ee-shesaxen/causa-backend:latest_mvp"
   CAUSA_LOG_LEVEL: "INFO"
 
   # Database Configuration
@@ -31,6 +31,7 @@ data:
   LLM_BASE_URL: ""
   LLM_AUTH_TYPE: ""
   LLM_CUSTOM_HEADERS: ""
+  LLM_API_KEY: ""
 
   # Alert Configuration
   # Minimum alert severity to trigger diagnostic pipeline (critical, warning, info)
@@ -45,6 +46,7 @@ data:
   CAUSA_MCP_K8S_ENDPOINT: "http://kubernetes-mcp-server.openshift-tuning.svc.cluster.local:8080"
   CAUSA_MCP_K8S_HEALTH_PATH: "/healthz"
   CAUSA_MCP_K8S_TIMEOUT: "5000"
+
 
   CAUSA_MCP_KRUIZE_ENDPOINT: "http://kubernetes-mcp-server.openshift-tuning.svc.cluster.local:8080"
   CAUSA_MCP_KRUIZE_HEALTH_PATH: "/q/health"

@@ -4,9 +4,7 @@ metadata:
   name: causa-config
 data:
   # OpenShift-specific configuration
-  CAUSA_PORT: "8080"
   CAUSA_LOG_LEVEL: "INFO"
   # Environment marker
   CLUSTER_TYPE: "openshift"
-  # OpenShift-specific database configuration
-  CAUSA_DB_URL: "jdbc:postgresql://iri-db-rw.openshift-tuning.svc.cluster.local:5432/iri-db"
+
