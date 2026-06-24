@@ -1,0 +1,12 @@
+{
+  "name": "Causa RCA - High Failure Rate",
+  "type": "metric alert",
+  "query": "sum(last_15m):sum:causa_rca_analysis_failed.count{*} > 0",
+  "message": "RCA generation failures detected.\n\nFailures: {{value}}\n\nInvestigate:\n- Causa backend logs\n- LLM/API availability\n- Data source connectivity\n- RCA generation pipeline",
+  "tags": ["causa", "rca", "failure-rate", "openmetrics", "datadog"],
+  "options": {
+    "include_tags": true,
+    "notify_no_data": false,
+    "require_full_window": false
+  }
+}

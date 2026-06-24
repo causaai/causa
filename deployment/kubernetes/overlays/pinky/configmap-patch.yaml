@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: causa-config
+data:
+  # OpenShift-specific configuration
+  CAUSA_PORT: "8080"
+  CAUSA_LOG_LEVEL: "INFO"
+  # Environment marker
+  CLUSTER_TYPE: "openshift"
+  # Database connection override
+  CAUSA_DB_URL: "jdbc:postgresql://diagnostics-tool-db-rw.openshift-tuning.svc.cluster.local:5432/diagnostics-tool-db"

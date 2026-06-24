@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: causa-backend
+spec:
+  template:
+    spec:
+      containers:
+        - name: causa-backend
+          # OpenShift security context constraints
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+          # Database credentials from diagnostics-tool-db in openshift-tuning namespace
+          env:
+            - name: CAUSA_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: diagnostics-tool-db-app
+                  key: password
+            - name: CAUSA_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: diagnostics-tool-db-app
+                  key: username
+          # Resource limits for OpenShift
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
