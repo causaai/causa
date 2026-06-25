@@ -1,21 +1,36 @@
 package com.causa.core.services.impl;
 
-import com.causa.common.constants.ContextConstants;
+import com.causa.common.constants.DiagnosticConstants;
 import com.causa.common.constants.DiagnosticConstants.DiagnosticStatus;
+import com.causa.common.constants.JsonParsingConstants;
+import com.causa.common.constants.ContextConstants;
 import com.causa.common.constants.DiagnosticConstants.Fields;
 import com.causa.common.constants.McpConstants.LogFields;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
+import com.causa.config.LLMConfig;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
+import com.causa.core.domain.LLMRequest;
+import com.causa.core.domain.LLMResponse;
+import com.causa.core.domain.RootCauseAnalysis;
 import com.causa.core.ports.DiagnosticRepository;
+import com.causa.core.ports.llm.PromptSender;
 import com.causa.core.services.DiagnosticService;
+import com.causa.core.services.RcaPromptBuilder;
 import com.causa.mcp.McpContextCollector;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
 import com.causa.core.domain.DiagnosticContext;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Set;
 
 /**
  * Diagnostic Service Implementation
@@ -31,12 +46,27 @@ public class DiagnosticServiceImpl implements DiagnosticService {
 
     private final DiagnosticRepository diagnosticRepository;
     private final McpContextCollector mcpContextCollector;
+    private final RcaPromptBuilder rcaPromptBuilder;
+    private final PromptSender promptSender;
+    private final LLMConfig llmConfig;
+    private final ObjectMapper objectMapper;
+    private final Validator validator;
 
     @Inject
     public DiagnosticServiceImpl(DiagnosticRepository diagnosticRepository,
-                                  McpContextCollector mcpContextCollector) {
+                                  McpContextCollector mcpContextCollector,
+                                  RcaPromptBuilder rcaPromptBuilder,
+                                  PromptSender promptSender,
+                                  LLMConfig llmConfig,
+                                  ObjectMapper objectMapper,
+                                  Validator validator) {
         this.diagnosticRepository = diagnosticRepository;
         this.mcpContextCollector = mcpContextCollector;
+        this.rcaPromptBuilder = rcaPromptBuilder;
+        this.promptSender = promptSender;
+        this.llmConfig = llmConfig;
+        this.objectMapper = objectMapper;
+        this.validator = validator;
     }
 
     @Override
@@ -67,7 +97,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             .field("status", DiagnosticStatus.PENDING.getValue())
             .log();
 
-        // TODO: Trigger async diagnostic pipeline
+
         // For now, just call placeholder methods synchronously
         DiagnosticContext diagnosticContext = collectContext(alert);
 
@@ -91,7 +121,11 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                  separator + ContextConstants.NEWLINE)
             .field(Fields.DIAGNOSTIC_ID, diagnosticId)
             .log();
-
+        
+        RootCauseAnalysis rca = performRootCauseAnalysis(alert, contextForLLM);
+        
+        // TODO: Store RCA result in database
+        // TODO: validateRca(alert, rca);
         determineDiagnosisType(alert);
         performRootCauseAnalysis(alert);
         validateRca(alert);
@@ -100,7 +134,6 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     }
 
     /**
-
      * Collects diagnostic context from all MCP servers (Kubernetes, Cryostat, Kruize).
      *
      * <p>Aggregates pod status, events, logs, resource recommendations, and JFR analysis
@@ -118,49 +151,133 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     }
 
     /**
-     * Placeholder: Determines the type of diagnosis needed based on alert characteristics.
+     * Performs root cause analysis using LLM.
      *
-     * <p>Future implementation will classify the alert (OOM, GC thrashing, memory leak, etc.)
-     * and route to appropriate diagnostic templates.
-     *
-     * @param alert the alert to classify
-     */
-    private void determineDiagnosisType(Alert alert) {
-        log.debug(LogMessages.Diagnostic.DIAGNOSIS_TYPE_DETERMINED)
-            .field("alertId", alert.getAlertId())
-            .log();
-
-        // TODO: Implement diagnosis type classification
-        // - Analyze alert name and labels
-        // - Route to appropriate prompt template
-    }
-
-    /**
-     * Placeholder: Performs root cause analysis using LLM.
-     *
-     * <p>Future implementation will use LangChain4J to:
-     * <ul>
-     *   <li>Build structured prompts with context</li>
-     *   <li>Call LLM (Claude/Ollama/Bob)</li>
-     *   <li>Parse structured JSON response</li>
-     *   <li>Extract fault domain and confidence score</li>
-     * </ul>
+     * <p>Builds the RCA prompt from YAML template, calls the LLM, and parses
+     * the structured JSON response into a RootCauseAnalysis object.
      *
      * @param alert the alert to analyze
+     * @param contextString the collected MCP context
+     * @return the RCA result
      */
-    private void performRootCauseAnalysis(Alert alert) {
+    private RootCauseAnalysis performRootCauseAnalysis(Alert alert, String contextString) {
         log.debug(LogMessages.Diagnostic.ROOT_CAUSE_ANALYSIS_STARTED)
             .field("alertId", alert.getAlertId())
             .log();
 
-        // TODO: Implement LLM-based RCA
-        // - Use LangChain4J prompt templates
-        // - Call LLM with structured output
-        // - Parse and validate response
+        try {
+            // Build the prompt using YAML template
+            String systemPrompt = rcaPromptBuilder.getSystemPrompt();
+            String userPrompt = rcaPromptBuilder.buildPrompt(alert, contextString);
+
+            log.info(LogMessages.Diagnostic.RCA_PROMPT_BUILT)
+                .field(DiagnosticConstants.FIELD_ALERT_ID, alert.getAlertId())
+                .field("systemPromptLength", systemPrompt.length())
+                .field("userPromptLength", userPrompt.length())
+                .log();
+
+            log.debug("Context and prompts prepared")
+                .field("alertId", alert.getAlertId())
+                .field("contextLength", contextString.length())
+                .field("systemPromptLength", systemPrompt.length())
+                .field("userPromptLength", userPrompt.length())
+                .log();
+
+            // Build LLM request
+            LLMRequest llmRequest = LLMRequest.builder(userPrompt)
+                .systemPrompt(systemPrompt)
+                .temperature(llmConfig.temperature())
+                .maxTokens(llmConfig.maxTokens())
+                .build();
+
+            // Call the LLM (works with both LangChain and BobShell)
+            LLMResponse llmResponse = promptSender.send(llmRequest);
+
+            log.info(LogMessages.Diagnostic.LLM_RESPONSE_RECEIVED)
+                .field(DiagnosticConstants.FIELD_ALERT_ID, alert.getAlertId())
+                .field("modelUsed", llmResponse.modelUsed())
+                .field("inputTokens", llmResponse.inputTokens())
+                .field("outputTokens", llmResponse.outputTokens())
+                .field("latencyMs", llmResponse.latencyMs())
+                .log();
+
+            // Parse JSON response to RootCauseAnalysis
+            String responseText = llmResponse.responseText();
+
+            log.debug("Parsing LLM response")
+                .field("alertId", alert.getAlertId())
+                .field("responseLength", responseText.length())
+                .log();
+
+            RootCauseAnalysis rca = parseRcaResponse(responseText);
+
+            log.info(LogMessages.Diagnostic.RCA_GENERATED_SUCCESS)
+                .field(DiagnosticConstants.FIELD_ALERT_ID, alert.getAlertId())
+                .field("anomalyType", rca.anomalyType())
+                .field("rcaConfidence", rca.llmConfidenceScoreForRca())
+                .field("solutionConfidence", rca.llmConfidenceScoreForSolution())
+                .log();
+
+            return rca;
+
+        } catch (Exception e) {
+            log.error(LogMessages.Diagnostic.RCA_GENERATION_FAILED)
+                .field(DiagnosticConstants.FIELD_ALERT_ID, alert.getAlertId())
+                .exception(e)
+                .log();
+            throw new RuntimeException("Failed to generate RCA for alert: " + alert.getAlertId(), e);
+        }
     }
 
     /**
-     * Placeholder: Validates LLM output using hybrid validation engine.
+     * Parses the LLM JSON response into a RootCauseAnalysis object.
+     *
+     * <p>Handles markdown code blocks case-insensitively (```json, ```JSON, ```json5, etc.)
+     * by removing entire first line if it starts with backticks.
+     *
+     * @param responseText the LLM response text (should be JSON)
+     * @return the parsed RCA
+     */
+    private RootCauseAnalysis parseRcaResponse(String responseText) throws Exception {
+        // Clean the response - remove markdown code blocks if present
+        String jsonText = responseText.trim();
+
+        // Handle opening code block case-insensitively
+        if (jsonText.startsWith(JsonParsingConstants.CODE_BLOCK_PREFIX)) {
+            // Remove entire first line (handles ```json, ```JSON, ```json5, etc.)
+            int firstNewline = jsonText.indexOf('\n');
+            if (firstNewline > 0) {
+                jsonText = jsonText.substring(firstNewline + 1);
+            }
+        }
+
+        // Handle closing code block
+        if (jsonText.endsWith(JsonParsingConstants.CODE_BLOCK_PREFIX)) {
+            jsonText = jsonText.substring(0, jsonText.length() - JsonParsingConstants.CODE_BLOCK_PREFIX_LENGTH);
+        }
+
+        jsonText = jsonText.trim();
+
+        // Parse JSON to RootCauseAnalysis
+        RootCauseAnalysis rca = objectMapper.readValue(jsonText, RootCauseAnalysis.class);
+
+        // Validate the deserialized object
+        // Note: Jackson deserialization does NOT trigger Bean Validation annotations automatically
+        Set<ConstraintViolation<RootCauseAnalysis>> violations = validator.validate(rca);
+        if (!violations.isEmpty()) {
+            StringBuilder errorMsg = new StringBuilder("RCA validation failed:");
+            for (ConstraintViolation<RootCauseAnalysis> violation : violations) {
+                errorMsg.append("\n  - ").append(violation.getPropertyPath())
+                        .append(": ").append(violation.getMessage());
+            }
+            throw new IllegalArgumentException(errorMsg.toString());
+        }
+
+        return rca;
+    }
+
+    /**
+     * Validates LLM output using hybrid validation engine.
      *
      * <p>Future implementation will:
      * <ul>
@@ -170,8 +287,9 @@ public class DiagnosticServiceImpl implements DiagnosticService {
      * </ul>
      *
      * @param alert the alert being analyzed
+     * @param rca the RCA result to validate
      */
-    private void validateRca(Alert alert) {
+    private void validateRca(Alert alert, RootCauseAnalysis rca) {
         log.debug(LogMessages.Diagnostic.RCA_VALIDATION_STARTED)
             .field("alertId", alert.getAlertId())
             .log();

@@ -134,6 +134,13 @@ public final class LogMessages {
         public static final String DIAGNOSTIC_COMPLETED = "Diagnostic completed";
         public static final String DIAGNOSTIC_FAILED = "Diagnostic failed";
 
+        // RCA Prompt Building
+        public static final String RCA_PROMPT_BUILT = "RCA prompt built";
+        public static final String LLM_CONTEXT_BUILT = "LLM context built";
+        public static final String LLM_RESPONSE_RECEIVED = "LLM response received";
+        public static final String RCA_GENERATED_SUCCESS = "RCA generated successfully";
+        public static final String RCA_GENERATION_FAILED = "RCA generation failed";
+
         // Exception messages
         public static final String DIAGNOSTIC_PERSIST_FAILED = "Failed to persist diagnostic";
         public static final String DIAGNOSTIC_UPDATE_FAILED = "Failed to update diagnostic";

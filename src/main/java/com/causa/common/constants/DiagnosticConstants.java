@@ -29,6 +29,13 @@ public final class DiagnosticConstants {
     }
 
     /**
+     * Field name constants for structured logging
+     */
+    public static final String FIELD_ALERT_ID = "alertId";
+    public static final String FIELD_DIAGNOSTIC_ID = "diagnosticId";
+    public static final String FIELD_STATUS = "status";
+
+    /**
      * Diagnostic Status
      *
      * <p>Defines the lifecycle status of a diagnostic analysis.
