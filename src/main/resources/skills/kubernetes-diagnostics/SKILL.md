@@ -161,11 +161,13 @@ resources:
 - `Running` → Normal operation
 - `Pending` → Waiting to schedule/start
 - `Failed` → Terminated with error
-- `CrashLoopBackOff` → Repeated failures
+- `Succeeded` → Completed successfully
+- `Unknown` → Status cannot be determined
 
 **`containerStatuses[].state`**:
 - `running` → Active
 - `waiting` → Not started (check `reason`)
+  - Common reasons: `CrashLoopBackOff`, `ImagePullBackOff`, `ContainerCreating`
 - `terminated` → Exited (check `exitCode` and `reason`)
 
 **`restartCount`**: >5 indicates instability (crash loop or probe failures)

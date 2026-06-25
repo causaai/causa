@@ -184,20 +184,25 @@ public class LangChainPromptSender implements PromptSender {
     private String buildSystemText(LLMRequest request) {
         StringBuilder sb = new StringBuilder();
 
-        // Add skills catalogue (preemptive disclosure)
-        if (skills != null) {
+        // Add skills catalogue (preemptive disclosure) only if enabled
+        boolean skillsEnabled = request.enableSkills().orElse(true);
+        if (skillsEnabled && skills != null) {
             String catalogue = skills.formatAvailableSkills();
             if (catalogue != null && !catalogue.isBlank()) {
                 sb.append("You have access to the following skills:\n\n");
                 sb.append(catalogue);
-                sb.append("\n\nWhen the user's request relates to one of these skills, ");
-                sb.append("call activate_skill(\"skill-name\") first to receive detailed instructions.\n\n");
+                sb.append("\n\n# Tool Usage Instructions\n");
+                sb.append("When the user's request relates to one of the skills listed above:\n");
+                sb.append("1. Use the EXACT skill name from the list above (e.g., 'kubernetes-diagnostics')\n");
+                sb.append("2. Call: activate_skill(\"exact-skill-name-from-list\")\n");
+                sb.append("3. DO NOT make up skill names or paraphrase them\n");
+                sb.append("4. The skill name parameter must match exactly as shown above\n\n");
             }
         }
 
         // Add custom system prompt
         request.systemPrompt().ifPresent(prompt -> {
-            if (!sb.isEmpty()) {
+            if (sb.length() > 0) {
                 sb.append("\n\n");
             }
             sb.append(prompt);
@@ -205,7 +210,7 @@ public class LangChainPromptSender implements PromptSender {
 
         // Add context
         request.context().ifPresent(ctx -> {
-            if (!sb.isEmpty()) {
+            if (sb.length() > 0) {
                 sb.append("\n\n");
             }
             sb.append(ctx);
@@ -233,7 +238,7 @@ public class LangChainPromptSender implements PromptSender {
         final int MAX_TOOL_ITERATIONS = 5;
         int iteration = 0;
 
-        ChatResponse response;
+        ChatResponse response = null;
         while (iteration < MAX_TOOL_ITERATIONS) {
             // Build chat request with tool specifications
             ChatRequest chatRequest = buildChatRequest(messages, request);
@@ -266,7 +271,11 @@ public class LangChainPromptSender implements PromptSender {
 
                     // Execute tool via skills.toolProvider()
                     var toolProviderResult = skills.toolProvider().provideTools(null);
-                    var toolExecutor = toolProviderResult.toolExecutorByName(toolRequest.name());
+                    var toolExecutor = toolProviderResult.aiServiceTools().stream()
+                        .filter(tool -> tool.name().equals(toolRequest.name()))
+                        .findFirst()
+                        .map(tool -> tool.toolExecutor())
+                        .orElseThrow(() -> new IllegalArgumentException("Tool not found: " + toolRequest.name()));
                     var toolExecutionResult = toolExecutor.executeWithContext(toolRequest, null);
                     String toolResult = String.valueOf(toolExecutionResult.result());
 
@@ -287,9 +296,6 @@ public class LangChainPromptSender implements PromptSender {
                         .exception(e)
                         .log();
 
-                    // Print full stack trace for debugging
-                    e.printStackTrace();
-
                     // Return error to LLM so it can handle gracefully
                     String errorMessage = "Tool execution failed: " + e.getClass().getSimpleName() + ": " + e.getMessage();
                     messages.add(ToolExecutionResultMessage.from(toolRequest, errorMessage));
@@ -299,11 +305,11 @@ public class LangChainPromptSender implements PromptSender {
             iteration++;
         }
 
-        // Max iterations reached - return last response
+        // Max iterations reached - return last response from the loop
         log.warn("Max tool execution iterations reached")
             .field("max_iterations", MAX_TOOL_ITERATIONS)
             .log();
-        return chatModel.chat(buildChatRequest(messages, request));
+        return response;
     }
 
     /**
@@ -330,12 +336,15 @@ public class LangChainPromptSender implements PromptSender {
                 .messages(messages);
 
         // Register tool specifications from skills (activate_skill, read_skill_resource, etc.)
-        boolean hasTools = skills != null && skills.toolProvider() != null;
+        boolean skillsEnabled = request.enableSkills().orElse(true);
+        boolean hasTools = skillsEnabled && skills != null && skills.toolProvider() != null;
 
         if (hasTools) {
             var toolProviderResult = skills.toolProvider().provideTools(null);
             builder.toolSpecifications(
-                toolProviderResult.tools().keySet().toArray(new dev.langchain4j.agent.tool.ToolSpecification[0])
+                toolProviderResult.aiServiceTools().stream()
+                    .map(tool -> tool.toolSpecification())
+                    .toArray(dev.langchain4j.agent.tool.ToolSpecification[]::new)
             );
 
             // When using tools, set parameters directly on builder
