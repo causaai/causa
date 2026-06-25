@@ -125,6 +125,13 @@
             <version>${langchain4j-vertex-anthropic.version}</version>
         </dependency>
 
+        <!-- Quarkus LangChain4j Skills Extension (Production-ready) -->
+        <dependency>
+            <groupId>io.quarkiverse.langchain4j</groupId>
+            <artifactId>quarkus-langchain4j-skills</artifactId>
+            <version>1.11.0</version>
+        </dependency>
+
         <!-- Test Dependencies -->
         <dependency>
             <groupId>io.quarkus</groupId>

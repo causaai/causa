@@ -8,14 +8,18 @@ import com.causa.config.LLMConfig;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
 import com.causa.core.ports.llm.PromptSender;
+import dev.langchain4j.agent.tool.ToolExecutionRequest;
+import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
+import dev.langchain4j.data.message.ToolExecutionResultMessage;
 import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.request.ChatRequestParameters;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import io.quarkus.arc.properties.UnlessBuildProperty;
+import dev.langchain4j.skills.Skills;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -44,12 +48,14 @@ public class LangChainPromptSender implements PromptSender {
 
     private final ChatModel chatModel;
     private final LLMConfig config;
+    private final Skills skills;
     private final AtomicBoolean ready = new AtomicBoolean(false);
 
     @Inject
-    public LangChainPromptSender(ChatModel chatModel, LLMConfig config) {
+    public LangChainPromptSender(ChatModel chatModel, LLMConfig config, Skills skills) {
         this.chatModel = chatModel;
         this.config = config;
+        this.skills = skills;
     }
 
     @Override
@@ -75,11 +81,8 @@ public class LangChainPromptSender implements PromptSender {
             // Build chat message list
             List<ChatMessage> messages = buildMessages(request);
 
-            // Build chat request with per-request parameter overrides
-            ChatRequest chatRequest = buildChatRequest(messages, request);
-
-            // Call the LLM with the configured request
-            ChatResponse response = chatModel.chat(chatRequest);
+            // Execute LLM call with tool execution loop
+            ChatResponse response = executeWithToolLoop(messages, request);
 
             long latencyMs = (System.nanoTime() - startNanos) / 1_000_000;
 
@@ -169,28 +172,148 @@ public class LangChainPromptSender implements PromptSender {
     }
 
     /**
-     * Builds the system message text from system prompt and context.
+     * Builds the system message text from system prompt, context, and skills catalogue.
+     *
+     * <p>Implements preemptive skill disclosure by injecting the skills catalogue
+     * (name + description only) into the system message. The LLM can then call
+     * activate_skill("skill-name") to load full content on-demand.
      *
      * @param request the LLM request
      * @return the combined system text
      */
     private String buildSystemText(LLMRequest request) {
         StringBuilder sb = new StringBuilder();
-        request.systemPrompt().ifPresent(sb::append);
+
+        // Add skills catalogue (preemptive disclosure)
+        if (skills != null) {
+            String catalogue = skills.formatAvailableSkills();
+            if (catalogue != null && !catalogue.isBlank()) {
+                sb.append("You have access to the following skills:\n\n");
+                sb.append(catalogue);
+                sb.append("\n\nWhen the user's request relates to one of these skills, ");
+                sb.append("call activate_skill(\"skill-name\") first to receive detailed instructions.\n\n");
+            }
+        }
+
+        // Add custom system prompt
+        request.systemPrompt().ifPresent(prompt -> {
+            if (!sb.isEmpty()) {
+                sb.append("\n\n");
+            }
+            sb.append(prompt);
+        });
+
+        // Add context
         request.context().ifPresent(ctx -> {
             if (!sb.isEmpty()) {
                 sb.append("\n\n");
             }
             sb.append(ctx);
         });
+
         return sb.toString();
     }
 
     /**
-     * Builds a ChatRequest with per-request parameter overrides.
+     * Executes LLM call with automatic tool execution loop.
+     *
+     * <p>Implements multi-turn tool calling:
+     * <ol>
+     *   <li>Call LLM with tool specifications (e.g., activate_skill)</li>
+     *   <li>If LLM requests tool execution, execute the tool</li>
+     *   <li>Add tool result to conversation and call LLM again</li>
+     *   <li>Repeat until LLM returns text response (max 5 iterations)</li>
+     * </ol>
+     *
+     * @param messages the conversation messages
+     * @param request the LLM request
+     * @return the final chat response
+     */
+    private ChatResponse executeWithToolLoop(List<ChatMessage> messages, LLMRequest request) {
+        final int MAX_TOOL_ITERATIONS = 5;
+        int iteration = 0;
+
+        ChatResponse response;
+        while (iteration < MAX_TOOL_ITERATIONS) {
+            // Build chat request with tool specifications
+            ChatRequest chatRequest = buildChatRequest(messages, request);
+
+            // Call the LLM
+            response = chatModel.chat(chatRequest);
+
+            // Check if LLM wants to execute tools
+            if (!response.aiMessage().hasToolExecutionRequests()) {
+                // No tool calls - return final response
+                return response;
+            }
+
+            // Execute requested tools
+            log.info("LLM requested tool execution(s)")
+                .field("tool_count", response.aiMessage().toolExecutionRequests().size())
+                .field("iteration", iteration + 1)
+                .log();
+
+            // Add AI message (with tool requests) to conversation
+            messages.add(response.aiMessage());
+
+            // Execute each tool and add results
+            for (ToolExecutionRequest toolRequest : response.aiMessage().toolExecutionRequests()) {
+                try {
+                    log.info("Executing tool")
+                        .field("tool_name", toolRequest.name())
+                        .field("arguments", toolRequest.arguments())
+                        .log();
+
+                    // Execute tool via skills.toolProvider()
+                    var toolProviderResult = skills.toolProvider().provideTools(null);
+                    var toolExecutor = toolProviderResult.toolExecutorByName(toolRequest.name());
+                    var toolExecutionResult = toolExecutor.executeWithContext(toolRequest, null);
+                    String toolResult = String.valueOf(toolExecutionResult.result());
+
+                    log.info("Tool execution completed")
+                        .field("tool_name", toolRequest.name())
+                        .field("result_length", toolResult.length())
+                        .log();
+
+                    // Add tool result to conversation
+                    messages.add(ToolExecutionResultMessage.from(toolRequest, toolResult));
+
+                } catch (Exception e) {
+                    log.error("Tool execution failed")
+                        .field("tool_name", toolRequest.name())
+                        .field("error_class", e.getClass().getName())
+                        .field("error_message", e.getMessage())
+                        .field("cause", e.getCause() != null ? e.getCause().getMessage() : "null")
+                        .exception(e)
+                        .log();
+
+                    // Print full stack trace for debugging
+                    e.printStackTrace();
+
+                    // Return error to LLM so it can handle gracefully
+                    String errorMessage = "Tool execution failed: " + e.getClass().getSimpleName() + ": " + e.getMessage();
+                    messages.add(ToolExecutionResultMessage.from(toolRequest, errorMessage));
+                }
+            }
+
+            iteration++;
+        }
+
+        // Max iterations reached - return last response
+        log.warn("Max tool execution iterations reached")
+            .field("max_iterations", MAX_TOOL_ITERATIONS)
+            .log();
+        return chatModel.chat(buildChatRequest(messages, request));
+    }
+
+    /**
+     * Builds a ChatRequest with per-request parameter overrides and tool specifications.
      *
      * <p>Applies optional parameters from {@link LLMRequest} (maxTokens, temperature).
      * If not specified, the underlying model's configured defaults are used.
+     *
+     * <p>Registers tool specifications from {@link Skills#toolProvider()} so the LLM
+     * can call tools like {@code activate_skill} and {@code read_skill_resource}.
      *
      * <p><b>Note on enableCaching:</b> Prompt caching is provider-specific and typically
      * configured at the model level (e.g., Anthropic's prompt caching). The enableCaching
@@ -203,15 +326,35 @@ public class LangChainPromptSender implements PromptSender {
      * @return a configured ChatRequest
      */
     private ChatRequest buildChatRequest(List<ChatMessage> messages, LLMRequest request) {
-        ChatRequestParameters parameters = ChatRequestParameters.builder()
-                .maxOutputTokens(request.maxTokens().orElse(null))
-                .temperature(request.temperature().orElse(null))
-                .build();
+        ChatRequest.Builder builder = ChatRequest.builder()
+                .messages(messages);
 
-        return ChatRequest.builder()
-                .messages(messages)
-                .parameters(parameters)
-                .build();
+        // Register tool specifications from skills (activate_skill, read_skill_resource, etc.)
+        boolean hasTools = skills != null && skills.toolProvider() != null;
+
+        if (hasTools) {
+            var toolProviderResult = skills.toolProvider().provideTools(null);
+            builder.toolSpecifications(
+                toolProviderResult.tools().keySet().toArray(new dev.langchain4j.agent.tool.ToolSpecification[0])
+            );
+
+            // When using tools, set parameters directly on builder
+            if (request.maxTokens().isPresent()) {
+                builder.maxOutputTokens(request.maxTokens().get());
+            }
+            if (request.temperature().isPresent()) {
+                builder.temperature(request.temperature().get());
+            }
+        } else {
+            // When NOT using tools, use parameters object
+            ChatRequestParameters parameters = ChatRequestParameters.builder()
+                    .maxOutputTokens(request.maxTokens().orElse(null))
+                    .temperature(request.temperature().orElse(null))
+                    .build();
+            builder.parameters(parameters);
+        }
+
+        return builder.build();
     }
 
     /**
