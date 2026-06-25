@@ -26,13 +26,18 @@ IBM BOB AI Service API
 
 BOB Shell must be installed in the environment where causa-backend runs:
 
-**Local Development:**
+**Local Development (macOS/Linux):**
 ```bash
-npm install -g bob-shell@1.0.4
+curl -fsSL https://bob.ibm.com/download/bobshell.sh | bash
+```
+
+**Local Development (Windows):**
+```powershell
+powershell -ep Bypass 'irm -Uri "https://bob.ibm.com/download/bobshell.ps1" | iex'
 ```
 
 **Docker/OpenShift:**
-The Dockerfile automatically installs BOB Shell during image build.
+The Dockerfile automatically installs BOB Shell during image build using IBM's official installation script.
 
 ### 2. API Key Configuration
 
@@ -217,13 +222,14 @@ The `BobShellPromptSender` automatically extracts the clean JSON content from BO
 **1. BOB Shell Not Found**
 ```
 Error: BOB Shell is not available
-Solution: Install BOB Shell via npm install -g bob-shell@1.0.4
+Solution: Install BOB Shell using official script:
+         curl -fsSL https://bob.ibm.com/download/bobshell.sh | bash
 ```
 
 **2. API Key Missing**
 ```
-Error: BOBSHELL_API_KEY environment variable not set
-Solution: Set the API key: export BOBSHELL_API_KEY=your-key
+Error: LLM_API_KEY environment variable not set
+Solution: Set the API key: export LLM_API_KEY=your-bob-api-key
 ```
 
 **3. Timeout**
@@ -259,20 +265,32 @@ Solution: Check BOB Shell logs and verify API key is valid
 
 ### Local Development
 
-1. Install BOB Shell:
+1. Install BOB Shell using official script:
 ```bash
-npm install -g bob-shell@1.0.4
+# macOS/Linux
+curl -fsSL https://bob.ibm.com/download/bobshell.sh | bash
+
+# Windows
+powershell -ep Bypass 'irm -Uri "https://bob.ibm.com/download/bobshell.ps1" | iex'
 ```
 
-2. Set API key:
+2. Verify installation:
 ```bash
-export BOBSHELL_API_KEY=your-api-key
+which bob
+bob --version
 ```
 
-3. Run causa-backend:
+3. Set API key:
+```bash
+export LLM_API_KEY=your-bob-api-key
+```
+
+4. Run causa-backend:
 ```bash
 ./mvnw quarkus:dev
 ```
+
+**Note:** The application will automatically detect BOB Shell in your PATH.
 
 ### Docker Build
 
@@ -280,19 +298,44 @@ export BOBSHELL_API_KEY=your-api-key
 # Build the application
 ./mvnw package
 
-# Build Docker image (BOB Shell installed automatically)
+# Build Docker image (BOB Shell installed automatically via official script)
 docker build -f src/main/docker/Dockerfile.jvm -t causa-backend:latest .
 
 # Run with API key
-docker run -e BOBSHELL_API_KEY=your-api-key -p 8080:8080 causa-backend:latest
+docker run -e LLM_API_KEY=your-bob-api-key -p 8080:8080 causa-backend:latest
 ```
+
+**What happens during build:**
+1. Dockerfile installs curl
+2. Downloads and runs IBM's official BOB Shell installation script: `https://bob.ibm.com/download/bobshell.sh`
+3. BOB Shell is automatically configured and ready to use
+
+**No registry configuration or authentication tokens needed!**
 
 ### OpenShift Deployment
 
+#### Prerequisites
+
+1. **Build and Push Image:**
+
+```bash
+# Build the application
+./mvnw package
+
+# Build and push image (BOB Shell installed automatically)
+docker build -f src/main/docker/Dockerfile.jvm \
+  -t quay.io/your-org/causa-backend:latest .
+
+docker push quay.io/your-org/causa-backend:latest
+```
+
+#### Deployment Steps
+
 1. Create secret for API key:
 ```bash
-oc create secret generic bob-shell-secret \
-  --from-literal=BOBSHELL_API_KEY=your-api-key
+oc create secret generic causa-llm-secrets \
+  --from-literal=LLM_API_KEY=your-bob-api-key \
+  -n diagnostics-tool
 ```
 
 2. Update deployment to use secret:
@@ -301,25 +344,28 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: causa-backend
+  namespace: diagnostics-tool
 spec:
   template:
     spec:
       containers:
       - name: causa-backend
         env:
-        - name: BOBSHELL_API_KEY
+        - name: LLM_API_KEY
           valueFrom:
             secretKeyRef:
-              name: bob-shell-secret
-              key: BOBSHELL_API_KEY
+              name: causa-llm-secrets
+              key: LLM_API_KEY
         - name: LLM_PROVIDER
           value: "bob-shell"
 ```
 
 3. Deploy:
 ```bash
-oc apply -f deployment.yaml
+oc apply -k deployment/kubernetes/overlays/openshift
 ```
+
+**Note:** The same `LLM_API_KEY` secret is used for all LLM providers (Claude, Vertex AI, BOB Shell). Only the key value is provider-specific.
 
 ## Monitoring
 
@@ -416,8 +462,49 @@ curl -X POST http://localhost:8080/api/diagnostics \
 For issues or questions:
 - Check logs: `kubectl logs -f pod/causa-backend-xxx`
 - Verify BOB Shell: `bob --version`
-- Check API key: `echo $BOBSHELL_API_KEY`
+- Check API key: `echo $LLM_API_KEY`
 - Review configuration: `cat application.yml`
+
+## Installation Methods
+
+BOB Shell can be installed using IBM's official installation script, which handles all dependencies and configuration automatically.
+
+### Official Installation Script
+
+**For macOS/Linux:**
+```bash
+curl -fsSL https://bob.ibm.com/download/bobshell.sh | bash
+```
+
+**For Windows:**
+```powershell
+powershell -ep Bypass 'irm -Uri "https://bob.ibm.com/download/bobshell.ps1" | iex'
+```
+
+### Docker Installation
+
+The Dockerfile automatically uses the official installation script:
+```dockerfile
+# Install BOB Shell using official IBM script
+RUN curl -fsSL https://bob.ibm.com/download/bobshell.sh | bash
+```
+
+No registry configuration or authentication tokens needed!
+
+### Troubleshooting Installation
+
+**Installation Script Fails:**
+```
+curl: (7) Failed to connect to bob.ibm.com
+```
+
+**Solution:**
+1. Check internet connectivity
+2. Verify firewall/proxy settings allow access to bob.ibm.com
+3. Try from a different network
+4. Contact IT support if corporate firewall blocks access
+
+For detailed installation instructions and troubleshooting, see [BOB Shell Installation Guide](bob-shell-installation.md).
 
 ## Next Steps
 

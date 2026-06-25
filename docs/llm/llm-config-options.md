@@ -476,7 +476,10 @@ BOB_TIMEOUT_SECONDS=180
 ```
 
 **Notes:**
-- BOB Shell must be installed: `npm install -g bob-shell@1.0.4`
+- BOB Shell must be installed using official IBM script:
+  - **macOS/Linux:** `curl -fsSL https://bob.ibm.com/download/bobshell.sh | bash`
+  - **Windows:** `powershell -ep Bypass 'irm -Uri "https://bob.ibm.com/download/bobshell.ps1" | iex'`
+  - See [BOB Shell Installation Guide](bob-shell-installation.md) for details
 - Uses the same `LLM_API_KEY` as other providers (provider-specific key)
 - Executes BOB Shell CLI directly via ProcessBuilder
 - All prompts sent via stdin for reliability

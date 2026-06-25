@@ -84,14 +84,21 @@ FROM registry.access.redhat.com/ubi9/openjdk-21-runtime:1.24
 
 ENV LANGUAGE='en_US:en'
 
-# Install Node.js and npm for BOB Shell
+# Install BOB Shell using official IBM installation script
 USER 0
-RUN microdnf install -y nodejs npm && \
+
+# Install Node.js (required by BOB Shell installation script - needs v22.15+)
+# Using NodeSource repository for latest Node.js
+RUN curl -fsSL https://rpm.nodesource.com/setup_22.x | bash - && \
+    microdnf install -y nodejs && \
     microdnf clean all
 
-# Install BOB Shell CLI globally
-RUN npm install -g bob-shell@1.0.4 && \
-    npm cache clean --force
+# Verify Node.js installation
+RUN node --version && npm --version
+
+# Install BOB Shell using official IBM script
+# This handles all dependencies and configuration automatically
+RUN curl -fsSL https://bob.ibm.com/download/bobshell.sh | bash
 
 # Verify BOB Shell installation
 RUN bob --version
