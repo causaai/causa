@@ -6,6 +6,7 @@ import com.causa.common.logging.LogMessages;
 import org.eclipse.microprofile.health.HealthCheck;
 import org.eclipse.microprofile.health.HealthCheckResponse;
 import org.eclipse.microprofile.health.Liveness;
+import org.eclipse.microprofile.health.Readiness;
 
 /**
  * Liveness Health Check
@@ -18,6 +19,7 @@ import org.eclipse.microprofile.health.Liveness;
  * @since 1.0.0
  */
 @Liveness
+@Readiness
 public class LivenessCheck implements HealthCheck {
 
     private static final CausaLogger log = CausaLogger.getLogger(LivenessCheck.class);

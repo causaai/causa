@@ -22,8 +22,7 @@ public final class DiagnosticConstants {
     public static final String FIELD_SYSTEM_PROMPT_LENGTH = "systemPromptLength";
     public static final String FIELD_USER_PROMPT_LENGTH = "userPromptLength";
     public static final String FIELD_CONTEXT_LENGTH = "contextLength";
-     * Logging field names for diagnostics.
-     */
+
     public static final class Fields {
         private Fields() {}
 

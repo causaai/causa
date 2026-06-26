@@ -20,7 +20,8 @@ import org.eclipse.microprofile.health.Readiness;
  *
  * @since 0.0.1
  */
-@Readiness
+// @Readiness
+// TODO: Once persistence is added, supported graceful error handling
 public class LLMHealthCheck implements HealthCheck {
 
     private static final CausaLogger log = CausaLogger.getLogger(LLMHealthCheck.class);
