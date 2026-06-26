@@ -4,8 +4,6 @@ metadata:
   name: causa-backend
   labels:
     app.kubernetes.io/name: causa-backend
-    app.kubernetes.io/component: backend
-    app.kubernetes.io/part-of: causa
 spec:
   type: ClusterIP
   ports:
@@ -19,4 +17,4 @@ spec:
     protocol: TCP
   selector:
     app.kubernetes.io/name: causa-backend
-    app.kubernetes.io/component: backend
+

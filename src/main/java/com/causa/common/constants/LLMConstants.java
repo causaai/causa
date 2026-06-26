@@ -52,6 +52,16 @@ public final class LLMConstants {
     }
 
     /**
+     * Model name identifiers for detection.
+     */
+    public static final class ModelNames {
+        private ModelNames() {}
+
+        public static final String BOB = "bob";
+        public static final String GRANITE = "granite";
+    }
+
+    /**
      * Health check constants for LLM.
      */
     public static final class Health {

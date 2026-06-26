@@ -1,31 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-metadata:
-  name: causa-backend-kind
-  annotations:
-    config.kubernetes.io/description: "Kind overlay for Causa Backend"
-
-# Override base namespace
-namespace: diagnostics-tool
-
-commonLabels:
-  environment: kind
-  cluster: kind-cluster
-
-bases:
+resources:
   - ../../base
-
-# Removed ingress.yaml - use port-forward for local access instead
-# kubectl port-forward -n diagnostics-tool svc/causa-backend 8080:8080
 
 patches:
   - path: configmap-patch.yaml
-
-images:
-  - name: quay.io/rh-ee-shesaxen/causa-backend
-    newName: quay.io/rh-ee-shesaxen/causa-backend
-    newTag: sprint1_demo
 
 replicas:
   - name: causa-backend

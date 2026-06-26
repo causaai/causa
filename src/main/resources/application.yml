@@ -35,6 +35,8 @@ quarkus:
     category:
       "com.causa":
         level: ${CAUSA_APP_LOG_LEVEL:INFO}
+      "org.hibernate.SQL":
+        level: WARN
   
   # Console Configuration
   console:
@@ -106,6 +108,17 @@ causa:
       endpoint: ${CAUSA_MCP_K8S_ENDPOINT:http://kubernetes-mcp-server.diagnostics-tool.svc.cluster.local:8080}
       health-path: ${CAUSA_MCP_K8S_HEALTH_PATH:/healthz}
       timeout-ms: ${CAUSA_MCP_K8S_TIMEOUT:5000}
+    kruize:
+      endpoint: ${CAUSA_MCP_KRUIZE_ENDPOINT:http://kruize-mcp-server-service.openshift-tuning.svc.cluster.local:8080}
+      health-path: ${CAUSA_MCP_KRUIZE_HEALTH_PATH:/q/health/ready}
+      timeout-ms: ${CAUSA_MCP_KRUIZE_TIMEOUT:10000}
+    cryostat:
+      endpoint: ${CAUSA_MCP_CRYOSTAT_ENDPOINT:http://cryostat-mcp.openshift-tuning.svc.cluster.local:8000}
+      health-endpoint: ${CAUSA_MCP_CRYOSTAT_HEALTH_ENDPOINT:http://cryostat-mcp-api.openshift-tuning.svc.cluster.local:8080}
+      health-path: ${CAUSA_MCP_CRYOSTAT_HEALTH_PATH:/healthz}
+      timeout-ms: ${CAUSA_MCP_CRYOSTAT_TIMEOUT:15000}
+      retry-delay-ms: ${CAUSA_MCP_CRYOSTAT_RETRY_DELAY:5000}
+      max-retries: ${CAUSA_MCP_CRYOSTAT_MAX_RETRIES:3}
 
 #   # Feature Flags (Runtime configurable)
 #   features:

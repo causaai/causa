@@ -4,13 +4,12 @@ metadata:
   name: causa-config
   labels:
     app.kubernetes.io/name: causa-backend
-    app.kubernetes.io/component: config
 data:
   # Application Configuration
   CAUSA_LOG_LEVEL: "INFO"
 
   # Database Configuration
-  CAUSA_DB_URL: "jdbc:postgresql://diagnostics-tool-db-rw.diagnostics-tool.svc.cluster.local:5432/diagnostics-tool-db"
+  CAUSA_DB_URL: "jdbc:postgresql://iri-db-rw.openshift-tuning.svc.cluster.local:5432/iri-db"
 
   # LLM Configuration (Public settings - non-sensitive)
   # Provider: anthropic (direct API) | vertex-ai-anthropic (Google Cloud) | ibm-bob (future) | ollama (future)
@@ -41,13 +40,20 @@ data:
   # Comma-separated list of namespaces to ignore (e.g., system namespaces)
   CAUSA_ALERT_IGNORE_NS: "kube-system,istio-system"
   # MCP Kubernetes Configuration
-  CAUSA_MCP_K8S_ENDPOINT: "http://kubernetes-mcp-server.diagnostics-tool.svc.cluster.local:8080"
+  CAUSA_MCP_K8S_ENDPOINT: "http://kubernetes-mcp-server.openshift-tuning.svc.cluster.local:8080"
   CAUSA_MCP_K8S_HEALTH_PATH: "/healthz"
   CAUSA_MCP_K8S_TIMEOUT: "5000"
 
-  # LLM Configuration (placeholder)
-  # CAUSA_LLM_PROVIDER: "anthropic"
-  # CAUSA_LLM_MODEL: "claude-3-5-sonnet-20241022"
+  # MCP Kruize Configuration (Resource Optimization Recommendations)
+  CAUSA_MCP_KRUIZE_ENDPOINT: "http://kruize-mcp-server-service.openshift-tuning.svc.cluster.local:8080"
+  CAUSA_MCP_KRUIZE_HEALTH_PATH: "/q/health/ready"
+  CAUSA_MCP_KRUIZE_TIMEOUT: "10000"
 
-  # MCP Configuration (placeholder for other servers)
-    # CAUSA_MCP_SERVERS: "kruize,cryostat"
+  # MCP Cryostat Configuration (JFR-based Java Runtime Analysis)
+  CAUSA_MCP_CRYOSTAT_ENDPOINT: "http://cryostat-mcp.openshift-tuning.svc.cluster.local:8000"
+  CAUSA_MCP_CRYOSTAT_HEALTH_ENDPOINT: "http://cryostat-mcp-api.openshift-tuning.svc.cluster.local:8080"
+  CAUSA_MCP_CRYOSTAT_HEALTH_PATH: "/healthz"
+  CAUSA_MCP_CRYOSTAT_TIMEOUT: "15000"
+  CAUSA_MCP_CRYOSTAT_RETRY_DELAY: "5000"
+  CAUSA_MCP_CRYOSTAT_MAX_RETRIES: "3"
+

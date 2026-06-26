@@ -4,18 +4,15 @@ metadata:
   name: causa-backend
   labels:
     app.kubernetes.io/name: causa-backend
-    app.kubernetes.io/component: backend
 spec:
   replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: causa-backend
-      app.kubernetes.io/component: backend
   template:
     metadata:
       labels:
         app.kubernetes.io/name: causa-backend
-        app.kubernetes.io/component: backend
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "8080"
@@ -24,7 +21,7 @@ spec:
       serviceAccountName: causa-backend
       containers:
       - name: causa-backend
-        image: quay.io/rh-ee-shesaxen/causa-backend:sprint1_demo
+        image: quay.io/rh-ee-shesaxen/causa-backend:latest_mvp
         imagePullPolicy: Always
         ports:
         - name: http
@@ -43,30 +40,33 @@ spec:
         - secretRef:
             name: causa-llm-secrets
             optional: true  # Allow deployment without secrets for non-LLM features
+        - secretRef:
+            name: causa-db-secrets
+            optional: false  
         resources:
           requests:
-            cpu: 100m
-            memory: 256Mi
+            cpu: 250m
+            memory: 128Mi
           limits:
             cpu: 500m
-            memory: 512Mi
+            memory: 256Mi
         livenessProbe:
           httpGet:
             path: /q/health/live
             port: http
             scheme: HTTP
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          timeoutSeconds: 3
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 5
           successThreshold: 1
-          failureThreshold: 3
+          failureThreshold: 5
         readinessProbe:
           httpGet:
             path: /q/health/ready
             port: http
             scheme: HTTP
           initialDelaySeconds: 30
-          periodSeconds: 5
-          timeoutSeconds: 3
+          periodSeconds: 10
+          timeoutSeconds: 5
           successThreshold: 1
-          failureThreshold: 3
+          failureThreshold: 5

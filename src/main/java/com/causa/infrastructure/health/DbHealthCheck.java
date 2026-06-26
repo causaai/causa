@@ -20,7 +20,8 @@ import org.eclipse.microprofile.health.Readiness;
  *
  * @since 1.0.0
  */
-@Readiness
+// @Readiness
+// TODO: Once persistence is added, supported graceful error handling
 public class DbHealthCheck implements HealthCheck {
 
     private static final CausaLogger log = CausaLogger.getLogger(DbHealthCheck.class);

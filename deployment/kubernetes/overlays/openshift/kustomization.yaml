@@ -1,33 +1,14 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-metadata:
-  name: causa-backend-openshift
-  annotations:
-    config.kubernetes.io/description: "OpenShift overlay for Causa Backend"
-
-# Override base namespace
-namespace: diagnostics-tool
-
-commonLabels:
-  environment: openshift
-  platform: openshift
-
-bases:
-  - ../../base
-
 resources:
+  - ../../base
   - route.yaml
 
 patches:
   - path: configmap-patch.yaml
   - path: deployment-patch.yaml
 
-images:
-  - name: quay.io/rh-ee-shesaxen/causa-backend
-    newName: quay.io/rh-ee-shesaxen/causa-backend
-    newTag: sprint1_demo
-
 replicas:
   - name: causa-backend
-    count: 2
+    count: 1
