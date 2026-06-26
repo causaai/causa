@@ -126,9 +126,9 @@ public class DiagnosticServiceImpl implements DiagnosticService {
         
         // TODO: Store RCA result in database
         // TODO: validateRca(alert, rca);
-        determineDiagnosisType(alert);
-        performRootCauseAnalysis(alert);
-        validateRca(alert);
+        // determineDiagnosisType(alert);
+        // performRootCauseAnalysis(alert);
+        validateRca(alert, rca);
 
         return diagnostic;
     }
