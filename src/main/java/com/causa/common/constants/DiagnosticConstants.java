@@ -11,22 +11,22 @@ public final class DiagnosticConstants {
 
     private DiagnosticConstants() {
         // Prevent instantiation
-        /**
-        * Logging field names for diagnostics.
-        */
-        public static final class Fields {
-            private Fields() {}
-
-            public static final String DIAGNOSTIC_ID = "diagnosticId";
-        }
-
-        // Logging format constants
-        public static final int SEPARATOR_LENGTH = 80;
-        public static final String SEPARATOR_CHAR = "=";
-        public static final String CONTEXT_HEADER = "COLLECTED DIAGNOSTIC CONTEXT (LLM-Ready)";
-        public static final String NEWLINE = "\n";
-
     }
+
+    /**
+     * Logging field names for diagnostics.
+     */
+    public static final class Fields {
+        private Fields() {}
+
+        public static final String DIAGNOSTIC_ID = "diagnosticId";
+    }
+
+    // Logging format constants
+    public static final int SEPARATOR_LENGTH = 80;
+    public static final String SEPARATOR_CHAR = "=";
+    public static final String CONTEXT_HEADER = "COLLECTED DIAGNOSTIC CONTEXT (LLM-Ready)";
+    public static final String NEWLINE = "\n";
 
     /**
      * Field name constants for structured logging
