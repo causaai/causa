@@ -37,12 +37,12 @@ Expert diagnostic knowledge for Kubernetes pod failures. Provides diagnostic gui
 ```yaml
 resources:
   requests:
-    memory: "512Mi"
+    memory: <CURRENT_LIMIT / 2>
   limits:
-    memory: "2Gi"  # Increase from previous value
+    memory: <CURRENT_LIMIT * 2>  # Double current limit or use observed peak + buffer
 ```
 
-**Prevent**: Profile memory usage, fix leaks, tune JVM heap (`-XX:MaxRAMPercentage=75`)
+**Prevent**: Profile memory usage, fix leaks, tune JVM heap
 
 ---
 
@@ -51,13 +51,13 @@ resources:
 **Signals**:
 - `state: waiting`, `reason: CrashLoopBackOff`
 - Event: `BackOff restarting failed container`
-- Exponential backoff: 10s → 20s → 40s → 5min
+- Exponential backoff timing increases with each restart
 
 **Root Cause**: Application exits immediately after startup
 
 **Common Triggers**:
-- Missing env vars or config
-- Dependency unavailable (DB, service)
+- Missing environment variables or configuration
+- Dependency unavailable (database, external service)
 - Port conflict
 - Unhandled startup exception
 
@@ -170,7 +170,7 @@ resources:
   - Common reasons: `CrashLoopBackOff`, `ImagePullBackOff`, `ContainerCreating`
 - `terminated` → Exited (check `exitCode` and `reason`)
 
-**`restartCount`**: >5 indicates instability (crash loop or probe failures)
+**`restartCount`**: High values indicate instability (crash loop or probe failures)
 
 **`ready`**: `false` = readiness probe failing or container not started
 
