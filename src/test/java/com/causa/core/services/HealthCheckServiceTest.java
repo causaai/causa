@@ -67,6 +67,15 @@ class HealthCheckServiceTest {
     private HealthCheckService healthCheckService;
 
     private static final String APP_VERSION = "0.0.1";
+    private static final String MCP_K8S_ENDPOINT = "http://localhost:8081";
+    private static final String MCP_K8S_HEALTH_PATH = "/health";
+    private static final int MCP_K8S_TIMEOUT = 5000;
+    private static final String MCP_KRUIZE_ENDPOINT = "http://localhost:8082";
+    private static final String MCP_KRUIZE_HEALTH_PATH = "/health";
+    private static final int MCP_KRUIZE_TIMEOUT = 5000;
+    private static final String MCP_CRYOSTAT_HEALTH_ENDPOINT = "http://localhost:8083";
+    private static final String MCP_CRYOSTAT_HEALTH_PATH = "/health";
+    private static final int MCP_CRYOSTAT_TIMEOUT = 5000;
     private static final String MCP_ENDPOINT = "http://localhost:8081";
     private static final String MCP_HEALTH_PATH = "/health";
     private static final int MCP_TIMEOUT = 5000;
@@ -77,6 +86,15 @@ class HealthCheckServiceTest {
                 databaseConnectionService,
                 dataSource,
                 APP_VERSION,
+                MCP_K8S_ENDPOINT,
+                MCP_K8S_HEALTH_PATH,
+                MCP_K8S_TIMEOUT,
+                MCP_KRUIZE_ENDPOINT,
+                MCP_KRUIZE_HEALTH_PATH,
+                MCP_KRUIZE_TIMEOUT,
+                MCP_CRYOSTAT_HEALTH_ENDPOINT,
+                MCP_CRYOSTAT_HEALTH_PATH,
+                MCP_CRYOSTAT_TIMEOUT,
                 MCP_ENDPOINT,
                 MCP_HEALTH_PATH,
                 MCP_TIMEOUT,
