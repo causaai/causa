@@ -72,6 +72,12 @@ public record RootCauseAnalysis(
         @JsonProperty("POSSIBLE_GC_PAUSE")
         POSSIBLE_GC_PAUSE,
 
+        @JsonProperty("CONNECTION_POOL_EXHAUSTED")
+        CONNECTION_POOL_EXHAUSTED,
+
+        @JsonProperty("POSSIBLE_CONNECTION_POOL_EXHAUSTED")
+        POSSIBLE_CONNECTION_POOL_EXHAUSTED,
+
         @JsonProperty("HEALTHY")
         HEALTHY
     }

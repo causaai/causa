@@ -1,8 +1,264 @@
 # RCA Prompt Template Configuration
 # Provider-specific prompts for Root Cause Analysis
 
-# Vertex AI Anthropic (Claude via Google Cloud)
+# Vertex AI Anthropic - Connection Pool Exhaustion RCA (ACTIVE for chaos testing)
 vertex-ai-anthropic:
+  name: "vertex-ai-anthropic-connection-pool-rca"
+  version: "1.0"
+  description: "Root Cause Analysis for connection pool exhaustion and resource depletion issues"
+
+  system_prompt: |
+    You are an expert Root Cause Analysis (RCA) engine specializing in Kubernetes pod resource exhaustion issues, particularly JDBC/database connection pool exhaustion, thread pool saturation, and application-level resource depletion in Java applications.
+
+  user_prompt: |
+    # ROOT CAUSE ANALYSIS PROMPT FOR CONNECTION POOL EXHAUSTION
+
+    ## OUTPUT REQUIREMENT
+
+    **Return ONLY valid JSON. Start with `{` and end with `}`. No markdown, no code blocks, no explanatory text outside the JSON structure.**
+
+    ## INPUT SIGNALS
+
+    You will receive the following signals (some may be missing):
+
+    ### 1. POD_STATUS
+    - Contains: Pod phase, restart count, ready status, container statuses
+    - **Note**: A "Running" pod can have connection pool exhaustion without memory issues
+
+    ### 2. APPLICATION_LOGS (Pod stdout/stderr)
+    - Contains: Application events, error messages, stack traces, HTTP errors
+    - Look for: ConnectionWaitTimeoutException, HTTP 503, database connection errors
+    - May contain: -verbose:dynload class loading output (OpenJ9)
+
+    ### 3. POD_EVENTS
+    - Contains: Pod state changes, readiness probe failures, warnings
+    - Look for: Readiness probe failures (pod marked not-ready due to /health endpoint failures)
+    - **NOT looking for**: OOMKilled (this is connection exhaustion, not memory)
+
+    ### 4. LIBERTY_TRACE_LOG
+    - **CRITICAL SIGNAL**: Liberty application trace logs (when traceSpecification is enabled)
+    - **Contains**: Detailed WAS.j2c JDBC connection pool traces, thread pool traces, JCA adapter traces
+    - **Key patterns**:
+      - "Connection wait timeout exceeded" (definitive connection exhaustion)
+      - "PoolManager.reserve" entry/exit with timeouts
+      - Connection lifecycle: acquire, release, timeout events
+      - "ConnectionWaitTimeoutException" with pool name
+      - Thread pool executor saturation warnings
+    - **When present**: Provides definitive evidence of connection pool state
+
+    ### 5. JVM_LOGS (OpenJ9/Semeru specific)
+    - **VERBOSE_GC_LOG**: GC events, heap usage - **USE TO RULE OUT MEMORY ISSUES**
+      - If heap < 75% consistently = NOT a memory problem
+      - Quiet GC = confirms memory is healthy
+    - **JAVACORE_DUMP**: Thread dumps showing threads blocked on connection waits
+      - Look for: Threads in WAITING state on PoolManager.reserve
+      - Stack traces showing JDBC connection acquisition blocked
+    - **SHARED_CLASS_CACHE_STATS**: Startup health indicator
+      - Proves pod started successfully (rules out startup issues)
+      - Cache hit rate shows no JIT throttling
+
+    ### 6. KRUIZE_PERFORMANCE_RECOMMENDATIONS
+    - Resource recommendations - use to confirm resources are adequate
+    - If recommendations don't suggest increasing memory = memory is not the issue
+
+    ## AVAILABLE CONTEXT DATA
+
+    {{context}}
+
+    ## ANOMALY CATEGORIES
+
+    Categorize into EXACTLY ONE:
+    - **CONNECTION_POOL_EXHAUSTED**: Database connection pool fully exhausted, requests timing out
+    - **POSSIBLE_CONNECTION_POOL_EXHAUSTED**: Connection pool pressure without full exhaustion
+    - **OOM_KILLED**: Pod terminated due to OOM (included for completeness, unlikely in connection pool scenario)
+    - **POSSIBLE_GC_PAUSE**: GC issues (included for completeness, unlikely if heap < 75%)
+    - **HEALTHY**: No anomalies detected
+
+    ## ANALYSIS WORKFLOW
+
+    ### STEP 1: ANOMALY DETECTION
+
+    **CRITICAL**: Connection pool exhaustion occurs with LOW memory usage. Do NOT diagnose as memory issue if heap < 75%.
+
+    **Categorization Logic** (apply in order, stop at first match):
+
+    1. **CONNECTION_POOL_EXHAUSTED** if ANY of:
+       - ConnectionWaitTimeoutException in LIBERTY_TRACE_LOG or APPLICATION_LOGS
+       - "Connection wait timeout exceeded" in LIBERTY_TRACE_LOG (WAS.j2c traces)
+       - "PoolManager.reserve" timeouts in LIBERTY_TRACE_LOG
+       - HTTP 503 errors in APPLICATION_LOGS + connection errors
+       - Readiness probe failures in POD_EVENTS + connection pool traces
+       - Thread dumps (JAVACORE_DUMP) showing threads blocked waiting for DB connections
+       - **AND**: VERBOSE_GC_LOG shows heap < 75% (confirms NOT memory issue)
+
+    2. **POSSIBLE_CONNECTION_POOL_EXHAUSTED** if ANY of:
+       - Connection wait warnings (not full timeouts) in LIBERTY_TRACE_LOG
+       - Slow connection acquisition times in LIBERTY_TRACE_LOG
+       - Thread pool saturation in LIBERTY_TRACE_LOG (com.ibm.ws.threading traces)
+       - Sporadic 503 errors without consistent timeout pattern
+       - Connection pool pressure indicators without complete exhaustion
+
+    3. **OOM_KILLED** if ANY of:
+       - OOMKilled event in POD_EVENTS (unlikely in connection pool chaos scenario)
+       - Exit code 137
+       - OutOfMemoryError + pod crash
+
+    4. **POSSIBLE_GC_PAUSE** if ANY of:
+       - Long GC pauses in VERBOSE_GC_LOG (unlikely if heap < 75%)
+       - Memory usage > 75% + GC pressure
+
+    5. **HEALTHY** ONLY if ALL of:
+       - No connection timeout errors
+       - No HTTP 503 errors
+       - No readiness probe failures
+       - Pod running normally
+
+    ### STEP 2: ROOT CAUSE IDENTIFICATION
+
+    **For CONNECTION_POOL_EXHAUSTED / POSSIBLE_CONNECTION_POOL_EXHAUSTED:**
+    - Identify connection pool configuration from LIBERTY_TRACE_LOG or context
+      - Pool size (e.g., DB_MAX_POOL_SIZE=3 in chaos scenario)
+      - Connection timeout settings
+      - Min/max pool sizes
+    - Check for connection leaks:
+      - Connections acquired but never released
+      - Long-running transactions holding connections
+      - Application code not closing connections in finally blocks
+    - Analyze request concurrency vs pool size:
+      - If concurrent requests > pool size → exhaustion expected
+      - Example: 4 concurrent requests + pool size 3 = 4th request times out
+    - Review slow queries:
+      - Database queries taking >500ms hold connections longer
+      - CHAOS_DB_SLOW_QUERY_MS setting increases hold time
+    - Check for chaos engineering settings:
+      - CHAOS_DB_LEAK_ENABLED=true → connections intentionally leaked
+      - CHAOS_DB_SLOW_QUERY_MS=500 → queries artificially slowed
+    - **Evidence from signals**:
+      - LIBERTY_TRACE_LOG: Parse WAS.j2c traces for pool state
+      - JAVACORE_DUMP: Count blocked threads waiting for connections
+      - VERBOSE_GC_LOG: Confirm heap < 75% (rules out memory)
+      - APPLICATION_LOGS: Extract 503 errors and exception stack traces
+
+    **For OOM_KILLED / POSSIBLE_GC_PAUSE:**
+    - (Standard memory analysis - less likely in this scenario)
+
+    **For HEALTHY:**
+    - Confirm all signals normal
+
+    ### STEP 3: EVIDENCE COLLECTION
+
+    Collect concrete evidence from signals:
+    - **LIBERTY_TRACE_LOG**: Verbatim WAS.j2c traces showing timeouts
+    - **APPLICATION_LOGS**: Exact ConnectionWaitTimeoutException messages
+    - **POD_EVENTS**: Readiness probe failure timestamps
+    - **JAVACORE_DUMP**: Thread stack traces showing blocked connection waits
+    - **VERBOSE_GC_LOG**: Heap usage percentages proving memory is healthy
+    - **SHARED_CLASS_CACHE_STATS**: Cache statistics proving startup was successful
+
+    **Critical rules**:
+    - Quote log lines EXACTLY (verbatim)
+    - Do NOT invent evidence
+    - If VERBOSE_GC_LOG shows heap < 75%, explicitly state "Memory is NOT the issue"
+    - Shared cache stats presence = startup healthy (no JIT throttling)
+
+    ### STEP 4: SOLUTION FORMULATION
+
+    **For CONNECTION_POOL_EXHAUSTED:**
+
+    Primary solutions:
+    1. **Increase connection pool size**
+       - WHY: Pool too small for concurrent load
+       - Evidence: concurrent requests > pool size
+       - Implementation: Increase DB_MAX_POOL_SIZE
+       - Success: High if leak-free, Medium if leaks present
+
+    2. **Fix connection leaks**
+       - WHY: Connections acquired but not released
+       - Evidence: Thread dumps showing connections held indefinitely
+       - Implementation: Add try-finally blocks, use try-with-resources
+       - Success: High if leaks identified
+
+    3. **Reduce connection hold time**
+       - WHY: Slow queries hold connections too long
+       - Evidence: Trace logs showing slow query execution
+       - Implementation: Optimize queries, reduce timeouts
+       - Success: Medium to High
+
+    4. **Disable chaos engineering**
+       - WHY: CHAOS_DB_LEAK_ENABLED or CHAOS_DB_SLOW_QUERY_MS artificially creating exhaustion
+       - Evidence: Env vars in pod spec or ConfigMap
+       - Implementation: Set CHAOS_DB_LEAK_ENABLED=false
+       - Success: High (this is intentional chaos)
+
+    ### STEP 5: CONFIDENCE SCORING
+
+    **RCA Confidence (0.0-1.0)**:
+    - 1.0: LIBERTY_TRACE_LOG shows "Connection wait timeout exceeded" + thread dumps + heap < 75%
+    - 0.7-0.9: ConnectionWaitTimeoutException in logs + 503 errors + readiness failures
+    - 0.4-0.6: 503 errors + readiness failures but no trace logs
+    - 0.0-0.3: Limited signals
+
+    **Solution Confidence (0.0-1.0)**:
+    - 1.0: Chaos flags present (disable = instant fix)
+    - 0.7-0.9: Clear pool size < concurrency (increase = high success)
+    - 0.4-0.6: Suspected leaks but not confirmed
+    - 0.0-0.3: Speculative solutions
+
+    ## OUTPUT FORMAT
+
+    {
+      "issue_title": "<Concise summary max 100 chars>",
+      "issue_description": "<NON-TECHNICAL: 'The application couldn't connect to the database because all connections were in use.' Avoid: JDBC, pool, WAS.j2c, Liberty terms.>",
+      "technical_description": "<DETAILED: Pool size, timeout values, concurrent requests, connection lifecycle, chaos settings. 6-10 sentences.>",
+      "anomaly_type": "<EXACTLY ONE OF: CONNECTION_POOL_EXHAUSTED | POSSIBLE_CONNECTION_POOL_EXHAUSTED | OOM_KILLED | POSSIBLE_GC_PAUSE | HEALTHY>",
+      "root_cause": "<4-6 sentences: WHY exhaustion occurred, pool config, concurrency, leaks, chaos settings>",
+      "supporting_logs": [
+        "<Verbatim LIBERTY_TRACE_LOG line: Connection wait timeout exceeded>",
+        "<Verbatim APPLICATION_LOGS exception>",
+        "<Verbatim JAVACORE_DUMP thread stack showing blocked wait>",
+        "<If no logs: 'No direct supporting logs present'>"
+      ],
+      "evidences": [
+        "<Evidence 1: Connection timeout from LIBERTY_TRACE_LOG with exact message>",
+        "<Evidence 2: HTTP 503 count from APPLICATION_LOGS>",
+        "<Evidence 3: Readiness failures from POD_EVENTS with timestamps>",
+        "<Evidence 4: Heap usage from VERBOSE_GC_LOG showing < 75% (rules out memory)>",
+        "<Evidence 5: Thread dump showing N threads blocked on PoolManager.reserve>",
+        "<Evidence 6: Shared cache stats showing successful startup>",
+        "<Evidence 7: Pool configuration (DB_MAX_POOL_SIZE=3)>",
+        "<All relevant evidences from available signals>"
+      ],
+      "possible_solutions": [
+        {
+          "solution": "<Specific fix>",
+          "justification": "<WHY this fixes it, reference evidence>",
+          "success_probability": "<High | Medium | Low>",
+          "implementation_notes": "<How to implement>"
+        }
+      ],
+      "llm_confidence_score_for_rca": <0.0 to 1.0>,
+      "llm_confidence_score_for_solution": <0.0 to 1.0>,
+      "confidence_summary": "<2-4 sentences: Which signals provided strong evidence, why confident or not>",
+      "llm_notes": "<3-7 sentences: Analysis narrative, how signals corroborated, why this is connection pool not memory, chaos scenario detection, confidence rationale>"
+    }
+
+    ## CRITICAL CONSTRAINTS
+
+    1. **Output Format**: ONLY valid JSON, no markdown
+    2. **Anomaly Type**: Use CONNECTION_POOL_EXHAUSTED if definitive evidence (not HEALTHY, not OOM)
+    3. **Memory Check**: If heap < 75%, explicitly rule out memory in llm_notes
+    4. **Evidence**: All must be verbatim from signals
+    5. **Chaos Detection**: Check for CHAOS_DB_LEAK_ENABLED, mention in root_cause if present
+    6. **Liberty Traces**: Prioritize LIBERTY_TRACE_LOG over APPLICATION_LOGS for connection pool analysis
+    7. **Solution Justification**: Every solution must explain WHY with evidence
+    8. **Language**: issue_description = plain English for users; technical_description = full detail for developers
+
+    ---
+
+    Now analyze the above context and provide your RCA in JSON format.
+
+# Vertex AI Anthropic - Memory-focused RCA (INACTIVE - replaced by connection-pool variant above)
+vertex-ai-anthropic-memory:
   name: "vertex-ai-anthropic-rca"
   version: "1.1"
   description: "Root Cause Analysis for Kubernetes pod issues - Vertex AI Anthropic (with Semeru/OpenJ9 JVM log support)"
@@ -136,7 +392,10 @@ vertex-ai-anthropic:
     **Rules**:
     - Use ONLY information present in provided signals
     - Quote log lines EXACTLY as they appear (verbatim)
+    - **Multi-line log entries**: Combine related lines into single string with \n (e.g., OpenJ9 class loading: "<Loaded...>\n<  Class size...>\n<  Read time...>")
+    - **JSON-formatted logs**: Extract human-readable message field, not raw JSON string
     - Do NOT invent, assume, or construct evidence
+    - Do NOT include empty strings or blank lines in supporting_logs array - skip empty lines when copying logs
     - If no supporting logs exist, state "No direct supporting logs present"
     - **JVM Detection**: If VERBOSE_GC_LOG, JIT_LOG, or JAVACORE_DUMP sections are present, the app is running OpenJ9/Semeru. In this case, IGNORE all Cryostat JFR sections and use JVM logs instead for GC/memory/thread analysis.
 
@@ -180,6 +439,9 @@ vertex-ai-anthropic:
       "supporting_logs": [
         "<Verbatim log line 1 from APPLICATION_LOGS>",
         "<Verbatim log line 2 from APPLICATION_LOGS>",
+        "<For multi-line entries (e.g., class loading with 3 lines), combine into single string with \\n>",
+        "<For JSON-formatted logs, extract the human-readable message field, not raw JSON>",
+        "<Skip empty/blank lines - do NOT add empty strings to this array>",
         "<If no logs: 'No direct supporting logs present'>"
       ],
       "evidences": [
@@ -369,7 +631,10 @@ direct-anthropic:
     **Rules**:
     - Use ONLY information present in provided signals
     - Quote log lines EXACTLY as they appear (verbatim)
+    - **Multi-line log entries**: Combine related lines into single string with \n (e.g., OpenJ9 class loading: "<Loaded...>\n<  Class size...>\n<  Read time...>")
+    - **JSON-formatted logs**: Extract human-readable message field, not raw JSON string
     - Do NOT invent, assume, or construct evidence
+    - Do NOT include empty strings or blank lines in supporting_logs array - skip empty lines when copying logs
     - If no supporting logs exist, state "No direct supporting logs present"
     - **JVM Detection**: If VERBOSE_GC_LOG, JIT_LOG, or JAVACORE_DUMP sections are present, the app is running OpenJ9/Semeru. In this case, IGNORE all Cryostat JFR sections and use JVM logs instead for GC/memory/thread analysis.
 
@@ -413,6 +678,9 @@ direct-anthropic:
       "supporting_logs": [
         "<Verbatim log line 1 from APPLICATION_LOGS>",
         "<Verbatim log line 2 from APPLICATION_LOGS>",
+        "<For multi-line entries (e.g., class loading with 3 lines), combine into single string with \\n>",
+        "<For JSON-formatted logs, extract the human-readable message field, not raw JSON>",
+        "<Skip empty/blank lines - do NOT add empty strings to this array>",
         "<If no logs: 'No direct supporting logs present'>"
       ],
       "evidences": [
@@ -602,7 +870,10 @@ bob:
     **Rules**:
     - Use ONLY information present in provided signals
     - Quote log lines EXACTLY as they appear (verbatim)
+    - **Multi-line log entries**: Combine related lines into single string with \n (e.g., OpenJ9 class loading: "<Loaded...>\n<  Class size...>\n<  Read time...>")
+    - **JSON-formatted logs**: Extract human-readable message field, not raw JSON string
     - Do NOT invent, assume, or construct evidence
+    - Do NOT include empty strings or blank lines in supporting_logs array - skip empty lines when copying logs
     - If no supporting logs exist, state "No direct supporting logs present"
     - **JVM Detection**: If VERBOSE_GC_LOG, JIT_LOG, or JAVACORE_DUMP sections are present, the app is running OpenJ9/Semeru. In this case, IGNORE all Cryostat JFR sections and use JVM logs instead for GC/memory/thread analysis.
 
@@ -646,6 +917,9 @@ bob:
       "supporting_logs": [
         "<Verbatim log line 1 from APPLICATION_LOGS>",
         "<Verbatim log line 2 from APPLICATION_LOGS>",
+        "<For multi-line entries (e.g., class loading with 3 lines), combine into single string with \\n>",
+        "<For JSON-formatted logs, extract the human-readable message field, not raw JSON>",
+        "<Skip empty/blank lines - do NOT add empty strings to this array>",
         "<If no logs: 'No direct supporting logs present'>"
       ],
       "evidences": [
