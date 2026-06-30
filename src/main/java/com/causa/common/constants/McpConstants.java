@@ -204,6 +204,7 @@ public final class McpConstants {
         public static final String RESTART_COUNT_FIELD = "restartCount:";
         public static final String CONTAINER_STATUSES_SECTION = "containerStatuses:";
         public static final String INIT_CONTAINER_STATUSES_SECTION = "initContainerStatuses:";
+        public static final String STATUS_SECTION = "status:";
         public static final String SPEC_SECTION = "spec:";
         public static final String CONTAINERS_SECTION = "containers:";
         public static final String RESOURCES_SECTION = "resources:";
