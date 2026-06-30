@@ -103,6 +103,15 @@ causa:
     ignore-namespaces: ${CAUSA_ALERT_IGNORE_NS:kube-system,istio-system}
     cooldown-cleanup-interval: ${CAUSA_ALERT_COOLDOWN_CLEANUP_INTERVAL:5m}
 
+  # Prometheus Configuration
+  prometheus:
+    enabled: ${CAUSA_PROMETHEUS_ENABLED:true}
+    timeout-ms: ${CAUSA_PROMETHEUS_TIMEOUT:10000}
+    lookback-hours: ${CAUSA_PROMETHEUS_LOOKBACK_HOURS:2}
+    max-data-points: ${CAUSA_PROMETHEUS_MAX_DATA_POINTS:60}
+    url-override: ${CAUSA_PROMETHEUS_URL:}
+    auth-token: ${CAUSA_PROMETHEUS_TOKEN:}
+
   mcp:
     kubernetes:
       endpoint: ${CAUSA_MCP_K8S_ENDPOINT:http://kubernetes-mcp-server.diagnostics-tool.svc.cluster.local:8080}
@@ -111,7 +120,7 @@ causa:
     kruize:
       endpoint: ${CAUSA_MCP_KRUIZE_ENDPOINT:http://kruize-mcp-server-service.openshift-tuning.svc.cluster.local:8080}
       health-path: ${CAUSA_MCP_KRUIZE_HEALTH_PATH:/q/health/ready}
-      timeout-ms: ${CAUSA_MCP_KRUIZE_TIMEOUT:10000}
+      timeout-ms: ${CAUSA_MCP_KRUIZE_TIMEOUT:30000}
     cryostat:
       endpoint: ${CAUSA_MCP_CRYOSTAT_ENDPOINT:http://cryostat-mcp.openshift-tuning.svc.cluster.local:8000}
       health-endpoint: ${CAUSA_MCP_CRYOSTAT_HEALTH_ENDPOINT:http://cryostat-mcp-api.openshift-tuning.svc.cluster.local:8080}

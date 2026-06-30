@@ -38,6 +38,14 @@ public final class DiagnosticContext {
     private final String exceptionAnalysis;
     private final String containerAnalysis;
 
+    // JVM logs (Semeru/OpenJ9 specific)
+    private final String verboseGcLog;
+    private final String jitLog;
+    private final String javacoreDump;
+
+    // Prometheus metrics
+    private final String prometheusMetrics;
+
     private DiagnosticContext(Builder builder) {
         this.podName = builder.podName;
         this.containerName = builder.containerName;
@@ -52,6 +60,10 @@ public final class DiagnosticContext {
         this.threadAnalysis = builder.threadAnalysis;
         this.exceptionAnalysis = builder.exceptionAnalysis;
         this.containerAnalysis = builder.containerAnalysis;
+        this.verboseGcLog = builder.verboseGcLog;
+        this.jitLog = builder.jitLog;
+        this.javacoreDump = builder.javacoreDump;
+        this.prometheusMetrics = builder.prometheusMetrics;
     }
 
     // Getters
@@ -108,6 +120,22 @@ public final class DiagnosticContext {
         return containerAnalysis;
     }
 
+    public String getVerboseGcLog() {
+        return verboseGcLog;
+    }
+
+    public String getJitLog() {
+        return jitLog;
+    }
+
+    public String getJavacoreDump() {
+        return javacoreDump;
+    }
+
+    public String getPrometheusMetrics() {
+        return prometheusMetrics;
+    }
+
     /**
      * Checks if any Kubernetes context was collected.
      *
@@ -140,12 +168,31 @@ public final class DiagnosticContext {
     }
 
     /**
+     * Checks if any JVM logs were collected.
+     *
+     * @return true if any JVM log is present
+     */
+    public boolean hasJvmLogs() {
+        return isNotBlank(verboseGcLog) || isNotBlank(jitLog) || isNotBlank(javacoreDump);
+    }
+
+    /**
+     * Checks if Prometheus metrics were collected.
+     *
+     * @return true if metrics are present
+     */
+    public boolean hasPrometheusMetrics() {
+        return isNotBlank(prometheusMetrics);
+    }
+
+    /**
      * Checks if any diagnostic context was collected.
      *
      * @return true if any context field is non-null and non-blank
      */
     public boolean hasAnyContext() {
-        return hasKubernetesContext() || hasKruizeContext() || hasCryostatContext();
+        return hasKubernetesContext() || hasKruizeContext() || hasCryostatContext()
+            || hasJvmLogs() || hasPrometheusMetrics();
     }
 
     /**
@@ -185,6 +232,14 @@ public final class DiagnosticContext {
         appendSection(sb, ContextConstants.SECTION_THREAD_ANALYSIS, threadAnalysis);
         appendSection(sb, ContextConstants.SECTION_EXCEPTION_ANALYSIS, exceptionAnalysis);
         appendSection(sb, ContextConstants.SECTION_CONTAINER_ANALYSIS, containerAnalysis);
+
+        // JVM logs (Semeru/OpenJ9)
+        appendSection(sb, ContextConstants.SECTION_VERBOSEGC_LOG, verboseGcLog);
+        appendSection(sb, ContextConstants.SECTION_JIT_LOG, jitLog);
+        appendSection(sb, ContextConstants.SECTION_JAVACORE_DUMP, javacoreDump);
+
+        // Prometheus metrics
+        appendSection(sb, ContextConstants.SECTION_PROMETHEUS_METRICS, prometheusMetrics);
 
         return sb.toString();
     }
@@ -241,6 +296,10 @@ public final class DiagnosticContext {
         private String threadAnalysis;
         private String exceptionAnalysis;
         private String containerAnalysis;
+        private String verboseGcLog;
+        private String jitLog;
+        private String javacoreDump;
+        private String prometheusMetrics;
 
         private Builder() {}
 
@@ -306,6 +365,26 @@ public final class DiagnosticContext {
 
         public Builder containerAnalysis(String containerAnalysis) {
             this.containerAnalysis = containerAnalysis;
+            return this;
+        }
+
+        public Builder verboseGcLog(String verboseGcLog) {
+            this.verboseGcLog = verboseGcLog;
+            return this;
+        }
+
+        public Builder jitLog(String jitLog) {
+            this.jitLog = jitLog;
+            return this;
+        }
+
+        public Builder javacoreDump(String javacoreDump) {
+            this.javacoreDump = javacoreDump;
+            return this;
+        }
+
+        public Builder prometheusMetrics(String prometheusMetrics) {
+            this.prometheusMetrics = prometheusMetrics;
             return this;
         }
 

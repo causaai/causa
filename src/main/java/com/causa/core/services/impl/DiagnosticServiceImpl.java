@@ -9,7 +9,9 @@ import com.causa.common.constants.McpConstants.LogFields;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
 import com.causa.config.LLMConfig;
+import com.causa.config.PrometheusConfig;
 import com.causa.core.domain.Alert;
+import com.causa.core.ports.PrometheusClient;
 import com.causa.core.domain.Diagnostic;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
@@ -46,6 +48,8 @@ public class DiagnosticServiceImpl implements DiagnosticService {
 
     private final DiagnosticRepository diagnosticRepository;
     private final McpContextCollector mcpContextCollector;
+    private final PrometheusClient prometheusClient;
+    private final PrometheusConfig prometheusConfig;
     private final RcaPromptBuilder rcaPromptBuilder;
     private final PromptSender promptSender;
     private final LLMConfig llmConfig;
@@ -55,6 +59,8 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     @Inject
     public DiagnosticServiceImpl(DiagnosticRepository diagnosticRepository,
                                   McpContextCollector mcpContextCollector,
+                                  PrometheusClient prometheusClient,
+                                  PrometheusConfig prometheusConfig,
                                   RcaPromptBuilder rcaPromptBuilder,
                                   PromptSender promptSender,
                                   LLMConfig llmConfig,
@@ -62,6 +68,8 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                                   Validator validator) {
         this.diagnosticRepository = diagnosticRepository;
         this.mcpContextCollector = mcpContextCollector;
+        this.prometheusClient = prometheusClient;
+        this.prometheusConfig = prometheusConfig;
         this.rcaPromptBuilder = rcaPromptBuilder;
         this.promptSender = promptSender;
         this.llmConfig = llmConfig;
@@ -98,8 +106,11 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             .log();
 
 
-        // For now, just call placeholder methods synchronously
+        // Collect MCP context (Kubernetes, Kruize, Cryostat, JVM logs)
         DiagnosticContext diagnosticContext = collectContext(alert);
+
+        // Enrich with Prometheus metrics
+        diagnosticContext = enrichWithPrometheusMetrics(diagnosticContext, alert);
 
         // Log the complete collected context for visibility
         log.info(LogMessages.Diagnostic.CONTEXT_COLLECTED)
@@ -108,6 +119,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             .field(LogFields.HAS_K8S_CONTEXT, diagnosticContext.hasKubernetesContext())
             .field(LogFields.HAS_KRUIZE_CONTEXT, diagnosticContext.hasKruizeContext())
             .field(LogFields.HAS_CRYOSTAT_CONTEXT, diagnosticContext.hasCryostatContext())
+            .field("hasJvmLogs", diagnosticContext.hasJvmLogs())
             .log();
 
         String contextForLLM = diagnosticContext.toString();
@@ -123,7 +135,17 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             .log();
         
         RootCauseAnalysis rca = performRootCauseAnalysis(alert, contextForLLM);
-        
+
+        try {
+            log.info("RCA GENERATED")
+                    .field("rca", objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(rca))
+                    .log();
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            log.info("RCA GENERATED")
+                    .field("rca", rca)
+                    .log();
+        }
+
         // TODO: Store RCA result in database
         // TODO: validateRca(alert, rca);
         // determineDiagnosisType(alert);
@@ -298,5 +320,130 @@ public class DiagnosticServiceImpl implements DiagnosticService {
         // - Evidence assertion verification
         // - Rule-based metric validation
         // - Optional critic LLM pass
+    }
+
+    /**
+     * Enriches diagnostic context with Prometheus time-series metrics.
+     *
+     * <p>Collects memory, CPU, and GC metrics for the specified lookback period.
+     * <p>Returns a new DiagnosticContext with Prometheus metrics added.
+     *
+     * @param context the existing context from MCP servers
+     * @param alert the alert being diagnosed
+     * @return enriched context with Prometheus metrics, or original context if collection fails
+     */
+    private DiagnosticContext enrichWithPrometheusMetrics(DiagnosticContext context, Alert alert) {
+        if (!prometheusConfig.enabled()) {
+            log.debug("Prometheus metrics collection is disabled");
+            return context;
+        }
+
+        try {
+            // Extract Prometheus URL from alert's generatorURL
+            String prometheusUrl = extractPrometheusUrl(alert);
+            if (prometheusUrl == null) {
+                log.debug("No Prometheus URL available for metrics collection")
+                    .field("alertId", alert.getAlertId())
+                    .log();
+                return context;
+            }
+
+            // Collect metrics
+            String metrics = prometheusClient.collectMemoryMetrics(
+                prometheusUrl,
+                alert.getNamespace(),
+                alert.getPodName(),
+                alert.getContainerName(),
+                alert.getTimestamp(),
+                prometheusConfig.lookbackHours()
+            );
+
+            if (metrics != null && !metrics.isBlank()) {
+                log.info("Prometheus metrics collected")
+                    .field("alertId", alert.getAlertId())
+                    .field("podName", alert.getPodName())
+                    .field("prometheusUrl", prometheusUrl)
+                    .log();
+
+                // Create new context with Prometheus metrics
+                return DiagnosticContext.builder()
+                    .podName(context.getPodName())
+                    .containerName(context.getContainerName())
+                    .namespace(context.getNamespace())
+                    .podStatus(context.getPodStatus())
+                    .podEvents(context.getPodEvents())
+                    .podLogs(context.getPodLogs())
+                    .costRecommendations(context.getCostRecommendations())
+                    .performanceRecommendations(context.getPerformanceRecommendations())
+                    .gcAnalysis(context.getGcAnalysis())
+                    .memoryAnalysis(context.getMemoryAnalysis())
+                    .threadAnalysis(context.getThreadAnalysis())
+                    .exceptionAnalysis(context.getExceptionAnalysis())
+                    .containerAnalysis(context.getContainerAnalysis())
+                    .verboseGcLog(context.getVerboseGcLog())
+                    .jitLog(context.getJitLog())
+                    .javacoreDump(context.getJavacoreDump())
+                    .prometheusMetrics(metrics)  // Add Prometheus metrics
+                    .build();
+            }
+
+            return context;
+
+        } catch (Exception e) {
+            log.warn("Failed to enrich context with Prometheus metrics")
+                .field("alertId", alert.getAlertId())
+                .field("error", e.getMessage())
+                .log();
+            return context;  // Return original context on failure
+        }
+    }
+
+    /**
+     * Extracts metrics URL from alert.
+     *
+     * <p>Tries in order:
+     * <ol>
+     *   <li>'metrics_url' label (application /metrics endpoint)</li>
+     *   <li>'prometheus_url' label (custom override)</li>
+     *   <li>generatorURL from alert (cluster Prometheus - may require auth)</li>
+     *   <li>Config override</li>
+     * </ol>
+     *
+     * @param alert the alert
+     * @return metrics URL (either app /metrics or Prometheus API), or null if not available
+     */
+    private String extractPrometheusUrl(Alert alert) {
+        if (alert.getLabels() != null) {
+            // Prefer app metrics endpoint (no auth required)
+            String metricsUrl = alert.getLabels().get("metrics_url");
+            if (metricsUrl != null && !metricsUrl.isBlank()) {
+                log.debug("Using application metrics endpoint from alert")
+                    .field("metricsUrl", metricsUrl)
+                    .log();
+                return metricsUrl;
+            }
+
+            // Try custom prometheus_url
+            String prometheusUrl = alert.getLabels().get("prometheus_url");
+            if (prometheusUrl != null && !prometheusUrl.isBlank()) {
+                return prometheusUrl;
+            }
+
+            // Try generatorURL from labels (AlertMapper stores it there)
+            String generatorUrl = alert.getLabels().get("generatorURL");
+            if (generatorUrl != null && !generatorUrl.isBlank()) {
+                String extracted = prometheusClient.extractPrometheusUrl(generatorUrl);
+                if (extracted != null) {
+                    log.debug("Extracted Prometheus URL from generatorURL")
+                        .field("generatorURL", generatorUrl)
+                        .field("extracted", extracted)
+                        .log();
+                    return extracted;
+                }
+            }
+        }
+
+        // Fallback to config override
+        return prometheusConfig.urlOverride().orElse(null);
     }
 }

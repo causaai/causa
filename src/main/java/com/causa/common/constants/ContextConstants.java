@@ -39,6 +39,14 @@ public final class ContextConstants {
     public static final String SECTION_EXCEPTION_ANALYSIS = "EXCEPTION ANALYSIS (Cryostat JFR)";
     public static final String SECTION_CONTAINER_ANALYSIS = "CONTAINER RESOURCE ANALYSIS (Cryostat JFR)";
 
+    // JVM log sections
+    public static final String SECTION_VERBOSEGC_LOG = "VERBOSE GC LOG (OpenJ9/Semeru)";
+    public static final String SECTION_JIT_LOG = "JIT COMPILATION LOG (OpenJ9/Semeru)";
+    public static final String SECTION_JAVACORE_DUMP = "THREAD DUMP (Javacore)";
+
+    // Prometheus metrics section
+    public static final String SECTION_PROMETHEUS_METRICS = "PROMETHEUS TIME-SERIES METRICS";
+
     // Identity field labels
     public static final String LABEL_POD = "Pod";
     public static final String LABEL_CONTAINER = "Container";

@@ -58,8 +58,13 @@ public class AlertMapper {
      * @return the domain Alert object
      */
     public Alert toDomain(AlertWebhookRequest.AlertItem item) {
-        Map<String, String> labels = item.getLabels();
+        Map<String, String> labels = new java.util.HashMap<>(item.getLabels());
         Map<String, String> annotations = item.getAnnotations();
+
+        // Add generatorURL to labels for Prometheus integration
+        if (item.getGeneratorURL() != null && !item.getGeneratorURL().isBlank()) {
+            labels.put("generatorURL", item.getGeneratorURL());
+        }
 
         // Required fields (validated before this is called)
         String alertName = labels.get(AlertConstants.Labels.ALERT_NAME);

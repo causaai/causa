@@ -74,6 +74,7 @@ public final class McpConstants {
         // Kubernetes MCP tools
         public static final String PODS_GET = "pods_get";
         public static final String PODS_LOG = "pods_log";
+        public static final String PODS_EXEC = "pods_exec";
         public static final String EVENTS_LIST = "events_list";
 
         // Kruize MCP tools
@@ -105,6 +106,36 @@ public final class McpConstants {
 
         // Cryostat arguments
         public static final String POD_NAME = "pod_name";
+    }
+
+    /**
+     * JVM log collection constants
+     */
+    public static final class JvmLogs {
+        private JvmLogs() {}
+
+        // Standard log directory in Liberty/Semeru containers
+        public static final String LOG_DIRECTORY = "/logs";
+
+        // Dump directory for thread dumps and heap dumps
+        public static final String DUMP_DIRECTORY = "/dumps";
+
+        // Log file patterns
+        public static final String VERBOSEGC_PATTERN = "verbosegc*.log";
+        public static final String JIT_LOG_PATTERN = "jit.log*";
+
+        // Dump file patterns
+        public static final String JAVACORE_PATTERN = "javacore*.txt";
+        public static final String HEAPDUMP_PATTERN = "heapdump*.phd";
+
+        // Default number of lines to collect from each log
+        public static final int DEFAULT_LOG_LINES = 50;
+
+        // Lines to collect from thread dumps (javacores can be large)
+        public static final int JAVACORE_LINES = 100;
+
+        // Maximum total lines to prevent overwhelming context
+        public static final int MAX_TOTAL_LINES = 200;
     }
 
     /**

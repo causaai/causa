@@ -47,7 +47,8 @@ data:
   # MCP Kruize Configuration (Resource Optimization Recommendations)
   CAUSA_MCP_KRUIZE_ENDPOINT: "http://kruize-mcp-server-service.openshift-tuning.svc.cluster.local:8080"
   CAUSA_MCP_KRUIZE_HEALTH_PATH: "/q/health/ready"
-  CAUSA_MCP_KRUIZE_TIMEOUT: "10000"
+  # Increased timeout: Kruize does internal filtering which can take 15-20 seconds
+  CAUSA_MCP_KRUIZE_TIMEOUT: "30000"
 
   # MCP Cryostat Configuration (JFR-based Java Runtime Analysis)
   CAUSA_MCP_CRYOSTAT_ENDPOINT: "http://cryostat-mcp.openshift-tuning.svc.cluster.local:8000"
@@ -56,4 +57,22 @@ data:
   CAUSA_MCP_CRYOSTAT_TIMEOUT: "15000"
   CAUSA_MCP_CRYOSTAT_RETRY_DELAY: "5000"
   CAUSA_MCP_CRYOSTAT_MAX_RETRIES: "3"
+
+  # Prometheus Configuration (Time-Series Metrics for RCA)
+  # Enable/disable Prometheus metrics collection
+  CAUSA_PROMETHEUS_ENABLED: "true"
+
+  # HTTP timeout for Prometheus API calls (milliseconds)
+  CAUSA_PROMETHEUS_TIMEOUT: "10000"
+
+  # How many hours of historical metrics to collect before alert time
+  CAUSA_PROMETHEUS_LOOKBACK_HOURS: "2"
+
+  # Maximum data points per metric (prevents overwhelming LLM)
+  CAUSA_PROMETHEUS_MAX_DATA_POINTS: "60"
+
+  # Optional: Override Prometheus URL (leave empty to auto-detect from alert.generatorURL)
+  # Internal DNS: http://prometheus-k8s.openshift-monitoring.svc.cluster.local:9091
+  # External Route: https://prometheus-k8s-openshift-monitoring.apps.cluster-zzptd.zzptd.sandbox177.opentlc.com
+  CAUSA_PROMETHEUS_URL: "http://prometheus-k8s.openshift-monitoring.svc.cluster.local:9091"
 

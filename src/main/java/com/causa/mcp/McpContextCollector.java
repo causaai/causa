@@ -105,6 +105,11 @@ public class McpContextCollector {
             collectCryostatContext(contextBuilder, alert);
         }
 
+        // JVM logs collection (optional, Semeru/OpenJ9 specific)
+        if (alert.getPodName() != null && !alert.getPodName().isBlank()) {
+            collectJvmLogs(contextBuilder, alert);
+        }
+
         DiagnosticContext context = contextBuilder.build();
 
         log.info(LogMessages.Mcp.MCP_CONTEXT_COLLECTION_COMPLETE)
@@ -112,6 +117,7 @@ public class McpContextCollector {
             .field(McpConstants.LogFields.HAS_K8S_CONTEXT, context.hasKubernetesContext())
             .field(McpConstants.LogFields.HAS_KRUIZE_CONTEXT, context.hasKruizeContext())
             .field(McpConstants.LogFields.HAS_CRYOSTAT_CONTEXT, context.hasCryostatContext())
+            .field("hasJvmLogs", context.hasJvmLogs())
             .log();
 
         return context;
@@ -983,5 +989,145 @@ public class McpContextCollector {
             }
         }
         return null;
+    }
+
+    /**
+     * Collects JVM logs from Semeru/OpenJ9 applications.
+     * Uses oc exec to retrieve verbosegc, JIT logs, etc. from /logs directory.
+     * This is optional and will fail gracefully if logs don't exist.
+     *
+     * @param builder the context builder to populate
+     * @param alert the alert
+     */
+    private void collectJvmLogs(DiagnosticContext.Builder builder, Alert alert) {
+        String podName = alert.getPodName();
+        String namespace = alert.getNamespace();
+        String containerName = alert.getContainerName();
+
+        // Collect verbose GC log
+        String verboseGcLog = collectPodFileLog(
+            podName,
+            namespace,
+            containerName,
+            McpConstants.JvmLogs.LOG_DIRECTORY + "/" + McpConstants.JvmLogs.VERBOSEGC_PATTERN,
+            McpConstants.JvmLogs.DEFAULT_LOG_LINES,
+            alert.getAlertId()
+        );
+        builder.verboseGcLog(verboseGcLog);
+
+        // Collect JIT log
+        String jitLog = collectPodFileLog(
+            podName,
+            namespace,
+            containerName,
+            McpConstants.JvmLogs.LOG_DIRECTORY + "/" + McpConstants.JvmLogs.JIT_LOG_PATTERN,
+            McpConstants.JvmLogs.DEFAULT_LOG_LINES,
+            alert.getAlertId()
+        );
+        builder.jitLog(jitLog);
+
+        // Collect most recent javacore (thread dump)
+        String javacoreDump = collectPodFileLog(
+            podName,
+            namespace,
+            containerName,
+            McpConstants.JvmLogs.DUMP_DIRECTORY + "/" + McpConstants.JvmLogs.JAVACORE_PATTERN,
+            McpConstants.JvmLogs.JAVACORE_LINES,
+            alert.getAlertId()
+        );
+        builder.javacoreDump(javacoreDump);
+
+        // Log summary of what was collected
+        boolean anyJvmLogsCollected = verboseGcLog != null || jitLog != null || javacoreDump != null;
+        if (anyJvmLogsCollected) {
+            log.info("JVM logs collected from pod")
+                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+                .field(McpConstants.LogFields.POD_NAME, podName)
+                .field("hasVerboseGc", verboseGcLog != null)
+                .field("hasJitLog", jitLog != null)
+                .field("hasJavacore", javacoreDump != null)
+                .log();
+        }
+    }
+
+    /**
+     * Collects log file content from a pod using oc exec via Kubernetes MCP.
+     * Uses shell commands to find and tail the log file.
+     *
+     * @param podName the pod name
+     * @param namespace the namespace
+     * @param containerName the container name (nullable)
+     * @param logFilePattern the log file path pattern (e.g., /logs/verbosegc*.log)
+     * @param tailLines number of lines to tail
+     * @param alertId the alert ID for logging
+     * @return the log content, or null if not found/error
+     */
+    private String collectPodFileLog(String podName, String namespace, String containerName,
+                                     String logFilePattern, int tailLines, String alertId) {
+        try {
+            String sessionId = initializeMcpSession(
+                mcpConfig.kubernetes().endpoint() + McpConstants.Paths.MCP_ENDPOINT,
+                mcpConfig.kubernetes().timeoutMs()
+            );
+
+            // Build the shell command to find and tail the log file
+            // Use ls to find the first matching file, then tail it
+            String findCmd = "ls " + logFilePattern + " 2>/dev/null | head -1";
+            String command = "file=$(" + findCmd + ") && [ -n \"$file\" ] && head -" + tailLines + " \"$file\" || echo ''";
+
+            ObjectNode arguments = objectMapper.createObjectNode();
+            arguments.put(McpConstants.Arguments.NAME, podName);
+            arguments.put(McpConstants.Arguments.NAMESPACE, namespace);
+            if (containerName != null && !containerName.isBlank()) {
+                arguments.put(McpConstants.Arguments.CONTAINER, containerName);
+            }
+
+            // Command must be an array of strings for Kubernetes exec
+            // Use /bin/sh -c to execute the shell command
+            ArrayNode commandArray = objectMapper.createArrayNode();
+            commandArray.add("/bin/sh");
+            commandArray.add("-c");
+            commandArray.add(command);
+            arguments.set("command", commandArray);
+
+            JsonNode result = callMcpTool(
+                mcpConfig.kubernetes().endpoint() + McpConstants.Paths.MCP_ENDPOINT,
+                sessionId,
+                McpConstants.Tools.PODS_EXEC,
+                arguments,
+                mcpConfig.kubernetes().timeoutMs()
+            );
+
+            String logContent = extractTextFromContent(result);
+
+            // Return null if empty or "No Data Available"
+            if (logContent == null || logContent.trim().isEmpty() ||
+                logContent.equals(McpConstants.Defaults.NO_DATA_AVAILABLE)) {
+                return null;
+            }
+
+            return logContent.trim();
+
+        } catch (Exception e) {
+            // Log at debug level - pod may have been terminated/replaced after alert fired
+            // This is expected behavior during rolling updates
+            String errorMsg = e.getMessage();
+            if (errorMsg != null && (errorMsg.contains("not found") || errorMsg.contains("container not found"))) {
+                log.debug("Pod or container no longer exists (likely terminated during rollout)")
+                    .field("logFilePattern", logFilePattern)
+                    .field(McpConstants.LogFields.POD_NAME, podName)
+                    .field(McpConstants.LogFields.CONTAINER, containerName)
+                    .field(McpConstants.LogFields.ALERT_ID, alertId)
+                    .log();
+            } else {
+                log.debug("Failed to collect JVM log file")
+                    .field("logFilePattern", logFilePattern)
+                    .field(McpConstants.LogFields.POD_NAME, podName)
+                    .field(McpConstants.LogFields.ALERT_ID, alertId)
+                    .field(McpConstants.LogFields.ERROR, errorMsg)
+                    .log();
+            }
+            return null;
+        }
     }
 }
