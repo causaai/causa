@@ -108,6 +108,7 @@ public class McpContextCollector {
         // JVM logs collection (optional, Semeru/OpenJ9 specific)
         if (alert.getPodName() != null && !alert.getPodName().isBlank()) {
             collectJvmLogs(contextBuilder, alert);
+            collectSharedClassCacheStats(contextBuilder, alert);
         }
 
         DiagnosticContext context = contextBuilder.build();
@@ -1004,41 +1005,57 @@ public class McpContextCollector {
         String namespace = alert.getNamespace();
         String containerName = alert.getContainerName();
 
-        // Collect verbose GC log
+        // Collect verbose GC log (use tail to get recent GC cycles, not initialization)
         String verboseGcLog = collectPodFileLog(
             podName,
             namespace,
             containerName,
             McpConstants.JvmLogs.LOG_DIRECTORY + "/" + McpConstants.JvmLogs.VERBOSEGC_PATTERN,
-            McpConstants.JvmLogs.DEFAULT_LOG_LINES,
+            McpConstants.JvmLogs.VERBOSEGC_LINES,
+            true,  // useTail = true for recent GC events
             alert.getAlertId()
         );
         builder.verboseGcLog(verboseGcLog);
 
-        // Collect JIT log
+        // Collect JIT log (use tail to get recent compilations)
         String jitLog = collectPodFileLog(
             podName,
             namespace,
             containerName,
             McpConstants.JvmLogs.LOG_DIRECTORY + "/" + McpConstants.JvmLogs.JIT_LOG_PATTERN,
-            McpConstants.JvmLogs.DEFAULT_LOG_LINES,
+            McpConstants.JvmLogs.JIT_LOG_LINES,
+            true,  // useTail = true for recent compilations
             alert.getAlertId()
         );
         builder.jitLog(jitLog);
 
-        // Collect most recent javacore (thread dump)
+        // Collect Liberty trace.log (use tail to get recent WAS.j2c traces)
+        // Contains detailed connection pool traces when traceSpecification includes WAS.j2c*=fine
+        String traceLog = collectPodFileLog(
+            podName,
+            namespace,
+            containerName,
+            McpConstants.JvmLogs.LOG_DIRECTORY + "/" + McpConstants.JvmLogs.TRACE_LOG_PATTERN,
+            McpConstants.JvmLogs.TRACE_LOG_LINES,
+            true,  // useTail = true for recent connection timeout events
+            alert.getAlertId()
+        );
+        builder.traceLog(traceLog);
+
+        // Collect most recent javacore (thread dump) - use head since it's a snapshot
         String javacoreDump = collectPodFileLog(
             podName,
             namespace,
             containerName,
             McpConstants.JvmLogs.DUMP_DIRECTORY + "/" + McpConstants.JvmLogs.JAVACORE_PATTERN,
             McpConstants.JvmLogs.JAVACORE_LINES,
+            false,  // useTail = false, javacores are snapshots, read from beginning
             alert.getAlertId()
         );
         builder.javacoreDump(javacoreDump);
 
         // Log summary of what was collected
-        boolean anyJvmLogsCollected = verboseGcLog != null || jitLog != null || javacoreDump != null;
+        boolean anyJvmLogsCollected = verboseGcLog != null || jitLog != null || javacoreDump != null || traceLog != null;
         if (anyJvmLogsCollected) {
             log.info("JVM logs collected from pod")
                 .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
@@ -1046,34 +1063,36 @@ public class McpContextCollector {
                 .field("hasVerboseGc", verboseGcLog != null)
                 .field("hasJitLog", jitLog != null)
                 .field("hasJavacore", javacoreDump != null)
+                .field("hasTraceLog", traceLog != null)
                 .log();
         }
     }
 
     /**
      * Collects log file content from a pod using oc exec via Kubernetes MCP.
-     * Uses shell commands to find and tail the log file.
+     * Uses shell commands to find and head/tail the log file.
      *
      * @param podName the pod name
      * @param namespace the namespace
      * @param containerName the container name (nullable)
      * @param logFilePattern the log file path pattern (e.g., /logs/verbosegc*.log)
-     * @param tailLines number of lines to tail
+     * @param numLines number of lines to collect
+     * @param useTail true to use tail (last N lines), false to use head (first N lines)
      * @param alertId the alert ID for logging
      * @return the log content, or null if not found/error
      */
     private String collectPodFileLog(String podName, String namespace, String containerName,
-                                     String logFilePattern, int tailLines, String alertId) {
+                                     String logFilePattern, int numLines, boolean useTail, String alertId) {
         try {
             String sessionId = initializeMcpSession(
                 mcpConfig.kubernetes().endpoint() + McpConstants.Paths.MCP_ENDPOINT,
                 mcpConfig.kubernetes().timeoutMs()
             );
 
-            // Build the shell command to find and tail the log file
-            // Use ls to find the first matching file, then tail it
+            // Build the shell command to find and head/tail the log file
             String findCmd = "ls " + logFilePattern + " 2>/dev/null | head -1";
-            String command = "file=$(" + findCmd + ") && [ -n \"$file\" ] && head -" + tailLines + " \"$file\" || echo ''";
+            String readCmd = useTail ? "tail -" + numLines : "head -" + numLines;
+            String command = "file=$(" + findCmd + ") && [ -n \"$file\" ] && " + readCmd + " \"$file\" || echo ''";
 
             ObjectNode arguments = objectMapper.createObjectNode();
             arguments.put(McpConstants.Arguments.NAME, podName);
@@ -1128,6 +1147,85 @@ public class McpContextCollector {
                     .log();
             }
             return null;
+        }
+    }
+
+    /**
+     * Collects OpenJ9 shared class cache statistics.
+     * Lists cache files and runs 'java -Xshareclasses:printStats' to retrieve cache metrics.
+     * The cache file format is: C<platform>_<name>_G<generation>L<layer>
+     * Example: C290M21F1A64P_liberty_G45L00 (64M cache for 'liberty' name)
+     *
+     * @param builder the context builder to populate
+     * @param alert the alert
+     */
+    private void collectSharedClassCacheStats(DiagnosticContext.Builder builder, Alert alert) {
+        String podName = alert.getPodName();
+        String namespace = alert.getNamespace();
+        String containerName = alert.getContainerName();
+
+        try {
+            String sessionId = initializeMcpSession(
+                mcpConfig.kubernetes().endpoint() + McpConstants.Paths.MCP_ENDPOINT,
+                mcpConfig.kubernetes().timeoutMs()
+            );
+
+            // Build command to:
+            // 1. Check if cache directory exists
+            // 2. List cache files with size info (ls -lh shows allocated size)
+            // 3. Print detailed cache statistics (printStats shows usage, AOT data, etc.)
+            String command = "if [ -d " + McpConstants.JvmLogs.SHARED_CLASS_CACHE_DIR + " ]; then " +
+                "echo '=== Shared Class Cache Files (ls -lh " + McpConstants.JvmLogs.SHARED_CLASS_CACHE_DIR + ") ===' && " +
+                "ls -lh " + McpConstants.JvmLogs.SHARED_CLASS_CACHE_DIR + " && " +
+                "echo '' && echo '=== Cache Statistics (printStats) ===' && " +
+                "java -Xshareclasses:printStats=name=" + McpConstants.JvmLogs.SHARED_CLASS_CACHE_NAME +
+                ",cacheDir=" + McpConstants.JvmLogs.SHARED_CLASS_CACHE_DIR + " 2>&1; " +
+                "else echo 'Shared class cache directory not found'; fi";
+
+            ObjectNode arguments = objectMapper.createObjectNode();
+            arguments.put(McpConstants.Arguments.NAME, podName);
+            arguments.put(McpConstants.Arguments.NAMESPACE, namespace);
+            if (containerName != null && !containerName.isBlank()) {
+                arguments.put(McpConstants.Arguments.CONTAINER, containerName);
+            }
+
+            // Command must be an array for Kubernetes exec
+            ArrayNode commandArray = objectMapper.createArrayNode();
+            commandArray.add("/bin/sh");
+            commandArray.add("-c");
+            commandArray.add(command);
+            arguments.set("command", commandArray);
+
+            JsonNode result = callMcpTool(
+                mcpConfig.kubernetes().endpoint() + McpConstants.Paths.MCP_ENDPOINT,
+                sessionId,
+                McpConstants.Tools.PODS_EXEC,
+                arguments,
+                mcpConfig.kubernetes().timeoutMs()
+            );
+
+            String cacheStats = extractTextFromContent(result);
+
+            // Set if we got any output (even if just the file listing)
+            // Cache file existence alone is valuable diagnostic info (shows cache is enabled)
+            if (cacheStats != null && !cacheStats.trim().isEmpty() &&
+                !cacheStats.contains("directory not found") &&
+                !cacheStats.equals(McpConstants.Defaults.NO_DATA_AVAILABLE)) {
+                builder.sharedClassCacheStats(cacheStats.trim());
+
+                log.info("Shared class cache stats collected")
+                    .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+                    .field(McpConstants.LogFields.POD_NAME, podName)
+                    .log();
+            }
+
+        } catch (Exception e) {
+            // Debug level - cache may not exist in all environments (not all apps use OpenJ9/Semeru)
+            log.debug("Failed to collect shared class cache stats")
+                .field(McpConstants.LogFields.POD_NAME, podName)
+                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+                .field(McpConstants.LogFields.ERROR, e.getMessage())
+                .log();
         }
     }
 }

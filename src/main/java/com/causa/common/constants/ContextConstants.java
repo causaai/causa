@@ -43,6 +43,10 @@ public final class ContextConstants {
     public static final String SECTION_VERBOSEGC_LOG = "VERBOSE GC LOG (OpenJ9/Semeru)";
     public static final String SECTION_JIT_LOG = "JIT COMPILATION LOG (OpenJ9/Semeru)";
     public static final String SECTION_JAVACORE_DUMP = "THREAD DUMP (Javacore)";
+    public static final String SECTION_SHARED_CLASS_CACHE = "SHARED CLASS CACHE STATS (OpenJ9/Semeru)";
+
+    // Liberty application log sections
+    public static final String SECTION_TRACE_LOG = "LIBERTY TRACE LOG (WAS.j2c/threading/jca)";
 
     // Prometheus metrics section
     public static final String SECTION_PROMETHEUS_METRICS = "PROMETHEUS TIME-SERIES METRICS";

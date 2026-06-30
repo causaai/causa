@@ -6,12 +6,11 @@ labels:
       app.kubernetes.io/managed-by: kustomize
 
 resources:
-  - namespace.yaml
   - serviceaccount.yaml
   - configmap.yaml
   - deployment.yaml
   - service.yaml
 
 images:
-  - name: quay.io/rh-ee-shesaxen/causa-backend
-    newTag: latest_mvp
+  - name: quay.io/shbirada/causa-backend
+    newTag: jvm_logging_v7

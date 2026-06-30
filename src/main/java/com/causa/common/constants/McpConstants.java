@@ -120,22 +120,34 @@ public final class McpConstants {
         // Dump directory for thread dumps and heap dumps
         public static final String DUMP_DIRECTORY = "/dumps";
 
+        // Shared class cache directory (OpenJ9)
+        public static final String SHARED_CLASS_CACHE_DIR = "/tmp/sharedcache";
+        public static final String SHARED_CLASS_CACHE_NAME = "liberty";
+
         // Log file patterns
         public static final String VERBOSEGC_PATTERN = "verbosegc*.log";
         public static final String JIT_LOG_PATTERN = "jit.log*";
+        public static final String TRACE_LOG_PATTERN = "trace.log*";
 
         // Dump file patterns
         public static final String JAVACORE_PATTERN = "javacore*.txt";
-        public static final String HEAPDUMP_PATTERN = "heapdump*.phd";
 
-        // Default number of lines to collect from each log
+        // Lines to collect from verbose GC log (recent GC events - use tail)
+        // ~10-20 lines per GC cycle, so 100 lines = 5-10 recent cycles
+        public static final int VERBOSEGC_LINES = 100;
+
+        // Lines to collect from JIT log (recent compilations - use tail)
+        public static final int JIT_LOG_LINES = 50;
+
+        // Lines to collect from thread dumps (snapshot - use head)
+        public static final int JAVACORE_LINES = 200;
+
+        // Lines to collect from Liberty trace.log (connection pool traces - use tail)
+        // Captures WAS.j2c connection timeout patterns
+        public static final int TRACE_LOG_LINES = 100;
+
+        // Default fallback
         public static final int DEFAULT_LOG_LINES = 50;
-
-        // Lines to collect from thread dumps (javacores can be large)
-        public static final int JAVACORE_LINES = 100;
-
-        // Maximum total lines to prevent overwhelming context
-        public static final int MAX_TOTAL_LINES = 200;
     }
 
     /**

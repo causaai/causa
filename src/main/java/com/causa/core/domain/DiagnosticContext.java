@@ -42,6 +42,10 @@ public final class DiagnosticContext {
     private final String verboseGcLog;
     private final String jitLog;
     private final String javacoreDump;
+    private final String sharedClassCacheStats;
+
+    // Liberty application logs
+    private final String traceLog;
 
     // Prometheus metrics
     private final String prometheusMetrics;
@@ -63,6 +67,8 @@ public final class DiagnosticContext {
         this.verboseGcLog = builder.verboseGcLog;
         this.jitLog = builder.jitLog;
         this.javacoreDump = builder.javacoreDump;
+        this.sharedClassCacheStats = builder.sharedClassCacheStats;
+        this.traceLog = builder.traceLog;
         this.prometheusMetrics = builder.prometheusMetrics;
     }
 
@@ -132,6 +138,14 @@ public final class DiagnosticContext {
         return javacoreDump;
     }
 
+    public String getSharedClassCacheStats() {
+        return sharedClassCacheStats;
+    }
+
+    public String getTraceLog() {
+        return traceLog;
+    }
+
     public String getPrometheusMetrics() {
         return prometheusMetrics;
     }
@@ -173,7 +187,8 @@ public final class DiagnosticContext {
      * @return true if any JVM log is present
      */
     public boolean hasJvmLogs() {
-        return isNotBlank(verboseGcLog) || isNotBlank(jitLog) || isNotBlank(javacoreDump);
+        return isNotBlank(verboseGcLog) || isNotBlank(jitLog) || isNotBlank(javacoreDump)
+            || isNotBlank(sharedClassCacheStats) || isNotBlank(traceLog);
     }
 
     /**
@@ -237,6 +252,10 @@ public final class DiagnosticContext {
         appendSection(sb, ContextConstants.SECTION_VERBOSEGC_LOG, verboseGcLog);
         appendSection(sb, ContextConstants.SECTION_JIT_LOG, jitLog);
         appendSection(sb, ContextConstants.SECTION_JAVACORE_DUMP, javacoreDump);
+        appendSection(sb, ContextConstants.SECTION_SHARED_CLASS_CACHE, sharedClassCacheStats);
+
+        // Liberty application logs
+        appendSection(sb, ContextConstants.SECTION_TRACE_LOG, traceLog);
 
         // Prometheus metrics
         appendSection(sb, ContextConstants.SECTION_PROMETHEUS_METRICS, prometheusMetrics);
@@ -299,6 +318,8 @@ public final class DiagnosticContext {
         private String verboseGcLog;
         private String jitLog;
         private String javacoreDump;
+        private String sharedClassCacheStats;
+        private String traceLog;
         private String prometheusMetrics;
 
         private Builder() {}
@@ -380,6 +401,16 @@ public final class DiagnosticContext {
 
         public Builder javacoreDump(String javacoreDump) {
             this.javacoreDump = javacoreDump;
+            return this;
+        }
+
+        public Builder sharedClassCacheStats(String sharedClassCacheStats) {
+            this.sharedClassCacheStats = sharedClassCacheStats;
+            return this;
+        }
+
+        public Builder traceLog(String traceLog) {
+            this.traceLog = traceLog;
             return this;
         }
 

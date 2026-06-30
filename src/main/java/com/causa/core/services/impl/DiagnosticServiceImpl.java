@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -283,6 +284,9 @@ public class DiagnosticServiceImpl implements DiagnosticService {
         // Parse JSON to RootCauseAnalysis
         RootCauseAnalysis rca = objectMapper.readValue(jsonText, RootCauseAnalysis.class);
 
+        // Clean up empty strings from arrays (defensive filter in case LLM doesn't follow prompt)
+        rca = cleanEmptyStrings(rca);
+
         // Validate the deserialized object
         // Note: Jackson deserialization does NOT trigger Bean Validation annotations automatically
         Set<ConstraintViolation<RootCauseAnalysis>> violations = validator.validate(rca);
@@ -296,6 +300,49 @@ public class DiagnosticServiceImpl implements DiagnosticService {
         }
 
         return rca;
+    }
+
+    /**
+     * Filters out empty strings from supporting_logs and evidences arrays.
+     * Defensive cleanup in case LLM doesn't follow prompt instructions.
+     *
+     * @param rca the parsed RCA object
+     * @return new RCA with empty strings filtered out
+     */
+    private RootCauseAnalysis cleanEmptyStrings(RootCauseAnalysis rca) {
+        if (rca == null) {
+            return null;
+        }
+
+        // Filter empty strings from supporting_logs
+        List<String> cleanedLogs = rca.supportingLogs() != null
+            ? rca.supportingLogs().stream()
+                .filter(log -> log != null && !log.trim().isEmpty())
+                .toList()
+            : List.of();
+
+        // Filter empty strings from evidences
+        List<String> cleanedEvidences = rca.evidences() != null
+            ? rca.evidences().stream()
+                .filter(evidence -> evidence != null && !evidence.trim().isEmpty())
+                .toList()
+            : List.of();
+
+        // Return new RCA with cleaned arrays
+        return new RootCauseAnalysis(
+            rca.issueTitle(),
+            rca.issueDescription(),
+            rca.technicalDescription(),
+            rca.anomalyType(),
+            rca.rootCause(),
+            cleanedLogs,
+            cleanedEvidences,
+            rca.possibleSolutions(),
+            rca.llmConfidenceScoreForRca(),
+            rca.llmConfidenceScoreForSolution(),
+            rca.confidenceSummary(),
+            rca.llmNotes()
+        );
     }
 
     /**
