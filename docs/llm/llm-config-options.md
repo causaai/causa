@@ -16,8 +16,12 @@ application.yml (causa.llm.*)
     ↓
 LLMConfig.java (@ConfigMapping)
     ↓
-Injected into ChatModelFactory & LangChainPromptSender
+Injected into ChatModelFactory, LangChainPromptSender & BobShellPromptSender
 ```
+
+> **Note — BOB Shell shares the same `LLMConfig` properties as other providers.**
+> `LLM_API_KEY`, `LLM_TIMEOUT_SECONDS`, and all standard inference parameters apply equally
+> to Claude (Anthropic / Vertex AI) and BOB Shell. There is no separate `BOB_*` config namespace.
 
 ---
 
@@ -34,7 +38,8 @@ Injected into ChatModelFactory & LangChainPromptSender
 **Valid Values:**
 - `anthropic` — Claude via direct Anthropic API (**✅ Implemented**)
 - `vertex-ai-anthropic` — Claude via Google Cloud Vertex AI (**✅ Implemented**)
-- `ibm-bob` — IBM Bob via OpenAI-compatible API (**🚧 Planned**)
+- `bob` — IBM BOB Shell CLI (**✅ Implemented**)
+- `ibm-bob` — IBM Bob via OpenAI-compatible REST API (**🚧 Planned**)
 - `ollama` — Ollama local models (**🚧 Planned**)
 
 **Example:**
@@ -135,25 +140,26 @@ export LLM_MAX_TOKENS=2048
 
 ### `LLM_TIMEOUT_SECONDS`
 
-**Description:** Network timeout for the LLM API call.
+**Description:** Timeout for the LLM call. Applies to **all providers** — Claude (HTTP streaming) and BOB Shell (process execution).
 
 **Type:** Integer
 
-**Default:** `60`
+**Default:** `180`
 
 **Recommended Values:**
-- `30` — Short responses (< 500 tokens)
-- `60` — Standard (1000-2000 tokens)
-- `120` — Long responses (4000+ tokens)
+- `60` — Claude on Anthropic / Vertex AI (short-to-medium responses)
+- `120` — Claude with long responses (4000+ tokens)
+- `180` — BOB Shell (process startup + analysis, default for this deployment)
 
 **Example:**
 ```bash
-export LLM_TIMEOUT_SECONDS=90
+export LLM_TIMEOUT_SECONDS=180
 ```
 
 **Notes:**
-- Timeout includes HTTP connection + response streaming
-- Too short = premature failures on slow networks
+- For Claude: includes HTTP connection + response streaming
+- For BOB Shell: controls the `Process.waitFor()` deadline — BOB Shell analysis on large prompts can take 100–130 s, so `180` is the safe default
+- Too short = premature failures on slow networks / large prompts
 - Too long = hung requests block worker threads
 
 ---
@@ -419,7 +425,7 @@ export LLM_CHAT_MEMORY_SIZE=20
 - `LLM_MODEL_NAME` (default: `claude-sonnet-4-6`)
 - `LLM_TEMPERATURE` (default: `0.1`)
 - `LLM_MAX_TOKENS` (default: `4096`)
-- `LLM_TIMEOUT_SECONDS` (default: `60`)
+- `LLM_TIMEOUT_SECONDS` (default: `180` — lower to `60` if only using Claude with short responses)
 
 **Example `.env`:**
 ```bash
@@ -428,7 +434,7 @@ LLM_API_KEY=sk-ant-api03-xxxxxxxxxxxxxxxx
 LLM_MODEL_NAME=claude-sonnet-4-6
 LLM_TEMPERATURE=0.1
 LLM_MAX_TOKENS=4096
-LLM_TIMEOUT_SECONDS=60
+LLM_TIMEOUT_SECONDS=180
 ```
 
 ---
@@ -445,7 +451,7 @@ LLM_TIMEOUT_SECONDS=60
 - `LLM_MODEL_NAME` (default: `claude-sonnet-4-6`)
 - `LLM_TEMPERATURE` (default: `0.1`)
 - `LLM_MAX_TOKENS` (default: `4096`)
-- `LLM_TIMEOUT_SECONDS` (default: `60`)
+- `LLM_TIMEOUT_SECONDS` (default: `180` — lower to `60` if only using Claude with short responses)
 
 **Example `.env`:**
 ```bash
@@ -460,19 +466,17 @@ LLM_MODEL_NAME=claude-sonnet-4-6
 ### BOB Shell (✅ Implemented)
 
 **Required:**
-- `LLM_PROVIDER=bob-shell`
+- `LLM_PROVIDER=bob`
 - `LLM_API_KEY=<bob-api-key>` (BOB Shell authentication key)
 
 **Optional:**
-- `BOB_SHELL_PATH` (default: `bob` - assumes BOB Shell is in PATH)
-- `BOB_TIMEOUT_SECONDS` (default: `180` - 3 minutes for long-running analysis)
+- `LLM_TIMEOUT_SECONDS` (default: `180` — BOB Shell analysis can take 100–130 s; keep at `180` or higher)
 
 **Example `.env`:**
 ```bash
-LLM_PROVIDER=bob-shell
+LLM_PROVIDER=bob
 LLM_API_KEY=your-bob-api-key-here
-BOB_SHELL_PATH=bob
-BOB_TIMEOUT_SECONDS=180
+LLM_TIMEOUT_SECONDS=180
 ```
 
 **Notes:**
@@ -487,9 +491,8 @@ BOB_TIMEOUT_SECONDS=180
 
 **In Kubernetes ConfigMap:**
 ```yaml
-# BOB Shell Configuration (Public settings)
-BOB_SHELL_PATH: "bob"
-BOB_TIMEOUT_SECONDS: "180"
+# BOB Shell requires longer execution time — set to 180s (3 min) for long-running analysis
+LLM_TIMEOUT_SECONDS: "180"
 ```
 
 **In Kubernetes Secret:**

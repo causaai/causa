@@ -29,19 +29,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * directly via ProcessBuilder. This provides native BOB integration without requiring
  * a separate wrapper service.
  *
- * <p>BOB Shell is a Node.js CLI tool that must be installed via npm:
- * <pre>npm install -g bob-shell@1.0.4</pre>
+ * <p>BOB Shell is a Node.js CLI tool bundled with the application image.
  *
  * <p>Requires BOBSHELL_API_KEY environment variable for authentication.
  *
  * <p>TEMPORARY: Using @Named for testing - RESTORE BEFORE PR
- * <p>This bean is conditionally enabled only when {@code causa.llm.provider} is set to "bob-shell".
+ * <p>This bean is conditionally enabled only when {@code causa.llm.provider} is set to "bob".
  * When disabled, {@link LangChainPromptSender} is used instead.
  *
  * @since 0.0.1
  */
 @ApplicationScoped
-@IfBuildProperty(name = "causa.llm.provider", stringValue = "bob-shell")
+@IfBuildProperty(name = "causa.llm.provider", stringValue = "bob")
 public class BobShellPromptSender implements PromptSender {
 
     private static final CausaLogger log = CausaLogger.getLogger(BobShellPromptSender.class);
@@ -49,16 +48,12 @@ public class BobShellPromptSender implements PromptSender {
     
     private final LLMConfig config;
     private final AtomicBoolean ready = new AtomicBoolean(false);
-    private final String bobShellPath;
-    private final String apiKey;
 
     @Inject
     public BobShellPromptSender(LLMConfig config) {
         this.config = config;
-        this.bobShellPath = config.bob().shellPath();
-        this.apiKey = config.bob().apiKey().orElse(null);
-        
-        if (this.apiKey == null || this.apiKey.isBlank()) {
+        // api-key and timeout-seconds are shared with other providers — read from top-level LLMConfig
+        if (config.apiKey().orElse("").isBlank()) {
             log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
                 .field(LLMConstants.ConfigKeys.MISSING_CONFIG, LLMConstants.ConfigKeys.LLM_API_KEY)
                 .log();
@@ -69,7 +64,7 @@ public class BobShellPromptSender implements PromptSender {
     public LLMResponse send(LLMRequest request) {
         if (!isReady()) {
             log.error(LogMessages.LLM.MODEL_NOT_AVAILABLE)
-                .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.BOB_SHELL)
+                .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.IBM_BOB)
                 .log();
             throw new LLMException(
                 LLMConstants.ErrorMessages.MODEL_NOT_AVAILABLE,
@@ -78,8 +73,8 @@ public class BobShellPromptSender implements PromptSender {
         }
 
         log.info(LogMessages.LLM.PROMPT_SEND_START)
-            .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.BOB_SHELL)
-            .field(LLMConstants.Fields.MODEL, LLMConstants.BobShell.MODEL_NAME)
+            .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.IBM_BOB)
+            .field(LLMConstants.Fields.MODEL, LLMConstants.Provider.IBM_BOB)
             .log();
 
         long startNanos = System.nanoTime();
@@ -99,7 +94,7 @@ public class BobShellPromptSender implements PromptSender {
 
             LLMResponse llmResponse = new LLMResponse(
                 responseText,
-                LLMConstants.BobShell.MODEL_NAME,
+                LLMConstants.Provider.IBM_BOB,
                 tokenUsage.promptTokens,
                 tokenUsage.completionTokens,
                 0, // BOB doesn't support cache creation tokens
@@ -153,7 +148,7 @@ public class BobShellPromptSender implements PromptSender {
      */
     private boolean checkAvailability() {
         try {
-            ProcessBuilder pb = new ProcessBuilder(bobShellPath, LLMConstants.BobShell.VERSION_FLAG);
+            ProcessBuilder pb = new ProcessBuilder(config.bob().shellPath(), LLMConstants.BobShell.VERSION_FLAG);
             Process process = pb.start();
             boolean completed = process.waitFor(
                 LLMConstants.BobShell.VERSION_CHECK_TIMEOUT_SECONDS,
@@ -169,7 +164,7 @@ public class BobShellPromptSender implements PromptSender {
             int exitCode = process.exitValue();
             if (exitCode == 0) {
                 log.info(LogMessages.LLM.BOB_SHELL_AVAILABLE)
-                    .field(LLMConstants.BobShell.LOG_FIELD_SHELL_PATH, bobShellPath)
+                    .field(LLMConstants.BobShell.LOG_FIELD_SHELL_PATH, config.bob().shellPath())
                     .log();
                 return true;
             } else {
@@ -218,19 +213,25 @@ public class BobShellPromptSender implements PromptSender {
      */
     private String executeBobShell(String prompt) throws LLMException, InterruptedException {
         try {
+            // Fail fast — there is no point spawning a process without a valid API key
+            String apiKey = config.apiKey().orElse("").trim();
+            if (apiKey.isBlank()) {
+                throw new LLMException(
+                    LLMConstants.ErrorMessages.API_KEY_REQUIRED + LLMConstants.Provider.IBM_BOB,
+                    LLMConstants.ErrorTypes.MISSING_CONFIGURATION
+                );
+            }
+
             // Always use stdin mode for reliability and consistency
             ProcessBuilder pb = new ProcessBuilder(
-                bobShellPath,
+                config.bob().shellPath(),
                 LLMConstants.BobShell.FLAG_ACCEPT_LICENSE,
                 LLMConstants.BobShell.FLAG_YOLO,
                 LLMConstants.BobShell.FLAG_OUTPUT_JSON,
                 LLMConstants.BobShell.OUTPUT_FORMAT_JSON
             );
-            
-            // Set API key environment variable
-            if (apiKey != null && !apiKey.isBlank()) {
-                pb.environment().put(LLMConstants.BobShell.ENV_API_KEY, apiKey);
-            }
+
+            pb.environment().put(LLMConstants.BobShell.ENV_API_KEY_NAME, apiKey);
             
             pb.redirectErrorStream(true);
             
@@ -244,7 +245,7 @@ public class BobShellPromptSender implements PromptSender {
             }
             
             // Wait for completion with timeout
-            int timeoutSeconds = config.bob().timeoutSeconds();
+            int timeoutSeconds = config.timeoutSeconds();
             boolean completed = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
             
             if (!completed) {
@@ -304,35 +305,28 @@ public class BobShellPromptSender implements PromptSender {
         // BOB Shell output format:
         // Debug logs...
         // ---output---
-        // {actual JSON content}
+        // {"response": "...", ...}
         // ---output---
         // {stats JSON}
-        
+
         String[] parts = bobOutput.split(LLMConstants.BobShell.OUTPUT_MARKER);
         if (parts.length >= 2) {
-            // Get content between first pair of markers
-            String content = parts[1].trim();
-            
-            // Remove trailing stats JSON if present
-            int lastBrace = content.lastIndexOf('}');
-            if (lastBrace > 0) {
-                // Find the first complete JSON object
-                int firstBrace = content.indexOf('{');
-                if (firstBrace >= 0) {
-                    // Extract just the first JSON object
-                    int braceCount = 0;
-                    for (int i = firstBrace; i < content.length(); i++) {
-                        if (content.charAt(i) == '{') braceCount++;
-                        if (content.charAt(i) == '}') braceCount--;
-                        if (braceCount == 0) {
-                            return content.substring(firstBrace, i + 1).trim();
-                        }
-                    }
+            try {
+                // Use Jackson to parse the content block — consistent with extractTokenUsage()
+                // and correctly handles special characters inside string values
+                JsonNode root = objectMapper.readTree(parts[1].trim());
+                JsonNode responseNode = root.get(LLMConstants.BobShell.JSON_FIELD_RESPONSE);
+                if (responseNode != null) {
+                    return responseNode.asText();
                 }
+                // "response" field absent — return the full serialised JSON as a string
+                return root.toString();
+            } catch (Exception e) {
+                log.warn(LogMessages.LLM.BOB_TOKEN_PARSE_FAILED).exception(e).log();
+                return parts[1].trim();
             }
-            return content;
         }
-        
+
         // Fallback: return full output if markers not found
         log.warn(LogMessages.LLM.BOB_OUTPUT_MARKERS_NOT_FOUND).log();
         return bobOutput;

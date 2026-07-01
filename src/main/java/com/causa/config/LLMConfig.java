@@ -144,34 +144,20 @@ public interface LLMConfig {
     }
 
     /**
-     * BOB Shell Configuration
+     * BOB Shell specific configuration.
+     *
+     * <p>Only holds parameters that are unique to BOB Shell. Common parameters such as
+     * {@code api-key} and {@code timeout-seconds} are read from the top-level
+     * {@link LLMConfig} properties so they are not duplicated across providers.
      */
     interface BobConfig {
         /**
-         * Path to BOB Shell executable.
+         * Path to BOB Shell executable bundled with the application.
          *
-         * @return the shell path (default: "bob" to use system PATH)
+         * @return the shell path (default: "bob" assumes it is on the system PATH)
          */
         @WithName("shell-path")
         @WithDefault("bob")
         String shellPath();
-
-        /**
-         * BOB Shell API key for authentication.
-         *
-         * @return the API key, or empty to use BOBSHELL_API_KEY env var
-         */
-        @WithName("api-key")
-        Optional<String> apiKey();
-
-        /**
-         * Timeout for BOB Shell execution in seconds.
-         *
-         * @return the timeout in seconds (default: 180)
-         */
-        @WithName("timeout-seconds")
-        @WithDefault("180")
-        int timeoutSeconds();
-
     }
 }

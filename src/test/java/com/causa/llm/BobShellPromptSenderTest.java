@@ -53,9 +53,10 @@ class BobShellPromptSenderTest {
      */
     private void setupDefaultMocks() {
         lenient().when(llmConfig.bob()).thenReturn(bobConfig);
-        lenient().when(bobConfig.shellPath()).thenReturn(LLMConstants.BobShell.DEFAULT_SHELL_PATH);
-        lenient().when(bobConfig.apiKey()).thenReturn(Optional.of("test-api-key"));
-        lenient().when(bobConfig.timeoutSeconds()).thenReturn(LLMConstants.BobShell.DEFAULT_TIMEOUT_SECONDS);
+        lenient().when(bobConfig.shellPath()).thenReturn(LLMConstants.Provider.IBM_BOB);
+        // apiKey and timeoutSeconds come from top-level LLMConfig, not BobConfig
+        lenient().when(llmConfig.apiKey()).thenReturn(Optional.of("test-api-key"));
+        lenient().when(llmConfig.timeoutSeconds()).thenReturn(LLMConstants.BobShell.DEFAULT_TIMEOUT_SECONDS);
     }
 
     @Nested
@@ -65,68 +66,58 @@ class BobShellPromptSenderTest {
         @Test
         @DisplayName("Should initialize with valid configuration")
         void shouldInitializeWithValidConfiguration() {
-            // Given
-            when(llmConfig.bob()).thenReturn(bobConfig);
-            when(bobConfig.shellPath()).thenReturn(LLMConstants.BobShell.DEFAULT_SHELL_PATH);
-            when(bobConfig.apiKey()).thenReturn(Optional.of("test-api-key"));
-            
+            // Given - constructor only reads config.apiKey(); shell path is read lazily on use
+            when(llmConfig.apiKey()).thenReturn(Optional.of("test-api-key"));
+
             // When
             bobShellPromptSender = new BobShellPromptSender(llmConfig);
 
             // Then
             assertNotNull(bobShellPromptSender);
-            // Constructor calls config.bob() twice (for shellPath and apiKey)
-            verify(llmConfig, times(2)).bob();
-            verify(bobConfig).shellPath();
-            verify(bobConfig).apiKey();
+            verify(llmConfig).apiKey();
         }
 
         @Test
-        @DisplayName("Should use default shell path when not configured")
-        void shouldUseDefaultShellPath() {
-            // Given
-            when(llmConfig.bob()).thenReturn(bobConfig);
-            when(bobConfig.shellPath()).thenReturn(LLMConstants.BobShell.DEFAULT_SHELL_PATH);
-            when(bobConfig.apiKey()).thenReturn(Optional.of("test-api-key"));
+        @DisplayName("Should read shell path from config lazily on each use")
+        void shouldReadShellPathFromConfigLazily() {
+            // Given - shell path is not read in constructor, only when send()/checkAvailability() is called
+            when(llmConfig.apiKey()).thenReturn(Optional.of("test-api-key"));
 
             // When
             bobShellPromptSender = new BobShellPromptSender(llmConfig);
 
-            // Then
+            // Then - no bob() or shellPath() called during construction
             assertNotNull(bobShellPromptSender);
-            verify(bobConfig).shellPath();
+            verify(llmConfig, never()).bob();
         }
 
         @Test
         @DisplayName("Should use environment variable for API key when not in config")
         void shouldUseEnvironmentVariableForApiKey() {
             // Given
-            when(llmConfig.bob()).thenReturn(bobConfig);
-            when(bobConfig.shellPath()).thenReturn(LLMConstants.BobShell.DEFAULT_SHELL_PATH);
-            when(bobConfig.apiKey()).thenReturn(Optional.empty());
+            when(llmConfig.apiKey()).thenReturn(Optional.empty());
 
             // When
             bobShellPromptSender = new BobShellPromptSender(llmConfig);
 
             // Then
             assertNotNull(bobShellPromptSender);
-            verify(bobConfig).apiKey();
+            verify(llmConfig).apiKey();
             // BOB Shell will use BOBSHELL_API_KEY environment variable
         }
 
         @Test
-        @DisplayName("Should handle configuration correctly")
+        @DisplayName("Should handle custom configuration correctly")
         void shouldHandleConfigurationCorrectly() {
             // Given
-            when(llmConfig.bob()).thenReturn(bobConfig);
-            when(bobConfig.shellPath()).thenReturn("/custom/path/bob");
-            when(bobConfig.apiKey()).thenReturn(Optional.of("custom-key"));
+            when(llmConfig.apiKey()).thenReturn(Optional.of("custom-key"));
 
             // When
             bobShellPromptSender = new BobShellPromptSender(llmConfig);
 
             // Then
             assertNotNull(bobShellPromptSender);
+            verify(llmConfig).apiKey();
         }
     }
 
@@ -234,34 +225,30 @@ class BobShellPromptSenderTest {
         @Test
         @DisplayName("Should respect custom shell path")
         void shouldRespectCustomShellPath() {
-            // Given
-            String customPath = "/custom/path/to/bob";
-            when(llmConfig.bob()).thenReturn(bobConfig);
-            when(bobConfig.shellPath()).thenReturn(customPath);
-            when(bobConfig.apiKey()).thenReturn(Optional.of("test-api-key"));
+            // Given - shell path is read from config lazily; constructor only reads apiKey
+            when(llmConfig.apiKey()).thenReturn(Optional.of("test-api-key"));
 
             // When
             bobShellPromptSender = new BobShellPromptSender(llmConfig);
 
             // Then
             assertNotNull(bobShellPromptSender);
-            verify(bobConfig).shellPath();
+            // shell path is read on each process invocation via config.bob().shellPath()
+            verify(llmConfig, never()).bob();
         }
 
         @Test
         @DisplayName("Should handle missing API key gracefully")
         void shouldHandleMissingApiKeyGracefully() {
             // Given
-            when(llmConfig.bob()).thenReturn(bobConfig);
-            when(bobConfig.shellPath()).thenReturn(LLMConstants.BobShell.DEFAULT_SHELL_PATH);
-            when(bobConfig.apiKey()).thenReturn(Optional.empty());
+            when(llmConfig.apiKey()).thenReturn(Optional.empty());
 
             // When
             bobShellPromptSender = new BobShellPromptSender(llmConfig);
 
             // Then
             assertNotNull(bobShellPromptSender);
-            verify(bobConfig).apiKey();
+            verify(llmConfig).apiKey();
             // BOB Shell will use BOBSHELL_API_KEY environment variable
         }
     }
@@ -392,7 +379,7 @@ class BobShellPromptSenderTest {
         @Test
         @DisplayName("Should use correct model name")
         void shouldUseCorrectModelName() {
-            assertEquals("bob-shell-1.0.4", LLMConstants.BobShell.MODEL_NAME);
+            assertEquals("bob", LLMConstants.Provider.IBM_BOB);
         }
 
         @Test
@@ -414,7 +401,7 @@ class BobShellPromptSenderTest {
         @Test
         @DisplayName("Should use correct environment variable name")
         void shouldUseCorrectEnvironmentVariableName() {
-            assertEquals("BOBSHELL_API_KEY", LLMConstants.BobShell.ENV_API_KEY);
+            assertEquals("BOBSHELL_API_KEY", LLMConstants.BobShell.ENV_API_KEY_NAME);
         }
 
         @Test

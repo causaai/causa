@@ -31,13 +31,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * separation between business logic and LLM integration.
  *
  * <p>TEMPORARY: Conditional annotation removed for testing - RESTORE BEFORE PR
- * <p>This bean is enabled by default unless {@code causa.llm.provider} is set to "bob-shell".
- * When "bob-shell" is configured, {@link BobShellPromptSender} is used instead.
+ * <p>This bean is enabled by default unless {@code causa.llm.provider} is set to "bob".
+ * When "bob" is configured, {@link BobShellPromptSender} is used instead.
  *
  * @since 0.0.1
  */
 @ApplicationScoped
-@UnlessBuildProperty(name = "causa.llm.provider", stringValue = "bob-shell")
+@UnlessBuildProperty(name = "causa.llm.provider", stringValue = "bob")
 public class LangChainPromptSender implements PromptSender {
 
     private static final CausaLogger log = CausaLogger.getLogger(LangChainPromptSender.class);

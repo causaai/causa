@@ -56,23 +56,20 @@ export LLM_API_KEY=your-bob-api-key-here
 ```yaml
 causa:
   llm:
-    provider: bob-shell  # Set to use BOB Shell
-    api-key: ${LLM_API_KEY:}  # API key (same as other providers)
-    timeout-seconds: 180  # BOB Shell timeout
+    provider: bob             # Activates BobShellPromptSender
+    api-key: ${LLM_API_KEY:}  # Same key used by Claude — BOB Shell reads this via LLM_API_KEY
+    timeout-seconds: 180      # Shared timeout — controls Process.waitFor() for BOB Shell
     bob:
-      shell-path: bob  # Path to BOB Shell executable (default: "bob")
-      api-key: ${LLM_API_KEY:}  # Uses LLM_API_KEY
-      timeout-seconds: 180  # BOB-specific timeout
+      shell-path: bob         # BOB binary bundled in the image; default is "bob" (on PATH)
 ```
 
 ### Environment Variables
 
 | Variable | Description | Required | Default |
 |----------|-------------|----------|---------|
-| `LLM_API_KEY` | API key for authentication (provider-specific) | Yes | - |
-| `BOB_SHELL_PATH` | Path to BOB Shell executable | No | `bob` |
-| `BOB_TIMEOUT_SECONDS` | Timeout for BOB Shell execution | No | `180` |
 | `LLM_PROVIDER` | LLM provider to use | Yes | - |
+| `LLM_API_KEY` | API key for authentication (provider-specific) | Yes | - |
+| `LLM_TIMEOUT_SECONDS` | Timeout in seconds — controls process execution deadline for BOB Shell | No | `180` |
 
 **Note:** BOB Shell uses the same `LLM_API_KEY` environment variable as other providers (Claude, Vertex AI). The key value is provider-specific.
 
@@ -81,10 +78,8 @@ causa:
 For Kubernetes deployments, BOB Shell configuration can be set in the ConfigMap (`deployment/kubernetes/base/configmap.yaml`):
 
 ```yaml
-# BOB Shell Configuration (Public settings)
-# Path to BOB Shell executable (default: 'bob' assumes it's in PATH)
-BOB_SHELL_PATH: "bob"
-BOB_TIMEOUT_SECONDS: "180"
+# BOB Shell reuses shared LLM settings — increase timeout for long-running analysis
+LLM_TIMEOUT_SECONDS: "180"
 ```
 
 ### Kubernetes Secret
@@ -111,12 +106,12 @@ Once the provider switching logic is implemented by your team, you can use BOB S
 ```yaml
 causa:
   llm:
-    provider: bob-shell
+    provider: bob
 ```
 
 2. Or via environment variable:
 ```bash
-export LLM_PROVIDER=bob-shell
+export LLM_PROVIDER=bob
 ```
 
 ### Programmatic Usage
@@ -357,7 +352,7 @@ spec:
               name: causa-llm-secrets
               key: LLM_API_KEY
         - name: LLM_PROVIDER
-          value: "bob-shell"
+          value: "bob"
 ```
 
 3. Deploy:
@@ -386,7 +381,7 @@ Response:
       "name": "BOB Shell Readiness",
       "status": "UP",
       "data": {
-        "provider": "bob-shell",
+        "provider": "bob",
         "shell_path": "bob",
         "version": "1.0.4"
       }

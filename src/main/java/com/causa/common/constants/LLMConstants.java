@@ -47,8 +47,7 @@ public final class LLMConstants {
 
         public static final String ANTHROPIC = "anthropic";
         public static final String VERTEX_AI_ANTHROPIC = "vertex-ai-anthropic";
-        public static final String IBM_BOB = "ibm-bob";
-        public static final String BOB_SHELL = "bob-shell";
+        public static final String IBM_BOB = "bob";
         public static final String OLLAMA = "ollama";
     }
 
@@ -59,8 +58,6 @@ public final class LLMConstants {
         private BobShell() {}
         
         // BOB Shell configuration
-        public static final String MODEL_NAME = "bob-shell-1.0.4";
-        public static final String DEFAULT_SHELL_PATH = "bob";
         public static final int DEFAULT_TIMEOUT_SECONDS = 180;
         
         // BOB Shell CLI flags
@@ -74,13 +71,14 @@ public final class LLMConstants {
         public static final String OUTPUT_MARKER = "---output---";
         
         // Environment variables
-        public static final String ENV_API_KEY = "BOBSHELL_API_KEY";  // BOB Shell internally uses this env var
+        public static final String ENV_API_KEY_NAME = "BOBSHELL_API_KEY";  // BOB Shell internally uses this env var
         
         // Health check
         public static final String VERSION_FLAG = "--version";
         public static final int VERSION_CHECK_TIMEOUT_SECONDS = 5;
         
         // JSON field names
+        public static final String JSON_FIELD_RESPONSE = "response";
         public static final String JSON_FIELD_STATS = "stats";
         public static final String JSON_FIELD_PROMPT_TOKENS = "promptTokens";
         public static final String JSON_FIELD_COMPLETION_TOKENS = "completionTokens";

@@ -97,7 +97,9 @@ RUN curl -fsSL https://rpm.nodesource.com/setup_22.x | bash - && \
 RUN node --version && npm --version
 
 # Install BOB Shell using official IBM script
-# This handles all dependencies and configuration automatically
+# The script installs the latest version published at
+# https://s3.us-south.cloud-object-storage.appdomain.cloud/bob-shell/bobshell-version.txt
+# and handles all dependencies and configuration automatically
 RUN curl -fsSL https://bob.ibm.com/download/bobshell.sh | bash
 
 # Verify BOB Shell installation
