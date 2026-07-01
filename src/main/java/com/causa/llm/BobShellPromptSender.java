@@ -287,7 +287,7 @@ public class BobShellPromptSender implements PromptSender {
                     LLMConstants.ErrorTypes.LLM_REQUEST_FAILED
                 );
             }
-            
+
             return responseText;
         } catch (IOException e) {
             throw new LLMException(
@@ -300,31 +300,21 @@ public class BobShellPromptSender implements PromptSender {
 
     /**
      * Extracts the actual content from BOB Shell output (between ---output--- markers).
+     *
+     * <p>Actual BOB Shell output format:
+     * <pre>
+     * YOLO mode is enabled...    (debug noise)
+     * ---output---
+     * Hello! I'm Bob...          (plain text response — NOT JSON)
+     * ---output---
+     * {"response": "", "stats": {"models": {"premium": {"tokens": {...}}}}}
+     * </pre>
      */
     private String extractContent(String bobOutput) {
-        // BOB Shell output format:
-        // Debug logs...
-        // ---output---
-        // {"response": "...", ...}
-        // ---output---
-        // {stats JSON}
-
         String[] parts = bobOutput.split(LLMConstants.BobShell.OUTPUT_MARKER);
         if (parts.length >= 2) {
-            try {
-                // Use Jackson to parse the content block — consistent with extractTokenUsage()
-                // and correctly handles special characters inside string values
-                JsonNode root = objectMapper.readTree(parts[1].trim());
-                JsonNode responseNode = root.get(LLMConstants.BobShell.JSON_FIELD_RESPONSE);
-                if (responseNode != null) {
-                    return responseNode.asText();
-                }
-                // "response" field absent — return the full serialised JSON as a string
-                return root.toString();
-            } catch (Exception e) {
-                log.warn(LogMessages.LLM.BOB_TOKEN_PARSE_FAILED).exception(e).log();
-                return parts[1].trim();
-            }
+            // parts[1] is plain text — return it directly
+            return parts[1].trim();
         }
 
         // Fallback: return full output if markers not found
@@ -333,37 +323,34 @@ public class BobShellPromptSender implements PromptSender {
     }
 
     /**
-     * Extracts token usage from BOB Shell statistics block using Jackson JSON parser.
-     * This is more robust and maintainable than regex-based parsing.
+     * Extracts token usage from BOB Shell statistics block.
+     *
+     * <p>Token counts are nested under:
+     * {@code stats.models.premium.tokens.{prompt, candidates, total}}
      */
     private TokenUsage extractTokenUsage(String bobOutput) {
         try {
-            // BOB Shell output format:
-            // ---output---
-            // {actual content JSON}
-            // ---output---
-            // {stats JSON}
-            
             String[] parts = bobOutput.split(LLMConstants.BobShell.OUTPUT_MARKER);
             if (parts.length >= 3) {
-                // Third part contains the statistics JSON
-                String statsBlock = parts[2].trim();
-                
-                // Parse JSON using Jackson
-                JsonNode root = objectMapper.readTree(statsBlock);
-                JsonNode stats = root.get(LLMConstants.BobShell.JSON_FIELD_STATS);
-                
-                if (stats != null) {
-                    long promptTokens = stats.path(LLMConstants.BobShell.JSON_FIELD_PROMPT_TOKENS).asLong(0);
-                    long completionTokens = stats.path(LLMConstants.BobShell.JSON_FIELD_COMPLETION_TOKENS).asLong(0);
-                    long totalTokens = stats.path(LLMConstants.BobShell.JSON_FIELD_TOKENS_USED).asLong(0);
-                    
+                JsonNode root = objectMapper.readTree(parts[2].trim());
+                // Navigate: stats → models → premium → tokens
+                JsonNode tokens = root
+                    .path(LLMConstants.BobShell.JSON_FIELD_STATS)
+                    .path(LLMConstants.BobShell.JSON_FIELD_MODELS)
+                    .path(LLMConstants.BobShell.JSON_FIELD_PREMIUM)
+                    .path(LLMConstants.BobShell.JSON_FIELD_TOKENS);
+
+                if (!tokens.isMissingNode()) {
+                    long promptTokens     = tokens.path(LLMConstants.BobShell.JSON_FIELD_PROMPT_TOKENS).asLong(0);
+                    long completionTokens = tokens.path(LLMConstants.BobShell.JSON_FIELD_COMPLETION_TOKENS).asLong(0);
+                    long totalTokens      = tokens.path(LLMConstants.BobShell.JSON_FIELD_TOKENS_USED).asLong(0);
+
                     log.debug(LogMessages.LLM.BOB_EXTRACTED_TOKEN_USAGE)
                         .field(LLMConstants.BobShell.LOG_FIELD_PROMPT_TOKENS, promptTokens)
                         .field(LLMConstants.BobShell.LOG_FIELD_COMPLETION_TOKENS, completionTokens)
                         .field(LLMConstants.BobShell.LOG_FIELD_TOTAL_TOKENS, totalTokens)
                         .log();
-                    
+
                     return new TokenUsage(promptTokens, completionTokens, totalTokens);
                 } else {
                     log.warn(LogMessages.LLM.BOB_STATS_FIELD_NOT_FOUND).log();
@@ -374,11 +361,9 @@ public class BobShellPromptSender implements PromptSender {
                     .log();
             }
         } catch (Exception e) {
-            log.warn(LogMessages.LLM.BOB_TOKEN_PARSE_FAILED)
-                .exception(e)
-                .log();
+            log.warn(LogMessages.LLM.BOB_TOKEN_PARSE_FAILED).exception(e).log();
         }
-        
+
         return new TokenUsage(0, 0, 0);
     }
 

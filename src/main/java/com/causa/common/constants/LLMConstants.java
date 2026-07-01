@@ -77,12 +77,16 @@ public final class LLMConstants {
         public static final String VERSION_FLAG = "--version";
         public static final int VERSION_CHECK_TIMEOUT_SECONDS = 5;
         
-        // JSON field names
+        // JSON field names — top-level stats block
         public static final String JSON_FIELD_RESPONSE = "response";
         public static final String JSON_FIELD_STATS = "stats";
-        public static final String JSON_FIELD_PROMPT_TOKENS = "promptTokens";
-        public static final String JSON_FIELD_COMPLETION_TOKENS = "completionTokens";
-        public static final String JSON_FIELD_TOKENS_USED = "tokensUsed";
+        // Nested path: stats.models.premium.tokens
+        public static final String JSON_FIELD_MODELS = "models";
+        public static final String JSON_FIELD_PREMIUM = "premium";
+        public static final String JSON_FIELD_TOKENS = "tokens";
+        public static final String JSON_FIELD_PROMPT_TOKENS = "prompt";
+        public static final String JSON_FIELD_COMPLETION_TOKENS = "candidates";
+        public static final String JSON_FIELD_TOKENS_USED = "total";
         
         // Log field names
         public static final String LOG_FIELD_SHELL_PATH = "shell_path";
