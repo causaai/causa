@@ -88,11 +88,13 @@ causa:
     temperature: ${LLM_TEMPERATURE:0.1}
     max-tokens: ${LLM_MAX_TOKENS:4096}
     api-key: ${LLM_API_KEY:}
-    timeout-seconds: ${LLM_TIMEOUT_SECONDS:60}
+    timeout-seconds: ${LLM_TIMEOUT_SECONDS:180}
     chat-memory-size: ${LLM_CHAT_MEMORY_SIZE:10}
     vertex:
       project-id: ${VERTEX_PROJECT_ID:}
       location: ${VERTEX_LOCATION:us-east5}
+    bob:
+      shell-path: bob
 
   # Alert Configuration
   alerts:

@@ -115,6 +115,14 @@ public interface LLMConfig {
     VertexConfig vertex();
 
     /**
+     * BOB Shell specific configuration.
+     *
+     * @return the BOB Shell config
+     */
+    @WithName("bob")
+    BobConfig bob();
+
+    /**
      * Vertex AI Configuration
      */
     interface VertexConfig {
@@ -133,5 +141,23 @@ public interface LLMConfig {
          */
         @WithName("location")
         String location();
+    }
+
+    /**
+     * BOB Shell specific configuration.
+     *
+     * <p>Only holds parameters that are unique to BOB Shell. Common parameters such as
+     * {@code api-key} and {@code timeout-seconds} are read from the top-level
+     * {@link LLMConfig} properties so they are not duplicated across providers.
+     */
+    interface BobConfig {
+        /**
+         * Path to BOB Shell executable bundled with the application.
+         *
+         * @return the shell path (default: "bob" assumes it is on the system PATH)
+         */
+        @WithName("shell-path")
+        @WithDefault("bob")
+        String shellPath();
     }
 }

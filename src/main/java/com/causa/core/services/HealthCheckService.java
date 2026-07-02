@@ -12,8 +12,8 @@ import com.causa.common.logging.LogMessages;
 import com.causa.config.LLMConfig;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
+import com.causa.core.ports.llm.PromptSender;
 import com.causa.infrastructure.persistence.DatabaseConnectionService;
-import com.causa.llm.LangChainPromptSender;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -55,7 +55,7 @@ public class HealthCheckService {
     private final String mcpK8sEndpoint;
     private final String mcpK8sHealthPath;
     private final int mcpK8sTimeout;
-    private final LangChainPromptSender llmPromptSender;
+    private final PromptSender llmPromptSender;
     private final LLMConfig llmConfig;
 
     @Inject
@@ -66,7 +66,7 @@ public class HealthCheckService {
             @ConfigProperty(name = "causa.mcp.kubernetes.endpoint") String mcpK8sEndpoint,
             @ConfigProperty(name = "causa.mcp.kubernetes.health-path") String mcpK8sHealthPath,
             @ConfigProperty(name = "causa.mcp.kubernetes.timeout-ms") int mcpK8sTimeout,
-            LangChainPromptSender llmPromptSender,
+            PromptSender llmPromptSender,
             LLMConfig llmConfig) {
         this.databaseConnectionService = databaseConnectionService;
         this.dataSource = dataSource;

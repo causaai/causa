@@ -15,6 +15,7 @@ import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.request.ChatRequestParameters;
 import dev.langchain4j.model.chat.response.ChatResponse;
+import io.quarkus.arc.properties.UnlessBuildProperty;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -29,9 +30,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * This adapter wraps the provider-agnostic LangChain4J interface, providing a clean
  * separation between business logic and LLM integration.
  *
+ * <p>TEMPORARY: Conditional annotation removed for testing - RESTORE BEFORE PR
+ * <p>This bean is enabled by default unless {@code causa.llm.provider} is set to "bob".
+ * When "bob" is configured, {@link BobShellPromptSender} is used instead.
+ *
  * @since 0.0.1
  */
 @ApplicationScoped
+@UnlessBuildProperty(name = "causa.llm.provider", stringValue = "bob")
 public class LangChainPromptSender implements PromptSender {
 
     private static final CausaLogger log = CausaLogger.getLogger(LangChainPromptSender.class);

@@ -13,12 +13,13 @@ data:
   CAUSA_DB_URL: "jdbc:postgresql://diagnostics-tool-db-rw.diagnostics-tool.svc.cluster.local:5432/diagnostics-tool-db"
 
   # LLM Configuration (Public settings - non-sensitive)
-  # Provider: anthropic (direct API) | vertex-ai-anthropic (Google Cloud) | ibm-bob (future) | ollama (future)
+  # Provider: anthropic (direct API) | vertex-ai-anthropic (Google Cloud) | bob (BOB Shell CLI) | ibm-bob (future REST API) | ollama (future)
   LLM_PROVIDER: "vertex-ai-anthropic"
   LLM_MODEL_NAME: "claude-sonnet-4-6"
   LLM_TEMPERATURE: "0.1"
   LLM_MAX_TOKENS: "8192"
-  LLM_TIMEOUT_SECONDS: "60"
+  # BOB Shell requires longer execution time — set to 180s (3 min) for long-running analysis
+  LLM_TIMEOUT_SECONDS: "180"
   LLM_CHAT_MEMORY_SIZE: "25"
 
   # Vertex AI Configuration (Public settings)

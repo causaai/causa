@@ -4,7 +4,7 @@
 
 The LLM module provides a **provider-agnostic abstraction** for integrating Large Language Models into the Causa diagnostic platform. It follows **hexagonal architecture** principles, using **LangChain4J** as the common integration layer across multiple LLM providers.
 
-**Current Status:** ✅ Claude (Anthropic API + Vertex AI) implemented | 🚧 IBM Bob, Ollama planned
+**Current Status:** ✅ Claude (Anthropic API + Vertex AI) implemented | ✅ IBM BOB Shell (`bob`) implemented | 🚧 IBM Bob REST API, Ollama planned
 
 ---
 
@@ -289,8 +289,8 @@ Kubernetes uses this to decide whether to route traffic to the pod.
 
 | Provider | Library | Authentication |
 |----------|---------|----------------|
-| IBM Bob | `langchain4j-open-ai` (OpenAI-compatible) | `IBM_BOB_API_KEY` + `LLM_BASE_URL` |
-| Ollama | `langchain4j-ollama` | None (local runtime) |
+| IBM Bob REST API (`ibm-bob`) | `langchain4j-open-ai` (OpenAI-compatible) | `LLM_API_KEY` + `LLM_BASE_URL` |
+| Ollama (`ollama`) | `langchain4j-ollama` | None (local runtime) |
 
 
 
