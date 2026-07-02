@@ -49,6 +49,24 @@ public final class LogMessages {
         public static final String UNSUPPORTED_PROVIDER = "Unsupported LLM provider";
         public static final String MISSING_CONFIGURATION = "Missing required LLM configuration";
         public static final String MODEL_NOT_AVAILABLE = "LLM chat model not available";
+        
+        // BOB Shell specific log messages
+        public static final String BOB_VERSION_CHECK_TIMEOUT = "BOB Shell version check timed out";
+        public static final String BOB_AVAILABILITY_CHECK_FAILED = "BOB Shell availability check failed";
+        public static final String BOB_SHELL_AVAILABLE = "BOB Shell is available and ready";
+        public static final String BOB_SHELL_NOT_AVAILABLE = "BOB Shell is not available";
+        public static final String BOB_SHELL_FAILED = "BOB Shell failed";
+        public static final String BOB_OUTPUT_MARKERS_NOT_FOUND = "Could not find ---output--- markers in BOB Shell response";
+        public static final String BOB_EXTRACTED_TOKEN_USAGE = "Extracted token usage from BOB Shell";
+        public static final String BOB_STATS_FIELD_NOT_FOUND = "Stats field not found in BOB Shell output";
+        public static final String BOB_STATS_BLOCK_NOT_FOUND = "Could not find statistics block in BOB Shell output";
+        public static final String BOB_TOKEN_PARSE_FAILED = "Failed to parse token usage from BOB Shell output";
+        
+        // BOB Shell error messages
+        public static final String BOB_NOT_AVAILABLE = "BOB Shell is not available";
+        public static final String BOB_TIMEOUT_TEMPLATE = "BOB Shell execution timed out after %d seconds";
+        public static final String BOB_EXIT_CODE_TEMPLATE = "BOB Shell failed with exit code %d";
+        public static final String BOB_EMPTY_RESPONSE = "BOB Shell returned empty response";
     }
 
     /**

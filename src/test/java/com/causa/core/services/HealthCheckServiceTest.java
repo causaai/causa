@@ -67,9 +67,10 @@ class HealthCheckServiceTest {
     private HealthCheckService healthCheckService;
 
     private static final String APP_VERSION = "0.0.1";
-    private static final String MCP_ENDPOINT = "http://localhost:8081";
+    // 192.0.2.1 is RFC 5737 TEST-NET — guaranteed non-routable, always results in connection failure
+    private static final String MCP_ENDPOINT = "http://192.0.2.1";
     private static final String MCP_HEALTH_PATH = "/health";
-    private static final int MCP_TIMEOUT = 5000;
+    private static final int MCP_TIMEOUT = 1; // 1 ms — fail immediately, don't slow down tests
 
     @BeforeEach
     void setUp() {

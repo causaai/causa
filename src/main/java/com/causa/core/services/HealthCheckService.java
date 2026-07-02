@@ -12,8 +12,8 @@ import com.causa.common.logging.LogMessages;
 import com.causa.config.LLMConfig;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
+import com.causa.core.ports.llm.PromptSender;
 import com.causa.infrastructure.persistence.DatabaseConnectionService;
-import com.causa.llm.LangChainPromptSender;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -61,7 +61,7 @@ public class HealthCheckService {
     private final String mcpCryostatHealthEndpoint;
     private final String mcpCryostatHealthPath;
     private final int mcpCryostatTimeout;
-    private final LangChainPromptSender llmPromptSender;
+    private final PromptSender llmPromptSender;
     private final LLMConfig llmConfig;
 
     @Inject
@@ -78,7 +78,7 @@ public class HealthCheckService {
             @ConfigProperty(name = "causa.mcp.cryostat.health-endpoint") String mcpCryostatHealthEndpoint,
             @ConfigProperty(name = "causa.mcp.cryostat.health-path") String mcpCryostatHealthPath,
             @ConfigProperty(name = "causa.mcp.cryostat.timeout-ms") int mcpCryostatTimeout,
-            LangChainPromptSender llmPromptSender,
+            PromptSender llmPromptSender,
             LLMConfig llmConfig) {
         this.databaseConnectionService = databaseConnectionService;
         this.dataSource = dataSource;
