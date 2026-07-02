@@ -123,6 +123,16 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             .log();
         
         RootCauseAnalysis rca = performRootCauseAnalysis(alert, contextForLLM);
+
+        try {
+            log.info("RCA GENERATED")
+                .field("rca", objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(rca))
+                .log();
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            log.info("RCA GENERATED")
+                .field("rca", rca)
+                .log();
+        }
         
         // TODO: Store RCA result in database
         // TODO: validateRca(alert, rca);
