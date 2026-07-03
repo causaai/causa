@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  * LangChain Prompt Sender
  *
- * <p>Implementation of {@link PromptSender} using LangChain4J's {@link ChatLanguageModel}.
+ * <p>Implementation of {@link PromptSender} using LangChain4J's {@link ChatModel}.
  * This adapter wraps the provider-agnostic LangChain4J interface, providing a clean
  * separation between business logic and LLM integration.
  *
