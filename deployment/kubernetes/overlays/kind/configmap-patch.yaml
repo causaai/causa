@@ -6,9 +6,4 @@ data:
   CAUSA_LOG_LEVEL: "DEBUG"
   # Environment marker
   CLUSTER_TYPE: "kind"
-  # Kind specific database configuration
-  CAUSA_DB_URL: "jdbc:postgresql://iri-db-rw.monitoring.svc.cluster.local:5432/iri-db"
-  CAUSA_MCP_K8S_ENDPOINT: "http://kubernetes-mcp-server.monitoring.svc.cluster.local:8080"
-  CAUSA_MCP_KRUIZE_ENDPOINT: "http://kruize-mcp-server-service.monitoring.svc.cluster.local:8080"
-  CAUSA_MCP_CRYOSTAT_ENDPOINT: "http://cryostat-mcp.monitoring.svc.cluster.local:8000"
-  CAUSA_MCP_CRYOSTAT_HEALTH_ENDPOINT: "http://cryostat-mcp-api.monitoring.svc.cluster.local:8080"
+

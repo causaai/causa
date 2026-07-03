@@ -30,6 +30,12 @@ spec:
         - name: management
           containerPort: 9000
           protocol: TCP
+        env:
+        # adding the namespace, which may be required to construct FQDN for k8s svc URLs
+        - name: APP_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         envFrom:
         # Public configuration (non-sensitive)
         # Loads ALL keys from ConfigMap as environment variables
@@ -42,7 +48,7 @@ spec:
             optional: true  # Allow deployment without secrets for non-LLM features
         - secretRef:
             name: causa-db-secrets
-            optional: false  
+            optional: false
         resources:
           requests:
             cpu: 250m

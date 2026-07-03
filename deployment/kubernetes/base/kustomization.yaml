@@ -6,7 +6,6 @@ labels:
       app.kubernetes.io/managed-by: kustomize
 
 resources:
-  - namespace.yaml
   - serviceaccount.yaml
   - configmap.yaml
   - deployment.yaml
