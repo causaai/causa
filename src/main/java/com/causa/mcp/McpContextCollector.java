@@ -51,23 +51,87 @@ public class McpContextCollector {
     }
 
     /**
-     * Collects context from MCP servers and returns as a formatted string.
+     * Collects diagnostic context from all MCP servers (Kubernetes, Kruize, Cryostat).
      *
-     * <p>TODO: This is a stub method to be implemented by other developer.
-     * Will collect context from Kubernetes MCP (pod status, events, logs),
-     * Kruize MCP (recommendations), and Cryostat MCP (JFR analysis).
+     * <p>Aggregates pod status, events, logs, resource recommendations, and JFR analysis
+     * into a single {@link DiagnosticContext} object for LLM consumption.
+     *
+     * <p>MCP servers are optional - if not configured or unavailable, context collection
+     * will be skipped and empty context will be returned. This allows the application
+     * to start without MCP dependencies.
      *
      * @param alert the alert to collect context for
-     * @return formatted context string with all diagnostic signals
+     * @return diagnostic context with all collected data (fields are nullable on failure)
      */
-    public String collectContextAsString(Alert alert) {
-        // TODO: Implement full MCP context collection
-        // For now, return placeholder to allow compilation
-        log.warn("collectContextAsString not yet implemented - using placeholder")
-            .field("alertId", alert.getAlertId())
+    public DiagnosticContext collectContext(Alert alert) {
+        log.info(LogMessages.Mcp.MCP_CONTEXT_COLLECTION_START)
+            .field(McpConstants.LogFields.ALERT_ID, alert.getId())
+            .field(McpConstants.LogFields.POD_NAME, alert.getPodName())
+            .field(McpConstants.LogFields.NAMESPACE, alert.getNamespace())
             .log();
-        return "MCP context collection not yet implemented. This method will be implemented by another developer.";
+
+        // Check if MCP is configured
+        if (!isMcpConfigured()) {
+            log.info("MCP servers not configured - skipping context collection").log();
+            return DiagnosticContext.builder()
+                .podName(alert.getPodName())
+                .containerName(alert.getContainerName())
+                .namespace(alert.getNamespace())
+                .build();
+        }
+
+        DiagnosticContext.Builder contextBuilder = DiagnosticContext.builder()
+            .podName(alert.getPodName())
+            .containerName(alert.getContainerName())
+            .namespace(alert.getNamespace());
+
+        String resolvedContainerName = alert.getContainerName();
+        String fullPodYaml = null; // Keep full YAML for container name extraction
+
+        // Kubernetes context collection
+        if (alert.getPodName() != null && !alert.getPodName().isBlank()) {
+            fullPodYaml = collectKubernetesPodStatus(alert, contextBuilder);
+
+            // Try to extract container name from pod status if not in alert
+            if (resolvedContainerName == null || resolvedContainerName.isBlank()) {
+                resolvedContainerName = extractContainerNameFromPodStatus(fullPodYaml);
+                contextBuilder.containerName(resolvedContainerName);
+            }
+
+            contextBuilder.podEvents(collectKubernetesPodEvents(alert));
+            contextBuilder.podLogs(collectKubernetesPodLogs(alert));
+        } else {
+            log.info(LogMessages.Mcp.MCP_SKIPPED_NO_POD)
+                .field(McpConstants.LogFields.ALERT_ID, alert.getId())
+                .log();
+        }
+
+        // Kruize context collection (requires container name)
+        if (resolvedContainerName != null && !resolvedContainerName.isBlank()) {
+            collectKruizeContext(contextBuilder, alert, resolvedContainerName);
+        } else {
+            log.info(LogMessages.Mcp.MCP_KRUIZE_SKIPPED_NO_CONTAINER)
+                .field(McpConstants.LogFields.ALERT_ID, alert.getId())
+                .log();
+        }
+
+        // Cryostat context collection (requires pod name)
+        if (alert.getPodName() != null && !alert.getPodName().isBlank()) {
+            collectCryostatContext(contextBuilder, alert);
+        }
+
+        DiagnosticContext context = contextBuilder.build();
+
+        log.info(LogMessages.Mcp.MCP_CONTEXT_COLLECTION_COMPLETE)
+            .field(McpConstants.LogFields.ALERT_ID, alert.getId())
+            .field(McpConstants.LogFields.HAS_K8S_CONTEXT, context.hasKubernetesContext())
+            .field(McpConstants.LogFields.HAS_KRUIZE_CONTEXT, context.hasKruizeContext())
+            .field(McpConstants.LogFields.HAS_CRYOSTAT_CONTEXT, context.hasCryostatContext())
+            .log();
+
+        return context;
     }
+
 
 
     /**
