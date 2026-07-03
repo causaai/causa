@@ -108,7 +108,7 @@ public class ChatModelFactory {
             );
         }
 
-        String modelName = config.modelName().orElse("(not set)");
+        String modelName = config.modelName().orElse("");
         log.info(LogMessages.LLM.LLM_PROVIDER_DETECTED)
             .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.ANTHROPIC)
             .field(LLMConstants.Fields.AUTH_TYPE, LLMConstants.AuthModes.API_KEY)
@@ -120,7 +120,7 @@ public class ChatModelFactory {
 
         return AnthropicChatModel.builder()
             .apiKey(apiKey)
-            .modelName(config.modelName().orElse(""))
+            .modelName(modelName)
             .temperature(config.temperature())
             .maxTokens(config.maxTokens())
             .timeout(Duration.ofSeconds(config.timeoutSeconds()))
@@ -150,7 +150,7 @@ public class ChatModelFactory {
         }
 
         String location = config.vertex().location().orElse("us-east5");
-        String modelName = config.modelName().orElse("(not set)");
+        String modelName = config.modelName().orElse("");
 
         log.info(LogMessages.LLM.LLM_PROVIDER_DETECTED)
             .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.VERTEX_AI_ANTHROPIC)
@@ -165,7 +165,7 @@ public class ChatModelFactory {
         return VertexAiAnthropicChatModel.builder()
             .project(projectId)
             .location(location)
-            .modelName(config.modelName().orElse(""))
+            .modelName(modelName)
             .maxTokens(config.maxTokens())
             .logRequests(true)
             .logResponses(true)
