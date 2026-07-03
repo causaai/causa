@@ -239,6 +239,40 @@ class HealthCheckServiceTest {
         }
 
         @Test
+        @DisplayName("Should return UP with 'unknown' fallback when modelName is absent")
+        void shouldReturnUpWithUnknownFallbackWhenModelNameAbsent() {
+            // Given
+            when(databaseConnectionService.isReady()).thenReturn(false);
+            when(llmPromptSender.isReady()).thenReturn(true);
+            when(llmConfig.modelName()).thenReturn(Optional.empty());
+
+            LLMResponse mockResponse = new LLMResponse(
+                    "OK",
+                    "unknown",
+                    11L,
+                    4L,
+                    0L,
+                    0L,
+                    100L
+            );
+            when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(mockResponse);
+
+            // When
+            HealthCheckResponseDto response = healthCheckService.getSystemHealth();
+
+            // Then
+            assertNotNull(response);
+            ComponentHealthDto llmHealth = response.getComponents().get(HealthCheckConstants.ComponentNames.LLM_PROVIDER);
+            assertNotNull(llmHealth);
+            assertEquals(AppConstants.HealthStatus.UP.getValue(), llmHealth.getStatus());
+            assertTrue(llmHealth.getMessage().contains("unknown"),
+                    "Expected message to contain 'unknown' fallback, but was: " + llmHealth.getMessage());
+
+            verify(llmPromptSender).isReady();
+            verify(llmPromptSender).send(any(LLMRequest.class));
+        }
+
+        @Test
         @DisplayName("Should return DOWN when LLM is not ready")
         void shouldReturnDownWhenLlmNotReady() {
             // Given
