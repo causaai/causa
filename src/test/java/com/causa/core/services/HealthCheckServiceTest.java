@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.Statement;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -76,7 +77,6 @@ class HealthCheckServiceTest {
     private static final String MCP_CRYOSTAT_HEALTH_ENDPOINT = "http://localhost:8083";
     private static final String MCP_CRYOSTAT_HEALTH_PATH = "/health";
     private static final int MCP_CRYOSTAT_TIMEOUT = 5000;
-    private static final String MCP_ENDPOINT = "http://localhost:8081";
     // 192.0.2.1 is RFC 5737 TEST-NET — guaranteed non-routable, always results in connection failure
     private static final String MCP_ENDPOINT = "http://192.0.2.1";
     private static final String MCP_HEALTH_PATH = "/health";
@@ -97,9 +97,6 @@ class HealthCheckServiceTest {
                 MCP_CRYOSTAT_HEALTH_ENDPOINT,
                 MCP_CRYOSTAT_HEALTH_PATH,
                 MCP_CRYOSTAT_TIMEOUT,
-                MCP_ENDPOINT,
-                MCP_HEALTH_PATH,
-                MCP_TIMEOUT,
                 llmPromptSender,
                 llmConfig
         );
@@ -212,7 +209,7 @@ class HealthCheckServiceTest {
             // Given
             when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(true);
-            when(llmConfig.modelName()).thenReturn("claude-sonnet-4-6");
+            when(llmConfig.modelName()).thenReturn(Optional.of("claude-sonnet-4-6"));
             
             LLMResponse mockResponse = new LLMResponse(
                     "OK",
@@ -343,7 +340,7 @@ class HealthCheckServiceTest {
 
             // Given - LLM UP
             when(llmPromptSender.isReady()).thenReturn(true);
-            when(llmConfig.modelName()).thenReturn("claude-sonnet-4-6");
+            when(llmConfig.modelName()).thenReturn(Optional.of("claude-sonnet-4-6"));
             LLMResponse mockResponse = new LLMResponse("OK", "claude-sonnet-4-6", 11L, 4L, 0L, 0L, 100L);
             when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(mockResponse);
 
@@ -364,7 +361,7 @@ class HealthCheckServiceTest {
 
             // Given - LLM UP
             when(llmPromptSender.isReady()).thenReturn(true);
-            when(llmConfig.modelName()).thenReturn("claude-sonnet-4-6");
+            when(llmConfig.modelName()).thenReturn(Optional.of("claude-sonnet-4-6"));
             LLMResponse mockResponse = new LLMResponse("OK", "claude-sonnet-4-6", 11L, 4L, 0L, 0L, 100L);
             when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(mockResponse);
 
