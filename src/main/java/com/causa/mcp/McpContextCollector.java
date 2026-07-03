@@ -1,5 +1,12 @@
 package com.causa.mcp;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.UUID;
+
 import com.causa.common.constants.McpConstants;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
@@ -48,10 +55,6 @@ public class McpContextCollector {
      *
      * <p>Aggregates pod status, events, logs, resource recommendations, and JFR analysis
      * into a single {@link DiagnosticContext} object for LLM consumption.
-     *
-     * <p>MCP servers are optional - if not configured or unavailable, context collection
-     * will be skipped and empty context will be returned. This allows the application
-     * to start without MCP dependencies.
      *
      * @param alert the alert to collect context for
      * @return diagnostic context with all collected data (fields are nullable on failure)
