@@ -21,7 +21,6 @@ import jakarta.inject.Inject;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * LangChain Prompt Sender
@@ -44,7 +43,6 @@ public class LangChainPromptSender implements PromptSender {
 
     private final ChatModel chatModel;
     private final LLMConfig config;
-    private final AtomicBoolean ready = new AtomicBoolean(false);
 
     @Inject
     public LangChainPromptSender(ChatModel chatModel, LLMConfig config) {
@@ -137,14 +135,7 @@ public class LangChainPromptSender implements PromptSender {
 
     @Override
     public boolean isReady() {
-        return ready.get();
-    }
-
-    /**
-     * Marks the prompt sender as ready. Called by LLMStartup after successful connectivity check.
-     */
-    void setReady(boolean ready) {
-        this.ready.set(ready);
+        return chatModel != null && config.modelName().filter(m -> !m.isBlank()).isPresent();
     }
 
     /**
