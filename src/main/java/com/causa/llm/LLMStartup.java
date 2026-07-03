@@ -38,25 +38,28 @@ public class LLMStartup {
     }
 
     void onStartup(@Observes @Priority(AppConstants.StartupConstants.LLM_PRIORITY) StartupEvent event) {
+        String provider = config.provider().orElse("(not configured)");
+        String modelName = config.modelName().orElse("(not configured)");
+
         log.info(LogMessages.LLM.CONNECTIVITY_CHECK_START)
-            .field(LLMConstants.Fields.PROVIDER, config.provider())
-            .field(LLMConstants.Fields.MODEL, config.modelName())
+            .field(LLMConstants.Fields.PROVIDER, provider)
+            .field(LLMConstants.Fields.MODEL, modelName)
             .log();
 
         boolean ready = verifyConnectivity();
 
         if (ready) {
             log.info(LogMessages.LLM.LLM_READY)
-                .field(LLMConstants.Fields.PROVIDER, config.provider())
-                .field(LLMConstants.Fields.MODEL, config.modelName())
+                .field(LLMConstants.Fields.PROVIDER, provider)
+                .field(LLMConstants.Fields.MODEL, modelName)
                 .field(LLMConstants.Fields.AUTH_TYPE, config.authType().orElse("NOT_SET"))
                 .field(LLMConstants.Fields.TEMPERATURE, config.temperature())
                 .field(LLMConstants.Fields.MAX_TOKENS, config.maxTokens())
                 .field(LLMConstants.Fields.TIMEOUT_SECONDS, config.timeoutSeconds())
                 .log();
         } else {
-            log.error(LogMessages.LLM.LLM_STARTUP_FAILED)
-                .field(LLMConstants.Fields.PROVIDER, config.provider())
+            log.warn(LogMessages.LLM.LLM_STARTUP_FAILED)
+                .field(LLMConstants.Fields.PROVIDER, provider)
                 .log();
         }
     }
@@ -67,11 +70,12 @@ public class LLMStartup {
      * @return true if the LLM responded successfully, false otherwise
      */
     private boolean verifyConnectivity() {
+        String provider = config.provider().orElse("(not configured)");
         try {
             // Check if provider is ready first
             if (!promptSender.isReady()) {
-                log.warn("LLM provider not ready during startup check")
-                    .field(LLMConstants.Fields.PROVIDER, config.provider())
+                log.warn(LogMessages.LLM.LLM_STARTUP_FAILED)
+                    .field(LLMConstants.Fields.PROVIDER, provider)
                     .log();
                 return false;
             }
@@ -83,7 +87,7 @@ public class LLMStartup {
             LLMResponse response = promptSender.send(testRequest);
 
             log.info(LogMessages.LLM.CONNECTIVITY_CHECK_SUCCESS)
-                .field(LLMConstants.Fields.PROVIDER, config.provider())
+                .field(LLMConstants.Fields.PROVIDER, provider)
                 .field(LLMConstants.Fields.MODEL, response.modelUsed())
                 .field(LLMConstants.Fields.LATENCY_MS, response.latencyMs())
                 .log();
@@ -91,10 +95,10 @@ public class LLMStartup {
             return true;
 
         } catch (Exception e) {
-            log.error(LogMessages.LLM.CONNECTIVITY_CHECK_FAILED)
-                .field(LLMConstants.Fields.PROVIDER, config.provider())
+            // Log a clean one-line warning — no stack trace on startup to keep logs quiet
+            log.warn(LogMessages.LLM.CONNECTIVITY_CHECK_FAILED)
+                .field(LLMConstants.Fields.PROVIDER, provider)
                 .field(LLMConstants.Fields.ERROR_TYPE, e.getClass().getSimpleName())
-                .exception(e)
                 .log();
 
             return false;

@@ -13,23 +13,26 @@ data:
 
   # LLM Configuration (Public settings - non-sensitive)
   # Provider: anthropic (direct API) | vertex-ai-anthropic (Google Cloud) | bob (BOB Shell CLI) | ibm-bob (future REST API) | ollama (future)
-  LLM_PROVIDER: ""
-  LLM_MODEL_NAME: ""
+  # DO NOT set required string properties to "" 
+  # LLM_PROVIDER: ""
+  # LLM_MODEL_NAME: ""
+
+  # Vertex AI Configuration (Public settings)
+  # Valid regions: us-east5, us-central1, europe-west1, asia-southeast1
+  # Note: 'global' is NOT valid for Claude on Vertex AI
+  # VERTEX_LOCATION: ""
+
+
+  # Optional overrides (leave empty to use defaults)
+  # LLM_BASE_URL: ""
+  # LLM_AUTH_TYPE: ""
+  # LLM_CUSTOM_HEADERS: ""
+
   LLM_TEMPERATURE: "0.1"
   LLM_MAX_TOKENS: "8192"
   # BOB Shell requires longer execution time — set to 180s (3 min) for long-running analysis
   LLM_TIMEOUT_SECONDS: "180"
   LLM_CHAT_MEMORY_SIZE: "25"
-
-  # Vertex AI Configuration (Public settings)
-  # Valid regions: us-east5, us-central1, europe-west1, asia-southeast1
-  # Note: 'global' is NOT valid for Claude on Vertex AI
-  VERTEX_LOCATION: ""
-
-  # Optional overrides (leave empty to use defaults)
-  LLM_BASE_URL: ""
-  LLM_AUTH_TYPE: ""
-  LLM_CUSTOM_HEADERS: ""
 
   # Alert Configuration
   # Minimum alert severity to trigger diagnostic pipeline (critical, warning, info)

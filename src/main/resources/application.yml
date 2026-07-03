@@ -55,7 +55,7 @@ quarkus:
     username: ${CAUSA_DB_USERNAME:causa_backend}
     password: ${CAUSA_DB_PASSWORD:}
     jdbc:
-      url: ${CAUSA_DB_URL:jdbc:postgresql://diagnostics-tool-db-rw.diagnostics-tool.svc.cluster.local:5432/diagnostics-tool-db}
+      url: ${CAUSA_DB_URL:jdbc:postgresql://iri-db-rw:5432/iri-db}
       min-size: ${CAUSA_DB_POOL_MIN_SIZE:2}
       max-size: ${CAUSA_DB_POOL_MAX_SIZE:10}
       idle-removal-interval: ${CAUSA_DB_POOL_IDLE_REMOVAL:PT2M}
@@ -83,18 +83,18 @@ causa:
   # LLM Configuration (LangChain4J)
   llm:
     provider: ${LLM_PROVIDER:vertex-ai-anthropic}
-    model-name: ${LLM_MODEL_NAME:claude-sonnet-4-6}
+    model-name: ${LLM_MODEL_NAME:}
     base-url: ${LLM_BASE_URL:}
     auth-type: ${LLM_AUTH_TYPE:}
     custom-headers: ${LLM_CUSTOM_HEADERS:{}}
     temperature: ${LLM_TEMPERATURE:0.1}
-    max-tokens: ${LLM_MAX_TOKENS:4096}
+    max-tokens: ${LLM_MAX_TOKENS:8192}
     api-key: ${LLM_API_KEY:}
     timeout-seconds: ${LLM_TIMEOUT_SECONDS:180}
     chat-memory-size: ${LLM_CHAT_MEMORY_SIZE:10}
     vertex:
       project-id: ${VERTEX_PROJECT_ID:}
-      location: ${VERTEX_LOCATION:us-east5}
+      location: ${VERTEX_LOCATION:}
     bob:
       shell-path: bob
 
@@ -107,16 +107,16 @@ causa:
 
   mcp:
     kubernetes:
-      endpoint: ${CAUSA_MCP_K8S_ENDPOINT:http://kubernetes-mcp-server.diagnostics-tool.svc.cluster.local:8080}
+      endpoint: ${CAUSA_MCP_K8S_ENDPOINT:http://kubernetes-mcp-server:8080}
       health-path: ${CAUSA_MCP_K8S_HEALTH_PATH:/healthz}
       timeout-ms: ${CAUSA_MCP_K8S_TIMEOUT:5000}
     kruize:
-      endpoint: ${CAUSA_MCP_KRUIZE_ENDPOINT:http://kruize-mcp-server-service.openshift-tuning.svc.cluster.local:8080}
+      endpoint: ${CAUSA_MCP_KRUIZE_ENDPOINT:http://kruize-mcp-server-service:8080}
       health-path: ${CAUSA_MCP_KRUIZE_HEALTH_PATH:/q/health/ready}
       timeout-ms: ${CAUSA_MCP_KRUIZE_TIMEOUT:10000}
     cryostat:
-      endpoint: ${CAUSA_MCP_CRYOSTAT_ENDPOINT:http://cryostat-mcp.openshift-tuning.svc.cluster.local:8000}
-      health-endpoint: ${CAUSA_MCP_CRYOSTAT_HEALTH_ENDPOINT:http://cryostat-mcp-api.openshift-tuning.svc.cluster.local:8080}
+      endpoint: ${CAUSA_MCP_CRYOSTAT_ENDPOINT:http://cryostat-mcp:8000}
+      health-endpoint: ${CAUSA_MCP_CRYOSTAT_HEALTH_ENDPOINT:http://cryostat-mcp-api:8080}
       health-path: ${CAUSA_MCP_CRYOSTAT_HEALTH_PATH:/healthz}
       timeout-ms: ${CAUSA_MCP_CRYOSTAT_TIMEOUT:15000}
       retry-delay-ms: ${CAUSA_MCP_CRYOSTAT_RETRY_DELAY:5000}

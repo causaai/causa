@@ -176,6 +176,7 @@ public final class LLMConstants {
         public static final String API_KEY_REQUIRED = "LLM_API_KEY is required for provider: ";
         public static final String VERTEX_PROJECT_ID_REQUIRED = "VERTEX_PROJECT_ID is required for provider: ";
         public static final String MODEL_NOT_AVAILABLE = "LLM chat model not available";
+        public static final String LLM_CONFIG_NOT_AVAILABLE = "LLM config not available";
         public static final String REQUEST_FAILED_TEMPLATE = "LLM request failed: %s";
         public static final String TEMPERATURE_RANGE_MESSAGE = "temperature must be between 0.0 and 1.0 inclusive";
         public static final String MAX_TOKENS_RANGE_MESSAGE = "maxTokens must be greater than 0";
@@ -233,5 +234,7 @@ public final class LLMConstants {
         public static final String LLM_CONNECTIVITY_FAILED = "LLM connectivity test failed";
         public static final String LLM_CONNECTED_FORMAT = "Connected to LangChain4J with %s";
         public static final String LLM_ERROR_FORMAT = "LLM health check failed: %s";
+        public static final String LLM_CONFIG_NOT_AVAILABLE = "LLM config not available";
+        public static final String LLM_CONNECTION_FAILED = "LLM connection failed";
     }
 }

@@ -16,6 +16,9 @@ import java.util.Optional;
  * Maps to {@code causa.llm.*} in application.yml, which reads from {@code LLM_*} environment variables.
  *
  * <p>All properties support runtime ENV variable overrides.
+ * All required string fields are {@link Optional} so the application starts cleanly even when
+ * LLM environment variables are not set. Missing values are handled at the usage site with
+ * a clean "LLM config not available" message instead of a startup exception.
  *
  * @since 0.0.1
  */
@@ -25,18 +28,18 @@ public interface LLMConfig {
     /**
      * LLM provider to use (anthropic, vertex-ai-anthropic, openai, ollama).
      *
-     * @return the provider name
+     * @return the provider name, or empty if not configured
      */
     @WithName("provider")
-    String provider();
+    Optional<String> provider();
 
     /**
      * Model name to use for LLM requests.
      *
-     * @return the model name
+     * @return the model name, or empty if not configured
      */
     @WithName("model-name")
-    String modelName();
+    Optional<String> modelName();
 
     /**
      * Base URL for the LLM API. Overrides default cloud endpoints.
@@ -72,6 +75,7 @@ public interface LLMConfig {
      * @return the temperature
      */
     @WithName("temperature")
+    @WithDefault("0.1")
     double temperature();
 
     /**
@@ -80,6 +84,7 @@ public interface LLMConfig {
      * @return the max tokens
      */
     @WithName("max-tokens")
+    @WithDefault("8192")
     int maxTokens();
 
     /**
@@ -96,6 +101,7 @@ public interface LLMConfig {
      * @return the timeout in seconds
      */
     @WithName("timeout-seconds")
+    @WithDefault("180")
     int timeoutSeconds();
 
     /**
@@ -104,6 +110,7 @@ public interface LLMConfig {
      * @return the chat memory size
      */
     @WithName("chat-memory-size")
+    @WithDefault("10")
     int chatMemorySize();
 
     /**
@@ -137,10 +144,10 @@ public interface LLMConfig {
         /**
          * Google Cloud region (e.g., global, us-east5, europe-west1).
          *
-         * @return the location
+         * @return the location, or empty if not configured
          */
         @WithName("location")
-        String location();
+        Optional<String> location();
     }
 
     /**

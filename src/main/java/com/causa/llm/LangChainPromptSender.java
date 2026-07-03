@@ -56,7 +56,7 @@ public class LangChainPromptSender implements PromptSender {
     public LLMResponse send(LLMRequest request) {
         if (!isReady()) {
             log.error(LogMessages.LLM.MODEL_NOT_AVAILABLE)
-                .field(LLMConstants.Fields.PROVIDER, config.provider())
+                .field(LLMConstants.Fields.PROVIDER, config.provider().orElse("(not configured)"))
                 .log();
             throw new LLMException(
                 LLMConstants.ErrorMessages.MODEL_NOT_AVAILABLE,
@@ -65,7 +65,7 @@ public class LangChainPromptSender implements PromptSender {
         }
 
         log.info(LogMessages.LLM.PROMPT_SEND_START)
-            .field(LLMConstants.Fields.PROVIDER, config.provider())
+            .field(LLMConstants.Fields.PROVIDER, config.provider().orElse("(not configured)"))
             .field(LLMConstants.Fields.MODEL, resolveModel(request))
             .log();
 
@@ -221,6 +221,6 @@ public class LangChainPromptSender implements PromptSender {
      * @return the model name
      */
     private String resolveModel(LLMRequest request) {
-        return request.modelOverride().orElse(config.modelName());
+        return request.modelOverride().orElse(config.modelName().orElse(""));
     }
 }

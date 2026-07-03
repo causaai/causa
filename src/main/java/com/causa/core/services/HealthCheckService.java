@@ -321,7 +321,7 @@ public class HealthCheckService {
 
             long latency = System.currentTimeMillis() - startTime;
             String message = String.format(LLMConstants.Messages.LLM_CONNECTED_FORMAT,
-                    llmConfig.modelName());
+                    llmConfig.modelName().orElse("unknown"));
 
             log.info(LogMessages.HealthCheck.LLM_CHECK_PASSED)
                 .field(ApiConstants.LogFields.LATENCY_MS, latency)
