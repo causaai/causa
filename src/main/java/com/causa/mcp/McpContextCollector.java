@@ -1,12 +1,5 @@
 package com.causa.mcp;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
-import java.util.UUID;
-
 import com.causa.common.constants.McpConstants;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
@@ -65,20 +58,10 @@ public class McpContextCollector {
      */
     public DiagnosticContext collectContext(Alert alert) {
         log.info(LogMessages.Mcp.MCP_CONTEXT_COLLECTION_START)
-            .field(McpConstants.LogFields.ALERT_ID, alert.getId())
+            .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
             .field(McpConstants.LogFields.POD_NAME, alert.getPodName())
             .field(McpConstants.LogFields.NAMESPACE, alert.getNamespace())
             .log();
-
-        // Check if MCP is configured
-        if (!isMcpConfigured()) {
-            log.info("MCP servers not configured - skipping context collection").log();
-            return DiagnosticContext.builder()
-                .podName(alert.getPodName())
-                .containerName(alert.getContainerName())
-                .namespace(alert.getNamespace())
-                .build();
-        }
 
         DiagnosticContext.Builder contextBuilder = DiagnosticContext.builder()
             .podName(alert.getPodName())
@@ -102,7 +85,7 @@ public class McpContextCollector {
             contextBuilder.podLogs(collectKubernetesPodLogs(alert));
         } else {
             log.info(LogMessages.Mcp.MCP_SKIPPED_NO_POD)
-                .field(McpConstants.LogFields.ALERT_ID, alert.getId())
+                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
                 .log();
         }
 
@@ -111,7 +94,7 @@ public class McpContextCollector {
             collectKruizeContext(contextBuilder, alert, resolvedContainerName);
         } else {
             log.info(LogMessages.Mcp.MCP_KRUIZE_SKIPPED_NO_CONTAINER)
-                .field(McpConstants.LogFields.ALERT_ID, alert.getId())
+                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
                 .log();
         }
 
@@ -123,7 +106,7 @@ public class McpContextCollector {
         DiagnosticContext context = contextBuilder.build();
 
         log.info(LogMessages.Mcp.MCP_CONTEXT_COLLECTION_COMPLETE)
-            .field(McpConstants.LogFields.ALERT_ID, alert.getId())
+            .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
             .field(McpConstants.LogFields.HAS_K8S_CONTEXT, context.hasKubernetesContext())
             .field(McpConstants.LogFields.HAS_KRUIZE_CONTEXT, context.hasKruizeContext())
             .field(McpConstants.LogFields.HAS_CRYOSTAT_CONTEXT, context.hasCryostatContext())
