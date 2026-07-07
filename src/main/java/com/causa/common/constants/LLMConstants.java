@@ -193,6 +193,10 @@ public final class LLMConstants {
         public static final String REQUEST_FAILED_TEMPLATE = "LLM request failed: %s";
         public static final String TEMPERATURE_RANGE_MESSAGE = "temperature must be between 0.0 and 1.0 inclusive";
         public static final String MAX_TOKENS_RANGE_MESSAGE = "maxTokens must be greater than 0";
+        public static final String NO_USER_MESSAGE = "No UserMessage found in conversation";
+        public static final String TOOL_NOT_FOUND_TEMPLATE = "Tool not found: %s";
+        public static final String TOOL_EXECUTION_FAILED_TEMPLATE = "Tool execution failed: %s: %s";
+        public static final String MAX_TOOL_ITERATIONS_TEMPLATE = "LLM did not produce a text response after %d tool iterations";
     }
 
     /**

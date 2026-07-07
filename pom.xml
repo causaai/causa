@@ -138,6 +138,12 @@
             <artifactId>langchain4j-vertex-ai-anthropic</artifactId>
             <version>${langchain4j-vertex-anthropic.version}</version>
         </dependency>
+        
+        <dependency>
+            <groupId>io.quarkiverse.langchain4j</groupId>
+            <artifactId>quarkus-langchain4j-skills</artifactId>
+            <version>1.11.0</version>
+        </dependency>
 
         <!-- Google Auth Library — in-memory ADC JSON credentials for Vertex AI -->
         <dependency>
