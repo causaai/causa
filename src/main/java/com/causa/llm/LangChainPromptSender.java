@@ -33,7 +33,6 @@ import java.util.List;
  * This adapter wraps the provider-agnostic LangChain4J interface, providing a clean
  * separation between business logic and LLM integration.
  *
- * <p>TEMPORARY: Conditional annotation removed for testing - RESTORE BEFORE PR
  * <p>This bean is enabled by default unless {@code causa.llm.provider} is set to "bob".
  * When "bob" is configured, {@link BobShellPromptSender} is used instead.
  *

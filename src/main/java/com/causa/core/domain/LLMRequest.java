@@ -18,6 +18,7 @@ import java.util.Optional;
  * @param enableCaching Whether to use prompt caching (optional, defaults to config)
  * @param enableSkills Whether to expose skills to the LLM (optional, defaults to true)
  * @param maxTokens Maximum response tokens (optional, defaults to config)
+ * @param enableSkills Whether to expose skills to the LLM (optional, defaults to true)
  * @param temperature Sampling temperature 0.0-1.0 (optional, defaults to config)
  * @since 0.0.1
  */
