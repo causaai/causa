@@ -9,6 +9,8 @@ import com.causa.infrastructure.persistence.mappers.AlertEntityMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
+import java.util.Optional;
+
 /**
  * Alert Repository Implementation
  *
@@ -52,5 +54,11 @@ public class AlertRepositoryImpl implements AlertRepository {
         } catch (Exception e) {
             throw new AlertException(LogMessages.Alert.ALERT_UPDATE_FAILED + ": " + alertId, "UpdateError", e);
         }
+    }
+
+    @Override
+    public Optional<Alert> findById(String alertId) {
+        return AlertEntity.<AlertEntity>findByIdOptional(alertId)
+            .map(AlertEntityMapper::toDomain);
     }
 }

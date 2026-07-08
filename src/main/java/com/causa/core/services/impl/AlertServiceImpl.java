@@ -15,6 +15,7 @@ import jakarta.inject.Inject;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -156,5 +157,10 @@ public class AlertServiceImpl implements AlertService {
             .field("removedEntries", removedEntries)
             .field("remainingEntries", cooldownCache.size())
             .log();
+    }
+
+    @Override
+    public Optional<Alert> getAlert(String alertId) {
+        return alertRepository.findById(alertId);
     }
 }
