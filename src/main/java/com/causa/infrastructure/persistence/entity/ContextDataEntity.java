@@ -2,6 +2,7 @@ package com.causa.infrastructure.persistence.entity;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.*;
+import org.hibernate.annotations.Array;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -53,10 +54,12 @@ public class ContextDataEntity extends BaseEntity {
      * 1536-dimension vector embedding of {@code content} (OpenAI standard).
      * Stored as pgvector {@code vector(1536)} — {@code null} until the embedding pipeline runs.
      *
-     * NOTE: Hibernate does not natively know the {@code vector} type.
-     * We store it as a plain {@code float[]} and rely on the pgvector JDBC driver
-     * to handle the conversion transparently.
+     * Mapped via {@code hibernate-vector} (Hibernate 6.4+): {@code @JdbcTypeCode(SqlTypes.VECTOR)}
+     * registers the native pgvector JDBC type handler and {@code @Array(length = 1536)} declares
+     * the fixed dimension, producing the correct {@code vector(1536)} DDL and wire-format binding.
      */
+    @JdbcTypeCode(SqlTypes.VECTOR)
+    @Array(length = 1536)
     @Column(columnDefinition = "vector(1536)")
     private float[] embedding;
 

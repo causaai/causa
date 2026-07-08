@@ -17,6 +17,7 @@
         <surefire-plugin.version>3.5.6</surefire-plugin.version>
         <langchain4j.version>1.15.1</langchain4j.version>
         <langchain4j-vertex-anthropic.version>1.15.1-beta25</langchain4j-vertex-anthropic.version>
+        <hibernate.version>7.3.6.Final</hibernate.version>
     </properties>
 
     <dependencyManagement>
@@ -70,6 +71,13 @@
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-hibernate-orm-panache</artifactId>
+        </dependency>
+
+        <!-- Hibernate Vector — native pgvector support (requires Hibernate 6.4+) -->
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-vector</artifactId>
+            <version>${hibernate.version}</version>
         </dependency>
 
         <!-- Hibernate Validator -->
