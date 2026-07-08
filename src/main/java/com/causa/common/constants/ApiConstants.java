@@ -95,6 +95,17 @@ public final class ApiConstants {
         }
 
         /**
+         * Diagnostics API paths.
+         */
+        public static final class Diagnostics {
+            private Diagnostics() {}
+
+            public static final String BASE        = Version.API_V1 + "/diagnostics";
+            public static final String BY_ID       = Version.API_V1 + "/diagnostics/{id}";
+            public static final String PATH_PARAM  = "id";
+        }
+
+        /**
          * Configuration management API paths and query parameter names.
          */
         public static final class Configs {

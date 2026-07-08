@@ -166,6 +166,13 @@ public final class LogMessages {
         // Exception messages
         public static final String DIAGNOSTIC_PERSIST_FAILED = "Failed to persist diagnostic";
         public static final String DIAGNOSTIC_UPDATE_FAILED = "Failed to update diagnostic";
+
+        // Diagnostics API
+        public static final String DIAGNOSTICS_LIST_REQUEST  = "Diagnostics list request received";
+        public static final String DIAGNOSTICS_LIST_RETURNED = "Diagnostics list returned";
+        public static final String DIAGNOSTIC_GET_REQUEST    = "Diagnostic detail request received";
+        public static final String DIAGNOSTIC_GET_FOUND      = "Diagnostic detail retrieved";
+        public static final String DIAGNOSTIC_GET_NOT_FOUND  = "Diagnostic not found for given ID";
     }
 
     /**

@@ -26,10 +26,9 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import com.causa.core.domain.DiagnosticContext;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -131,8 +130,8 @@ public class DiagnosticServiceImpl implements DiagnosticService {
         // TODO: Step 4: Validate RCA against collected context
         // validateRca(alert, rca, contextForLLM);
 
-        // TODO: Step 5: Store RCA result in database
-        // diagnosticRepository.saveRca(diagnosticId, rca);
+        // Step 5: Persist completed diagnostic with RCA results
+        diagnostic = persistCompletedDiagnostic(diagnostic, rca);
 
         return diagnostic;
     }
@@ -218,8 +217,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             log.info(LogMessages.Diagnostic.RCA_GENERATED_SUCCESS)
                 .field(DiagnosticConstants.FIELD_ALERT_ID, alert.getAlertId())
                 .field("anomalyType", rca.anomalyType())
-                .field("rcaConfidence", rca.llmConfidenceScoreForRca())
-                .field("solutionConfidence", rca.llmConfidenceScoreForSolution())
+                .field("rcaConfidence", rca.confidenceSummary() != null ? rca.confidenceSummary().rcaConfidenceScore() : null)
                 .log();
 
             return rca;
@@ -281,23 +279,70 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     }
 
     /**
+     * Persists a completed diagnostic with the parsed RCA results.
+     *
+     * <p>Rebuilds the Diagnostic domain object with COMPLETED status and populated
+     * RCA fields, then merges it into the database.
+     *
+     * @param pending the original PENDING diagnostic
+     * @param rca     the parsed RCA result
+     * @return the updated Diagnostic in COMPLETED status
+     */
+    private Diagnostic persistCompletedDiagnostic(Diagnostic pending, RootCauseAnalysis rca) {
+        try {
+            String rcaJson = objectMapper.writeValueAsString(rca);
+
+            Float confidenceScore = null;
+            if (rca.confidenceSummary() != null && rca.confidenceSummary().rcaConfidenceScore() != null) {
+                confidenceScore = rca.confidenceSummary().rcaConfidenceScore().floatValue();
+            }
+
+            com.causa.common.constants.DiagnosticConstants.FaultDomain faultDomain = null;
+            if (rca.anomalyType() != null) {
+                try {
+                    faultDomain = com.causa.common.constants.DiagnosticConstants.FaultDomain
+                        .fromString(rca.anomalyType().name());
+                } catch (IllegalArgumentException ignored) {
+                    // anomaly type has no matching fault domain — leave null
+                }
+            }
+
+            Diagnostic completed = Diagnostic.builder()
+                .diagnosticId(pending.getDiagnosticId())
+                .alertId(pending.getAlertId())
+                .status(DiagnosticStatus.COMPLETED)
+                .generatedAt(pending.getGeneratedAt())
+                .confidenceScore(confidenceScore)
+                .faultDomain(faultDomain)
+                .rootCauseAnalysis(rcaJson)
+                .build();
+
+            return diagnosticRepository.update(completed);
+
+        } catch (Exception e) {
+            log.error(LogMessages.Diagnostic.DIAGNOSTIC_UPDATE_FAILED)
+                .field("diagnosticId", pending.getDiagnosticId())
+                .exception(e)
+                .log();
+            // Return pending diagnostic — RCA was still generated, persistence failed
+            return pending;
+        }
+    }
+
+    @Override
+    public List<Diagnostic> listDiagnostics() {
+        return diagnosticRepository.findAll();
+    }
+
+    @Override
+    public Optional<Diagnostic> getDiagnosticById(String diagnosticId) {
+        return diagnosticRepository.findById(diagnosticId);
+    }
+
+    /**
      * Validates RCA output against collected diagnostic context.
      *
      * <p>NOTE: This is a placeholder. The actual validation framework is in branch rca-validation-impl.
-     * When merged, this should be replaced with:
-     * <pre>
-     * private ValidatedRCA validateRca(Alert alert, RootCauseAnalysis rca, String diagnosticContext) {
-     *     return rcaValidator.get().validate(rca, diagnosticContext);
-     * }
-     * </pre>
-     *
-     * <p>Validation framework features:
-     * <ul>
-     *   <li>Assertion extraction from RCA (rule-based or LLM-powered)</li>
-     *   <li>Evidence matching against diagnostic context</li>
-     *   <li>LLM-based assertion analysis with targeted questions</li>
-     *   <li>Confidence scoring and validation results</li>
-     * </ul>
      *
      * @param alert the alert being analyzed
      * @param rca the RCA result to validate
@@ -310,6 +355,5 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             .log();
 
         // TODO: Remove this placeholder when RCA validation framework is merged
-        // See branch: rca-validation-impl
     }
 }

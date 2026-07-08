@@ -61,9 +61,22 @@ public final class DiagnosticEntityMapper {
             entity.setIssueType(diagnostic.getFaultDomain().getValue());
         }
 
-        // rootCauseAnalysis (JSON string) → rootCauseSummary
+        // rootCauseAnalysis (JSON string) → rootCauseSummary + extract issueTitle and issueDescription
         if (diagnostic.getRootCauseAnalysis() != null) {
             entity.setRootCauseSummary(diagnostic.getRootCauseAnalysis());
+            try {
+                JsonNode rcaNode = objectMapper.readTree(diagnostic.getRootCauseAnalysis());
+                JsonNode titleNode = rcaNode.get("issue_title");
+                if (titleNode != null && !titleNode.isNull()) {
+                    entity.setIssueTitle(titleNode.asText());
+                }
+                JsonNode descNode = rcaNode.get("issue_description");
+                if (descNode != null && !descNode.isNull()) {
+                    entity.setIssueDescription(descNode.asText());
+                }
+            } catch (Exception ignored) {
+                // best-effort extraction — entity persists even if parse fails
+            }
         }
 
         // confidenceScore → confidenceInfo JSONB
