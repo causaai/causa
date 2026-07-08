@@ -104,12 +104,17 @@ public final class ConfigConstants {
          */
         public static final String GOOGLE_APPLICATION_CREDENTIALS = "GOOGLE_APPLICATION_CREDENTIALS";
 
+        // --- Skills ---
+
+        /** Whether the skills system is globally enabled ({@code true}/{@code false}). */
+        public static final String SKILLS_ENABLED    = "LLM_SKILLS_ENABLED";
+
         /** Immutable set of all valid LLM key names — used for key validation. */
         public static final java.util.Set<String> ALL_KEYS = java.util.Set.of(
                 PROVIDER, MODEL_NAME, BASE_URL, AUTH_TYPE, CUSTOM_HEADERS,
                 TEMPERATURE, MAX_TOKENS, API_KEY, TIMEOUT_SECONDS, CHAT_MEMORY_SIZE,
                 VERTEX_PROJECT_ID, VERTEX_LOCATION, BOB_SHELL_PATH,
-                GOOGLE_APPLICATION_CREDENTIALS
+                GOOGLE_APPLICATION_CREDENTIALS, SKILLS_ENABLED
         );
     }
 

@@ -190,7 +190,7 @@ public class LangChainPromptSender implements PromptSender {
         StringBuilder sb = new StringBuilder();
 
         // Add skills catalogue (preemptive disclosure) only if enabled
-        boolean skillsEnabled = request.enableSkills().orElse(true);
+        boolean skillsEnabled = request.enableSkills().orElse(appConfig.getLlmConfig().getSkillsEnabled());
         if (skillsEnabled && skills != null) {
             String catalogue = skills.formatAvailableSkills();
             if (catalogue != null && !catalogue.isBlank()) {
@@ -239,8 +239,16 @@ public class LangChainPromptSender implements PromptSender {
         // Build model fresh from current config once per invocation, reused across all tool iterations
         ChatModel chatModel = chatModelFactory.chatModel();
 
+        boolean skillsEnabled = request.enableSkills().orElse(appConfig.getLlmConfig().getSkillsEnabled());
+        boolean hasTools = skillsEnabled && skills != null && skills.toolProvider() != null;
+
         for (int iteration = 0; iteration < max_tool_iterations; iteration++) {
-            ChatRequest chatRequest = buildChatRequest(messages, request);
+            // Computed once per iteration — shared by buildChatRequest and executor lookup below.
+            var toolProviderResult = hasTools
+                    ? skills.toolProvider().provideTools(toolProviderRequest(messages))
+                    : null;
+
+            ChatRequest chatRequest = buildChatRequest(messages, request, toolProviderResult);
             ChatResponse response = chatModel.chat(chatRequest);
 
             // No tool calls — return the final text response
@@ -254,9 +262,6 @@ public class LangChainPromptSender implements PromptSender {
                     .log();
 
             messages.add(response.aiMessage());
-
-            // Pass message history so Skills tracks which skills are already activated
-            var toolProviderResult = skills.toolProvider().provideTools(toolProviderRequest(messages));
 
             for (ToolExecutionRequest toolRequest : response.aiMessage().toolExecutionRequests()) {
                 try {
@@ -316,8 +321,10 @@ public class LangChainPromptSender implements PromptSender {
      * <p>Applies optional parameters from {@link LLMRequest} (maxTokens, temperature).
      * If not specified, the underlying model's configured defaults are used.
      *
-     * <p>Registers tool specifications from {@link Skills#toolProvider()} so the LLM
-     * can call tools like {@code activate_skill} and {@code read_skill_resource}.
+     * <p>Registers tool specifications from the supplied {@code toolProviderResult} so the
+     * LLM can call tools like {@code activate_skill} and {@code read_skill_resource}.
+     * The caller is responsible for computing the result once per iteration and passing it
+     * here, avoiding a redundant {@code provideTools()} invocation.
      *
      * <p><b>Note on enableCaching:</b> Prompt caching is provider-specific and typically
      * configured at the model level (e.g., Anthropic's prompt caching). The enableCaching
@@ -325,19 +332,18 @@ public class LangChainPromptSender implements PromptSender {
      * directly control ChatRequestParameters as LangChain4J handles caching at the
      * provider layer.
      *
-     * @param messages the chat messages
-     * @param request the LLM request containing optional parameter overrides
+     * @param messages           the chat messages
+     * @param request            the LLM request containing optional parameter overrides
+     * @param toolProviderResult pre-computed tool provider result for this iteration,
+     *                           or {@code null} when skills are disabled
      * @return a configured ChatRequest
      */
-    private ChatRequest buildChatRequest(List<ChatMessage> messages, LLMRequest request) {
+    private ChatRequest buildChatRequest(List<ChatMessage> messages, LLMRequest request,
+            dev.langchain4j.service.tool.ToolProviderResult toolProviderResult) {
         ChatRequest.Builder builder = ChatRequest.builder()
                 .messages(messages);
 
-        boolean skillsEnabled = request.enableSkills().orElse(true);
-        boolean hasTools = skillsEnabled && skills != null && skills.toolProvider() != null;
-
-        if (hasTools) {
-            var toolProviderResult = skills.toolProvider().provideTools(toolProviderRequest(messages));
+        if (toolProviderResult != null) {
             builder.toolSpecifications(
                     toolProviderResult.tools().keySet().stream()
                             .toArray(dev.langchain4j.agent.tool.ToolSpecification[]::new)

@@ -30,6 +30,8 @@ data:
 
   LLM_TEMPERATURE: "0.1"
   LLM_MAX_TOKENS: "8192"
+  # Set to "false" to disable skills globally
+  LLM_SKILLS_ENABLED: "true"
   # BOB Shell requires longer execution time — set to 180s (3 min) for long-running analysis
   LLM_TIMEOUT_SECONDS: "180"
   LLM_CHAT_MEMORY_SIZE: "25"

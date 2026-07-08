@@ -32,6 +32,7 @@ public final class LLMConfig {
     private final String vertexLocation;
     private final String bobShellPath;
     private final String googleApplicationCredentials;
+    private final String skillsEnabled;
 
     LLMConfig(Map<String, String> cache) {
         this.provider                    = cache.get(ConfigConstants.LLM.PROVIDER);
@@ -48,6 +49,7 @@ public final class LLMConfig {
         this.vertexLocation              = cache.get(ConfigConstants.LLM.VERTEX_LOCATION);
         this.bobShellPath                = cache.get(ConfigConstants.LLM.BOB_SHELL_PATH);
         this.googleApplicationCredentials = cache.get(ConfigConstants.LLM.GOOGLE_APPLICATION_CREDENTIALS);
+        this.skillsEnabled               = cache.get(ConfigConstants.LLM.SKILLS_ENABLED);
     }
 
     /** LLM provider identifier — e.g. {@code vertex-ai-anthropic}, {@code anthropic}, {@code bob}. */
@@ -122,5 +124,15 @@ public final class LLMConfig {
      */
     public Optional<String> getGoogleApplicationCredentials() {
         return Optional.ofNullable(googleApplicationCredentials);
+    }
+
+    /**
+     * Whether skills are globally enabled. Can be overridden per-request via
+     * {@link com.causa.core.domain.LLMRequest#enableSkills()}.
+     *
+     * @return {@code true} if skills are enabled (default {@code true})
+     */
+    public boolean getSkillsEnabled() {
+        return skillsEnabled != null ? Boolean.parseBoolean(skillsEnabled) : true;
     }
 }
