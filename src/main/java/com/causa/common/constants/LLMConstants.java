@@ -159,6 +159,7 @@ public final class LLMConstants {
         public static final int MAX_TOKENS = 8192;
         public static final int TIMEOUT_SECONDS = 60;
         public static final int CHAT_MEMORY_SIZE = 10;
+        public static final int MAX_TOOL_ITERATIONS = 5;
         public static final String AUTH_TYPE = "API_KEY";
         // Valid regions for Claude on Vertex AI: us-east5, us-central1, europe-west1, asia-southeast1
         // Note: 'global' is NOT a valid location for Claude models

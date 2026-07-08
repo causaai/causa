@@ -234,7 +234,7 @@ public class LangChainPromptSender implements PromptSender {
      * @return the final chat response
      */
     private ChatResponse executeWithToolLoop(List<ChatMessage> messages, LLMRequest request) {
-        final int max_tool_iterations = 5;
+        final int max_tool_iterations = LLMConstants.Defaults.MAX_TOOL_ITERATIONS;
 
         // Build model fresh from current config once per invocation, reused across all tool iterations
         ChatModel chatModel = chatModelFactory.chatModel();

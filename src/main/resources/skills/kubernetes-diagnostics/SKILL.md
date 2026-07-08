@@ -52,7 +52,7 @@ The container has not started. Check POD EVENTS for `BackOff` (crash loop) or im
 The pod is currently running but has crashed before. Correlate with POD EVENTS and POD LOGS from previous restarts.
 
 **`Resource Limits Memory`**
-The memory limit is the hard ceiling for the entire container process. If the process exceeds it the kernel sends SIGKILL (exit code 137) with no application-level error in logs.
+The memory limit is the hard ceiling for the entire container process. If the process exceeds it, the kernel sends SIGKILL (exit code 137) with no application-level error in logs.
 
 **`Resource Limits CPU`**
 A very low CPU limit throttles the process and can cause slow startup or probe timeouts even when the application itself is functioning.
