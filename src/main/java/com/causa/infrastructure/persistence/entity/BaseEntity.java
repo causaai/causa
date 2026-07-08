@@ -6,38 +6,26 @@ import jakarta.persistence.MappedSuperclass;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 /**
  * Base Entity
  *
- * <p>Abstract base class for all JPA entities. Extends {@link PanacheEntityBase} to
- * allow entities to define their own {@code @Id} fields and provides automatic timestamp
- * tracking for creation and last update.
+ * <p>Abstract base class for all JPA entities providing automatic {@code TIMESTAMP WITH TIME ZONE}
+ * tracking via Hibernate's {@link CreationTimestamp} and {@link UpdateTimestamp}.
  *
- * <p>The {@code createdAt} and {@code updatedAt} fields are automatically managed
- * by Hibernate using {@link CreationTimestamp} and {@link UpdateTimestamp} annotations.
- *
- * @since 1.0.0
+ * @since 0.0.1
  */
 @MappedSuperclass
 public abstract class BaseEntity extends PanacheEntityBase {
 
-    /**
-     * Timestamp when the entity was created.
-     *
-     * <p>Automatically set by Hibernate on first persist. Immutable after creation.
-     */
+    /** Set once on first persist; never updated. Maps to column {@code created_at}. */
     @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
-    public LocalDateTime createdAt;
+    @Column(nullable = false, updatable = false)
+    public OffsetDateTime createdAt;
 
-    /**
-     * Timestamp when the entity was last updated.
-     *
-     * <p>Automatically updated by Hibernate on every merge/update operation.
-     */
+    /** Updated by Hibernate on every merge. Maps to column {@code updated_at}. */
     @UpdateTimestamp
-    @Column(name = "updated_at", nullable = false)
-    public LocalDateTime updatedAt;
+    @Column(nullable = false)
+    public OffsetDateTime updatedAt;
 }
