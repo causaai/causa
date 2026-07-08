@@ -305,7 +305,7 @@ public class LangChainPromptSender implements PromptSender {
      * If not specified, the underlying model's configured defaults are used.
      *
      * <p>Registers tool specifications from the supplied {@code toolProviderResult} so the
-     * LLM can call tools like {@code activate_skill}.
+     * LLM can call tools like {@code activate_skill} and {@code read_skill_resource}.
      * The caller is responsible for computing the result once per iteration and passing it
      * here, avoiding a redundant {@code provideTools()} invocation.
      *

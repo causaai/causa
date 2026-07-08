@@ -130,6 +130,14 @@ public interface LLMConfig {
     BobConfig bob();
 
     /**
+     * Skills configuration.
+     *
+     * @return the skills config
+     */
+    @WithName("skills")
+    SkillsConfig skills();
+
+    /**
      * Vertex AI Configuration
      */
     interface VertexConfig {
@@ -148,6 +156,21 @@ public interface LLMConfig {
          */
         @WithName("location")
         Optional<String> location();
+    }
+
+    /**
+     * Skills Configuration.
+     */
+    interface SkillsConfig {
+        /**
+         * Whether skills are globally enabled. Can be overridden per-request via
+         * {@link com.causa.core.domain.LLMRequest#enableSkills()}.
+         *
+         * @return {@code true} if skills are enabled (default)
+         */
+        @WithName("enabled")
+        @WithDefault("true")
+        boolean enabled();
     }
 
     /**
