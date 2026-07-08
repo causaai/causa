@@ -1,8 +1,8 @@
 package com.causa.infrastructure.persistence.entity;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
 import jakarta.persistence.*;
+import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -14,19 +14,25 @@ import java.time.OffsetDateTime;
  * <p>Time-series table whose primary key is {@code created_at} (no surrogate ID by design).
  * Used for Causa engine heartbeat snapshots; rows older than 15 days are pruned by a scheduler.
  *
+ * <p>{@code createdAt} shadows {@link BaseEntity#createdAt} to promote it to {@code @Id}.
+ * {@code updatedAt} is inherited from {@link BaseEntity} and managed by Hibernate's
+ * {@code @UpdateTimestamp} — no override needed.
+ *
  * @since 0.0.1
  */
 @Entity
 @Table(name = "health_checks")
-public class HealthCheckEntity extends PanacheEntityBase {
+public class HealthCheckEntity extends BaseEntity {
 
     /**
      * PK — timestamp of the snapshot. No surrogate ID: one row per heartbeat instant.
-     * Immutable after creation; Hibernate must not update it.
+     * Shadows {@link BaseEntity#createdAt} to add {@code @Id}; set once by Hibernate via
+     * {@code @CreationTimestamp} and never updated.
      */
     @Id
+    @CreationTimestamp
     @Column(nullable = false, updatable = false)
-    private OffsetDateTime createdAt;
+    public OffsetDateTime createdAt;
 
     /** Overall health status: {@code UP}, {@code DEGRADED}, or {@code DOWN}. */
     @Column(nullable = false, length = 32)
@@ -40,10 +46,6 @@ public class HealthCheckEntity extends PanacheEntityBase {
     @Column(nullable = false, columnDefinition = "jsonb")
     private JsonNode componentInfo;
 
-    /** Maintained by the DB trigger; application should not set this directly. */
-    @Column(nullable = false)
-    private OffsetDateTime updatedAt;
-
     // -------------------------------------------------------------------------
     // Getters and Setters
     // -------------------------------------------------------------------------
@@ -56,7 +58,4 @@ public class HealthCheckEntity extends PanacheEntityBase {
 
     public JsonNode getComponentInfo() { return componentInfo; }
     public void setComponentInfo(JsonNode componentInfo) { this.componentInfo = componentInfo; }
-
-    public OffsetDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
 }
