@@ -9,7 +9,7 @@ import org.hibernate.type.SqlTypes;
  * Diagnostic JPA Entity — maps to the {@code diagnostics} table.
  *
  * <p>Stores LLM-generated root cause analysis output along with token analytics,
- * evidence, solutions, and validation data.
+ * evidence, recommendations, and validation data.
  * Column names are derived automatically from field names via
  * {@code CamelCaseToUnderscoresNamingStrategy}.
  *
@@ -80,7 +80,7 @@ public class DiagnosticEntity extends BaseEntity {
      */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
-    private JsonNode solutions;
+    private JsonNode recommendations;
 
     /**
      * Supporting evidence bundle stored as JSONB.
@@ -158,8 +158,8 @@ public class DiagnosticEntity extends BaseEntity {
     public JsonNode getLlmInfo() { return llmInfo; }
     public void setLlmInfo(JsonNode llmInfo) { this.llmInfo = llmInfo; }
 
-    public JsonNode getSolutions() { return solutions; }
-    public void setSolutions(JsonNode solutions) { this.solutions = solutions; }
+    public JsonNode getRecommendations() { return recommendations; }
+    public void setRecommendations(JsonNode recommendations) { this.recommendations = recommendations; }
 
     public JsonNode getEvidence() { return evidence; }
     public void setEvidence(JsonNode evidence) { this.evidence = evidence; }
