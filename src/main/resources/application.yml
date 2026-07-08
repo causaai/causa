@@ -84,6 +84,8 @@ quarkus:
     mapping:
       format:
         global: ignore
+    physical-naming-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+
 
 
 # Custom Application Configuration
