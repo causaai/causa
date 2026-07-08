@@ -6,6 +6,7 @@ import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
 import com.causa.config.AppConfig;
 import com.causa.config.LLMConfig;
+import com.google.auth.oauth2.GoogleCredentials;
 import dev.langchain4j.model.anthropic.AnthropicChatModel;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.vertexai.anthropic.VertexAiAnthropicChatModel;
@@ -13,7 +14,10 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.time.Duration;
+import java.util.Base64;
 
 /**
  * Chat Model Factory
@@ -28,7 +32,8 @@ import java.time.Duration;
  * <p><strong>Supported Providers:</strong>
  * <ul>
  *   <li>{@code anthropic} - Claude via direct Anthropic API (requires LLM_API_KEY)</li>
- *   <li>{@code vertex-ai-anthropic} - Claude via Google Cloud Vertex AI (requires VERTEX_PROJECT_ID, uses ADC)</li>
+ *   <li>{@code vertex-ai-anthropic} - Claude via Google Cloud Vertex AI (requires VERTEX_PROJECT_ID
+ *       and GOOGLE_APPLICATION_CREDENTIALS as Base64-encoded ADC JSON)</li>
  *   <li>{@code openai} - OpenAI (planned)</li>
  *   <li>{@code ollama} - Ollama local models (planned)</li>
  * </ul>
@@ -50,11 +55,15 @@ public class ChatModelFactory {
     /**
      * Produces the ChatModel bean based on the configured provider.
      *
+     * <p>No scope annotation on {@code @Produces} — defaults to dependent scope,
+     * meaning CDI builds a fresh instance each time it is injected. This ensures
+     * the factory always reads the current live {@link AppConfig} values rather
+     * than capturing config that may not have been loaded yet at first proxy touch.
+     *
      * @return the chat model
      * @throws LLMException if the provider is unsupported or configuration is missing
      */
     @Produces
-    @ApplicationScoped
     public ChatModel chatModel() {
         LLMConfig config = appConfig.getLlmConfig();
         String provider = config.getProvider().orElse(null);
@@ -136,11 +145,18 @@ public class ChatModelFactory {
     /**
      * Builds a VertexAiAnthropicChatModel for Google Cloud Vertex AI access.
      *
+     * <p>Authentication uses the {@code GOOGLE_APPLICATION_CREDENTIALS} config value,
+     * which must be a Base64-encoded ADC JSON (personal ADC from
+     * {@code gcloud auth application-default login}, or a service account key).
+     * The JSON is decoded in-memory and passed directly to {@link GoogleCredentials#fromStream},
+     * so no file mount or environment variable is required on the pod.
+     *
      * @return the Vertex AI Anthropic chat model
-     * @throws LLMException if project ID is missing
+     * @throws LLMException if project ID or ADC credentials are missing or invalid
      */
     private ChatModel buildVertexAiAnthropicModel() {
         LLMConfig config = appConfig.getLlmConfig();
+
         String projectId = config.getVertexProjectId().filter(p -> !p.isBlank()).orElse(null);
         if (projectId == null) {
             log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
@@ -153,12 +169,41 @@ public class ChatModelFactory {
             );
         }
 
+        String adcBase64 = config.getGoogleApplicationCredentials().filter(s -> !s.isBlank()).orElse(null);
+        if (adcBase64 == null) {
+            log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
+                .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.VERTEX_AI_ANTHROPIC)
+                .field(LLMConstants.ConfigKeys.MISSING_CONFIG, "GOOGLE_APPLICATION_CREDENTIALS")
+                .log();
+            throw new LLMException(
+                "GOOGLE_APPLICATION_CREDENTIALS (Base64 ADC JSON) is required for provider: "
+                    + LLMConstants.Provider.VERTEX_AI_ANTHROPIC,
+                LLMConstants.ErrorTypes.MISSING_CONFIGURATION
+            );
+        }
+
+        GoogleCredentials credentials;
+        try {
+            byte[] jsonBytes = Base64.getDecoder().decode(adcBase64);
+            credentials = GoogleCredentials.fromStream(new ByteArrayInputStream(jsonBytes));
+        } catch (IllegalArgumentException e) {
+            throw new LLMException(
+                "GOOGLE_APPLICATION_CREDENTIALS is not valid Base64",
+                LLMConstants.ErrorTypes.MISSING_CONFIGURATION, e
+            );
+        } catch (IOException e) {
+            throw new LLMException(
+                "Failed to parse GOOGLE_APPLICATION_CREDENTIALS as ADC JSON: " + e.getMessage(),
+                LLMConstants.ErrorTypes.MISSING_CONFIGURATION, e
+            );
+        }
+
         String location = config.getVertexLocation().orElse("us-east5");
         String modelName = config.getModelName().orElse("");
 
         log.info(LogMessages.LLM.LLM_PROVIDER_DETECTED)
             .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.VERTEX_AI_ANTHROPIC)
-            .field(LLMConstants.Fields.AUTH_TYPE, LLMConstants.AuthModes.ADC)
+            .field(LLMConstants.Fields.AUTH_TYPE, "ADC_JSON")
             .field(LLMConstants.Fields.MODEL, modelName)
             .field(LLMConstants.Fields.VERTEX_PROJECT_ID, projectId)
             .field(LLMConstants.Fields.VERTEX_LOCATION, location)
@@ -171,6 +216,7 @@ public class ChatModelFactory {
             .location(location)
             .modelName(modelName)
             .maxTokens(config.getMaxTokens())
+            .credentials(credentials)
             .logRequests(true)
             .logResponses(true)
             .build();

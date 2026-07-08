@@ -5,7 +5,6 @@ import com.causa.common.exceptions.LLMException;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
 import com.causa.config.AppConfig;
-import com.causa.config.LLMConfig;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
 import com.causa.core.ports.llm.PromptSender;
@@ -30,9 +29,12 @@ import java.util.List;
  * This adapter wraps the provider-agnostic LangChain4J interface, providing a clean
  * separation between business logic and LLM integration.
  *
- * <p>TEMPORARY: Conditional annotation removed for testing - RESTORE BEFORE PR
  * <p>This bean is enabled by default unless {@code causa.llm.provider} is set to "bob".
  * When "bob" is configured, {@link BobShellPromptSender} is used instead.
+ *
+ * <p>{@link ChatModelFactory} is called per-request rather than injecting {@link ChatModel}
+ * directly, so the factory always reads the current live config from {@link AppConfig}
+ * instead of a config snapshot captured at bean-creation time.
  *
  * @since 0.0.1
  */
@@ -42,12 +44,12 @@ public class LangChainPromptSender implements PromptSender {
 
     private static final CausaLogger log = CausaLogger.getLogger(LangChainPromptSender.class);
 
-    private final ChatModel chatModel;
+    private final ChatModelFactory chatModelFactory;
     private final AppConfig appConfig;
 
     @Inject
-    public LangChainPromptSender(ChatModel chatModel, AppConfig appConfig) {
-        this.chatModel = chatModel;
+    public LangChainPromptSender(ChatModelFactory chatModelFactory, AppConfig appConfig) {
+        this.chatModelFactory = chatModelFactory;
         this.appConfig = appConfig;
     }
 
@@ -76,6 +78,9 @@ public class LangChainPromptSender implements PromptSender {
 
             // Build chat request with per-request parameter overrides
             ChatRequest chatRequest = buildChatRequest(messages, request);
+
+            // Build model fresh from current config on each call
+            ChatModel chatModel = chatModelFactory.chatModel();
 
             // Call the LLM with the configured request
             ChatResponse response = chatModel.chat(chatRequest);
@@ -136,7 +141,8 @@ public class LangChainPromptSender implements PromptSender {
 
     @Override
     public boolean isReady() {
-        return chatModel != null && appConfig.getLlmConfig().getModelName().filter(m -> !m.isBlank()).isPresent();
+        return appConfig.getLlmConfig().getProvider().filter(p -> !p.isBlank()).isPresent()
+            && appConfig.getLlmConfig().getModelName().filter(m -> !m.isBlank()).isPresent();
     }
 
     /**

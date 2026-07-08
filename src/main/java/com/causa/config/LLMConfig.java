@@ -115,7 +115,11 @@ public final class LLMConfig {
         return bobShellPath != null ? bobShellPath : "bob";
     }
 
-    /** Path to Google Application Default Credentials JSON file. */
+    /**
+     * Base64-encoded Google ADC JSON (personal ADC or service account key).
+     * Decode with {@link java.util.Base64#getDecoder()} then pass to
+     * {@code GoogleCredentials.fromStream()} — no file path, no pod mount.
+     */
     public Optional<String> getGoogleApplicationCredentials() {
         return Optional.ofNullable(googleApplicationCredentials);
     }
