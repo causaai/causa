@@ -2,6 +2,8 @@ package com.causa.core.ports;
 
 import com.causa.core.domain.Alert;
 
+import java.util.Optional;
+
 /**
  * Alert Repository - Secondary Port
  *
@@ -27,4 +29,12 @@ public interface AlertRepository {
      * @param hasDiagnostics the new value
      */
     void updateHasDiagnostics(String alertId, boolean hasDiagnostics);
+
+    /**
+     * Finds an alert by its application-generated ID.
+     *
+     * @param alertId the alert ID
+     * @return an Optional containing the domain Alert if found, empty otherwise
+     */
+    Optional<Alert> findById(String alertId);
 }

@@ -3,6 +3,7 @@ package com.causa.core.services;
 import com.causa.core.domain.Alert;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Alert Service - Primary Port
@@ -33,4 +34,12 @@ public interface AlertService {
      * @return true if the alert is still cooling down and should be skipped
      */
     boolean isInCooldown(Alert alert);
+
+    /**
+     * Retrieves a single alert by its ID.
+     *
+     * @param alertId the alert ID
+     * @return an Optional containing the Alert if found, empty otherwise
+     */
+    Optional<Alert> getAlert(String alertId);
 }
