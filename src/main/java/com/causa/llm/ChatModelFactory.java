@@ -53,6 +53,26 @@ public class ChatModelFactory {
     }
 
     /**
+     * Lightweight readiness check — validates that all required configuration and credentials
+     * for the configured provider are present and parseable, without making any remote calls
+     * or constructing an SDK client.
+     *
+     * @return {@code true} if the factory can build a model; {@code false} otherwise
+     */
+    public boolean isReady() {
+        try {
+            validateConfig();
+            return true;
+        } catch (LLMException e) {
+            log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
+                .field(LLMConstants.Fields.ERROR_TYPE, e.getErrorType())
+                .exception(e)
+                .log();
+            return false;
+        }
+    }
+
+    /**
      * Produces the ChatModel bean based on the configured provider.
      *
      * <p>No scope annotation on {@code @Produces} — defaults to dependent scope,
@@ -65,18 +85,10 @@ public class ChatModelFactory {
      */
     @Produces
     public ChatModel chatModel() {
-        LLMConfig config = appConfig.getLlmConfig();
-        String provider = config.getProvider().orElse(null);
+        validateConfig();
 
-        if (provider == null || provider.isBlank()) {
-            log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
-                .field(LLMConstants.ConfigKeys.MISSING_CONFIG, "LLM_PROVIDER")
-                .log();
-            throw new LLMException(
-                LLMConstants.ErrorMessages.LLM_CONFIG_NOT_AVAILABLE,
-                LLMConstants.ErrorTypes.MISSING_CONFIGURATION
-            );
-        }
+        LLMConfig config = appConfig.getLlmConfig();
+        String provider = config.getProvider().orElse("");
 
         log.info(LogMessages.LLM.LLM_FACTORY_INITIALIZING)
             .field(LLMConstants.Fields.PROVIDER, provider)
@@ -101,15 +113,41 @@ public class ChatModelFactory {
     }
 
     /**
-     * Builds an AnthropicChatModel for direct Anthropic API access.
+     * Validates that all required configuration for the configured provider is present and
+     * parseable. For {@code vertex-ai-anthropic} this includes Base64-decoding and parsing
+     * the ADC JSON — both purely in-memory, no remote calls.
      *
-     * @return the Anthropic chat model
-     * @throws LLMException if API key is missing
+     * @throws LLMException if any required config is missing or invalid
      */
-    private ChatModel buildAnthropicModel() {
+    private void validateConfig() {
         LLMConfig config = appConfig.getLlmConfig();
-        String apiKey = config.getApiKey().filter(k -> !k.isBlank()).orElse(null);
-        if (apiKey == null) {
+        String provider = config.getProvider().orElse(null);
+
+        if (provider == null || provider.isBlank()) {
+            log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
+                .field(LLMConstants.ConfigKeys.MISSING_CONFIG, "LLM_PROVIDER")
+                .log();
+            throw new LLMException(
+                LLMConstants.ErrorMessages.LLM_CONFIG_NOT_AVAILABLE,
+                LLMConstants.ErrorTypes.MISSING_CONFIGURATION
+            );
+        }
+
+        switch (provider.toLowerCase()) {
+            case LLMConstants.Provider.ANTHROPIC -> validateAnthropicConfig(config);
+            case LLMConstants.Provider.VERTEX_AI_ANTHROPIC -> validateVertexAiConfig(config);
+            default -> throw new LLMException(
+                String.format(LLMConstants.ErrorMessages.UNSUPPORTED_PROVIDER_TEMPLATE, provider),
+                LLMConstants.ErrorTypes.UNSUPPORTED_PROVIDER
+            );
+        }
+    }
+
+    /**
+     * Validates Anthropic-specific configuration (API key presence).
+     */
+    private void validateAnthropicConfig(LLMConfig config) {
+        if (config.getApiKey().filter(k -> !k.isBlank()).isEmpty()) {
             log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
                 .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.ANTHROPIC)
                 .field(LLMConstants.ConfigKeys.MISSING_CONFIG, LLMConstants.ConfigKeys.LLM_API_KEY)
@@ -119,6 +157,62 @@ public class ChatModelFactory {
                 LLMConstants.ErrorTypes.MISSING_CONFIGURATION
             );
         }
+    }
+
+    /**
+     * Validates Vertex AI-specific configuration: project ID presence, credentials presence,
+     * valid Base64 encoding, and parseable ADC JSON — all in-memory.
+     */
+    private void validateVertexAiConfig(LLMConfig config) {
+        if (config.getVertexProjectId().filter(p -> !p.isBlank()).isEmpty()) {
+            log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
+                .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.VERTEX_AI_ANTHROPIC)
+                .field(LLMConstants.ConfigKeys.MISSING_CONFIG, LLMConstants.ConfigKeys.VERTEX_PROJECT_ID)
+                .log();
+            throw new LLMException(
+                LLMConstants.ErrorMessages.VERTEX_PROJECT_ID_REQUIRED + LLMConstants.Provider.VERTEX_AI_ANTHROPIC,
+                LLMConstants.ErrorTypes.MISSING_CONFIGURATION
+            );
+        }
+
+        String adcBase64 = config.getGoogleApplicationCredentials().filter(s -> !s.isBlank()).orElse(null);
+        if (adcBase64 == null) {
+            log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
+                .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.VERTEX_AI_ANTHROPIC)
+                .field(LLMConstants.ConfigKeys.MISSING_CONFIG, "GOOGLE_APPLICATION_CREDENTIALS")
+                .log();
+            throw new LLMException(
+                "GOOGLE_APPLICATION_CREDENTIALS (Base64 ADC JSON) is required for provider: "
+                    + LLMConstants.Provider.VERTEX_AI_ANTHROPIC,
+                LLMConstants.ErrorTypes.MISSING_CONFIGURATION
+            );
+        }
+
+        try {
+            byte[] jsonBytes = Base64.getDecoder().decode(adcBase64);
+            GoogleCredentials.fromStream(new ByteArrayInputStream(jsonBytes));
+        } catch (IllegalArgumentException e) {
+            throw new LLMException(
+                "GOOGLE_APPLICATION_CREDENTIALS is not valid Base64",
+                LLMConstants.ErrorTypes.INVALID_CONFIGURATION, e
+            );
+        } catch (IOException e) {
+            throw new LLMException(
+                "Failed to parse GOOGLE_APPLICATION_CREDENTIALS as ADC JSON: " + e.getMessage(),
+                LLMConstants.ErrorTypes.INVALID_CONFIGURATION, e
+            );
+        }
+    }
+
+    /**
+     * Builds an AnthropicChatModel for direct Anthropic API access.
+     *
+     * @return the Anthropic chat model
+     */
+    private ChatModel buildAnthropicModel() {
+        LLMConfig config = appConfig.getLlmConfig();
+        // API key presence guaranteed by validateConfig() called before this method
+        String apiKey = config.getApiKey().orElse("");
 
         String modelName = config.getModelName().orElse("");
         log.info(LogMessages.LLM.LLM_PROVIDER_DETECTED)
@@ -151,36 +245,16 @@ public class ChatModelFactory {
      * The JSON is decoded in-memory and passed directly to {@link GoogleCredentials#fromStream},
      * so no file mount or environment variable is required on the pod.
      *
+     * <p>Presence and parseability of credentials are guaranteed by {@code validateConfig()}
+     * called before this method, so construction here is unconditional.
+     *
      * @return the Vertex AI Anthropic chat model
-     * @throws LLMException if project ID or ADC credentials are missing or invalid
      */
     private ChatModel buildVertexAiAnthropicModel() {
         LLMConfig config = appConfig.getLlmConfig();
-
-        String projectId = config.getVertexProjectId().filter(p -> !p.isBlank()).orElse(null);
-        if (projectId == null) {
-            log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
-                .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.VERTEX_AI_ANTHROPIC)
-                .field(LLMConstants.ConfigKeys.MISSING_CONFIG, LLMConstants.ConfigKeys.VERTEX_PROJECT_ID)
-                .log();
-            throw new LLMException(
-                LLMConstants.ErrorMessages.VERTEX_PROJECT_ID_REQUIRED + LLMConstants.Provider.VERTEX_AI_ANTHROPIC,
-                LLMConstants.ErrorTypes.MISSING_CONFIGURATION
-            );
-        }
-
-        String adcBase64 = config.getGoogleApplicationCredentials().filter(s -> !s.isBlank()).orElse(null);
-        if (adcBase64 == null) {
-            log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
-                .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.VERTEX_AI_ANTHROPIC)
-                .field(LLMConstants.ConfigKeys.MISSING_CONFIG, "GOOGLE_APPLICATION_CREDENTIALS")
-                .log();
-            throw new LLMException(
-                "GOOGLE_APPLICATION_CREDENTIALS (Base64 ADC JSON) is required for provider: "
-                    + LLMConstants.Provider.VERTEX_AI_ANTHROPIC,
-                LLMConstants.ErrorTypes.MISSING_CONFIGURATION
-            );
-        }
+        // Project ID and credentials presence/validity guaranteed by validateConfig()
+        String projectId = config.getVertexProjectId().orElse("");
+        String adcBase64 = config.getGoogleApplicationCredentials().orElse("");
 
         GoogleCredentials credentials;
         try {
@@ -203,7 +277,7 @@ public class ChatModelFactory {
 
         log.info(LogMessages.LLM.LLM_PROVIDER_DETECTED)
             .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.VERTEX_AI_ANTHROPIC)
-            .field(LLMConstants.Fields.AUTH_TYPE, "ADC_JSON")
+            .field(LLMConstants.Fields.AUTH_TYPE, LLMConstants.AuthModes.ADC_JSON)
             .field(LLMConstants.Fields.MODEL, modelName)
             .field(LLMConstants.Fields.VERTEX_PROJECT_ID, projectId)
             .field(LLMConstants.Fields.VERTEX_LOCATION, location)

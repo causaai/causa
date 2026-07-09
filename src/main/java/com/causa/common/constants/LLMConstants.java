@@ -214,6 +214,7 @@ public final class LLMConstants {
 
         public static final String API_KEY = "API_KEY";
         public static final String ADC = "ADC";
+        public static final String ADC_JSON = "ADC_JSON";
     }
 
     /**

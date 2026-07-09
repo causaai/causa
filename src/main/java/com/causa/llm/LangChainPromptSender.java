@@ -141,8 +141,18 @@ public class LangChainPromptSender implements PromptSender {
 
     @Override
     public boolean isReady() {
-        return appConfig.getLlmConfig().getProvider().filter(p -> !p.isBlank()).isPresent()
-            && appConfig.getLlmConfig().getModelName().filter(m -> !m.isBlank()).isPresent();
+        boolean ready = chatModelFactory.isReady();
+        if (ready) {
+            log.info(LogMessages.LLM.LLM_READY)
+                .field(LLMConstants.Fields.PROVIDER, appConfig.getLlmConfig().getProvider().orElse("(not configured)"))
+                .field(LLMConstants.Fields.MODEL, appConfig.getLlmConfig().getModelName().orElse("(not configured)"))
+                .log();
+        } else {
+            log.warn(LogMessages.LLM.MODEL_NOT_AVAILABLE)
+                .field(LLMConstants.Fields.PROVIDER, appConfig.getLlmConfig().getProvider().orElse("(not configured)"))
+                .log();
+        }
+        return ready;
     }
 
     /**
