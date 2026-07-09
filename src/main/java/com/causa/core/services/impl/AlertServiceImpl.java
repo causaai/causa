@@ -1,10 +1,4 @@
-package com.causa.core.services.diagnostic.impl;
-
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+package com.causa.core.services.impl;
 
 import com.causa.common.constants.AlertConstants.AlertSeverity;
 import com.causa.common.logging.CausaLogger;
@@ -12,12 +6,17 @@ import com.causa.common.logging.LogMessages;
 import com.causa.config.AppConfig;
 import com.causa.core.domain.Alert;
 import com.causa.core.ports.AlertRepository;
-import com.causa.core.services.diagnostic.AlertService;
-
+import com.causa.core.services.AlertService;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Alert Service Implementation

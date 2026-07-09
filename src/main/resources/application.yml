@@ -136,11 +136,6 @@ causa:
       retry-delay-ms: ${CAUSA_MCP_CRYOSTAT_RETRY_DELAY:5000}
       max-retries: ${CAUSA_MCP_CRYOSTAT_MAX_RETRIES:3}
 
-  # Validation Configuration
-  validation:
-    assertion-extractor: ${CAUSA_VALIDATION_ASSERTION_EXTRACTOR:llm}
-    assertion-analyzer: ${CAUSA_VALIDATION_ASSERTION_ANALYZER:llm}
-
 #   # Feature Flags (Runtime configurable)
 #   features:
 #     rag-enabled: ${CAUSA_FEATURE_RAG:false}

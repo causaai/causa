@@ -23,19 +23,15 @@ public final class Diagnostic {
     private final Float confidenceScore;
     private final FaultDomain faultDomain;
     private final String rootCauseAnalysis;  // Will be JSON string from LLM
-    private final String validationResult;
-    private final String validationData;  // JSON string
 
     private Diagnostic(Builder builder) {
         this.diagnosticId = Objects.requireNonNull(builder.diagnosticId, "diagnosticId cannot be null");
         this.alertId = Objects.requireNonNull(builder.alertId, "alertId cannot be null");
         this.status = Objects.requireNonNull(builder.status, "status cannot be null");
         this.generatedAt = Objects.requireNonNull(builder.generatedAt, "generatedAt cannot be null");
-        this.confidenceScore = builder.confidenceScore;
-        this.faultDomain = builder.faultDomain;
-        this.rootCauseAnalysis = builder.rootCauseAnalysis;
-        this.validationResult = builder.validationResult;
-        this.validationData = builder.validationData;
+        this.confidenceScore = builder.confidenceScore;  // nullable for PENDING status
+        this.faultDomain = builder.faultDomain;  // nullable for PENDING status
+        this.rootCauseAnalysis = builder.rootCauseAnalysis;  // nullable for PENDING status
     }
 
     // Getters
@@ -66,14 +62,6 @@ public final class Diagnostic {
 
     public String getRootCauseAnalysis() {
         return rootCauseAnalysis;
-    }
-
-    public String getValidationResult() {
-        return validationResult;
-    }
-
-    public String getValidationData() {
-        return validationData;
     }
 
     /**
@@ -109,8 +97,6 @@ public final class Diagnostic {
         private Float confidenceScore;
         private FaultDomain faultDomain;
         private String rootCauseAnalysis;
-        private String validationResult;
-        private String validationData;
 
         private Builder() {}
 
@@ -146,16 +132,6 @@ public final class Diagnostic {
 
         public Builder rootCauseAnalysis(String rootCauseAnalysis) {
             this.rootCauseAnalysis = rootCauseAnalysis;
-            return this;
-        }
-
-        public Builder validationResult(String validationResult) {
-            this.validationResult = validationResult;
-            return this;
-        }
-
-        public Builder validationData(String validationData) {
-            this.validationData = validationData;
             return this;
         }
 

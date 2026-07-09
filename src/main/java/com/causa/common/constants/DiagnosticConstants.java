@@ -26,25 +26,10 @@ public final class DiagnosticConstants {
     /**
      * Logging field names for diagnostics.
      */
-    public static final class LogFields {
-        private LogFields() {}
+    public static final class Fields {
+        private Fields() {}
 
         public static final String DIAGNOSTIC_ID = "diagnosticId";
-        public static final String ALERT_ID = "alertId";
-        public static final String STATUS = "status";
-        public static final String HAS_K8S_CONTEXT = "hasK8sContext";
-        public static final String HAS_KRUIZE_CONTEXT = "hasKruizeContext";
-        public static final String HAS_CRYOSTAT_CONTEXT = "hasCryostatContext";
-        public static final String SYSTEM_PROMPT_LENGTH = "systemPromptLength";
-        public static final String USER_PROMPT_LENGTH = "userPromptLength";
-        public static final String CONTEXT_LENGTH = "contextLength";
-        public static final String ASSERTION_COUNT = "assertionCount";
-        public static final String SUPPORTED_COUNT = "supportedCount";
-        public static final String UNSUPPORTED_COUNT = "unsupportedCount";
-        public static final String UNKNOWN_COUNT = "unknownCount";
-        public static final String OVERALL_CONFIDENCE = "overallConfidence";
-        public static final String VALIDATION_RESULT = "validationResult";
-        public static final String CONFIDENCE_SCORE = "confidenceScore";
     }
 
     // Logging format constants
