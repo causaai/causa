@@ -127,6 +127,7 @@ causa:
       shell-path: bob
     skills:
       enabled: ${LLM_SKILLS_ENABLED:true}
+      skills-dir: ${LLM_SKILLS_DIR:}
     google-application-credentials: ${GOOGLE_APPLICATION_CREDENTIALS:}
 
   # Alert Configuration

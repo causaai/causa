@@ -171,6 +171,17 @@ public interface LLMConfig {
         @WithName("enabled")
         @WithDefault("true")
         boolean enabled();
+
+        /**
+         * Optional path to an external directory containing additional skills.
+         * Each subdirectory must contain a {@code SKILL.md} file.
+         * External skills are merged on top of bundled classpath skills;
+         * when a name collision occurs the external skill wins.
+         *
+         * @return the filesystem path, or empty if not configured
+         */
+        @WithName("skills-dir")
+        Optional<String> skillsDir();
     }
 
     /**

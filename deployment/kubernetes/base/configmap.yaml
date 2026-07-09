@@ -32,6 +32,10 @@ data:
   LLM_MAX_TOKENS: "8192"
   # Set to "false" to disable skills globally
   LLM_SKILLS_ENABLED: "true"
+  # Optional: path to a directory of user-provided skills (each subdirectory must contain a SKILL.md).
+  # External skills are merged on top of bundled ones; external wins on name collision.
+  # Mount user skill ConfigMaps under this path, one subdirectory per skill.
+  # LLM_SKILLS_DIR: "/etc/causa/skills"
   # BOB Shell requires longer execution time — set to 180s (3 min) for long-running analysis
   LLM_TIMEOUT_SECONDS: "180"
   LLM_CHAT_MEMORY_SIZE: "25"
