@@ -15,10 +15,12 @@ import com.causa.core.domain.Diagnostic;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
 import com.causa.core.domain.RootCauseAnalysis;
+import com.causa.core.ports.AlertRepository;
 import com.causa.core.ports.DiagnosticRepository;
 import com.causa.core.ports.llm.PromptSender;
 import com.causa.core.services.DiagnosticService;
 import com.causa.core.services.RcaPromptBuilder;
+import com.causa.infrastructure.persistence.mappers.AlertEntityMapper;
 import com.causa.mcp.McpContextCollector;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -26,6 +28,7 @@ import jakarta.inject.Inject;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import com.causa.core.domain.DiagnosticContext;
+import org.eclipse.microprofile.context.ManagedExecutor;
 
 import java.time.Instant;
 import java.util.List;
@@ -35,7 +38,13 @@ import java.util.Set;
 /**
  * Diagnostic Service Implementation
  *
- * <p>Implements the diagnostic pipeline with placeholder methods for future LLM integration.
+ * <p>Implements the diagnostic pipeline with an async execution model:
+ * <ol>
+ *   <li>{@link #triggerDiagnostics} saves alert (PROCESSING) + diagnostic (PENDING) and returns immediately.</li>
+ *   <li>The full MCP context collection + LLM pipeline runs on a {@link ManagedExecutor} background thread.</li>
+ *   <li>On success → diagnostic COMPLETED, alert PROCESSED.</li>
+ *   <li>On failure → diagnostic FAILED, alert PROCESSED.</li>
+ * </ol>
  *
  * @since 0.0.1
  */
@@ -45,28 +54,34 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     private static final CausaLogger log = CausaLogger.getLogger(DiagnosticServiceImpl.class);
 
     private final DiagnosticRepository diagnosticRepository;
+    private final AlertRepository alertRepository;
     private final McpContextCollector mcpContextCollector;
     private final RcaPromptBuilder rcaPromptBuilder;
     private final PromptSender promptSender;
     private final AppConfig appConfig;
     private final ObjectMapper objectMapper;
     private final Validator validator;
+    private final ManagedExecutor managedExecutor;
 
     @Inject
     public DiagnosticServiceImpl(DiagnosticRepository diagnosticRepository,
+                                  AlertRepository alertRepository,
                                   McpContextCollector mcpContextCollector,
                                   RcaPromptBuilder rcaPromptBuilder,
                                   PromptSender promptSender,
                                   AppConfig appConfig,
                                   ObjectMapper objectMapper,
-                                  Validator validator) {
+                                  Validator validator,
+                                  ManagedExecutor managedExecutor) {
         this.diagnosticRepository = diagnosticRepository;
-        this.mcpContextCollector = mcpContextCollector;
-        this.rcaPromptBuilder = rcaPromptBuilder;
-        this.promptSender = promptSender;
-        this.appConfig = appConfig;
-        this.objectMapper = objectMapper;
-        this.validator = validator;
+        this.alertRepository      = alertRepository;
+        this.mcpContextCollector  = mcpContextCollector;
+        this.rcaPromptBuilder     = rcaPromptBuilder;
+        this.promptSender         = promptSender;
+        this.appConfig            = appConfig;
+        this.objectMapper         = objectMapper;
+        this.validator            = validator;
+        this.managedExecutor      = managedExecutor;
     }
 
     @Override
@@ -80,7 +95,8 @@ public class DiagnosticServiceImpl implements DiagnosticService {
         Instant now = Instant.now();
         String diagnosticId = IdGenerator.diagnosticId();
 
-        // Persist diagnostic with PENDING status immediately — this is returned regardless of LLM outcome
+        // Persist diagnostic with PENDING status immediately — this is returned to the caller
+        // before the LLM pipeline even starts.
         Diagnostic diagnostic = Diagnostic.builder()
             .diagnosticId(diagnosticId)
             .alertId(alert.getAlertId())
@@ -90,14 +106,58 @@ public class DiagnosticServiceImpl implements DiagnosticService {
 
         diagnostic = diagnosticRepository.save(diagnostic);
 
-        log.info(LogMessages.Diagnostic.DIAGNOSTIC_TRIGGERED)
+        log.info(LogMessages.Diagnostic.DIAGNOSTIC_INITIATED)
             .field("diagnosticId", diagnosticId)
             .field("alertId", alert.getAlertId())
             .field("status", DiagnosticStatus.PENDING.getValue())
             .log();
 
-        // Run the full LLM pipeline in a try/catch — a failure here must NOT bubble up
-        // and cancel the HTTP response. The alert and diagnostic row are already persisted.
+        // Fire-and-forget: dispatch the full MCP + LLM pipeline to a background thread.
+        // The HTTP response is returned immediately — the caller is NOT blocked.
+        // Capture finals for the lambda.
+        final Diagnostic pendingDiagnostic = diagnostic;
+        final Alert      capturedAlert     = alert;
+        managedExecutor.submit(() -> runPipelineAsync(capturedAlert, pendingDiagnostic));
+
+        return diagnostic;
+    }
+
+    /**
+     * Runs the full MCP context collection + LLM pipeline on a background thread.
+     *
+     * <p>Called exclusively by {@link #triggerDiagnostics} via {@link ManagedExecutor} —
+     * never on the HTTP request thread.
+     *
+     * <p>Status lifecycle managed here:
+     * <ol>
+     *   <li>PENDING  — set by {@link #triggerDiagnostics} before this method is called</li>
+     *   <li>IN_PROGRESS — set at the start of this method, before any MCP/LLM work</li>
+     *   <li>COMPLETED or FAILED — set on finish</li>
+     * </ol>
+     *
+     * <p>On success → diagnostic COMPLETED, alert PROCESSED.<br>
+     * On failure → diagnostic FAILED, alert PROCESSED.
+     *
+     * @param alert   the accepted alert being analyzed
+     * @param pending the PENDING diagnostic row already saved to the DB
+     */
+    private void runPipelineAsync(Alert alert, Diagnostic pending) {
+        String diagnosticId = pending.getDiagnosticId();
+
+        log.info(LogMessages.Diagnostic.DIAGNOSTIC_PIPELINE_START)
+            .field("diagnosticId", diagnosticId)
+            .field("alertId", alert.getAlertId())
+            .log();
+
+        // Mark diagnostic IN_PROGRESS immediately so callers polling the status see active work
+        Diagnostic inProgress = Diagnostic.builder()
+            .diagnosticId(pending.getDiagnosticId())
+            .alertId(pending.getAlertId())
+            .status(DiagnosticStatus.IN_PROGRESS)
+            .generatedAt(pending.getGeneratedAt())
+            .build();
+        diagnosticRepository.update(inProgress);
+
         try {
             // Step 1: Collect diagnostic context from MCP servers (K8s, Kruize, Cryostat)
             DiagnosticContext diagnosticContext = collectContext(alert);
@@ -126,7 +186,6 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             RootCauseAnalysis rca = performRootCauseAnalysis(alert, contextForLLM);
 
             // TODO: Step 4: Validate RCA against collected context
-            // TODO: Step 5: Store RCA result in database
 
             log.info(LogMessages.Diagnostic.DIAGNOSTIC_COMPLETED)
                 .field("diagnosticId", diagnosticId)
@@ -134,19 +193,52 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                 .field("anomalyType", rca.anomalyType())
                 .log();
 
-        // Step 5: Persist completed diagnostic with RCA results
-        diagnostic = persistCompletedDiagnostic(diagnostic, rca);
+            // Step 5: Persist completed diagnostic with RCA results
+            persistCompletedDiagnostic(pending, rca);
+
+            // Step 6: Mark alert PROCESSED — pipeline finished successfully
+            alertRepository.updateProcessingStatus(alert.getAlertId(), AlertEntityMapper.STATUS_PROCESSED);
+
+            log.info(LogMessages.Diagnostic.DIAGNOSTIC_PIPELINE_DONE)
+                .field("diagnosticId", diagnosticId)
+                .field("alertId", alert.getAlertId())
+                .log();
+
         } catch (Exception e) {
-            // LLM / MCP failure — log and continue. The diagnostic row stays with PENDING status.
-            // The HTTP response is NOT affected.
-            log.error(LogMessages.Diagnostic.DIAGNOSTIC_FAILED)
+            // MCP / LLM failure — update both records and log. Does NOT affect the HTTP response
+            // since this runs on a background thread after the response was already sent.
+            log.error(LogMessages.Diagnostic.DIAGNOSTIC_PIPELINE_FAILED)
                 .field("diagnosticId", diagnosticId)
                 .field("alertId", alert.getAlertId())
                 .exception(e)
                 .log();
-        }
 
-        return diagnostic;
+            // Mark diagnostic FAILED
+            try {
+                Diagnostic failed = Diagnostic.builder()
+                    .diagnosticId(pending.getDiagnosticId())
+                    .alertId(pending.getAlertId())
+                    .status(DiagnosticStatus.FAILED)
+                    .generatedAt(pending.getGeneratedAt())
+                    .build();
+                diagnosticRepository.update(failed);
+            } catch (Exception ex) {
+                log.error(LogMessages.Diagnostic.DIAGNOSTIC_UPDATE_FAILED)
+                    .field("diagnosticId", diagnosticId)
+                    .exception(ex)
+                    .log();
+            }
+
+            // Mark alert PROCESSED regardless — it was received and attempted
+            try {
+                alertRepository.updateProcessingStatus(alert.getAlertId(), AlertEntityMapper.STATUS_PROCESSED);
+            } catch (Exception ex) {
+                log.error(LogMessages.Alert.ALERT_UPDATE_FAILED)
+                    .field("alertId", alert.getAlertId())
+                    .exception(ex)
+                    .log();
+            }
+        }
     }
 
     /**

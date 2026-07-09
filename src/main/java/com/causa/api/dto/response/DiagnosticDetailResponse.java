@@ -21,6 +21,9 @@ public record DiagnosticDetailResponse(
     @JsonProperty("diagnostics_id")
     String diagnosticsId,
 
+    @JsonProperty("status")
+    String status,
+
     @JsonProperty("alert_id")
     String alertId,
 
@@ -181,6 +184,7 @@ public record DiagnosticDetailResponse(
 
         return new DiagnosticDetailResponse(
             diagnostic.getDiagnosticId(),
+            diagnostic.getStatus() != null ? diagnostic.getStatus().getValue() : null,
             diagnostic.getAlertId(),
             alert != null ? alert.getAlertName() : null,
             alert != null && alert.getSeverity() != null ? capitalise(alert.getSeverity().getValue()) : null,

@@ -33,6 +33,7 @@ import java.util.Optional;
  *
  * @since 0.0.1
  */
+@Path("/")
 @Produces(MediaType.APPLICATION_JSON)
 public class DiagnosticsController {
 

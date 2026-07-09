@@ -11,7 +11,6 @@ import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
-import com.causa.core.ports.AlertRepository;
 import com.causa.core.services.AlertService;
 import com.causa.core.services.AlertService.ProcessedAlerts;
 import com.causa.core.services.DiagnosticService;
@@ -51,17 +50,14 @@ public class AlertWebhookController {
 
     private final AlertService alertService;
     private final DiagnosticService diagnosticService;
-    private final AlertRepository alertRepository;
     private final AlertMapper alertMapper;
 
     @Inject
     public AlertWebhookController(AlertService alertService,
                                    DiagnosticService diagnosticService,
-                                   AlertRepository alertRepository,
                                    AlertMapper alertMapper) {
         this.alertService = alertService;
         this.diagnosticService = diagnosticService;
-        this.alertRepository = alertRepository;
         this.alertMapper = alertMapper;
     }
 
@@ -108,11 +104,11 @@ public class AlertWebhookController {
         ProcessedAlerts processed = alertService.processAlerts(domainAlerts);
 
         // Trigger diagnostics for each accepted alert.
-        // LLM/MCP failures are swallowed inside triggerDiagnostics — they never fail this request.
+        // triggerDiagnostics returns immediately (PENDING diagnostic row) — the LLM/MCP pipeline
+        // runs async on a background thread and updates both records when done.
         Map<String, String> acceptedEntries = new LinkedHashMap<>();
         for (Alert alert : processed.accepted()) {
             Diagnostic diagnostic = diagnosticService.triggerDiagnostics(alert);
-            alertRepository.updateHasDiagnostics(alert.getAlertId(), true);
             acceptedEntries.put(alert.getAlertId(), diagnostic.getDiagnosticId());
         }
 

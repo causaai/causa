@@ -25,6 +25,9 @@ public record DiagnosticListItemResponse(
     @JsonProperty("id")
     String id,
 
+    @JsonProperty("status")
+    String status,
+
     @JsonProperty("issue")
     String issue,
 
@@ -65,6 +68,7 @@ public record DiagnosticListItemResponse(
 
         return new DiagnosticListItemResponse(
             diagnostic.getDiagnosticId(),
+            diagnostic.getStatus() != null ? diagnostic.getStatus().getValue() : null,
             issueTitle,
             containerName,
             namespace,

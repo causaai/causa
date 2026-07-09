@@ -42,6 +42,14 @@ public interface AlertRepository {
     void updateHasDiagnostics(String alertId, boolean hasDiagnostics);
 
     /**
+     * Updates the processing status of an alert.
+     *
+     * @param alertId the alert ID
+     * @param status  the new Causa lifecycle status (e.g. PROCESSING, PROCESSED, FAILED)
+     */
+    void updateProcessingStatus(String alertId, String status);
+
+    /**
      * Finds an alert by its application-generated ID.
      *
      * @param alertId the alert ID

@@ -27,7 +27,7 @@ public class AlertRepositoryImpl implements AlertRepository {
     @Transactional
     public Alert save(Alert alert) {
         try {
-            AlertEntity entity = AlertEntityMapper.toEntityWithStatus(alert, AlertEntityMapper.STATUS_ACCEPTED, null);
+            AlertEntity entity = AlertEntityMapper.toEntityWithStatus(alert, AlertEntityMapper.STATUS_PROCESSING, null);
             entity.persist();
             return alert;
         } catch (Exception e) {
@@ -50,13 +50,17 @@ public class AlertRepositoryImpl implements AlertRepository {
     @Override
     @Transactional
     public void updateHasDiagnostics(String alertId, boolean hasDiagnostics) {
+        // kept for backward-compat; delegates to updateProcessingStatus
+        updateProcessingStatus(alertId, hasDiagnostics ? AlertEntityMapper.STATUS_PROCESSED : AlertEntityMapper.STATUS_PROCESSING);
+    }
+
+    @Override
+    @Transactional
+    public void updateProcessingStatus(String alertId, String status) {
         try {
-            // AlertEntity has no hasDiagnostics column — update status to PROCESSING/PROCESSED
-            // to reflect that diagnostics are in progress or complete.
-            String newStatus = hasDiagnostics ? "PROCESSED" : "ACCEPTED";
             int updated = AlertEntity.update(
                 AlertEntity.Fields.STATUS + " = ?1 where " + AlertEntity.Fields.ALERT_ID + " = ?2",
-                newStatus,
+                status,
                 alertId);
 
             if (updated == 0) {
