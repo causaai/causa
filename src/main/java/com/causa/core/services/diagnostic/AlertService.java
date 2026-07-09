@@ -1,8 +1,8 @@
-package com.causa.core.services;
-
-import com.causa.core.domain.Alert;
+package com.causa.core.services.diagnostic;
 
 import java.util.List;
+
+import com.causa.core.domain.Alert;
 
 /**
  * Alert Service - Primary Port

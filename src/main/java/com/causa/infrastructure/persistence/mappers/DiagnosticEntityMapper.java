@@ -80,6 +80,19 @@ public final class DiagnosticEntityMapper {
             entity.setDiagnosticsMetadata(meta);
         }
 
+        // Set validation fields
+        entity.setValidationResult(diagnostic.getValidationResult());
+
+        // Convert validation data String to JsonNode
+        if (diagnostic.getValidationData() != null) {
+            try {
+                JsonNode jsonNode = objectMapper.readTree(diagnostic.getValidationData());
+                entity.setValidationData(jsonNode);
+            } catch (Exception e) {
+                entity.setValidationData(null);
+            }
+        }
+
         return entity;
     }
 
@@ -121,6 +134,19 @@ public final class DiagnosticEntityMapper {
             builder.generatedAt(Instant.ofEpochMilli(meta.get("generatedAt").asLong()));
         } else {
             builder.generatedAt(Instant.now());
+        }
+
+        // Set validation result
+        builder.validationResult(entity.getValidationResult());
+
+        // Convert validation data JsonNode to String
+        if (entity.getValidationData() != null) {
+            try {
+                String jsonString = objectMapper.writeValueAsString(entity.getValidationData());
+                builder.validationData(jsonString);
+            } catch (Exception e) {
+                builder.validationData(null);
+            }
         }
 
         return builder.build();

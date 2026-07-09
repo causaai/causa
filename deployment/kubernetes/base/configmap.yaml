@@ -9,11 +9,11 @@ data:
   CAUSA_LOG_LEVEL: "INFO"
 
   # Database Configuration
-  CAUSA_DB_URL: "jdbc:postgresql://iri-db-rw:5432/iri-db"
+  CAUSA_DB_URL: "jdbc:postgresql://diagnostics-tool-db-rw.pinky.svc.cluster.local:5432/diagnostics-tool-db"
 
   # LLM Configuration (Public settings - non-sensitive)
   # Provider: anthropic (direct API) | vertex-ai-anthropic (Google Cloud) | bob (BOB Shell CLI) | ibm-bob (future REST API) | ollama (future)
-  # DO NOT set required string properties to "" 
+  # DO NOT set required string properties to  "" 
   # LLM_PROVIDER: ""
   # LLM_MODEL_NAME: ""
 
@@ -49,6 +49,20 @@ data:
   CAUSA_MCP_K8S_HEALTH_PATH: "/healthz"
   CAUSA_MCP_K8S_TIMEOUT: "5000"
 
+  # LLM Configuration (examples - choose one provider)
+  # Direct Anthropic API:
+  # CAUSA_LLM_PROVIDER: "anthropic"
+  # CAUSA_LLM_MODEL: "claude-3-5-sonnet-20241022"
+  # CAUSA_LLM_API_KEY: "sk-ant-..."
+  #
+  # Claude via Google Vertex AI (tested on OpenShift):
+  # CAUSA_LLM_PROVIDER: "vertex-ai-anthropic"
+  # CAUSA_LLM_MODEL: "claude-sonnet-4-6"
+  # CAUSA_VERTEX_PROJECT_ID: "your-gcp-project"
+  # CAUSA_VERTEX_LOCATION: "us-east5"
+
+  # MCP Configuration (placeholder for other servers)
+    # CAUSA_MCP_SERVERS: "kruize,cryostat"
   # MCP Kruize Configuration (Resource Optimization Recommendations)
   CAUSA_MCP_KRUIZE_ENDPOINT: "http://kruize-mcp-server-service:8080"
   CAUSA_MCP_KRUIZE_HEALTH_PATH: "/q/health/ready"

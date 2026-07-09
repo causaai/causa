@@ -32,6 +32,16 @@ public class PromptTemplateLoader {
     }
 
     /**
+     * Constructor for direct path usage (non-CDI, for assertion extraction/analysis).
+     *
+     * @param templatePath the direct path to the template file
+     */
+    public PromptTemplateLoader(String templatePath) {
+        // Normalize path - ensure it has leading "/" for classloader resource lookup
+        this.templatePath = templatePath.startsWith("/") ? templatePath : "/" + templatePath;
+    }
+
+    /**
      * Loads a prompt template for the specified model type.
      *
      * @param modelType the model type (default, bob, ollama, etc.)
@@ -75,7 +85,12 @@ public class PromptTemplateLoader {
                 (String) modelTemplate.get(PromptConstants.KEY_VERSION),
                 (String) modelTemplate.get(PromptConstants.KEY_DESCRIPTION),
                 (String) modelTemplate.get(PromptConstants.KEY_SYSTEM_PROMPT),
-                (String) modelTemplate.get(PromptConstants.KEY_USER_PROMPT)
+                (String) modelTemplate.get(PromptConstants.KEY_USER_PROMPT),
+                (String) modelTemplate.get(PromptConstants.KEY_VERIFICATION_OBSERVATION),
+                (String) modelTemplate.get(PromptConstants.KEY_VERIFICATION_TREND),
+                (String) modelTemplate.get(PromptConstants.KEY_VERIFICATION_CAUSALITY),
+                (String) modelTemplate.get(PromptConstants.KEY_VERIFICATION_CONFIGURATION),
+                (String) modelTemplate.get(PromptConstants.KEY_VERIFICATION_RECOMMENDATION)
             );
 
         } catch (Exception e) {
@@ -91,7 +106,12 @@ public class PromptTemplateLoader {
         String version,
         String description,
         String systemPrompt,
-        String userPrompt
+        String userPrompt,
+        String verificationObservation,
+        String verificationTrend,
+        String verificationCausality,
+        String verificationConfiguration,
+        String verificationRecommendation
     ) {
         /**
          * Renders the user prompt by replacing the context placeholder.
@@ -101,6 +121,23 @@ public class PromptTemplateLoader {
          */
         public String render(String context) {
             return userPrompt.replace(PromptConstants.PLACEHOLDER_CONTEXT, context);
+        }
+
+        /**
+         * Gets verification guidance for a specific assertion type.
+         *
+         * @param assertionType the assertion type (OBSERVATION, TREND, CAUSALITY, CONFIGURATION, RECOMMENDATION)
+         * @return the verification guidance text, or empty string if not available
+         */
+        public String getVerificationGuidance(String assertionType) {
+            return switch (assertionType.toUpperCase()) {
+                case "OBSERVATION" -> verificationObservation != null ? verificationObservation : "";
+                case "TREND" -> verificationTrend != null ? verificationTrend : "";
+                case "CAUSALITY" -> verificationCausality != null ? verificationCausality : "";
+                case "CONFIGURATION" -> verificationConfiguration != null ? verificationConfiguration : "";
+                case "RECOMMENDATION" -> verificationRecommendation != null ? verificationRecommendation : "";
+                default -> "";
+            };
         }
     }
 }

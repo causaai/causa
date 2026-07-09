@@ -1,8 +1,9 @@
-package com.causa.core.services;
+package com.causa.core.services.diagnostic;
 
 import com.causa.common.constants.ModelType;
 import com.causa.config.AppConfig;
 import com.causa.core.domain.Alert;
+import com.causa.core.services.PromptTemplateLoader;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
