@@ -1,4 +1,4 @@
-package com.causa.core.services.diagnostic;
+package com.causa.core.services;
 
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
