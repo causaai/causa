@@ -85,6 +85,17 @@ public final class ApiConstants {
         }
 
         /**
+         * Alert management API paths and query parameter names.
+         */
+        public static final class Alerts {
+            private Alerts() {}
+
+            public static final String BASE            = Version.API_V1 + "/alerts";
+            public static final String QUERY_ID        = "id";
+            public static final String QUERY_CONTAINER = "container";
+        }
+
+        /**
          * Configuration management API paths and query parameter names.
          */
         public static final class Configs {
