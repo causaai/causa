@@ -189,12 +189,12 @@ public class ChatModelFactory {
         } catch (IllegalArgumentException e) {
             throw new LLMException(
                 "GOOGLE_APPLICATION_CREDENTIALS is not valid Base64",
-                LLMConstants.ErrorTypes.MISSING_CONFIGURATION, e
+                LLMConstants.ErrorTypes.INVALID_CONFIGURATION, e
             );
         } catch (IOException e) {
             throw new LLMException(
                 "Failed to parse GOOGLE_APPLICATION_CREDENTIALS as ADC JSON: " + e.getMessage(),
-                LLMConstants.ErrorTypes.MISSING_CONFIGURATION, e
+                LLMConstants.ErrorTypes.INVALID_CONFIGURATION, e
             );
         }
 
