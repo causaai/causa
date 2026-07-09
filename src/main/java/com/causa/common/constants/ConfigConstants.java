@@ -97,9 +97,10 @@ public final class ConfigConstants {
         // --- Google ADC ---
 
         /**
-         * Path to the Google Application Default Credentials JSON file on the pod filesystem.
-         * Injected via the Vertex AI ADC deployment patch ({@code deployment-adc-patch.yaml}).
-         * Stored encrypted because it carries service-account credentials.
+         * Base64-encoded Google Application Default Credentials JSON
+         * (output of {@code gcloud auth application-default login}).
+         * Stored encrypted. Decoded in-memory at startup and passed directly to
+         * {@code GoogleCredentials.fromStream()} — no pod file mount required.
          */
         public static final String GOOGLE_APPLICATION_CREDENTIALS = "GOOGLE_APPLICATION_CREDENTIALS";
 
@@ -435,9 +436,7 @@ public final class ConfigConstants {
                     java.util.Map.entry(LLM.VERTEX_LOCATION,   "causa.llm.vertex.location"),
                     java.util.Map.entry(LLM.BOB_SHELL_PATH,    "causa.llm.bob.shell-path"),
                     // GOOGLE_APPLICATION_CREDENTIALS has no application.yml entry —
-                    // it is injected as a raw OS ENV var by the ADC deployment patch.
-                    // Omitting it from this map causes resolveFromConfig() to fall back
-                    // to System.getenv("GOOGLE_APPLICATION_CREDENTIALS") automatically.
+                    // its value is stored only in the DB (Base64-encoded ADC JSON).
                     // --- Alert ---
                     java.util.Map.entry(Alert.FILTER_SEVERITY,           "causa.alerts.filter-severity"),
                     java.util.Map.entry(Alert.COOLDOWN_MINUTES,          "causa.alerts.cooldown-minutes"),

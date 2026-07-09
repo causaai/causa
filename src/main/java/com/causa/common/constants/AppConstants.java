@@ -26,9 +26,6 @@ public final class AppConstants {
 
         /** Config cache bootstrap priority — runs after DB pool is live. */
         public static final int CONFIG_PRIORITY = 10;
-
-        /** LLM initialization priority — runs after config is loaded. */
-        public static final int LLM_PRIORITY = 20;
     }
 
     /**

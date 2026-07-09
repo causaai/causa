@@ -139,6 +139,13 @@
             <version>${langchain4j-vertex-anthropic.version}</version>
         </dependency>
 
+        <!-- Google Auth Library — in-memory ADC JSON credentials for Vertex AI -->
+        <dependency>
+            <groupId>com.google.auth</groupId>
+            <artifactId>google-auth-library-oauth2-http</artifactId>
+            <version>1.34.0</version>
+        </dependency>
+
         <!-- Test Dependencies -->
         <dependency>
             <groupId>io.quarkus</groupId>
