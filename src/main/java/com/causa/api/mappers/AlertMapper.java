@@ -4,6 +4,7 @@ import com.causa.api.dto.request.AlertWebhookRequest;
 import com.causa.common.constants.AlertConstants;
 import com.causa.common.constants.AlertConstants.AlertSeverity;
 import com.causa.common.constants.AlertConstants.AlertStatus;
+import com.causa.common.utils.IdGenerator;
 import com.causa.config.AppConfig;
 import com.causa.core.domain.Alert;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -67,27 +68,33 @@ public class AlertMapper {
         String namespace = getLabelWithFallback(labels, annotations, AlertConstants.Labels.NAMESPACE);
 
         // Optional fields
-        String pod = labels.get(AlertConstants.Labels.POD);
+        String pod         = labels.get(AlertConstants.Labels.POD);
         String severityStr = labels.getOrDefault(AlertConstants.Labels.SEVERITY, defaultSeverity);
 
         Instant timestamp = parseTimestamp(item.getStartsAt());
 
-        // Use Prometheus fingerprint as alert ID (globally unique, deterministic)
-        // Fallback to generated ID if fingerprint is missing (shouldn't happen with Alertmanager v4)
-        String alertId = Alert.generateAlertId(container, timestamp);
+        // alertId = our generated PK; sourceAlertId = Prometheus fingerprint
+        String alertId       = IdGenerator.alertId();
+        String sourceAlertId = (item.getFingerprint() != null && !item.getFingerprint().isBlank())
+            ? item.getFingerprint()
+            : alertName;   // fallback to alertname if fingerprint missing
 
         return Alert.builder()
             .alertId(alertId)
+            .sourceAlertId(sourceAlertId)
             .timestamp(timestamp)
             .alertName(alertName)
             .severity(AlertSeverity.fromString(severityStr))
             .podName(pod)
             .containerName(container)
             .namespace(namespace)
-            .status(AlertStatus.fromString(item.getStatus()))
+            .prometheusStatus(AlertStatus.fromString(item.getStatus()))
             .hasDiagnostics(false)
             .labels(labels)
             .annotations(annotations)
+            .fingerprint(item.getFingerprint())
+            .endsAt(item.getEndsAt())
+            .generatorURL(item.getGeneratorURL())
             .build();
     }
 

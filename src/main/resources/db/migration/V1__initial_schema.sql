@@ -70,7 +70,7 @@ CREATE TABLE IF NOT EXISTS diagnostics (
 
     -- Structured array of actionable remediation steps
     -- Each element: { solution, justification, success_probability, implementation_notes }
-    solutions           JSONB,
+    recommendations           JSONB,
 
     -- Supporting evidence: logs, metric citations, and confidence explanation
     -- Shape: { supporting_logs: [...], evidences: [...], confidence_summary: "..." }

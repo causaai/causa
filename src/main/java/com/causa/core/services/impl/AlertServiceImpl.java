@@ -14,7 +14,9 @@ import jakarta.inject.Inject;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -60,8 +62,9 @@ public class AlertServiceImpl implements AlertService {
     }
 
     @Override
-    public List<Alert> processAlerts(List<Alert> alerts) {
+    public AlertService.ProcessedAlerts processAlerts(List<Alert> alerts) {
         List<Alert> accepted = new ArrayList<>();
+        Map<Alert, String> rejected = new LinkedHashMap<>();
 
         for (Alert alert : alerts) {
             if (!passesSeverityFilter(alert)) {
@@ -70,6 +73,7 @@ public class AlertServiceImpl implements AlertService {
                     .field("severity", alert.getSeverity().getValue())
                     .field("minimum", minimumSeverity.getValue())
                     .log();
+                rejected.put(alertRepository.saveRejected(alert, "severity"), "severity");
                 continue;
             }
 
@@ -78,6 +82,7 @@ public class AlertServiceImpl implements AlertService {
                     .field("alertName", alert.getAlertName())
                     .field("namespace", alert.getNamespace())
                     .log();
+                rejected.put(alertRepository.saveRejected(alert, "namespace"), "namespace");
                 continue;
             }
 
@@ -87,23 +92,21 @@ public class AlertServiceImpl implements AlertService {
                     .field("podName", alert.getPodName())
                     .field("cooldownKey", alert.getCooldownKey())
                     .log();
+                rejected.put(alertRepository.saveRejected(alert, "cooldown"), "cooldown");
                 continue;
             }
 
-            // Record cooldown timestamp
+            // Record cooldown timestamp and persist with ACCEPTED status
             cooldownCache.put(alert.getCooldownKey(), Instant.now());
-
-            // Persist alert to database
             Alert savedAlert = alertRepository.save(alert);
-
             accepted.add(savedAlert);
 
             log.info(LogMessages.Alert.ALERT_ACCEPTED)
-                .field("alertId", alert.getAlertId())
-                .field("alertName", alert.getAlertName())
-                .field("severity", alert.getSeverity().getValue())
-                .field("namespace", alert.getNamespace())
-                .field("podName", alert.getPodName())
+                .field("alertId", savedAlert.getAlertId())
+                .field("alertName", savedAlert.getAlertName())
+                .field("severity", savedAlert.getSeverity().getValue())
+                .field("namespace", savedAlert.getNamespace())
+                .field("podName", savedAlert.getPodName())
                 .log();
 
             log.debug(LogMessages.Alert.ALERT_PERSISTED)
@@ -111,7 +114,7 @@ public class AlertServiceImpl implements AlertService {
                 .log();
         }
 
-        return accepted;
+        return new AlertService.ProcessedAlerts(accepted, rejected);
     }
 
     @Override
@@ -162,5 +165,13 @@ public class AlertServiceImpl implements AlertService {
     @Override
     public Optional<Alert> getAlert(String alertId) {
         return alertRepository.findById(alertId);
+    }
+
+    @Override
+    public List<Alert> getAlerts(String containerName) {
+        if (containerName != null && !containerName.isBlank()) {
+            return alertRepository.findByContainerName(containerName);
+        }
+        return alertRepository.findAll();
     }
 }

@@ -65,19 +65,6 @@ public final class Diagnostic {
     }
 
     /**
-     * Generates a deterministic diagnostic ID from alert ID and timestamp.
-     *
-     * <p>Format: diag-{alertId}-{epochMillis}
-     *
-     * @param alertId the alert ID
-     * @param timestamp the diagnostic timestamp
-     * @return the generated diagnostic ID
-     */
-    public static String generateDiagnosticId(String alertId, Instant timestamp) {
-        return "diag-" + alertId + "-" + timestamp.toEpochMilli();
-    }
-
-    /**
      * Creates a new builder for constructing Diagnostic instances.
      *
      * @return a new Builder instance
