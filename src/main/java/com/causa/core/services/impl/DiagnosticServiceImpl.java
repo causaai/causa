@@ -1,5 +1,6 @@
 package com.causa.core.services.impl;
 
+import com.causa.common.utils.IdGenerator;
 import com.causa.common.constants.DiagnosticConstants;
 import com.causa.common.constants.DiagnosticConstants.DiagnosticStatus;
 import com.causa.common.constants.JsonParsingConstants;
@@ -75,11 +76,11 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             .field("alertName", alert.getAlertName())
             .log();
 
-        // Generate diagnostic ID
+        // Generate diagnostic ID in diag_<16> format (VARCHAR(21) in DB)
         Instant now = Instant.now();
-        String diagnosticId = Diagnostic.generateDiagnosticId(alert.getAlertId(), now);
+        String diagnosticId = IdGenerator.diagnosticId();
 
-        // Create diagnostic in PENDING status
+        // Persist diagnostic with PENDING status immediately — this is returned regardless of LLM outcome
         Diagnostic diagnostic = Diagnostic.builder()
             .diagnosticId(diagnosticId)
             .alertId(alert.getAlertId())
@@ -87,51 +88,63 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             .generatedAt(now)
             .build();
 
-        // Persist diagnostic
         diagnostic = diagnosticRepository.save(diagnostic);
 
-        log.info("Diagnostic created")
+        log.info(LogMessages.Diagnostic.DIAGNOSTIC_TRIGGERED)
             .field("diagnosticId", diagnosticId)
             .field("alertId", alert.getAlertId())
             .field("status", DiagnosticStatus.PENDING.getValue())
             .log();
 
-        // TODO: Trigger async diagnostic pipeline
-        // For now, call diagnostic pipeline synchronously
+        // Run the full LLM pipeline in a try/catch — a failure here must NOT bubble up
+        // and cancel the HTTP response. The alert and diagnostic row are already persisted.
+        try {
+            // Step 1: Collect diagnostic context from MCP servers (K8s, Kruize, Cryostat)
+            DiagnosticContext diagnosticContext = collectContext(alert);
 
-        // Step 1: Collect diagnostic context from MCP servers (K8s, Kruize, Cryostat)
-        DiagnosticContext diagnosticContext = collectContext(alert);
+            log.info(LogMessages.Diagnostic.CONTEXT_COLLECTED)
+                .field(Fields.DIAGNOSTIC_ID, diagnosticId)
+                .field(LogFields.ALERT_ID, alert.getAlertId())
+                .field(LogFields.HAS_K8S_CONTEXT, diagnosticContext.hasKubernetesContext())
+                .field(LogFields.HAS_KRUIZE_CONTEXT, diagnosticContext.hasKruizeContext())
+                .field(LogFields.HAS_CRYOSTAT_CONTEXT, diagnosticContext.hasCryostatContext())
+                .log();
 
-        // Log context collection summary
-        log.info(LogMessages.Diagnostic.CONTEXT_COLLECTED)
-            .field(Fields.DIAGNOSTIC_ID, diagnosticId)
-            .field(LogFields.ALERT_ID, alert.getAlertId())
-            .field(LogFields.HAS_K8S_CONTEXT, diagnosticContext.hasKubernetesContext())
-            .field(LogFields.HAS_KRUIZE_CONTEXT, diagnosticContext.hasKruizeContext())
-            .field(LogFields.HAS_CRYOSTAT_CONTEXT, diagnosticContext.hasCryostatContext())
-            .log();
+            // Step 2: Format context for LLM
+            String contextForLLM = diagnosticContext.toString();
+            String separator = ContextConstants.SEPARATOR_CHAR.repeat(ContextConstants.SEPARATOR_LENGTH);
 
-        // Step 2: Convert context to formatted string for LLM
-        String contextForLLM = diagnosticContext.toString();
-        String separator = ContextConstants.SEPARATOR_CHAR.repeat(ContextConstants.SEPARATOR_LENGTH);
+            log.info(ContextConstants.NEWLINE + separator + ContextConstants.NEWLINE +
+                     ContextConstants.CONTEXT_LOG_HEADER + ContextConstants.NEWLINE +
+                     separator + ContextConstants.NEWLINE +
+                     contextForLLM +
+                     separator + ContextConstants.NEWLINE)
+                .field(Fields.DIAGNOSTIC_ID, diagnosticId)
+                .log();
 
-        // Log the full formatted context that will be sent to LLM
-        log.info(ContextConstants.NEWLINE + separator + ContextConstants.NEWLINE +
-                 ContextConstants.CONTEXT_LOG_HEADER + ContextConstants.NEWLINE +
-                 separator + ContextConstants.NEWLINE +
-                 contextForLLM +
-                 separator + ContextConstants.NEWLINE)
-            .field(Fields.DIAGNOSTIC_ID, diagnosticId)
-            .log();
+            // Step 3: Perform root cause analysis using LLM
+            RootCauseAnalysis rca = performRootCauseAnalysis(alert, contextForLLM);
 
-        // Step 3: Perform root cause analysis using LLM
-        RootCauseAnalysis rca = performRootCauseAnalysis(alert, contextForLLM);
+            // TODO: Step 4: Validate RCA against collected context
+            // TODO: Step 5: Store RCA result in database
 
-        // TODO: Step 4: Validate RCA against collected context
-        // validateRca(alert, rca, contextForLLM);
+            log.info(LogMessages.Diagnostic.DIAGNOSTIC_COMPLETED)
+                .field("diagnosticId", diagnosticId)
+                .field("alertId", alert.getAlertId())
+                .field("anomalyType", rca.anomalyType())
+                .log();
 
         // Step 5: Persist completed diagnostic with RCA results
         diagnostic = persistCompletedDiagnostic(diagnostic, rca);
+        } catch (Exception e) {
+            // LLM / MCP failure — log and continue. The diagnostic row stays with PENDING status.
+            // The HTTP response is NOT affected.
+            log.error(LogMessages.Diagnostic.DIAGNOSTIC_FAILED)
+                .field("diagnosticId", diagnosticId)
+                .field("alertId", alert.getAlertId())
+                .exception(e)
+                .log();
+        }
 
         return diagnostic;
     }

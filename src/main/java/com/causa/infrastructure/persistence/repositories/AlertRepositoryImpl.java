@@ -9,6 +9,7 @@ import com.causa.infrastructure.persistence.mappers.AlertEntityMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -26,7 +27,19 @@ public class AlertRepositoryImpl implements AlertRepository {
     @Transactional
     public Alert save(Alert alert) {
         try {
-            AlertEntity entity = AlertEntityMapper.toEntity(alert);
+            AlertEntity entity = AlertEntityMapper.toEntityWithStatus(alert, AlertEntityMapper.STATUS_ACCEPTED, null);
+            entity.persist();
+            return alert;
+        } catch (Exception e) {
+            throw new AlertException(LogMessages.Alert.ALERT_PERSIST_FAILED + ": " + alert.getAlertId(), "PersistenceError", e);
+        }
+    }
+
+    @Override
+    @Transactional
+    public Alert saveRejected(Alert alert, String reason) {
+        try {
+            AlertEntity entity = AlertEntityMapper.toEntityWithStatus(alert, AlertEntityMapper.STATUS_REJECTED, reason);
             entity.persist();
             return alert;
         } catch (Exception e) {
@@ -60,5 +73,22 @@ public class AlertRepositoryImpl implements AlertRepository {
     public Optional<Alert> findById(String alertId) {
         return AlertEntity.<AlertEntity>findByIdOptional(alertId)
             .map(AlertEntityMapper::toDomain);
+    }
+
+    @Override
+    public List<Alert> findAll() {
+        return AlertEntity.<AlertEntity>listAll()
+            .stream()
+            .map(AlertEntityMapper::toDomain)
+            .toList();
+    }
+
+    @Override
+    public List<Alert> findByContainerName(String containerName) {
+        return AlertEntity.<AlertEntity>list(
+                AlertEntity.Fields.CONTAINER_NAME + " = ?1", containerName)
+            .stream()
+            .map(AlertEntityMapper::toDomain)
+            .toList();
     }
 }
