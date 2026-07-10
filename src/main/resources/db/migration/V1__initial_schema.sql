@@ -20,7 +20,8 @@
 -- Enable required PostgreSQL extensions
 -- =============================================================================
 
-CREATE EXTENSION IF NOT EXISTS vector;
+-- CREATE EXTENSION IF NOT EXISTS vector;
+-- NOTE: pgvector extension not available in current database, commented out
 
 
 -- =============================================================================
@@ -70,7 +71,7 @@ CREATE TABLE IF NOT EXISTS diagnostics (
 
     -- Structured array of actionable remediation steps
     -- Each element: { solution, justification, success_probability, implementation_notes }
-    recommendations           JSONB,
+    recommendations     JSONB,
 
     -- Supporting evidence: logs, metric citations, and confidence explanation
     -- Shape: { supporting_logs: [...], evidences: [...], confidence_summary: "..." }
@@ -110,7 +111,7 @@ CREATE TABLE IF NOT EXISTS context_data (
     content          TEXT         NOT NULL,
 
     -- Vector Storage: Defaulting to 1536 dimensions (OpenAI standard)
-    embedding        vector(1536),
+    -- embedding        vector(1536),  -- Commented out: pgvector not available
 
     context_metadata JSONB,
     created_at       TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -124,8 +125,8 @@ CREATE INDEX IF NOT EXISTS idx_context_alert          ON context_data (alert_id,
 CREATE INDEX IF NOT EXISTS idx_context_container_name ON context_data (container_name);
 
 -- Production-grade HNSW Vector index for rapid similarity searches
-CREATE INDEX IF NOT EXISTS idx_context_vector ON context_data
-    USING hnsw (embedding vector_cosine_ops);
+-- CREATE INDEX IF NOT EXISTS idx_context_vector ON context_data
+--     USING hnsw (embedding vector_cosine_ops);  -- Commented out: pgvector not available
 
 
 -- =============================================================================
