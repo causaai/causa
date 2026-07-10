@@ -111,6 +111,8 @@ causa:
       location: ${VERTEX_LOCATION:}
     bob:
       shell-path: bob
+    skills:
+      enabled: ${LLM_SKILLS_ENABLED:true}
 
   # Alert Configuration
   alerts:
