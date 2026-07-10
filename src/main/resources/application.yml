@@ -69,6 +69,7 @@ quarkus:
     migrate-at-start: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+    baseline-version: 0
     validate-on-migrate: true
     out-of-order: false
 
