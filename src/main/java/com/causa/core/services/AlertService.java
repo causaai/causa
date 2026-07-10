@@ -5,6 +5,7 @@ import com.causa.core.domain.Alert;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import com.causa.core.domain.Alert;
 
 /**
  * Alert Service - Primary Port

@@ -46,7 +46,13 @@ public record DiagnosticDetailResponse(
     List<RecommendationInfo> recommendations,
 
     @JsonProperty("llm_notes")
-    String llmNotes
+    String llmNotes,
+
+    @JsonProperty("validation_result")
+    String validationResult,
+
+    @JsonProperty("validation_data")
+    Object validationData
 ) {
 
     // -------------------------------------------------------------------------
@@ -182,6 +188,16 @@ public record DiagnosticDetailResponse(
             llmNotes = rca.llmNotes();
         }
 
+        // Parse validationData JSON string into an object so it renders as nested JSON (not escaped string)
+        Object validationDataObj = null;
+        if (diagnostic.getValidationData() != null && !diagnostic.getValidationData().isBlank()) {
+            try {
+                validationDataObj = MAPPER.readValue(diagnostic.getValidationData(), Object.class);
+            } catch (Exception ignored) {
+                validationDataObj = diagnostic.getValidationData();
+            }
+        }
+
         return new DiagnosticDetailResponse(
             diagnostic.getDiagnosticId(),
             diagnostic.getStatus() != null ? diagnostic.getStatus().getValue() : null,
@@ -192,7 +208,9 @@ public record DiagnosticDetailResponse(
             workloadInfo,
             diagnosisInfo,
             recommendations,
-            llmNotes
+            llmNotes,
+            diagnostic.getValidationResult(),
+            validationDataObj
         );
     }
 
