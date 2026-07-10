@@ -168,6 +168,19 @@ public final class LogMessages {
         // Exception messages
         public static final String DIAGNOSTIC_PERSIST_FAILED = "Failed to persist diagnostic";
         public static final String DIAGNOSTIC_UPDATE_FAILED = "Failed to update diagnostic";
+
+        // Async pipeline
+        public static final String DIAGNOSTIC_INITIATED      = "Diagnostic initiated — returning to caller, pipeline running async";
+        public static final String DIAGNOSTIC_PIPELINE_START = "Async diagnostic pipeline started";
+        public static final String DIAGNOSTIC_PIPELINE_DONE  = "Async diagnostic pipeline completed";
+        public static final String DIAGNOSTIC_PIPELINE_FAILED = "Async diagnostic pipeline failed";
+
+        // Diagnostics API
+        public static final String DIAGNOSTICS_LIST_REQUEST  = "Diagnostics list request received";
+        public static final String DIAGNOSTICS_LIST_RETURNED = "Diagnostics list returned";
+        public static final String DIAGNOSTIC_GET_REQUEST    = "Diagnostic detail request received";
+        public static final String DIAGNOSTIC_GET_FOUND      = "Diagnostic detail retrieved";
+        public static final String DIAGNOSTIC_GET_NOT_FOUND  = "Diagnostic not found for given ID";
     }
 
     /**

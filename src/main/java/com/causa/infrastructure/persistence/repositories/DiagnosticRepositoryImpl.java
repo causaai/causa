@@ -9,6 +9,9 @@ import com.causa.infrastructure.persistence.mappers.DiagnosticEntityMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
+import java.util.List;
+import java.util.Optional;
+
 /**
  * Diagnostic Repository Implementation
  *
@@ -42,5 +45,21 @@ public class DiagnosticRepositoryImpl implements DiagnosticRepository {
         } catch (Exception e) {
             throw new DiagnosticException(LogMessages.Diagnostic.DIAGNOSTIC_UPDATE_FAILED + ": " + diagnostic.getDiagnosticId(), "UpdateError", e);
         }
+    }
+
+    @Override
+    public List<Diagnostic> findAll() {
+        return DiagnosticEntity.<DiagnosticEntity>listAll(
+                io.quarkus.panache.common.Sort.by("createdAt").descending()
+            )
+            .stream()
+            .map(DiagnosticEntityMapper::toDomain)
+            .toList();
+    }
+
+    @Override
+    public Optional<Diagnostic> findById(String diagnosticId) {
+        return DiagnosticEntity.<DiagnosticEntity>findByIdOptional(diagnosticId)
+            .map(DiagnosticEntityMapper::toDomain);
     }
 }

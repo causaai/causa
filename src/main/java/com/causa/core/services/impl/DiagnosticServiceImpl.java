@@ -1,42 +1,56 @@
 package com.causa.core.services.impl;
 
-import com.causa.common.utils.IdGenerator;
 import com.causa.common.constants.DiagnosticConstants;
 import com.causa.common.constants.DiagnosticConstants.DiagnosticStatus;
+import com.causa.common.constants.DiagnosticConstants.Fields;
+import com.causa.common.constants.DiagnosticConstants.LogFields;
 import com.causa.common.constants.JsonParsingConstants;
 import com.causa.common.constants.ContextConstants;
-import com.causa.common.constants.DiagnosticConstants.Fields;
-import com.causa.common.constants.McpConstants.LogFields;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
+import com.causa.common.utils.IdGenerator;
 import com.causa.config.AppConfig;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
+import com.causa.core.domain.DiagnosticContext;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
 import com.causa.core.domain.RootCauseAnalysis;
+import com.causa.core.domain.RootCauseAnalysis.AnomalyType;
+import com.causa.core.domain.validation.ValidatedRCA;
+import com.causa.core.domain.validation.ValidationResult;
+import com.causa.core.ports.AlertRepository;
 import com.causa.core.ports.DiagnosticRepository;
 import com.causa.core.ports.llm.PromptSender;
 import com.causa.core.services.DiagnosticService;
 import com.causa.core.services.RcaPromptBuilder;
+import com.causa.core.services.validation.RcaValidator;
+import com.causa.infrastructure.persistence.mappers.AlertEntityMapper;
 import com.causa.mcp.McpContextCollector;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
-import com.causa.core.domain.DiagnosticContext;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Diagnostic Service Implementation
  *
- * <p>Implements the diagnostic pipeline with placeholder methods for future LLM integration.
+ * <p>Implements the diagnostic pipeline with an async execution model:
+ * <ol>
+ *   <li>{@link #triggerDiagnostics} saves alert (PROCESSING) + diagnostic (PENDING) and returns immediately.</li>
+ *   <li>The full MCP context collection + LLM pipeline runs on a background thread via {@link ExecutorService}.</li>
+ *   <li>On success → diagnostic COMPLETED, alert PROCESSED.</li>
+ *   <li>On failure → diagnostic FAILED, alert PROCESSED.</li>
+ * </ol>
  *
  * @since 0.0.1
  */
@@ -46,28 +60,37 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     private static final CausaLogger log = CausaLogger.getLogger(DiagnosticServiceImpl.class);
 
     private final DiagnosticRepository diagnosticRepository;
+    private final AlertRepository alertRepository;
     private final McpContextCollector mcpContextCollector;
     private final RcaPromptBuilder rcaPromptBuilder;
     private final PromptSender promptSender;
     private final AppConfig appConfig;
     private final ObjectMapper objectMapper;
     private final Validator validator;
+    private final ExecutorService pipelineExecutor;
+    private final Optional<RcaValidator> rcaValidator;
 
     @Inject
     public DiagnosticServiceImpl(DiagnosticRepository diagnosticRepository,
+                                  AlertRepository alertRepository,
                                   McpContextCollector mcpContextCollector,
                                   RcaPromptBuilder rcaPromptBuilder,
                                   PromptSender promptSender,
                                   AppConfig appConfig,
                                   ObjectMapper objectMapper,
-                                  Validator validator) {
+                                  Validator validator,
+                                  Instance<RcaValidator> rcaValidatorInstance) {
         this.diagnosticRepository = diagnosticRepository;
-        this.mcpContextCollector = mcpContextCollector;
-        this.rcaPromptBuilder = rcaPromptBuilder;
-        this.promptSender = promptSender;
-        this.appConfig = appConfig;
-        this.objectMapper = objectMapper;
-        this.validator = validator;
+        this.alertRepository      = alertRepository;
+        this.mcpContextCollector  = mcpContextCollector;
+        this.rcaPromptBuilder     = rcaPromptBuilder;
+        this.promptSender         = promptSender;
+        this.appConfig            = appConfig;
+        this.objectMapper         = objectMapper;
+        this.validator            = validator;
+        this.pipelineExecutor     = Executors.newCachedThreadPool();
+        this.rcaValidator         = rcaValidatorInstance.isResolvable() ?
+            Optional.of(rcaValidatorInstance.get()) : Optional.empty();
     }
 
     @Override
@@ -81,7 +104,8 @@ public class DiagnosticServiceImpl implements DiagnosticService {
         Instant now = Instant.now();
         String diagnosticId = IdGenerator.diagnosticId();
 
-        // Persist diagnostic with PENDING status immediately — this is returned regardless of LLM outcome
+        // Persist diagnostic with PENDING status immediately — this is returned to the caller
+        // before the LLM pipeline even starts.
         Diagnostic diagnostic = Diagnostic.builder()
             .diagnosticId(diagnosticId)
             .alertId(alert.getAlertId())
@@ -91,14 +115,58 @@ public class DiagnosticServiceImpl implements DiagnosticService {
 
         diagnostic = diagnosticRepository.save(diagnostic);
 
-        log.info(LogMessages.Diagnostic.DIAGNOSTIC_TRIGGERED)
+        log.info(LogMessages.Diagnostic.DIAGNOSTIC_INITIATED)
             .field("diagnosticId", diagnosticId)
             .field("alertId", alert.getAlertId())
             .field("status", DiagnosticStatus.PENDING.getValue())
             .log();
 
-        // Run the full LLM pipeline in a try/catch — a failure here must NOT bubble up
-        // and cancel the HTTP response. The alert and diagnostic row are already persisted.
+        // Fire-and-forget: dispatch the full MCP + LLM pipeline to a background thread.
+        // The HTTP response is returned immediately — the caller is NOT blocked.
+        // Capture finals for the lambda.
+        final Diagnostic pendingDiagnostic = diagnostic;
+        final Alert      capturedAlert     = alert;
+        pipelineExecutor.submit(() -> runPipelineAsync(capturedAlert, pendingDiagnostic));
+
+        return diagnostic;
+    }
+
+    /**
+     * Runs the full MCP context collection + LLM pipeline on a background thread.
+     *
+     * <p>Called exclusively by {@link #triggerDiagnostics} via {@link ExecutorService} —
+     * never on the HTTP request thread.
+     *
+     * <p>Status lifecycle managed here:
+     * <ol>
+     *   <li>PENDING  — set by {@link #triggerDiagnostics} before this method is called</li>
+     *   <li>IN_PROGRESS — set at the start of this method, before any MCP/LLM work</li>
+     *   <li>COMPLETED or FAILED — set on finish</li>
+     * </ol>
+     *
+     * <p>On success → diagnostic COMPLETED, alert PROCESSED.<br>
+     * On failure → diagnostic FAILED, alert PROCESSED.
+     *
+     * @param alert   the accepted alert being analyzed
+     * @param pending the PENDING diagnostic row already saved to the DB
+     */
+    private void runPipelineAsync(Alert alert, Diagnostic pending) {
+        String diagnosticId = pending.getDiagnosticId();
+
+        log.info(LogMessages.Diagnostic.DIAGNOSTIC_PIPELINE_START)
+            .field("diagnosticId", diagnosticId)
+            .field("alertId", alert.getAlertId())
+            .log();
+
+        // Mark diagnostic IN_PROGRESS immediately so callers polling the status see active work
+        Diagnostic inProgress = Diagnostic.builder()
+            .diagnosticId(pending.getDiagnosticId())
+            .alertId(pending.getAlertId())
+            .status(DiagnosticStatus.IN_PROGRESS)
+            .generatedAt(pending.getGeneratedAt())
+            .build();
+        diagnosticRepository.update(inProgress);
+
         try {
             // Step 1: Collect diagnostic context from MCP servers (K8s, Kruize, Cryostat)
             DiagnosticContext diagnosticContext = collectContext(alert);
@@ -126,8 +194,22 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             // Step 3: Perform root cause analysis using LLM
             RootCauseAnalysis rca = performRootCauseAnalysis(alert, contextForLLM);
 
-            // TODO: Step 4: Validate RCA against collected context
-            // TODO: Step 5: Store RCA result in database
+            // Step 4: Mark VALIDATING — RCA done, validation about to start
+            Diagnostic validating = Diagnostic.builder()
+                .diagnosticId(pending.getDiagnosticId())
+                .alertId(pending.getAlertId())
+                .status(DiagnosticStatus.VALIDATING)
+                .generatedAt(pending.getGeneratedAt())
+                .build();
+            diagnosticRepository.update(validating);
+
+            log.info("Diagnostic status set to VALIDATING")
+                .field("diagnosticId", diagnosticId)
+                .field("alertId", alert.getAlertId())
+                .log();
+
+            // Step 5: Validate RCA against collected context
+            ValidatedRCA validatedRCA = validateRca(alert, rca, contextForLLM);
 
             log.info(LogMessages.Diagnostic.DIAGNOSTIC_COMPLETED)
                 .field("diagnosticId", diagnosticId)
@@ -135,17 +217,52 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                 .field("anomalyType", rca.anomalyType())
                 .log();
 
+            // Step 6: Persist completed diagnostic with RCA + validation results
+            updateDiagnosticWithValidation(pending, rca, validatedRCA);
+
+            // Step 6: Mark alert PROCESSED — pipeline finished successfully
+            alertRepository.updateProcessingStatus(alert.getAlertId(), AlertEntityMapper.STATUS_PROCESSED);
+
+            log.info(LogMessages.Diagnostic.DIAGNOSTIC_PIPELINE_DONE)
+                .field("diagnosticId", diagnosticId)
+                .field("alertId", alert.getAlertId())
+                .log();
+
         } catch (Exception e) {
-            // LLM / MCP failure — log and continue. The diagnostic row stays with PENDING status.
-            // The HTTP response is NOT affected.
-            log.error(LogMessages.Diagnostic.DIAGNOSTIC_FAILED)
+            // MCP / LLM failure — update both records and log. Does NOT affect the HTTP response
+            // since this runs on a background thread after the response was already sent.
+            log.error(LogMessages.Diagnostic.DIAGNOSTIC_PIPELINE_FAILED)
                 .field("diagnosticId", diagnosticId)
                 .field("alertId", alert.getAlertId())
                 .exception(e)
                 .log();
-        }
 
-        return diagnostic;
+            // Mark diagnostic FAILED
+            try {
+                Diagnostic failed = Diagnostic.builder()
+                    .diagnosticId(pending.getDiagnosticId())
+                    .alertId(pending.getAlertId())
+                    .status(DiagnosticStatus.FAILED)
+                    .generatedAt(pending.getGeneratedAt())
+                    .build();
+                diagnosticRepository.update(failed);
+            } catch (Exception ex) {
+                log.error(LogMessages.Diagnostic.DIAGNOSTIC_UPDATE_FAILED)
+                    .field("diagnosticId", diagnosticId)
+                    .exception(ex)
+                    .log();
+            }
+
+            // Mark alert PROCESSED regardless — it was received and attempted
+            try {
+                alertRepository.updateProcessingStatus(alert.getAlertId(), AlertEntityMapper.STATUS_PROCESSED);
+            } catch (Exception ex) {
+                log.error(LogMessages.Alert.ALERT_UPDATE_FAILED)
+                    .field("alertId", alert.getAlertId())
+                    .exception(ex)
+                    .log();
+            }
+        }
     }
 
     /**
@@ -229,8 +346,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             log.info(LogMessages.Diagnostic.RCA_GENERATED_SUCCESS)
                 .field(DiagnosticConstants.FIELD_ALERT_ID, alert.getAlertId())
                 .field("anomalyType", rca.anomalyType())
-                .field("rcaConfidence", rca.llmConfidenceScoreForRca())
-                .field("solutionConfidence", rca.llmConfidenceScoreForSolution())
+                .field("rcaConfidence", rca.confidenceSummary() != null ? rca.confidenceSummary().rcaConfidenceScore() : null)
                 .log();
 
             return rca;
@@ -292,35 +408,432 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     }
 
     /**
+     * Persists a completed diagnostic with the parsed RCA results.
+     *
+     * <p>Extracts {@code confidenceScore} from {@code rca.confidenceSummary()} and maps
+     * {@code anomalyType} to a {@link com.causa.common.constants.DiagnosticConstants.FaultDomain}.
+     * This is the base persistence step; call {@link #updateDiagnosticWithValidation} instead
+     * when validation results are available so they are layered on top.
+     *
+     * @param pending the original PENDING diagnostic
+     * @param rca     the parsed RCA result
+     * @return the updated Diagnostic in COMPLETED status
+     */
+    private Diagnostic persistCompletedDiagnostic(Diagnostic pending, RootCauseAnalysis rca) {
+        try {
+            String rcaJson = objectMapper.writeValueAsString(rca);
+
+            Float confidenceScore = null;
+            if (rca.confidenceSummary() != null && rca.confidenceSummary().rcaConfidenceScore() != null) {
+                confidenceScore = rca.confidenceSummary().rcaConfidenceScore().floatValue();
+            }
+
+            com.causa.common.constants.DiagnosticConstants.FaultDomain faultDomain = null;
+            if (rca.anomalyType() != null) {
+                try {
+                    faultDomain = com.causa.common.constants.DiagnosticConstants.FaultDomain
+                        .fromString(rca.anomalyType().name());
+                } catch (IllegalArgumentException ignored) {
+                    // anomaly type has no matching fault domain — leave null
+                }
+            }
+
+            Diagnostic completed = Diagnostic.builder()
+                .diagnosticId(pending.getDiagnosticId())
+                .alertId(pending.getAlertId())
+                .status(DiagnosticStatus.COMPLETED)
+                .generatedAt(pending.getGeneratedAt())
+                .confidenceScore(confidenceScore)
+                .faultDomain(faultDomain)
+                .rootCauseAnalysis(rcaJson)
+                .build();
+
+            return diagnosticRepository.update(completed);
+
+        } catch (Exception e) {
+            log.error(LogMessages.Diagnostic.DIAGNOSTIC_UPDATE_FAILED)
+                .field("diagnosticId", pending.getDiagnosticId())
+                .exception(e)
+                .log();
+            // Return pending diagnostic — RCA was still generated, persistence failed
+            return pending;
+        }
+    }
+
+    /**
      * Validates RCA output against collected diagnostic context.
      *
-     * <p>NOTE: This is a placeholder. The actual validation framework is in branch rca-validation-impl.
-     * When merged, this should be replaced with:
-     * <pre>
-     * private ValidatedRCA validateRca(Alert alert, RootCauseAnalysis rca, String diagnosticContext) {
-     *     return rcaValidator.get().validate(rca, diagnosticContext);
-     * }
-     * </pre>
-     *
-     * <p>Validation framework features:
+     * <p>Uses assertion-driven validation to verify each claim in the RCA
+     * against the collected diagnostic context. Validates:
      * <ul>
-     *   <li>Assertion extraction from RCA (rule-based or LLM-powered)</li>
-     *   <li>Evidence matching against diagnostic context</li>
-     *   <li>LLM-based assertion analysis with targeted questions</li>
-     *   <li>Confidence scoring and validation results</li>
+     *   <li>Observations and facts against K8s events and metrics</li>
+     *   <li>Trends against time-series data</li>
+     *   <li>Causal relationships against evidence chains</li>
+     *   <li>Configuration claims against actual settings</li>
      * </ul>
      *
      * @param alert the alert being analyzed
-     * @param rca the RCA result to validate
-     * @deprecated Use 3-parameter version: validateRca(Alert, RootCauseAnalysis, String)
+     * @param rca the root cause analysis to validate
+     * @param diagnosticContext the collected MCP context
+     * @return validated RCA with assertion-level validation results
      */
-    @Deprecated(since = "0.0.1", forRemoval = true)
-    private void validateRca(Alert alert, RootCauseAnalysis rca) {
-        log.debug(LogMessages.Diagnostic.RCA_VALIDATION_STARTED)
-            .field("alertId", alert.getAlertId())
+    private ValidatedRCA validateRca(Alert alert, RootCauseAnalysis rca, String diagnosticContext) {
+        log.info(LogMessages.Diagnostic.RCA_VALIDATION_STARTED)
+            .field(LogFields.ALERT_ID, alert.getAlertId())
+            .field("issueTitle", rca.issueTitle())
             .log();
 
-        // TODO: Remove this placeholder when RCA validation framework is merged
-        // See branch: rca-validation-impl
+        // Check if validator is available
+        if (rcaValidator.isEmpty()) {
+            log.warn("RCA validator not available, skipping validation")
+                .field(LogFields.ALERT_ID, alert.getAlertId())
+                .log();
+
+            // Return unvalidated RCA wrapped in ValidatedRCA with no validation results
+            return ValidatedRCA.builder()
+                .originalRca(rca)
+                .validationResults(java.util.List.of())
+                .validatedAt(Instant.now())
+                .build();
+        }
+
+        // Perform validation
+        ValidatedRCA validatedRCA = rcaValidator.get().validate(rca, diagnosticContext);
+
+        // Log validation results
+        logValidationResults(validatedRCA);
+
+        // Log validation summary
+        log.info("RCA validation completed")
+            .field(LogFields.ALERT_ID, alert.getAlertId())
+            .field("validationSummary", validatedRCA.summary().toSummaryString())
+            .field("isValid", validatedRCA.isValid())
+            .field("isHighConfidence", validatedRCA.isHighConfidence())
+            .field(LogFields.SUPPORTED_COUNT, validatedRCA.getSupportedAssertions().size())
+            .field(LogFields.UNSUPPORTED_COUNT, validatedRCA.getUnsupportedAssertions().size())
+            .field(LogFields.UNKNOWN_COUNT, validatedRCA.getUnknownAssertions().size())
+            .log();
+
+        return validatedRCA;
+    }
+
+    /**
+     * Logs detailed validation results for each assertion.
+     */
+    private void logValidationResults(ValidatedRCA validatedRCA) {
+        log.info("\n" + "=".repeat(80))
+            .log();
+        log.info("RCA VALIDATION RESULTS")
+            .log();
+        log.info("=".repeat(80))
+            .log();
+
+        for (ValidationResult result : validatedRCA.validationResults()) {
+            String statusSymbol = switch (result.status()) {
+                case SUPPORTED -> "✓";
+                case PARTIALLY_SUPPORTED -> "~";
+                case UNSUPPORTED -> "✗";
+                case UNKNOWN -> "?";
+            };
+
+            log.info(String.format("[%s] %s", statusSymbol, result.assertion().text()))
+                .field("assertionId", result.assertion().id())
+                .field("type", result.assertion().type())
+                .field("source", result.assertion().source())
+                .field("status", result.status())
+                .field("confidence", String.format("%.2f", result.confidence()))
+                .field("supportingEvidence", result.supportingEvidence().size())
+                .field("refutingEvidence", result.refutingEvidence().size())
+                .log();
+
+            // Log evidence details if present
+            if (!result.supportingEvidence().isEmpty()) {
+                for (int i = 0; i < result.supportingEvidence().size(); i++) {
+                    var evidence = result.supportingEvidence().get(i);
+                    log.debug(String.format("  Evidence %d: %s (relevance: %.2f)",
+                        i + 1,
+                        evidence.snippet().substring(0, Math.min(100, evidence.snippet().length())),
+                        evidence.relevanceScore()))
+                        .field("evidenceSource", evidence.source())
+                        .field("evidenceType", evidence.type())
+                        .log();
+                }
+            }
+
+            result.explanation().ifPresent(explanation ->
+                log.debug("  Explanation: " + explanation)
+                    .log()
+            );
+        }
+
+        log.info("=".repeat(80))
+            .log();
+        log.info("VALIDATION SUMMARY")
+            .log();
+        log.info(validatedRCA.summary().toSummaryString())
+            .log();
+        log.info("=".repeat(80))
+            .log();
+    }
+
+    /**
+     * Updates diagnostic with RCA and validation results.
+     *
+     * <p>Reuses {@link #persistCompletedDiagnostic} to extract {@code confidenceScore} and
+     * {@code faultDomain} from the RCA, then layers the validation fields
+     * ({@code validationResult}, {@code validationData}) on top before persisting.
+     *
+     * @param pending      the original PENDING diagnostic
+     * @param rca          the root cause analysis
+     * @param validatedRCA the validated RCA with validation results
+     * @return updated diagnostic
+     */
+    private Diagnostic updateDiagnosticWithValidation(
+        Diagnostic diagnostic,
+        RootCauseAnalysis rca,
+        ValidatedRCA validatedRCA
+    ) {
+        log.info("Starting to build validation persistence data")
+            .field(LogFields.DIAGNOSTIC_ID, diagnostic.getDiagnosticId())
+            .log();
+
+        try {
+            // Reuse existing logic: persist RCA fields (confidenceScore, faultDomain, rootCauseAnalysis)
+            Diagnostic base = persistCompletedDiagnostic(diagnostic, rca);
+
+            // Determine overall validation result
+            String validationResult = determineValidationResult(validatedRCA);
+
+            log.info("Validation result determined")
+                .field("validationResult", validationResult)
+                .log();
+
+            // Build validation data JSON
+            com.fasterxml.jackson.databind.node.ObjectNode validationDataNode = objectMapper.createObjectNode();
+
+            // Add dual validation if available
+            if (validatedRCA.dualValidation() != null) {
+                validationDataNode.set("dualValidation", objectMapper.valueToTree(validatedRCA.dualValidation()));
+            }
+
+            // Add summary
+            validationDataNode.set("summary", objectMapper.valueToTree(validatedRCA.summary()));
+
+            // Add all validation results
+            validationDataNode.set("validationResults", objectMapper.valueToTree(validatedRCA.validationResults()));
+
+            // Add validated timestamp
+            validationDataNode.put("validatedAt", validatedRCA.validatedAt().toString());
+
+            // Convert validation data to JSON string (compact for DB)
+            String validationDataString = objectMapper.writeValueAsString(validationDataNode);
+
+            // Create pretty-printed JSON for logging
+            String prettyJson = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(validationDataNode);
+
+            // Log assertions summary
+            log.info("\n" + "=".repeat(80) + "\n" +
+                     "📝 ASSERTIONS VALIDATED (" + validatedRCA.validationResults().size() + " total)\n" +
+                     "=".repeat(80))
+                .log();
+
+            for (int i = 0; i < validatedRCA.validationResults().size(); i++) {
+                var result = validatedRCA.validationResults().get(i);
+                String statusIcon = switch (result.status()) {
+                    case SUPPORTED -> "✅";
+                    case PARTIALLY_SUPPORTED -> "🟡";
+                    case UNSUPPORTED -> "❌";
+                    case UNKNOWN -> "❓";
+                };
+                log.info(String.format("  [%d] %s %s: %s (conf=%.2f, evidence=%d supporting)",
+                        i + 1, statusIcon, result.assertion().type(),
+                        result.assertion().text(), result.confidence(),
+                        result.supportingEvidence().size()))
+                    .log();
+            }
+
+            // Log rules summary if available
+            if (validatedRCA.dualValidation() != null && validatedRCA.dualValidation().ruleBasedVerdict() != null) {
+                var ruleVerdict = validatedRCA.dualValidation().ruleBasedVerdict();
+                log.info("\n" + "=".repeat(80) + "\n" +
+                         "📋 RULES EVALUATED (Hypothesis: " + ruleVerdict.getHypothesis() + ")\n" +
+                         "=".repeat(80))
+                    .log();
+                log.info(String.format("  Required Rules: %d/%d passed",
+                        ruleVerdict.getRequiredPassed(), ruleVerdict.getRequiredTotal()))
+                    .log();
+                log.info(String.format("  Supporting Rules: %d matched", ruleVerdict.getSupportingMatched()))
+                    .log();
+                log.info(String.format("  Exclusion Rules: %d matched", ruleVerdict.getExclusionMatched()))
+                    .log();
+                log.info(String.format("  Total Score: %d/%d (%.1f%%) | Confidence: %.2f",
+                        ruleVerdict.getTotalScore(),
+                        ruleVerdict.getMaxPossibleScore(),
+                        ruleVerdict.getNormalizedScore() * 100,
+                        ruleVerdict.getConfidence()))
+                    .log();
+                var breakdown = ruleVerdict.getScoreBreakdown();
+                if (breakdown != null) {
+                    log.info(String.format("  Score Breakdown: Required=%d, Supporting=%d, Exclusion=%d",
+                            breakdown.getRequiredScore(),
+                            breakdown.getSupportingScore(),
+                            breakdown.getExclusionScore()))
+                        .log();
+                }
+            }
+
+            // Layer validation fields on top of the already-persisted base diagnostic
+            Diagnostic updated = Diagnostic.builder()
+                .diagnosticId(base.getDiagnosticId())
+                .alertId(base.getAlertId())
+                .status(base.getStatus())
+                .generatedAt(base.getGeneratedAt())
+                .confidenceScore(base.getConfidenceScore())
+                .faultDomain(base.getFaultDomain())
+                .rootCauseAnalysis(base.getRootCauseAnalysis())
+                .validationResult(validationResult)
+                .validationData(validationDataString)
+                .build();
+
+            // Log validation persistence data before saving
+            log.info("\n" + "=".repeat(80) + "\n" +
+                     "💾 VALIDATION PERSISTENCE DATA\n" +
+                     "=".repeat(80) + "\n" +
+                     "validation_result: " + validationResult + "\n" +
+                     "validation_data (JSONB):\n" +
+                     prettyJson + "\n" +
+                     "=".repeat(80))
+                .log();
+
+            // Persist to database
+            updated = diagnosticRepository.update(updated);
+
+            log.info("Diagnostic updated with validation results")
+                .field(LogFields.DIAGNOSTIC_ID, diagnostic.getDiagnosticId())
+                .field(LogFields.VALIDATION_RESULT, validationResult)
+                .field(LogFields.CONFIDENCE_SCORE, validatedRCA.summary().averageConfidence())
+                .log();
+
+            return updated;
+
+        } catch (Exception e) {
+            // Try to log validation data even on failure
+            try {
+                String validationResult = determineValidationResult(validatedRCA);
+                com.fasterxml.jackson.databind.node.ObjectNode validationDataNode = objectMapper.createObjectNode();
+                if (validatedRCA.dualValidation() != null) {
+                    validationDataNode.set("dualValidation", objectMapper.valueToTree(validatedRCA.dualValidation()));
+                }
+                validationDataNode.set("summary", objectMapper.valueToTree(validatedRCA.summary()));
+                validationDataNode.set("validationResults", objectMapper.valueToTree(validatedRCA.validationResults()));
+                validationDataNode.put("validatedAt", validatedRCA.validatedAt().toString());
+                String prettyJson = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(validationDataNode);
+
+                log.error("\n" + "=".repeat(80) + "\n" +
+                         "📝 ASSERTIONS VALIDATED (" + validatedRCA.validationResults().size() + " total) - FAILED TO SAVE\n" +
+                         "=".repeat(80))
+                    .log();
+
+                for (int i = 0; i < validatedRCA.validationResults().size(); i++) {
+                    var result = validatedRCA.validationResults().get(i);
+                    String statusIcon = switch (result.status()) {
+                        case SUPPORTED -> "✅";
+                        case PARTIALLY_SUPPORTED -> "🟡";
+                        case UNSUPPORTED -> "❌";
+                        case UNKNOWN -> "❓";
+                    };
+                    log.error(String.format("  [%d] %s %s: %s (conf=%.2f, evidence=%d supporting)",
+                            i + 1, statusIcon, result.assertion().type(),
+                            result.assertion().text(), result.confidence(),
+                            result.supportingEvidence().size()))
+                        .log();
+                }
+
+                if (validatedRCA.dualValidation() != null && validatedRCA.dualValidation().ruleBasedVerdict() != null) {
+                    var ruleVerdict = validatedRCA.dualValidation().ruleBasedVerdict();
+                    log.error("\n" + "=".repeat(80) + "\n" +
+                             "📋 RULES EVALUATED (Hypothesis: " + ruleVerdict.getHypothesis() + ") - FAILED TO SAVE\n" +
+                             "=".repeat(80))
+                        .log();
+                    log.error(String.format("  Required Rules: %d/%d passed",
+                            ruleVerdict.getRequiredPassed(), ruleVerdict.getRequiredTotal()))
+                        .log();
+                    log.error(String.format("  Supporting Rules: %d matched", ruleVerdict.getSupportingMatched()))
+                        .log();
+                    log.error(String.format("  Exclusion Rules: %d matched", ruleVerdict.getExclusionMatched()))
+                        .log();
+                    log.error(String.format("  Total Score: %d/%d (%.1f%%) | Confidence: %.2f",
+                            ruleVerdict.getTotalScore(),
+                            ruleVerdict.getMaxPossibleScore(),
+                            ruleVerdict.getNormalizedScore() * 100,
+                            ruleVerdict.getConfidence()))
+                        .log();
+                    var breakdown = ruleVerdict.getScoreBreakdown();
+                    if (breakdown != null) {
+                        log.error(String.format("  Score Breakdown: Required=%d, Supporting=%d, Exclusion=%d",
+                                breakdown.getRequiredScore(),
+                                breakdown.getSupportingScore(),
+                                breakdown.getExclusionScore()))
+                            .log();
+                    }
+                }
+
+                log.error("\n" + "=".repeat(80) + "\n" +
+                         "💾 VALIDATION PERSISTENCE DATA (FAILED TO SAVE)\n" +
+                         "=".repeat(80) + "\n" +
+                         "validation_result: " + validationResult + "\n" +
+                         "validation_data (JSONB):\n" +
+                         prettyJson + "\n" +
+                         "=".repeat(80))
+                    .log();
+            } catch (Exception jsonEx) {
+                // Ignore JSON build errors in error handler
+            }
+
+            log.error("Failed to update diagnostic with validation results")
+                .field(LogFields.DIAGNOSTIC_ID, diagnostic.getDiagnosticId())
+                .exception(e)
+                .log();
+
+            // Return original diagnostic with FAILED status
+            return Diagnostic.builder()
+                .diagnosticId(diagnostic.getDiagnosticId())
+                .alertId(diagnostic.getAlertId())
+                .status(DiagnosticStatus.FAILED)
+                .generatedAt(diagnostic.getGeneratedAt())
+                .build();
+        }
+    }
+
+    /**
+     * Determines the overall validation result string from ValidatedRCA.
+     *
+     * @param validatedRCA the validated RCA
+     * @return validation result string (SUPPORTED, PARTIALLY_SUPPORTED, UNSUPPORTED)
+     */
+    private String determineValidationResult(ValidatedRCA validatedRCA) {
+        // If dual validation available, use final verdict
+        if (validatedRCA.dualValidation() != null) {
+            return validatedRCA.dualValidation().finalVerdict().status().name();
+        }
+
+        // Otherwise use assertion-based summary
+        if (validatedRCA.isHighConfidence()) {
+            return "SUPPORTED";
+        } else if (validatedRCA.isValid()) {
+            return "PARTIALLY_SUPPORTED";
+        } else {
+            return "UNSUPPORTED";
+        }
+    }
+
+    @Override
+    public List<Diagnostic> listDiagnostics() {
+        return diagnosticRepository.findAll();
+    }
+
+    @Override
+    public Optional<Diagnostic> getDiagnosticById(String diagnosticId) {
+        return diagnosticRepository.findById(diagnosticId);
     }
 }

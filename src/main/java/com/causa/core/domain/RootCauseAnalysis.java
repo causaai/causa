@@ -1,9 +1,6 @@
 package com.causa.core.domain;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import jakarta.validation.constraints.DecimalMax;
-import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 
@@ -11,7 +8,7 @@ import java.util.List;
  * Root Cause Analysis Domain Model
  *
  * <p>Represents the structured output from the LLM-based RCA process.
- * This matches the expected JSON schema from the RCA prompt template.
+ * This matches the JSON schema defined in rca-prompt-template.yml.
  *
  * @since 0.0.1
  */
@@ -37,23 +34,11 @@ public record RootCauseAnalysis(
     @JsonProperty("evidences")
     List<String> evidences,
 
-    @JsonProperty("possible_solutions")
-    List<Solution> possibleSolutions,
-
-    @JsonProperty("llm_confidence_score_for_rca")
-    @NotNull(message = "RCA confidence score is required")
-    @DecimalMin(value = "0.0", message = "RCA confidence score must be >= 0.0")
-    @DecimalMax(value = "1.0", message = "RCA confidence score must be <= 1.0")
-    Double llmConfidenceScoreForRca,
-
-    @JsonProperty("llm_confidence_score_for_solution")
-    @NotNull(message = "Solution confidence score is required")
-    @DecimalMin(value = "0.0", message = "Solution confidence score must be >= 0.0")
-    @DecimalMax(value = "1.0", message = "Solution confidence score must be <= 1.0")
-    Double llmConfidenceScoreForSolution,
+    @JsonProperty("recommendations")
+    List<Recommendation> recommendations,
 
     @JsonProperty("confidence_summary")
-    String confidenceSummary,
+    ConfidenceSummary confidenceSummary,
 
     @JsonProperty("llm_notes")
     String llmNotes
@@ -77,34 +62,38 @@ public record RootCauseAnalysis(
     }
 
     /**
-     * Solution Record
+     * Confidence Summary nested object.
+     * Maps to: { "rca_confidence_score": 0.85, "summary_text": "..." }
      */
-    public record Solution(
-        @JsonProperty("solution")
-        String solution,
+    public record ConfidenceSummary(
+        @JsonProperty("rca_confidence_score")
+        Double rcaConfidenceScore,
 
-        @JsonProperty("justification")
-        String justification,
+        @JsonProperty("summary_text")
+        String summaryText
+    ) {}
 
-        @JsonProperty("success_probability")
-        SuccessProbability successProbability,
+    /**
+     * Recommendation Record — maps to each element in the "recommendations" array.
+     * Fields align with the prompt template OUTPUT FORMAT.
+     */
+    public record Recommendation(
+        @JsonProperty("solution_type")
+        String solutionType,
+
+        @JsonProperty("solution_title")
+        String solutionTitle,
+
+        @JsonProperty("solution_description")
+        String solutionDescription,
 
         @JsonProperty("implementation_notes")
-        String implementationNotes
-    ) {
+        String implementationNotes,
 
-        /**
-         * Success Probability Enum
-         */
-        public enum SuccessProbability {
-            @JsonProperty("High")
-            HIGH,
+        @JsonProperty("solution_confidence_score")
+        Double solutionConfidenceScore,
 
-            @JsonProperty("Medium")
-            MEDIUM,
-
-            @JsonProperty("Low")
-            LOW
-        }
-    }
+        @JsonProperty("solution_alerts")
+        List<String> solutionAlerts
+    ) {}
 }
