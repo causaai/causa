@@ -24,6 +24,9 @@ public final class Diagnostic {
     private final FaultDomain faultDomain;
     private final String rootCauseAnalysis;  // Will be JSON string from LLM
 
+    private final String validationResult;
+    private final String validationData;  // JSON string
+
     private Diagnostic(Builder builder) {
         this.diagnosticId = Objects.requireNonNull(builder.diagnosticId, "diagnosticId cannot be null");
         this.alertId = Objects.requireNonNull(builder.alertId, "alertId cannot be null");
@@ -32,6 +35,9 @@ public final class Diagnostic {
         this.confidenceScore = builder.confidenceScore;  // nullable for PENDING status
         this.faultDomain = builder.faultDomain;  // nullable for PENDING status
         this.rootCauseAnalysis = builder.rootCauseAnalysis;  // nullable for PENDING status
+        this.validationResult = builder.validationResult;
+        this.validationData = builder.validationData;
+        
     }
 
     // Getters
@@ -64,6 +70,14 @@ public final class Diagnostic {
         return rootCauseAnalysis;
     }
 
+    public String getValidationResult() {
+        return validationResult;
+    }
+
+    public String getValidationData() {
+        return validationData;
+    }
+
     /**
      * Creates a new builder for constructing Diagnostic instances.
      *
@@ -84,6 +98,8 @@ public final class Diagnostic {
         private Float confidenceScore;
         private FaultDomain faultDomain;
         private String rootCauseAnalysis;
+        private String validationResult;
+        private String validationData;
 
         private Builder() {}
 
@@ -114,6 +130,16 @@ public final class Diagnostic {
 
         public Builder faultDomain(FaultDomain faultDomain) {
             this.faultDomain = faultDomain;
+            return this;
+        }
+
+        public Builder validationResult(String validationResult) {
+            this.validationResult = validationResult;
+            return this;
+        }
+
+        public Builder validationData(String validationData) {
+            this.validationData = validationData;
             return this;
         }
 
