@@ -35,15 +35,15 @@ public class AlertRepositoryImpl implements AlertRepository {
     @Override
     @Transactional
     public void updateHasDiagnostics(String alertId, boolean hasDiagnostics) {
+        // Note: The new entity structure doesn't have a hasDiagnostics field
+        // This is now derived from the existence of related diagnostics
+        // For now, this is a no-op, but we keep the method for interface compatibility
         try {
-            int updated = AlertEntity.update(
-                AlertEntity.Fields.HAS_DIAGNOSTICS + " = ?1 where " + AlertEntity.Fields.ALERT_ID + " = ?2",
-                hasDiagnostics,
-                alertId);
-
-            if (updated == 0) {
+            AlertEntity entity = AlertEntity.findById(alertId);
+            if (entity == null) {
                 throw new AlertException(LogMessages.Alert.ALERT_NOT_FOUND + ": " + alertId, "NotFound");
             }
+            // The relationship is now managed through the DiagnosticEntity.alert foreign key
         } catch (AlertException e) {
             throw e;
         } catch (Exception e) {
