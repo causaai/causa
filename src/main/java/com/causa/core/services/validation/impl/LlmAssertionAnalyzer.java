@@ -4,6 +4,7 @@ import com.causa.common.constants.LLMConstants;
 import com.causa.common.constants.PromptConstants;
 import com.causa.common.logging.CausaLogger;
 import com.causa.config.AppConfig;
+import com.causa.config.LLMConfig;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
 import com.causa.core.domain.validation.Assertion;
@@ -43,7 +44,6 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
     private static final CausaLogger log = CausaLogger.getLogger(LlmAssertionAnalyzer.class);
 
     private final PromptSender promptSender;
-    private final AppConfig appConfig;
     private final ObjectMapper objectMapper;
     private final PromptTemplateLoader promptTemplateLoader;
     private final String modelType;
@@ -55,7 +55,6 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
         ObjectMapper objectMapper
     ) {
         this.promptSender = promptSender;
-        this.appConfig = appConfig;
         this.objectMapper = objectMapper;
         this.promptTemplateLoader = new PromptTemplateLoader(PromptConstants.TEMPLATE_PATH_ASSERTION_ANALYSIS);
         this.modelType = determineModelType(appConfig.getLlmConfig());
@@ -64,7 +63,7 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
     /**
      * Determines the model type for template selection based on LLM configuration.
      */
-    private String determineModelType(com.causa.config.LLMConfig config) {
+    private String determineModelType(LLMConfig config) {
         String provider = config.getProvider().orElse("");
         String modelName = config.getModelName().orElse("");
 

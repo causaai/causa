@@ -35,4 +35,18 @@ public final class PromptConstants {
      * Template placeholder strings
      */
     public static final String PLACEHOLDER_CONTEXT = "{{context}}";
+    public static final String PLACEHOLDER_ASSERTION_TEXT = "{{assertion_text}}";
+    public static final String PLACEHOLDER_ASSERTION_TYPE = "{{assertion_type}}";
+    public static final String PLACEHOLDER_ASSERTION_SOURCE = "{{assertion_source}}";
+    public static final String PLACEHOLDER_VERIFICATION_GUIDANCE = "{{verification_guidance}}";
+    public static final String PLACEHOLDER_DIAGNOSTIC_CONTEXT = "{{diagnostic_context}}";
+
+    /**
+     * Template paths
+     */
+    public static final String TEMPLATE_PATH_ASSERTION_ANALYSIS = "prompts/assertion-analysis-prompt-template.yml";
+    public static final String TEMPLATE_PATH_ASSERTION_EXTRACTION = "prompts/assertion-extraction-prompt-template.yml";
+
+    public static final String PLACEHOLDER_SOURCE = "{{source}}";
+    public static final String PLACEHOLDER_RCA_TEXT = "{{rca_text}}";
 }

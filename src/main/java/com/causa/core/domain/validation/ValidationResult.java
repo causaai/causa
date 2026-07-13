@@ -5,8 +5,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-
 /**
  * Result of validating a single assertion against diagnostic context.
  *
@@ -124,7 +122,6 @@ public record ValidationResult(
     /**
      * Returns true if this assertion was validated (supported or partially supported).
      */
-    @JsonIgnore
     public boolean isValidated() {
         return status == ValidationStatus.SUPPORTED || status == ValidationStatus.PARTIALLY_SUPPORTED;
     }
@@ -132,7 +129,6 @@ public record ValidationResult(
     /**
      * Returns true if strong evidence was found (high confidence).
      */
-    @JsonIgnore
     public boolean hasStrongEvidence() {
         return confidence >= 0.8;
     }
@@ -140,7 +136,6 @@ public record ValidationResult(
     /**
      * Returns the total number of evidence pieces.
      */
-    @JsonIgnore
     public int evidenceCount() {
         return supportingEvidence.size() + refutingEvidence.size();
     }

@@ -32,6 +32,27 @@ public final class DiagnosticConstants {
         public static final String DIAGNOSTIC_ID = "diagnosticId";
     }
 
+    /**
+     * Logging field names for diagnostics.
+     */
+    public static final class LogFields {
+        private LogFields() {}
+
+        public static final String ALERT_ID = "alertId";
+        public static final String DIAGNOSTIC_ID = "diagnosticId";
+        public static final String HAS_K8S_CONTEXT = "hasK8sContext";
+        public static final String HAS_KRUIZE_CONTEXT = "hasKruizeContext";
+        public static final String HAS_CRYOSTAT_CONTEXT = "hasCryostatContext";
+        public static final String HYPOTHESIS = "hypothesis";
+        public static final String STATUS = "status";
+        public static final String CONFIDENCE = "confidence";
+        public static final String TOTAL_SCORE = "totalScore";
+        public static final String REQUIRED_PASSED = "requiredPassed";
+        public static final String REQUIRED_TOTAL = "requiredTotal";
+        public static final String SUPPORTING_MATCHED = "supportingMatched";
+        public static final String EXCLUSION_MATCHED = "exclusionMatched";
+    }
+
     // Logging format constants
     public static final int SEPARATOR_LENGTH = 80;
     public static final String SEPARATOR_CHAR = "=";
