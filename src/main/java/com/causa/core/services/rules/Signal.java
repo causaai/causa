@@ -62,12 +62,13 @@ public class Signal {
         return value;
     }
 
-    // Internal helper methods for rule evaluation - NOT serialized to JSON
-    String valueAsString() {
+    // Helper methods for rule evaluation - public for cross-package access
+    // Named without "get" prefix to avoid Jackson serialization
+    public String valueAsString() {
         return value != null ? value.toString() : null;
     }
 
-    Optional<Integer> valueAsInt() {
+    public Optional<Integer> valueAsInt() {
         if (value instanceof Integer) {
             return Optional.of((Integer) value);
         }
@@ -81,7 +82,7 @@ public class Signal {
         return Optional.empty();
     }
 
-    Optional<Double> valueAsDouble() {
+    public Optional<Double> valueAsDouble() {
         if (value instanceof Double) {
             return Optional.of((Double) value);
         }
@@ -98,7 +99,7 @@ public class Signal {
         return Optional.empty();
     }
 
-    Optional<Boolean> valueAsBoolean() {
+    public Optional<Boolean> valueAsBoolean() {
         if (value instanceof Boolean) {
             return Optional.of((Boolean) value);
         }
