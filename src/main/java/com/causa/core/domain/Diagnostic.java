@@ -37,7 +37,7 @@ public final class Diagnostic {
         this.rootCauseAnalysis = builder.rootCauseAnalysis;  // nullable for PENDING status
         this.validationResult = builder.validationResult;
         this.validationData = builder.validationData;
-
+        
     }
 
     // Getters

@@ -125,30 +125,30 @@ public class DynamicRuleEvaluator extends Rule.BaseRule {
 
             case "GREATER_THAN":
                 if (criteria.getThreshold() != null) {
-                    return signal.valueAsDouble().orElse(0.0) > criteria.getThreshold();
+                    return signal.getValueAsDouble().orElse(0.0) > criteria.getThreshold();
                 }
                 return false;
 
             case "LESS_THAN":
                 if (criteria.getThreshold() != null) {
-                    return signal.valueAsDouble().orElse(0.0) < criteria.getThreshold();
+                    return signal.getValueAsDouble().orElse(0.0) < criteria.getThreshold();
                 }
                 return false;
 
             case "GREATER_THAN_OR_EQUAL":
                 if (criteria.getThreshold() != null) {
-                    return signal.valueAsDouble().orElse(Double.MIN_VALUE) >= criteria.getThreshold();
+                    return signal.getValueAsDouble().orElse(Double.MIN_VALUE) >= criteria.getThreshold();
                 }
                 return false;
 
             case "LESS_THAN_OR_EQUAL":
                 if (criteria.getThreshold() != null) {
-                    return signal.valueAsDouble().orElse(Double.MAX_VALUE) <= criteria.getThreshold();
+                    return signal.getValueAsDouble().orElse(Double.MAX_VALUE) <= criteria.getThreshold();
                 }
                 return false;
 
             case "CONTAINS":
-                String signalStr = signal.valueAsString();
+                String signalStr = signal.getValueAsString();
                 String valueStr = criteria.getSignalValue().toString();
                 if ("CASE_INSENSITIVE".equalsIgnoreCase(matchType)) {
                     return signalStr != null && signalStr.toLowerCase().contains(valueStr.toLowerCase());
@@ -157,7 +157,7 @@ public class DynamicRuleEvaluator extends Rule.BaseRule {
 
             case "REGEX":
                 String regexPattern = criteria.getSignalValue().toString();
-                String signalValue = signal.valueAsString();
+                String signalValue = signal.getValueAsString();
                 if (signalValue == null) {
                     return false;
                 }
@@ -181,7 +181,7 @@ public class DynamicRuleEvaluator extends Rule.BaseRule {
 
         // Numeric comparison
         if (expectedValue instanceof Number) {
-            return signal.valueAsDouble().orElse(Double.NaN)
+            return signal.getValueAsDouble().orElse(Double.NaN)
                 .equals(((Number) expectedValue).doubleValue());
         }
 
@@ -189,14 +189,14 @@ public class DynamicRuleEvaluator extends Rule.BaseRule {
         if (signalValue instanceof Integer || expectedValue.toString().matches("\\d+")) {
             try {
                 int expected = Integer.parseInt(expectedValue.toString());
-                return signal.valueAsInt().orElse(Integer.MIN_VALUE) == expected;
+                return signal.getValueAsInt().orElse(Integer.MIN_VALUE) == expected;
             } catch (NumberFormatException e) {
                 // Fall through to string comparison
             }
         }
 
         // String comparison
-        String signalStr = signal.valueAsString();
+        String signalStr = signal.getValueAsString();
         String expectedStr = expectedValue.toString();
 
         if ("CASE_INSENSITIVE".equalsIgnoreCase(matchType)) {

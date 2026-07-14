@@ -52,61 +52,7 @@ public class McpContextCollector {
     }
 
     /**
-<<<<<<< Updated upstream
      * Collects diagnostic context from all MCP servers (Kubernetes, Kruize, Cryostat).
-=======
-     * Collects context from MCP servers and returns as a formatted string.
-     *
-     * <p>TODO: This is a stub method to be implemented by other developer.
-     * Will collect context from Kubernetes MCP (pod status, events, logs),
-     * Kruize MCP (recommendations), and Cryostat MCP (JFR analysis).
-     *
-     * @param alert the alert to collect context for
-     * @return formatted context string with all diagnostic signals
-     */
-    public String collectContextAsString(Alert alert) {
-        // ==============================================
-        // HARDCODED TEST DATA FOR HEAP OOM SCENARIO
-        // ==============================================
-        log.warn("TESTING: Using hardcoded heap OOM diagnostic context")
-            .field("alertId", alert.getAlertId())
-            .log();
-
-        return """
-=== KUBERNETES EVENTS ===
-[Warning] 2026-06-18 06:09:13 +0000 UTC: OOMKilled - Container heap-oom-prom was OOMKilled
-[Warning] 2026-06-18 06:09:13 +0000 UTC: BackOff - Back-off restarting failed container heap-oom-prom
-
-=== CONTAINER STATUS ===
-Container: heap-oom-prom
-State: Terminated
-Exit Code: 137
-Reason: OOMKilled
-Termination Reason: OOMKilled
-Restart Count: 5
-
-=== POD LOGS (last 50 lines) ===
-2026-06-18 06:09:01,405 INFO  Inserted 159000 targets. Current registry size=159000
-2026-06-18 06:09:01,411 INFO  Inserted 160000 targets. Current registry size=160000
-2026-06-18 06:09:01,417 INFO  Inserted 161000 targets. Current registry size=161000
-2026-06-18 06:09:01,507 INFO  Inserted 162000 targets. Current registry size=162000
-2026-06-18 06:09:02,615 INFO  Inserted 164000 targets. Current registry size=164000
-2026-06-18 06:09:03,745 INFO  Inserted 165000 targets. Current registry size=165000
-2026-06-18 06:09:03,807 INFO  Inserted 166000 targets. Current registry size=166001
-2026-06-18 06:09:04,839 INFO  Scrape started. targets=166350
-Aborting due to java.lang.OutOfMemoryError: Java heap space
-
-=== PROMETHEUS METRICS ===
-Memory Usage: 478/512 MiB (93%)
-Memory Limits: 512 MiB
-Heap Usage: 98%
-Trend: Memory usage increasing steadily
-""";
-    }
-
-    /**
-     * Collects context from MCP servers and logs results.
->>>>>>> Stashed changes
      *
      * <p>Aggregates pod status, events, logs, resource recommendations, and JFR analysis
      * into a single {@link DiagnosticContext} object for LLM consumption.

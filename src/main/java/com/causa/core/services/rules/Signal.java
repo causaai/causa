@@ -4,6 +4,22 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * Signal - Normalized Evidence from Observability Data.
+ *
+ * <p>Represents a structured piece of evidence extracted from logs, metrics,
+ * events, traces, or other diagnostic sources.
+ *
+ * <p>Signals are the input to rule evaluation. Each signal has:
+ * <ul>
+ *   <li><strong>type:</strong> Category (KUBERNETES_EVENT, METRIC, LOG, etc.)</li>
+ *   <li><strong>name:</strong> Signal identifier (e.g., "pod.status", "heap.usage.trend")</li>
+ *   <li><strong>value:</strong> Signal value (e.g., "OOMKilled", "INCREASING", "137")</li>
+ *   <li><strong>metadata:</strong> Additional context (source, timestamp, etc.)</li>
+ * </ul>
+ *
+ * @since 0.0.1
+ */
 public class Signal {
 
     public enum SignalType {
@@ -46,11 +62,11 @@ public class Signal {
         return value;
     }
 
-    public String valueAsString() {
+    public String getValueAsString() {
         return value != null ? value.toString() : null;
     }
 
-    public Optional<Integer> valueAsInt() {
+    public Optional<Integer> getValueAsInt() {
         if (value instanceof Integer) {
             return Optional.of((Integer) value);
         }
@@ -64,7 +80,7 @@ public class Signal {
         return Optional.empty();
     }
 
-    public Optional<Double> valueAsDouble() {
+    public Optional<Double> getValueAsDouble() {
         if (value instanceof Double) {
             return Optional.of((Double) value);
         }
@@ -81,7 +97,7 @@ public class Signal {
         return Optional.empty();
     }
 
-    public Optional<Boolean> valueAsBoolean() {
+    public Optional<Boolean> getValueAsBoolean() {
         if (value instanceof Boolean) {
             return Optional.of((Boolean) value);
         }

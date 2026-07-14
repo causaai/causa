@@ -110,6 +110,13 @@
             <artifactId>jackson-dataformat-yaml</artifactId>
         </dependency>
 
+        <!-- LangChain4J Skills -->
+        <dependency>
+            <groupId>io.quarkiverse.langchain4j</groupId>
+            <artifactId>quarkus-langchain4j-skills</artifactId>
+            <version>1.11.0</version>
+        </dependency>
+
         <!-- LangChain4J Core -->
         <dependency>
             <groupId>dev.langchain4j</groupId>

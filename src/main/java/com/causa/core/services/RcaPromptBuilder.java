@@ -5,6 +5,7 @@ import com.causa.config.AppConfig;
 import com.causa.core.domain.Alert;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import com.causa.core.services.PromptTemplateLoader;
 
 /**
  * RCA Prompt Builder

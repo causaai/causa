@@ -111,6 +111,8 @@ causa:
       location: ${VERTEX_LOCATION:}
     bob:
       shell-path: bob
+    skills:
+      enabled: ${LLM_SKILLS_ENABLED:true}
 
   # Alert Configuration
   alerts:
@@ -135,6 +137,10 @@ causa:
       timeout-ms: ${CAUSA_MCP_CRYOSTAT_TIMEOUT:15000}
       retry-delay-ms: ${CAUSA_MCP_CRYOSTAT_RETRY_DELAY:5000}
       max-retries: ${CAUSA_MCP_CRYOSTAT_MAX_RETRIES:3}
+  
+  validation:
+    assertion-extractor: ${CAUSA_VALIDATION_ASSERTION_EXTRACTOR:llm}
+    assertion-analyzer: ${CAUSA_VALIDATION_ASSERTION_ANALYZER:llm}
 
 #   # Feature Flags (Runtime configurable)
 #   features:

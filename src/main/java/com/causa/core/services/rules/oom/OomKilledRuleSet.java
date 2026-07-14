@@ -110,7 +110,7 @@ public class OomKilledRuleSet implements RuleSet {
             List<Signal> matched = signals.stream()
                 .filter(s -> s.getType() == Signal.SignalType.CONTAINER_STATUS)
                 .filter(s -> "exitCode".equals(s.getName()))
-                .filter(s -> s.valueAsInt().orElse(0) == 137)
+                .filter(s -> s.getValueAsInt().orElse(0) == 137)
                 .toList();
 
             if (!matched.isEmpty()) {
@@ -148,7 +148,7 @@ public class OomKilledRuleSet implements RuleSet {
                              s.getType() == Signal.SignalType.CONTAINER_STATUS)
                 .filter(s -> "terminationReason".equals(s.getName()) ||
                              "reason".equals(s.getName()))
-                .filter(s -> "OOMKilled".equalsIgnoreCase(s.valueAsString()))
+                .filter(s -> "OOMKilled".equalsIgnoreCase(s.getValueAsString()))
                 .toList();
 
             if (!matched.isEmpty()) {
@@ -184,8 +184,8 @@ public class OomKilledRuleSet implements RuleSet {
             List<Signal> matched = signals.stream()
                 .filter(s -> s.getType() == Signal.SignalType.METRIC)
                 .filter(s -> s.getName().contains("memory") && s.getName().contains("trend"))
-                .filter(s -> "INCREASING".equalsIgnoreCase(s.valueAsString()) ||
-                             "UP".equalsIgnoreCase(s.valueAsString()))
+                .filter(s -> "INCREASING".equalsIgnoreCase(s.getValueAsString()) ||
+                             "UP".equalsIgnoreCase(s.getValueAsString()))
                 .toList();
 
             if (!matched.isEmpty()) {
@@ -222,7 +222,7 @@ public class OomKilledRuleSet implements RuleSet {
                 .filter(s -> s.getType() == Signal.SignalType.KUBERNETES_EVENT)
                 .filter(s -> s.getName().contains("restart") || s.getName().contains("delete"))
                 .filter(s -> {
-                    String val = s.valueAsString();
+                    String val = s.getValueAsString();
                     return val != null && (val.contains("manual") || val.contains("kubectl"));
                 })
                 .toList();
@@ -237,7 +237,7 @@ public class OomKilledRuleSet implements RuleSet {
 
             return RuleEvaluationResult.failed(
                 this,
-                "Manual restart detected: " + manualRestarts.get(0).valueAsString()
+                "Manual restart detected: " + manualRestarts.get(0).getValueAsString()
             );
         }
     }
@@ -265,7 +265,7 @@ public class OomKilledRuleSet implements RuleSet {
                 .filter(s -> s.getType() == Signal.SignalType.METRIC ||
                              s.getType() == Signal.SignalType.JVM_ANALYSIS)
                 .filter(s -> s.getName().contains("heap") && s.getName().contains("usage"))
-                .filter(s -> s.valueAsDouble().orElse(0.0) > HEAP_THRESHOLD)
+                .filter(s -> s.getValueAsDouble().orElse(0.0) > HEAP_THRESHOLD)
                 .toList();
 
             if (!matched.isEmpty()) {
@@ -304,8 +304,8 @@ public class OomKilledRuleSet implements RuleSet {
                 .filter(s -> s.getName().contains("gc") && s.getName().contains("full"))
                 .filter(s -> {
                     // Check for high frequency or "frequent" tag
-                    Integer count = s.valueAsInt().orElse(0);
-                    String val = s.valueAsString();
+                    Integer count = s.getValueAsInt().orElse(0);
+                    String val = s.getValueAsString();
                     return count > 10 || (val != null && val.contains("frequent"));
                 })
                 .toList();
@@ -344,7 +344,7 @@ public class OomKilledRuleSet implements RuleSet {
                 .filter(s -> s.getType() == Signal.SignalType.METRIC ||
                              s.getType() == Signal.SignalType.JVM_ANALYSIS)
                 .filter(s -> s.getName().contains("heap") && s.getName().contains("trend"))
-                .filter(s -> "INCREASING".equalsIgnoreCase(s.valueAsString()))
+                .filter(s -> "INCREASING".equalsIgnoreCase(s.getValueAsString()))
                 .toList();
 
             if (!matched.isEmpty()) {
@@ -380,7 +380,7 @@ public class OomKilledRuleSet implements RuleSet {
             List<Signal> matched = signals.stream()
                 .filter(s -> s.getType() == Signal.SignalType.JVM_ANALYSIS)
                 .filter(s -> s.getName().contains("allocation") && s.getName().contains("trend"))
-                .filter(s -> "INCREASING".equalsIgnoreCase(s.valueAsString()))
+                .filter(s -> "INCREASING".equalsIgnoreCase(s.getValueAsString()))
                 .toList();
 
             if (!matched.isEmpty()) {
@@ -417,7 +417,7 @@ public class OomKilledRuleSet implements RuleSet {
                 .filter(s -> s.getType() == Signal.SignalType.KRUIZE_RECOMMENDATION)
                 .filter(s -> s.getName().contains("memory"))
                 .filter(s -> {
-                    String val = s.valueAsString();
+                    String val = s.getValueAsString();
                     return val != null && (val.contains("increase") || val.contains("raise"));
                 })
                 .toList();
@@ -460,7 +460,7 @@ public class OomKilledRuleSet implements RuleSet {
             List<Signal> matched = signals.stream()
                 .filter(s -> s.getType() == Signal.SignalType.LOG_PATTERN)
                 .filter(s -> {
-                    String val = s.valueAsString();
+                    String val = s.getValueAsString();
                     return val != null && OOM_PATTERN.matcher(val).find();
                 })
                 .toList();
@@ -499,7 +499,7 @@ public class OomKilledRuleSet implements RuleSet {
                 .filter(s -> s.getType() == Signal.SignalType.KUBERNETES_EVENT)
                 .filter(s -> s.getName().contains("pressure"))
                 .filter(s -> {
-                    String val = s.valueAsString();
+                    String val = s.getValueAsString();
                     return val != null && val.toLowerCase().contains("memory");
                 })
                 .toList();
@@ -539,7 +539,7 @@ public class OomKilledRuleSet implements RuleSet {
             List<Signal> matched = signals.stream()
                 .filter(s -> s.getType() == Signal.SignalType.KUBERNETES_EVENT)
                 .filter(s -> {
-                    String val = s.valueAsString();
+                    String val = s.getValueAsString();
                     return val != null && (val.contains("rollout") || val.contains("deployment") || val.contains("update"));
                 })
                 .toList();
@@ -577,7 +577,7 @@ public class OomKilledRuleSet implements RuleSet {
             List<Signal> matched = signals.stream()
                 .filter(s -> s.getType() == Signal.SignalType.KUBERNETES_EVENT)
                 .filter(s -> {
-                    String val = s.valueAsString();
+                    String val = s.getValueAsString();
                     return val != null && val.contains("evict") && val.toLowerCase().contains("disk");
                 })
                 .toList();
@@ -614,7 +614,7 @@ public class OomKilledRuleSet implements RuleSet {
         public RuleEvaluationResult evaluate(List<Signal> signals) {
             List<Signal> crashLoop = signals.stream()
                 .filter(s -> s.getType() == Signal.SignalType.POD_STATUS)
-                .filter(s -> "CrashLoopBackOff".equals(s.valueAsString()))
+                .filter(s -> "CrashLoopBackOff".equals(s.getValueAsString()))
                 .toList();
 
             if (crashLoop.isEmpty()) {
@@ -625,7 +625,7 @@ public class OomKilledRuleSet implements RuleSet {
             List<Signal> configError = signals.stream()
                 .filter(s -> s.getType() == Signal.SignalType.LOG_PATTERN)
                 .filter(s -> {
-                    String val = s.valueAsString();
+                    String val = s.getValueAsString();
                     return val != null && (val.contains("config") || val.contains("Invalid"));
                 })
                 .toList();
@@ -663,7 +663,7 @@ public class OomKilledRuleSet implements RuleSet {
             List<Signal> matched = signals.stream()
                 .filter(s -> s.getType() == Signal.SignalType.CONTAINER_STATUS)
                 .filter(s -> "exitCode".equals(s.getName()))
-                .filter(s -> s.valueAsInt().orElse(-1) == 0)
+                .filter(s -> s.getValueAsInt().orElse(-1) == 0)
                 .toList();
 
             if (!matched.isEmpty()) {

@@ -8,6 +8,7 @@ import com.causa.core.services.rules.oom.OomKilledRuleSet;
 import com.causa.core.services.validation.HypothesisValidator;
 import com.causa.rules.yaml.YamlRuleSetRegistry;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 
 import java.util.List;
@@ -56,12 +57,13 @@ public class RuleBasedHypothesisValidator implements HypothesisValidator {
         RuleEngine ruleEngine,
         DiagnosticContextSignalExtractor signalExtractor,
         OomKilledRuleSet oomKilledRuleSet,
-        Optional<YamlRuleSetRegistry> yamlRegistry
+        Instance<YamlRuleSetRegistry> yamlRegistryInstance
     ) {
         this.ruleEngine = ruleEngine;
         this.signalExtractor = signalExtractor;
         this.oomKilledRuleSet = oomKilledRuleSet;
-        this.yamlRegistry = yamlRegistry;
+        this.yamlRegistry = yamlRegistryInstance.isResolvable() ?
+            Optional.of(yamlRegistryInstance.get()) : Optional.empty();
     }
 
     @Override
