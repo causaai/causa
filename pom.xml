@@ -104,6 +104,12 @@
             <artifactId>quarkus-scheduler</artifactId>
         </dependency>
 
+        <!-- Jackson YAML support for YAML-based rule definitions -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+        </dependency>
+
         <!-- LangChain4J Core -->
         <dependency>
             <groupId>dev.langchain4j</groupId>

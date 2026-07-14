@@ -4,24 +4,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-
-/**
- * Signal - Normalized Evidence from Observability Data.
- *
- * <p>Represents a structured piece of evidence extracted from logs, metrics,
- * events, traces, or other diagnostic sources.
- *
- * <p>Signals are the input to rule evaluation. Each signal has:
- * <ul>
- *   <li><strong>type:</strong> Category (KUBERNETES_EVENT, METRIC, LOG, etc.)</li>
- *   <li><strong>name:</strong> Signal identifier (e.g., "pod.status", "heap.usage.trend")</li>
- *   <li><strong>value:</strong> Signal value (e.g., "OOMKilled", "INCREASING", "137")</li>
- *   <li><strong>metadata:</strong> Additional context (source, timestamp, etc.)</li>
- * </ul>
- *
- * @since 0.0.1
- */
 public class Signal {
 
     public enum SignalType {
@@ -64,23 +46,11 @@ public class Signal {
         return value;
     }
 
-<<<<<<< Updated upstream
-    // Helper methods for rule evaluation - public for cross-package access
-    // Named without "get" prefix to avoid Jackson serialization
     public String valueAsString() {
         return value != null ? value.toString() : null;
     }
 
     public Optional<Integer> valueAsInt() {
-=======
-    @JsonIgnore
-    public String getValueAsString() {
-        return value != null ? value.toString() : null;
-    }
-
-    @JsonIgnore
-    public Optional<Integer> getValueAsInt() {
->>>>>>> Stashed changes
         if (value instanceof Integer) {
             return Optional.of((Integer) value);
         }
@@ -94,12 +64,7 @@ public class Signal {
         return Optional.empty();
     }
 
-<<<<<<< Updated upstream
     public Optional<Double> valueAsDouble() {
-=======
-    @JsonIgnore
-    public Optional<Double> getValueAsDouble() {
->>>>>>> Stashed changes
         if (value instanceof Double) {
             return Optional.of((Double) value);
         }
@@ -116,12 +81,7 @@ public class Signal {
         return Optional.empty();
     }
 
-<<<<<<< Updated upstream
     public Optional<Boolean> valueAsBoolean() {
-=======
-    @JsonIgnore
-    public Optional<Boolean> getValueAsBoolean() {
->>>>>>> Stashed changes
         if (value instanceof Boolean) {
             return Optional.of((Boolean) value);
         }
