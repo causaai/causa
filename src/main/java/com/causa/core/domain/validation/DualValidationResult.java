@@ -2,6 +2,8 @@ package com.causa.core.domain.validation;
 
 import com.causa.core.services.rules.HypothesisValidationResult;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 /**
  * Dual Validation Result.
  *
@@ -37,6 +39,7 @@ public record DualValidationResult(
         /**
          * Calculate validation score (0.0 - 1.0).
          */
+        @JsonIgnore
         public double validationScore() {
             if (totalAssertions == 0) {
                 return 0.0;
@@ -80,10 +83,12 @@ public record DualValidationResult(
             RULE_BASED_PRIORITY
         }
 
+        @JsonIgnore
         public boolean isSupported() {
             return status == ValidationResult.ValidationStatus.SUPPORTED;
         }
 
+        @JsonIgnore
         public boolean isHighConfidence() {
             return confidence >= 0.8;
         }
@@ -92,6 +97,7 @@ public record DualValidationResult(
     /**
      * Check if RCA is validated (final verdict is SUPPORTED).
      */
+    @JsonIgnore
     public boolean isValidated() {
         return finalVerdict.status() == ValidationResult.ValidationStatus.SUPPORTED;
     }
@@ -99,6 +105,7 @@ public record DualValidationResult(
     /**
      * Check if validation has high confidence.
      */
+    @JsonIgnore
     public boolean isHighConfidence() {
         return finalVerdict.confidence() >= 0.8;
     }
@@ -106,6 +113,7 @@ public record DualValidationResult(
     /**
      * Get summary string.
      */
+    @JsonIgnore
     public String toSummaryString() {
         return String.format(
             "Final: %s (conf=%.2f) | Assertions: %s (conf=%.2f) | Rules: %s (conf=%.2f)",

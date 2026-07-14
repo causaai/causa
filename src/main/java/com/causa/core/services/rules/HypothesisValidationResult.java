@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 /**
  * Hypothesis Validation Result.
  *
@@ -150,34 +152,32 @@ public class HypothesisValidationResult {
         return explanation;
     }
 
+    @JsonIgnore
     public long getRequiredPassed() {
         return requiredResults.stream().filter(RuleEvaluationResult::isPassed).count();
     }
 
+    @JsonIgnore
     public long getRequiredTotal() {
         return requiredResults.size();
     }
 
+    @JsonIgnore
     public long getSupportingMatched() {
         return supportingResults.stream().filter(RuleEvaluationResult::isPassed).count();
     }
 
+    @JsonIgnore
     public long getExclusionMatched() {
         return exclusionResults.stream().filter(RuleEvaluationResult::isPassed).count();
     }
 
+    @JsonIgnore
     public boolean allRequiredPassed() {
         return requiredResults.stream().allMatch(RuleEvaluationResult::isPassed);
     }
 
-    public List<RuleEvaluationResult> getAllResults() {
-        List<RuleEvaluationResult> all = new ArrayList<>();
-        all.addAll(requiredResults);
-        all.addAll(supportingResults);
-        all.addAll(exclusionResults);
-        return all;
-    }
-
+    @JsonIgnore
     public String toSummaryString() {
         return String.format(
             "%s (confidence=%.2f, score=%d, required=%d/%d, supporting=%d, exclusion=%d)",
@@ -192,6 +192,7 @@ public class HypothesisValidationResult {
     }
 
     @Override
+    @JsonIgnore
     public String toString() {
         return String.format(
             "HypothesisValidation[hypothesis=%s, status=%s, confidence=%.2f, score=%d]",

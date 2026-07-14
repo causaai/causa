@@ -4,6 +4,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 /**
  * Signal - Normalized Evidence from Observability Data.
  *
@@ -62,6 +64,7 @@ public class Signal {
         return value;
     }
 
+<<<<<<< Updated upstream
     // Helper methods for rule evaluation - public for cross-package access
     // Named without "get" prefix to avoid Jackson serialization
     public String valueAsString() {
@@ -69,6 +72,15 @@ public class Signal {
     }
 
     public Optional<Integer> valueAsInt() {
+=======
+    @JsonIgnore
+    public String getValueAsString() {
+        return value != null ? value.toString() : null;
+    }
+
+    @JsonIgnore
+    public Optional<Integer> getValueAsInt() {
+>>>>>>> Stashed changes
         if (value instanceof Integer) {
             return Optional.of((Integer) value);
         }
@@ -82,7 +94,12 @@ public class Signal {
         return Optional.empty();
     }
 
+<<<<<<< Updated upstream
     public Optional<Double> valueAsDouble() {
+=======
+    @JsonIgnore
+    public Optional<Double> getValueAsDouble() {
+>>>>>>> Stashed changes
         if (value instanceof Double) {
             return Optional.of((Double) value);
         }
@@ -99,7 +116,12 @@ public class Signal {
         return Optional.empty();
     }
 
+<<<<<<< Updated upstream
     public Optional<Boolean> valueAsBoolean() {
+=======
+    @JsonIgnore
+    public Optional<Boolean> getValueAsBoolean() {
+>>>>>>> Stashed changes
         if (value instanceof Boolean) {
             return Optional.of((Boolean) value);
         }

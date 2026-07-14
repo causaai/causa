@@ -583,7 +583,6 @@ public class DiagnosticServiceImpl implements DiagnosticService {
      * {@code faultDomain} from the RCA, then layers the validation fields
      * ({@code validationResult}, {@code validationData}) on top before persisting.
      *
-     * @param pending      the original PENDING diagnostic
      * @param rca          the root cause analysis
      * @param validatedRCA the validated RCA with validation results
      * @return updated diagnostic

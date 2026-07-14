@@ -102,36 +102,6 @@ public class LlmAssertionExtractor implements AssertionExtractor {
             ));
         }
 
-        // // Extract from issue description
-        // if (rca.issueDescription() != null && !rca.issueDescription().isBlank()) {
-        //     allAssertions.addAll(extractFromText(
-        //         rca.issueDescription(),
-        //         Assertion.AssertionSource.ISSUE_DESCRIPTION,
-        //         "issueDescription"
-        //     ));
-        // }
-
-        // // Extract from technical description
-        // if (rca.technicalDescription() != null && !rca.technicalDescription().isBlank()) {
-        //     allAssertions.addAll(extractFromText(
-        //         rca.technicalDescription(),
-        //         Assertion.AssertionSource.TECHNICAL_DESCRIPTION,
-        //         "technicalDescription"
-        //     ));
-        // }
-
-        // // Extract from solutions
-        // if (rca.possibleSolutions() != null && !rca.possibleSolutions().isEmpty()) {
-        //     for (int i = 0; i < rca.possibleSolutions().size(); i++) {
-        //         var solution = rca.possibleSolutions().get(i);
-        //         allAssertions.addAll(extractFromText(
-        //             solution.solution(),
-        //             Assertion.AssertionSource.POSSIBLE_SOLUTIONS,
-        //             "possibleSolutions[" + i + "]"
-        //         ));
-        //     }
-        // }
-
         log.info("LLM assertion extraction completed")
             .field("totalAssertions", allAssertions.size())
             .log();
