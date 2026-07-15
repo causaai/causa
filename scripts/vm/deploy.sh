@@ -1,341 +1,208 @@
 #!/usr/bin/env bash
 # ============================================================
-# causa-backend — core deployment logic
-# ============================================================
-# Can be run directly ON the VM (local deploy) or sourced by
-# deploy_remote.sh which handles SSH transport.
-#
-# Usage (on the VM directly):
-#   bash deploy.sh --env-path /opt/causa/.env [OPTIONS]
-#
-# Options:
-#   --env-path <path>      Path to .env file (REQUIRED)
-#   --dir <path>           Install directory (default: /opt/causa)
-#   --uber-jar             Use single runner jar (default)
-#   --fast-jar             Use quarkus-app directory layout
-#   --skip-build           Skip Maven build, use existing artifact in target/
-#   --skip-service         Copy files only, do not install/restart systemd
-#   --jar-path <path>      Use this exact jar path (skips artifact discovery)
-#   --help|-h              Show this help
-#
-# Examples:
-#   # On the VM — artifact already transferred, just install service
-#   bash deploy.sh --env-path /opt/causa/.env --skip-build --skip-service
-#
-#   # On the dev machine — full build + local deploy (no SSH)
-#   bash deploy.sh --env-path ./prod.env
+# causa-backend — core deployment logic (Verbose Logging)
 # ============================================================
 set -euo pipefail
 
-# ── script location ──────────────────────────────────────────
+# ── Script Location & Logging Setup ──────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 LOG_FILE="${SCRIPT_DIR}/deploy.log"
 
-# Service template: look next to this script first (VM layout where the
-# file was scp'd alongside deploy.sh), then fall back to project tree
-# (dev machine layout: scripts/vm/ → ../../deployment/vm/)
+# Clear the log file at the start of each run
+: > "$LOG_FILE"
+
+# Helper 1: Print to BOTH console and log file
+info() {
+    echo -e "$*" | tee -a "$LOG_FILE"
+}
+
+# Helper 2: Run command silently on console, but verbosely in log
+run_verbose() {
+    echo "[$(date '+%H:%M:%S')] Executing: $*" >> "$LOG_FILE"
+    # Execute the command, appending stdout and stderr to the log
+    "$@" >> "$LOG_FILE" 2>&1
+}
+
 if [ -f "${SCRIPT_DIR}/causa-backend.service" ]; then
-  SERVICE_TEMPLATE="${SCRIPT_DIR}/causa-backend.service"
+    SERVICE_TEMPLATE="${SCRIPT_DIR}/causa-backend.service"
 else
-  SERVICE_TEMPLATE="${PROJECT_ROOT}/deployment/vm/causa-backend.service"
+    SERVICE_TEMPLATE="${PROJECT_ROOT}/deployment/vm/causa-backend.service"
 fi
 
-# ── defaults ─────────────────────────────────────────────────
+# ── Defaults ─────────────────────────────────────────────────
 INSTALL_DIR="/opt/causa"
 USE_FAST_JAR=false
 ENV_PATH=""
 SKIP_BUILD=false
-SKIP_SERVICE=false
 EXPLICIT_JAR=""
 
-# ── argument parsing ─────────────────────────────────────────
+# ── Argument Parsing ─────────────────────────────────────────
 while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --env-path)    ENV_PATH="$2";       shift 2 ;;
-    --dir)         INSTALL_DIR="$2";    shift 2 ;;
-    --uber-jar)    USE_FAST_JAR=false;  shift ;;
-    --fast-jar)    USE_FAST_JAR=true;   shift ;;
-    --skip-build)  SKIP_BUILD=true;     shift ;;
-    --skip-service) SKIP_SERVICE=true;  shift ;;
-    --jar-path)    EXPLICIT_JAR="$2"; SKIP_BUILD=true; shift 2 ;;
-    --help|-h)
-      grep '^#' "$0" | sed 's/^# \?//'
-      exit 0
-      ;;
-    *)
-      echo "[ERROR] Unknown argument: $1" >&2
-      echo "[ERROR] Usage: bash deploy.sh --env-path <path> [OPTIONS]" >&2
-      exit 1
-      ;;
-  esac
+    case "$1" in
+        --env-path)    ENV_PATH="$2";       shift 2 ;;
+        --dir)         INSTALL_DIR="$2";    shift 2 ;;
+        --uber-jar)    USE_FAST_JAR=false;  shift ;;
+        --fast-jar)    USE_FAST_JAR=true;   shift ;;
+        --skip-build)  SKIP_BUILD=true;     shift ;;
+        --jar-path)    EXPLICIT_JAR="$2"; SKIP_BUILD=true; shift 2 ;;
+        --help|-h)
+            echo "Usage: sudo bash deploy.sh --env-path <path> [OPTIONS]"
+            exit 0
+            ;;
+        *)
+            echo "[ERROR] Unknown argument: $1" >&2
+            exit 1
+            ;;
+    esac
 done
 
-# ── colours ──────────────────────────────────────────────────
-GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; BOLD='\033[1m'; NC='\033[0m'
-TICK="${GREEN}✔${NC}"
-CROSS="${RED}✘${NC}"
+info "======================================================"
+info "  Deploying Causa Backend"
+info "======================================================"
+info "  Install dir : ${INSTALL_DIR}"
+info "  Env file    : ${ENV_PATH}"
+info "  Log file    : ${LOG_FILE}"
+info "======================================================"
+info ""
 
-# ── logging ──────────────────────────────────────────────────
-# All verbose output goes to log file; console shows only spinner + result
-: > "$LOG_FILE"   # truncate log at start of each run
+# ── Step 1: Validate ─────────────────────────────────────────
+info "=> [1/7] Validating configuration..."
+if [ -z "$ENV_PATH" ] || [ ! -f "$ENV_PATH" ]; then
+    info "❌ ERROR: --env-path is missing or file not found ($ENV_PATH)"
+    exit 1
+fi
 
-log()  { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOG_FILE"; }
-logn() { echo "$*" >> "$LOG_FILE"; }  # raw, no timestamp
+if [ ! -f "$SERVICE_TEMPLATE" ]; then
+    info "❌ ERROR: systemd template not found ($SERVICE_TEMPLATE)"
+    exit 1
+fi
+info "✔ Validation passed."
 
-# ── spinner ──────────────────────────────────────────────────
-_SPINNER_PID=""
-
-spinner_start() {
-  local msg="$1"
-  printf "  ${BOLD}%-45s${NC}" "$msg"
-  (
-    local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
-    local i=0
-    while true; do
-      printf "\r  ${BOLD}%-45s${NC} ${YELLOW}%s${NC}" "$msg" "${frames[$((i % ${#frames[@]}))]}"
-      sleep 0.1
-      ((i++))
-    done
-  ) &
-  _SPINNER_PID=$!
-  disown "$_SPINNER_PID"
-}
-
-spinner_stop_ok() {
-  [[ -n "$_SPINNER_PID" ]] && kill "$_SPINNER_PID" 2>/dev/null; _SPINNER_PID=""
-  printf "\r  ${BOLD}%-45s${NC} ${TICK}\n" "$1"
-}
-
-spinner_stop_fail() {
-  [[ -n "$_SPINNER_PID" ]] && kill "$_SPINNER_PID" 2>/dev/null; _SPINNER_PID=""
-  printf "\r  ${BOLD}%-45s${NC} ${CROSS}\n" "$1"
-  echo ""
-  echo -e "  ${RED}Error details in: ${LOG_FILE}${NC}"
-  echo -e "  ${YELLOW}Last 20 lines:${NC}"
-  tail -20 "$LOG_FILE" | sed 's/^/    /'
-  echo ""
-}
-
-# run_step <label> <cmd...>
-# Runs cmd, streams output to log file, shows spinner on console
-run_step() {
-  local label="$1"; shift
-  spinner_start "$label"
-  log "=== STEP: $label ==="
-  if "$@" >> "$LOG_FILE" 2>&1; then
-    spinner_stop_ok "$label"
-    log "=== DONE: $label ==="
-  else
-    local rc=$?
-    spinner_stop_fail "$label"
-    log "=== FAILED: $label (exit $rc) ==="
-    exit $rc
-  fi
-}
-
-# ── validate ─────────────────────────────────────────────────
-validate() {
-  local errors=false
-
-  if [ -z "$ENV_PATH" ]; then
-    echo -e "  ${CROSS} ${RED}--env-path is required${NC}"
-    echo -e "     Example:  --env-path ./prod.env"
-    echo -e "     Template: deployment/vm/.env.example"
-    errors=true
-  elif [ ! -f "$ENV_PATH" ]; then
-    echo -e "  ${CROSS} ${RED}.env file not found at: $ENV_PATH${NC}"
-    errors=true
-  fi
-
-  if [ ! -f "$SERVICE_TEMPLATE" ]; then
-    echo -e "  ${CROSS} ${RED}systemd template not found: $SERVICE_TEMPLATE${NC}"
-    errors=true
-  fi
-
-  $errors && exit 1
-  return 0
-}
-
-# ── step functions ───────────────────────────────────────────
-
-step_build() {
-  if $SKIP_BUILD; then
-    log "Skipping build (--skip-build)"
-    return 0
-  fi
-  local jar_flag=""
-  $USE_FAST_JAR || jar_flag="-Dquarkus.package.jar.type=uber-jar"
+# ── Step 2: Build ────────────────────────────────────────────
+info "=> [2/7] Building application (this may take a minute)..."
+if $SKIP_BUILD; then
+  info "⏭  Skipping build (--skip-build or --jar-path provided)"
+else
   cd "$PROJECT_ROOT"
-  local mvnw="./mvnw"; [ -f "$mvnw" ] || mvnw="mvn"
-  chmod +x "$mvnw" 2>/dev/null || true
-  # shellcheck disable=SC2086
-  $mvnw clean package -DskipTests -Dquarkus.container-image.build=false $jar_flag
-}
+  mvnw="./mvnw"; [ -f "$mvnw" ] || mvnw="mvn"
+  run_verbose chmod +x "$mvnw"
+  
+  jar_flag=""
+  $USE_FAST_JAR || jar_flag="-Dquarkus.package.jar.type=uber-jar"
+  
+  if ! run_verbose $mvnw clean package -DskipTests -Dquarkus.container-image.build=false $jar_flag; then
+    info "❌ ERROR: Maven build failed!"
+    info "   Check the log for details: tail -n 50 $LOG_FILE"
+    exit 1
+  fi
+  
+  info "✔ Build complete."
+fi
 
-step_locate_artifact() {
-  log "Locating artifact (jar_mode=$(${USE_FAST_JAR} && echo fast-jar || echo uber-jar))"
-
-  if [ -n "$EXPLICIT_JAR" ]; then
-    [ -f "$EXPLICIT_JAR" ] || { log "ERROR: --jar-path not found: $EXPLICIT_JAR"; return 1; }
+# ── Step 3: Locate Artifact ──────────────────────────────────
+info "=> [3/7] Locating artifact..."
+if [ -n "$EXPLICIT_JAR" ]; then
     RUNNER="$EXPLICIT_JAR"
-    log "Using explicit jar: $RUNNER"
-    return 0
-  fi
-
-  if $USE_FAST_JAR; then
-    ARTIFACT_DIR="${PROJECT_ROOT}/target/quarkus-app"
-    [ -f "${ARTIFACT_DIR}/quarkus-run.jar" ] || {
-      log "ERROR: fast-jar not found at ${ARTIFACT_DIR}/quarkus-run.jar"
-      return 1
-    }
-    RUNNER="${ARTIFACT_DIR}/quarkus-run.jar"
-  else
+elif $USE_FAST_JAR; then
+    RUNNER="${PROJECT_ROOT}/target/quarkus-app/quarkus-run.jar"
+else
     RUNNER=$(ls "${PROJECT_ROOT}"/target/causa-backend-*-runner.jar 2>/dev/null | head -1 || true)
-    [ -n "$RUNNER" ] || {
-      log "ERROR: uber-jar not found in ${PROJECT_ROOT}/target/"
-      return 1
-    }
-  fi
-  log "Artifact: $RUNNER"
-}
+fi
 
-step_prepare_dir() {
-  log "Preparing install directory: $INSTALL_DIR"
-  mkdir -p "$INSTALL_DIR"
-  chmod 755 "$INSTALL_DIR"
-}
+if [ -z "$RUNNER" ] || [ ! -f "$RUNNER" ]; then
+    info "❌ ERROR: Artifact not found at: $RUNNER"
+    exit 1
+fi
+info "✔ Found artifact: $RUNNER"
 
-step_copy_files() {
-  log "Copying artifact to $INSTALL_DIR"
-  if $USE_FAST_JAR; then
-    rsync -a --delete "${PROJECT_ROOT}/target/quarkus-app/" "${INSTALL_DIR}/quarkus-app/"
-    log "Synced quarkus-app/ → ${INSTALL_DIR}/quarkus-app/"
-  else
-    cp "$RUNNER" "${INSTALL_DIR}/causa-backend-runner.jar"
-    log "Copied runner jar → ${INSTALL_DIR}/causa-backend-runner.jar"
-  fi
+# ── Step 4: Prepare & Copy Files ─────────────────────────────
+info "=> [4/7] Copying files to $INSTALL_DIR..."
+run_verbose mkdir -p "$INSTALL_DIR"
+run_verbose chmod 755 "$INSTALL_DIR"
 
-  log "Copying .env → ${INSTALL_DIR}/.env"
-  cp "$ENV_PATH" "${INSTALL_DIR}/.env"
-  chmod 600 "${INSTALL_DIR}/.env"
-}
+if $USE_FAST_JAR; then
+    run_verbose rsync -a --delete "${PROJECT_ROOT}/target/quarkus-app/" "${INSTALL_DIR}/quarkus-app/"
+else
+    run_verbose cp "$RUNNER" "${INSTALL_DIR}/causa-backend-runner.jar"
+fi
 
-step_install_service() {
-  if $SKIP_SERVICE; then
-    log "Skipping service install (--skip-service)"
-    return 0
-  fi
+run_verbose cp "$ENV_PATH" "${INSTALL_DIR}/.env"
+run_verbose chmod 600 "${INSTALL_DIR}/.env"
+info "✔ Files copied successfully."
 
-  local vm_jar_path
-  if $USE_FAST_JAR; then
-    vm_jar_path="${INSTALL_DIR}/quarkus-app/quarkus-run.jar"
-  else
-    vm_jar_path="${INSTALL_DIR}/causa-backend-runner.jar"
-  fi
+# ── Step 5: Install & Start Service ──────────────────────────
+info "=> [5/7] Configuring and starting systemd service..."
 
-  local vm_user="${SUDO_USER:-$(whoami)}"
-  local unit_dest="/etc/systemd/system/causa-backend.service"
+if $USE_FAST_JAR; then
+    VM_JAR_PATH="${INSTALL_DIR}/quarkus-app/quarkus-run.jar"
+else
+    VM_JAR_PATH="${INSTALL_DIR}/causa-backend-runner.jar"
+fi
 
-  log "Installing systemd unit: $unit_dest"
-  log "  JAR_PATH=${vm_jar_path}"
-  log "  VM_DIR=${INSTALL_DIR}"
-  log "  VM_USER=${vm_user}"
+VM_USER="${SUDO_USER:-$(whoami)}"
+UNIT_DEST="/etc/systemd/system/causa-backend.service"
 
-  sed \
-    -e "s|__JAR_PATH__|${vm_jar_path}|g" \
+sed \
+    -e "s|__JAR_PATH__|${VM_JAR_PATH}|g" \
     -e "s|__VM_DIR__|${INSTALL_DIR}|g" \
-    -e "s|__VM_USER__|${vm_user}|g" \
+    -e "s|__VM_USER__|${VM_USER}|g" \
     "$SERVICE_TEMPLATE" > /tmp/causa-backend.service
 
-  if command -v sudo &>/dev/null && [ "$(id -u)" -ne 0 ]; then
-    sudo mv /tmp/causa-backend.service "$unit_dest"
-    sudo systemctl daemon-reload
-    sudo systemctl enable causa-backend
-    sudo systemctl restart causa-backend
-  else
-    mv /tmp/causa-backend.service "$unit_dest"
-    systemctl daemon-reload
-    systemctl enable causa-backend
-    systemctl restart causa-backend
-  fi
+run_verbose mv /tmp/causa-backend.service "$UNIT_DEST"
+run_verbose systemctl daemon-reload
+run_verbose systemctl enable causa-backend
 
-  log "Service started. Waiting 5s for startup..."
-  sleep 5
-  systemctl status causa-backend --no-pager >> "$LOG_FILE" 2>&1 || true
-  journalctl -u causa-backend -n 30 --no-pager >> "$LOG_FILE" 2>&1 || true
-}
+info "   Restarting service (this may take a moment)..."
+run_verbose systemctl restart causa-backend --no-ask-password
+info "✔ Service restarted."
 
-# ── health check ─────────────────────────────────────────────
-step_healthcheck() {
-  local port="${CAUSA_PORT:-8080}"
-  local url="http://localhost:${port}/q/health/ready"
-  log "Health check: $url"
-  local i=0
-  while [ $i -lt 12 ]; do
-    if curl -sf "$url" >> "$LOG_FILE" 2>&1; then
-      log "Health check passed"
-      return 0
+# ── Step 6: Health Check ─────────────────────────────────────
+info "=> [6/7] Waiting for application to become ready..."
+PORT="${CAUSA_PORT:-8080}"
+URL="http://localhost:${PORT}/q/health/ready"
+
+ATTEMPTS=0
+MAX_ATTEMPTS=12
+READY=false
+
+while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
+    # Log the curl attempt verbosely just in case it fails weirdly
+    run_verbose echo "Attempting curl to $URL"
+    if curl -sf "$URL" >> "$LOG_FILE" 2>&1; then
+        READY=true
+        break
     fi
+    ATTEMPTS=$((ATTEMPTS+1))
+    info "   Attempt $ATTEMPTS/$MAX_ATTEMPTS - Not ready yet, waiting 5 seconds..."
     sleep 5
-    ((i++))
-    log "Waiting for health check... attempt $i/12"
-  done
-  log "Health check did not pass within 60s — service may still be starting"
-  return 1
-}
+done
 
-# ── main ─────────────────────────────────────────────────────
-main() {
-  local jar_mode; jar_mode=$(${USE_FAST_JAR} && echo "fast-jar" || echo "uber-jar")
-
-  echo ""
-  echo -e "  ${BOLD}Causa Backend — Deployment${NC}"
-  echo -e "  ──────────────────────────────────────────────"
-  echo -e "  Install dir : ${INSTALL_DIR}"
-  echo -e "  Jar mode    : ${jar_mode}"
-  echo -e "  Env file    : ${ENV_PATH}"
-  echo -e "  Log file    : ${LOG_FILE}"
-  echo ""
-
-  log "=== Causa Backend Deployment Started ==="
-  log "install_dir=$INSTALL_DIR jar_mode=$jar_mode env_path=$ENV_PATH"
-
-  validate
-
-  $SKIP_BUILD \
-    && run_step "Step 1/5  Build app               " true \
-    || run_step "Step 1/5  Build app               " step_build
-
-  run_step   "Step 2/5  Locate artifact          " step_locate_artifact
-  run_step   "Step 3/5  Prepare install dir       " step_prepare_dir
-  run_step   "Step 4/5  Copy files                " step_copy_files
-
-  $SKIP_SERVICE \
-    && run_step "Step 5/5  Install systemd service  " true \
-    || run_step "Step 5/5  Install systemd service  " step_install_service
-
-  if ! $SKIP_SERVICE; then
-    spinner_start "Health check (waiting up to 60s)  "
-    if step_healthcheck >> "$LOG_FILE" 2>&1; then
-      spinner_stop_ok "Health check (waiting up to 60s)  "
-    else
-      spinner_stop_fail "Health check (waiting up to 60s)  "
-    fi
-  fi
-
-  echo ""
-  echo -e "  ${BOLD}${GREEN}Deployment complete!${NC}"
-  echo -e "  ──────────────────────────────────────────────"
-  if ! $SKIP_SERVICE; then
-    echo -e "  ${BOLD}Service:${NC}  sudo systemctl status causa-backend"
-    echo -e "  ${BOLD}Logs:${NC}     sudo journalctl -u causa-backend -f"
-    echo -e "  ${BOLD}Health:${NC}   curl http://localhost:${CAUSA_PORT:-8080}/q/health/ready"
-  fi
-  echo -e "  ${BOLD}Deploy log:${NC} ${LOG_FILE}"
-  echo ""
-
-  log "=== Deployment Finished Successfully ==="
-}
-
-main
+if [ "$READY" = true ]; then
+    info "✔ Health check passed!"
+    info ""
+    
+    # ── Step 7: Exposing Connections ─────────────────────────
+    info "=> [7/7] Updating firewall rules..."
+    run_verbose firewall-cmd --add-port=8080/tcp --permanent
+    run_verbose firewall-cmd --reload
+    info "✔ Firewall rules updated."
+    
+    LOCAL_IP=$(hostname -I | awk '{print $1}')
+    
+    info ""
+    info "------------------------------------------------------"
+    info "🎉 DEPLOYMENT SUCCESSFUL!"
+    info "------------------------------------------------------"
+    info "Service is reachable at :"
+    info "  - Localhost : http://localhost:${PORT}"
+    info "  - Network   : http://${LOCAL_IP}:${PORT}"
+    info ""
+    info "Health check URL        : ${URL}"
+    info "Status: sudo systemctl status causa-backend"
+    info "Logs:   sudo journalctl -u causa-backend -f"
+else
+    info "❌ ERROR: Application did not become ready within 60 seconds."
+    info "Check logs to see what went wrong: sudo journalctl -u causa-backend -n 50"
+    exit 1
+fi
