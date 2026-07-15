@@ -175,32 +175,52 @@ public class ChatModelFactory {
             );
         }
 
-        String adcBase64 = config.getGoogleApplicationCredentials().filter(s -> !s.isBlank()).orElse(null);
-        if (adcBase64 == null) {
+        String adcValue = config.getGoogleApplicationCredentials().filter(s -> !s.isBlank()).orElse(null);
+        if (adcValue == null) {
             log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
                 .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.VERTEX_AI_ANTHROPIC)
                 .field(LLMConstants.ConfigKeys.MISSING_CONFIG, "GOOGLE_APPLICATION_CREDENTIALS")
                 .log();
             throw new LLMException(
-                "GOOGLE_APPLICATION_CREDENTIALS (Base64 ADC JSON) is required for provider: "
+                "GOOGLE_APPLICATION_CREDENTIALS (file path or Base64 ADC JSON) is required for provider: "
                     + LLMConstants.Provider.VERTEX_AI_ANTHROPIC,
                 LLMConstants.ErrorTypes.MISSING_CONFIGURATION
             );
         }
 
-        try {
-            byte[] jsonBytes = Base64.getDecoder().decode(adcBase64);
-            GoogleCredentials.fromStream(new ByteArrayInputStream(jsonBytes));
-        } catch (IllegalArgumentException e) {
-            throw new LLMException(
-                "GOOGLE_APPLICATION_CREDENTIALS is not valid Base64",
-                LLMConstants.ErrorTypes.INVALID_CONFIGURATION, e
-            );
-        } catch (IOException e) {
-            throw new LLMException(
-                "Failed to parse GOOGLE_APPLICATION_CREDENTIALS as ADC JSON: " + e.getMessage(),
-                LLMConstants.ErrorTypes.INVALID_CONFIGURATION, e
-            );
+        // If it's a file path, verify the file exists and is readable
+        if (adcValue.startsWith("/") || adcValue.contains(".json")) {
+            try {
+                java.nio.file.Path path = java.nio.file.Paths.get(adcValue);
+                if (!java.nio.file.Files.exists(path)) {
+                    throw new LLMException(
+                        "GOOGLE_APPLICATION_CREDENTIALS file not found: " + adcValue,
+                        LLMConstants.ErrorTypes.INVALID_CONFIGURATION
+                    );
+                }
+                GoogleCredentials.fromStream(java.nio.file.Files.newInputStream(path));
+            } catch (IOException e) {
+                throw new LLMException(
+                    "Failed to read GOOGLE_APPLICATION_CREDENTIALS from file: " + e.getMessage(),
+                    LLMConstants.ErrorTypes.INVALID_CONFIGURATION, e
+                );
+            }
+        } else {
+            // Try to parse as base64-encoded JSON
+            try {
+                byte[] jsonBytes = Base64.getDecoder().decode(adcValue);
+                GoogleCredentials.fromStream(new ByteArrayInputStream(jsonBytes));
+            } catch (IllegalArgumentException e) {
+                throw new LLMException(
+                    "GOOGLE_APPLICATION_CREDENTIALS is neither a valid file path nor valid Base64",
+                    LLMConstants.ErrorTypes.INVALID_CONFIGURATION, e
+                );
+            } catch (IOException e) {
+                throw new LLMException(
+                    "Failed to parse GOOGLE_APPLICATION_CREDENTIALS as ADC JSON: " + e.getMessage(),
+                    LLMConstants.ErrorTypes.INVALID_CONFIGURATION, e
+                );
+            }
         }
     }
 
@@ -254,12 +274,20 @@ public class ChatModelFactory {
         LLMConfig config = appConfig.getLlmConfig();
         // Project ID and credentials presence/validity guaranteed by validateConfig()
         String projectId = config.getVertexProjectId().orElse("");
-        String adcBase64 = config.getGoogleApplicationCredentials().orElse("");
+        String adcValue = config.getGoogleApplicationCredentials().orElse("");
 
         GoogleCredentials credentials;
         try {
-            byte[] jsonBytes = Base64.getDecoder().decode(adcBase64);
-            credentials = GoogleCredentials.fromStream(new ByteArrayInputStream(jsonBytes));
+            // Check if it's a file path or base64-encoded JSON
+            if (adcValue.startsWith("/") || adcValue.contains(".json")) {
+                // File path - read directly
+                java.nio.file.Path path = java.nio.file.Paths.get(adcValue);
+                credentials = GoogleCredentials.fromStream(java.nio.file.Files.newInputStream(path));
+            } else {
+                // Base64-encoded JSON
+                byte[] jsonBytes = Base64.getDecoder().decode(adcValue);
+                credentials = GoogleCredentials.fromStream(new ByteArrayInputStream(jsonBytes));
+            }
         } catch (IllegalArgumentException e) {
             throw new LLMException(
                 "GOOGLE_APPLICATION_CREDENTIALS is not valid Base64",
@@ -267,7 +295,7 @@ public class ChatModelFactory {
             );
         } catch (IOException e) {
             throw new LLMException(
-                "Failed to parse GOOGLE_APPLICATION_CREDENTIALS as ADC JSON: " + e.getMessage(),
+                "Failed to read GOOGLE_APPLICATION_CREDENTIALS: " + e.getMessage(),
                 LLMConstants.ErrorTypes.INVALID_CONFIGURATION, e
             );
         }
