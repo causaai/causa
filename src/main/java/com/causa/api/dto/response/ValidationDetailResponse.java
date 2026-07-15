@@ -43,9 +43,15 @@ public record ValidationDetailResponse(
         return new ValidationDetailResponse(
             diagnosticId,
             Instant.now(),
-            FinalVerdictDto.from(validationData.finalVerdict()),
-            AssertionValidationDto.from(validationData.assertionBasedVerdict()),
-            RuleValidationDto.from(validationData.ruleBasedVerdict())
+            validationData.finalVerdict() != null
+                ? FinalVerdictDto.from(validationData.finalVerdict())
+                : null,
+            validationData.assertionBasedVerdict() != null
+                ? AssertionValidationDto.from(validationData.assertionBasedVerdict())
+                : null,
+            validationData.ruleBasedVerdict() != null
+                ? RuleValidationDto.from(validationData.ruleBasedVerdict())
+                : null
         );
     }
 
