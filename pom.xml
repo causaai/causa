@@ -105,6 +105,21 @@
             <artifactId>quarkus-scheduler</artifactId>
         </dependency>
 
+        <!-- Jackson YAML support for YAML-based rule definitions -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+        </dependency>
+
+        <!-- LangChain4J Skills - DISABLED (not used in this deployment) -->
+        <!--
+        <dependency>
+            <groupId>io.quarkiverse.langchain4j</groupId>
+            <artifactId>quarkus-langchain4j-skills</artifactId>
+            <version>1.11.0</version>
+        </dependency>
+        -->
+
         <!-- LangChain4J Core -->
         <dependency>
             <groupId>dev.langchain4j</groupId>
@@ -144,6 +159,13 @@
             <groupId>io.quarkiverse.langchain4j</groupId>
             <artifactId>quarkus-langchain4j-skills</artifactId>
             <version>1.11.0</version>
+        </dependency>
+
+        <!-- Google Auth Library — in-memory ADC JSON credentials for Vertex AI -->
+        <dependency>
+            <groupId>com.google.auth</groupId>
+            <artifactId>google-auth-library-oauth2-http</artifactId>
+            <version>1.34.0</version>
         </dependency>
 
         <!-- Test Dependencies -->
