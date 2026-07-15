@@ -18,7 +18,6 @@ import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.request.ChatRequestParameters;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import dev.langchain4j.service.tool.ToolProviderRequest;
-import dev.langchain4j.skills.Skills;
 import io.quarkus.arc.properties.UnlessBuildProperty;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -50,13 +49,11 @@ public class LangChainPromptSender implements PromptSender {
 
     private final ChatModelFactory chatModelFactory;
     private final AppConfig appConfig;
-    private final Skills skills;
 
     @Inject
-    public LangChainPromptSender(ChatModelFactory chatModelFactory, AppConfig appConfig, Skills skills) {
+    public LangChainPromptSender(ChatModelFactory chatModelFactory, AppConfig appConfig) {
         this.chatModelFactory = chatModelFactory;
         this.appConfig = appConfig;
-        this.skills = skills;
     }
 
     @Override
@@ -189,16 +186,7 @@ public class LangChainPromptSender implements PromptSender {
     private String buildSystemText(LLMRequest request) {
         StringBuilder sb = new StringBuilder();
 
-        // Add skills catalogue (preemptive disclosure) only if enabled
-        boolean skillsEnabled = request.enableSkills().orElse(appConfig.getLlmConfig().getSkillsEnabled());
-        if (skillsEnabled && skills != null) {
-            String catalogue = skills.formatAvailableSkills();
-            if (catalogue != null && !catalogue.isBlank()) {
-                sb.append("You have access to the following skills:\n");
-                sb.append(catalogue);
-                sb.append("\n");
-            }
-        }
+        // Skills framework disabled
 
         // Add custom system prompt
         request.systemPrompt().ifPresent(prompt -> {
@@ -239,14 +227,12 @@ public class LangChainPromptSender implements PromptSender {
         // Build model fresh from current config once per invocation, reused across all tool iterations
         ChatModel chatModel = chatModelFactory.chatModel();
 
-        boolean skillsEnabled = request.enableSkills().orElse(appConfig.getLlmConfig().getSkillsEnabled());
-        boolean hasTools = skillsEnabled && skills != null && skills.toolProvider() != null;
+        // Skills framework disabled
+        boolean hasTools = false;
 
         for (int iteration = 0; iteration < max_tool_iterations; iteration++) {
-            // Computed once per iteration — shared by buildChatRequest and executor lookup below.
-            var toolProviderResult = hasTools
-                    ? skills.toolProvider().provideTools(toolProviderRequest(messages))
-                    : null;
+            // Skills framework disabled - no tool provider
+            dev.langchain4j.service.tool.ToolProviderResult toolProviderResult = null;
 
             ChatRequest chatRequest = buildChatRequest(messages, request, toolProviderResult);
             ChatResponse response = chatModel.chat(chatRequest);

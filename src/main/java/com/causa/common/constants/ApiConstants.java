@@ -107,6 +107,16 @@ public final class ApiConstants {
         }
 
         /**
+         * Validation API paths.
+         */
+        public static final class Validations {
+            private Validations() {}
+
+            public static final String BASE              = Version.API_V1 + "/validations";
+            public static final String QUERY_DIAGNOSTIC  = "diagnosticId";
+        }
+
+        /**
          * Configuration management API paths and query parameter names.
          */
         public static final class Configs {
