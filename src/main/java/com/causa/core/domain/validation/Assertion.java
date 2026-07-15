@@ -1,7 +1,5 @@
 package com.causa.core.domain.validation;
 
-import java.util.Optional;
-
 /**
  * Represents an atomic claim extracted from RCA output.
  *
@@ -22,8 +20,7 @@ public record Assertion(
     String id,
     String text,
     AssertionType type,
-    AssertionSource source,
-    Optional<String> relatedField
+    AssertionSource source
 ) {
 
     /**
@@ -33,7 +30,6 @@ public record Assertion(
      * @param text the assertion text
      * @param type the type of assertion
      * @param source where this assertion came from in the RCA
-     * @param relatedField optional field name in the RCA (e.g., "rootCause", "possibleSolutions[0]")
      */
     public Assertion {
         if (id == null || id.isBlank()) {
@@ -48,23 +44,13 @@ public record Assertion(
         if (source == null) {
             throw new IllegalArgumentException("Assertion source cannot be null");
         }
-        if (relatedField == null) {
-            relatedField = Optional.empty();
-        }
     }
 
     /**
-     * Creates a simple assertion without related field.
+     * Creates a simple assertion.
      */
     public static Assertion of(String id, String text, AssertionType type, AssertionSource source) {
-        return new Assertion(id, text, type, source, Optional.empty());
-    }
-
-    /**
-     * Creates an assertion with related field.
-     */
-    public static Assertion of(String id, String text, AssertionType type, AssertionSource source, String relatedField) {
-        return new Assertion(id, text, type, source, Optional.of(relatedField));
+        return new Assertion(id, text, type, source);
     }
 
     /**
