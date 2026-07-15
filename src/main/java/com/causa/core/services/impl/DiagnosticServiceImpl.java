@@ -608,19 +608,39 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                 .field("validationResult", validationResult)
                 .log();
 
-            // Build validation data JSON
+            // Build validation data JSON with clean structure
             com.fasterxml.jackson.databind.node.ObjectNode validationDataNode = objectMapper.createObjectNode();
 
             // Add dual validation if available
             if (validatedRCA.dualValidation() != null) {
-                validationDataNode.set("dualValidation", objectMapper.valueToTree(validatedRCA.dualValidation()));
+                var dualVal = validatedRCA.dualValidation();
+
+                // Final verdict
+                validationDataNode.set("finalVerdict", objectMapper.valueToTree(dualVal.finalVerdict()));
+
+                // Assertion validation
+                com.fasterxml.jackson.databind.node.ObjectNode assertionValidation = objectMapper.createObjectNode();
+                com.fasterxml.jackson.databind.node.ObjectNode assertionSummary = objectMapper.createObjectNode();
+                assertionSummary.put("status", dualVal.assertionBasedVerdict().status().toString());
+                assertionSummary.put("confidence", dualVal.assertionBasedVerdict().confidence());
+                assertionSummary.put("validationScore", dualVal.assertionBasedVerdict().validationScore());
+                assertionValidation.set("summary", assertionSummary);
+                assertionValidation.set("results", objectMapper.valueToTree(validatedRCA.validationResults()));
+                validationDataNode.set("assertionValidation", assertionValidation);
+
+                // Rule validation
+                com.fasterxml.jackson.databind.node.ObjectNode ruleValidation = objectMapper.createObjectNode();
+                com.fasterxml.jackson.databind.node.ObjectNode ruleSummary = objectMapper.createObjectNode();
+                ruleSummary.put("hypothesis", dualVal.ruleBasedVerdict().getHypothesis());
+                ruleSummary.put("status", dualVal.ruleBasedVerdict().getStatus().toString());
+                ruleSummary.put("confidence", dualVal.ruleBasedVerdict().getConfidence());
+                ruleSummary.put("totalScore", dualVal.ruleBasedVerdict().getTotalScore());
+                ruleSummary.put("requiredPassed", dualVal.ruleBasedVerdict().getRequiredPassed());
+                ruleSummary.put("requiredTotal", dualVal.ruleBasedVerdict().getRequiredTotal());
+                ruleValidation.set("summary", ruleSummary);
+                ruleValidation.set("results", objectMapper.valueToTree(dualVal.ruleBasedVerdict().getAllResults()));
+                validationDataNode.set("ruleValidation", ruleValidation);
             }
-
-            // Add summary
-            validationDataNode.set("summary", objectMapper.valueToTree(validatedRCA.summary()));
-
-            // Add all validation results
-            validationDataNode.set("validationResults", objectMapper.valueToTree(validatedRCA.validationResults()));
 
             // Add validated timestamp
             validationDataNode.put("validatedAt", validatedRCA.validatedAt().toString());
@@ -721,11 +741,38 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             try {
                 String validationResult = determineValidationResult(validatedRCA);
                 com.fasterxml.jackson.databind.node.ObjectNode validationDataNode = objectMapper.createObjectNode();
+
+                // Build clean validation data structure (same as success path)
                 if (validatedRCA.dualValidation() != null) {
-                    validationDataNode.set("dualValidation", objectMapper.valueToTree(validatedRCA.dualValidation()));
+                    var dualVal = validatedRCA.dualValidation();
+
+                    // Final verdict
+                    validationDataNode.set("finalVerdict", objectMapper.valueToTree(dualVal.finalVerdict()));
+
+                    // Assertion validation
+                    com.fasterxml.jackson.databind.node.ObjectNode assertionValidation = objectMapper.createObjectNode();
+                    com.fasterxml.jackson.databind.node.ObjectNode assertionSummary = objectMapper.createObjectNode();
+                    assertionSummary.put("status", dualVal.assertionBasedVerdict().status().toString());
+                    assertionSummary.put("confidence", dualVal.assertionBasedVerdict().confidence());
+                    assertionSummary.put("validationScore", dualVal.assertionBasedVerdict().validationScore());
+                    assertionValidation.set("summary", assertionSummary);
+                    assertionValidation.set("results", objectMapper.valueToTree(validatedRCA.validationResults()));
+                    validationDataNode.set("assertionValidation", assertionValidation);
+
+                    // Rule validation
+                    com.fasterxml.jackson.databind.node.ObjectNode ruleValidation = objectMapper.createObjectNode();
+                    com.fasterxml.jackson.databind.node.ObjectNode ruleSummary = objectMapper.createObjectNode();
+                    ruleSummary.put("hypothesis", dualVal.ruleBasedVerdict().getHypothesis());
+                    ruleSummary.put("status", dualVal.ruleBasedVerdict().getStatus().toString());
+                    ruleSummary.put("confidence", dualVal.ruleBasedVerdict().getConfidence());
+                    ruleSummary.put("totalScore", dualVal.ruleBasedVerdict().getTotalScore());
+                    ruleSummary.put("requiredPassed", dualVal.ruleBasedVerdict().getRequiredPassed());
+                    ruleSummary.put("requiredTotal", dualVal.ruleBasedVerdict().getRequiredTotal());
+                    ruleValidation.set("summary", ruleSummary);
+                    ruleValidation.set("results", objectMapper.valueToTree(dualVal.ruleBasedVerdict().getAllResults()));
+                    validationDataNode.set("ruleValidation", ruleValidation);
                 }
-                validationDataNode.set("summary", objectMapper.valueToTree(validatedRCA.summary()));
-                validationDataNode.set("validationResults", objectMapper.valueToTree(validatedRCA.validationResults()));
+
                 validationDataNode.put("validatedAt", validatedRCA.validatedAt().toString());
                 String prettyJson = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(validationDataNode);
 
