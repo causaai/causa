@@ -17,6 +17,7 @@
         <surefire-plugin.version>3.5.6</surefire-plugin.version>
         <langchain4j.version>1.15.1</langchain4j.version>
         <langchain4j-vertex-anthropic.version>1.15.1-beta25</langchain4j-vertex-anthropic.version>
+        <hibernate.version>7.3.6.Final</hibernate.version>
     </properties>
 
     <dependencyManagement>
@@ -60,10 +61,23 @@
             <artifactId>quarkus-jdbc-postgresql</artifactId>
         </dependency>
 
+        <!-- Flyway - Database Migration -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-flyway</artifactId>
+        </dependency>
+
         <!-- Hibernate ORM with Panache -->
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-hibernate-orm-panache</artifactId>
+        </dependency>
+
+        <!-- Hibernate Vector — native pgvector support (requires Hibernate 6.4+) -->
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-vector</artifactId>
+            <version>${hibernate.version}</version>
         </dependency>
 
         <!-- Hibernate Validator -->
@@ -89,6 +103,21 @@
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-scheduler</artifactId>
         </dependency>
+
+        <!-- Jackson YAML support for YAML-based rule definitions -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+        </dependency>
+
+        <!-- LangChain4J Skills - DISABLED (not used in this deployment) -->
+        <!--
+        <dependency>
+            <groupId>io.quarkiverse.langchain4j</groupId>
+            <artifactId>quarkus-langchain4j-skills</artifactId>
+            <version>1.11.0</version>
+        </dependency>
+        -->
 
         <!-- LangChain4J Core -->
         <dependency>
@@ -125,6 +154,13 @@
             <version>${langchain4j-vertex-anthropic.version}</version>
         </dependency>
 
+        <!-- Google Auth Library — in-memory ADC JSON credentials for Vertex AI -->
+        <dependency>
+            <groupId>com.google.auth</groupId>
+            <artifactId>google-auth-library-oauth2-http</artifactId>
+            <version>1.34.0</version>
+        </dependency>
+
         <!-- Test Dependencies -->
         <dependency>
             <groupId>io.quarkus</groupId>
@@ -150,6 +186,13 @@
             <groupId>org.mockito</groupId>
             <artifactId>mockito-junit-jupiter</artifactId>
             <scope>test</scope>
+        </dependency>
+
+        <!-- SnakeYAML for YAML prompt template parsing -->
+        <dependency>
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+            <version>2.2</version>
         </dependency>
     </dependencies>
 
