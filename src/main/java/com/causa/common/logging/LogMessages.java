@@ -131,10 +131,15 @@ public final class LogMessages {
         public static final String COOLDOWN_CACHE_CLEANUP = "Cooldown cache cleanup completed";
         public static final String ALERT_PERSISTED = "Alert persisted to database";
 
+        // Alerts API
+        public static final String ALERTS_GET_REQUEST   = "GET /api/v1/alerts request received";
+        public static final String ALERTS_GET_FOUND     = "Alert(s) retrieved successfully";
+        public static final String ALERTS_GET_NOT_FOUND = "Alert not found";
+
         // Exception messages
         public static final String ALERT_PERSIST_FAILED = "Failed to persist alert";
-        public static final String ALERT_UPDATE_FAILED = "Failed to update alert";
-        public static final String ALERT_NOT_FOUND = "Alert not found";
+        public static final String ALERT_UPDATE_FAILED  = "Failed to update alert";
+        public static final String ALERT_NOT_FOUND      = "Alert not found";
     }
 
     /**
