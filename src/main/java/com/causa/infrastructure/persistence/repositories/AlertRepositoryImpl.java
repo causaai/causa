@@ -7,6 +7,8 @@ import com.causa.core.ports.AlertRepository;
 import com.causa.infrastructure.persistence.entity.AlertEntity;
 import com.causa.infrastructure.persistence.mappers.AlertEntityMapper;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.Query;
 import jakarta.transaction.Transactional;
 
 import java.util.ArrayList;
@@ -22,6 +24,9 @@ import java.util.Optional;
  */
 @ApplicationScoped
 public class AlertRepositoryImpl implements AlertRepository {
+
+    @jakarta.inject.Inject
+    EntityManager em;
 
     @Override
     @Transactional
@@ -86,21 +91,16 @@ public class AlertRepositoryImpl implements AlertRepository {
     }
 
     /**
-     * AND query: builds conditions dynamically — only non-blank params are included.
+     * AND query using a native SQL statement so PostgreSQL JSONB operators ({@code ->>'namespace'})
+     * are valid. Panache {@code find()} only accepts JPQL which does not support JSONB syntax.
      *
-     * <ul>
-     *   <li>{@code workload_name} is a plain VARCHAR column — HQL equality works directly.</li>
-     *   <li>{@code namespace} lives inside the {@code workload_info} JSONB column —
-     *       accessed via the PostgreSQL {@code ->>} operator in a native fragment.</li>
-     * </ul>
-     *
-     * When both params are supplied the query becomes:
-     * {@code workloadName = ?1 AND workload_info->>'namespace' = ?2}
+     * <p>Conditions added only for non-blank parameters — all present conditions are AND-ed.
      */
     @Override
+    @SuppressWarnings("unchecked")
     public List<Alert> findByFilters(String workloadName, String namespace) {
-        boolean hasWorkload   = workloadName != null && !workloadName.isBlank();
-        boolean hasNamespace  = namespace    != null && !namespace.isBlank();
+        boolean hasWorkload  = workloadName != null && !workloadName.isBlank();
+        boolean hasNamespace = namespace    != null && !namespace.isBlank();
 
         if (!hasWorkload && !hasNamespace) {
             return findAll();
@@ -110,18 +110,23 @@ public class AlertRepositoryImpl implements AlertRepository {
         List<Object> params  = new ArrayList<>();
 
         if (hasWorkload) {
-            clauses.add(AlertEntity.Fields.WORKLOAD_NAME + " = ?" + (params.size() + 1));
+            clauses.add("workload_name = ?" + (params.size() + 1));
             params.add(workloadName);
         }
         if (hasNamespace) {
-            // JSONB ->> operator: native HQL fragment supported by Hibernate + PostgreSQL
+            // ->> is a PostgreSQL JSONB operator — only valid in native SQL, not JPQL
             clauses.add("workload_info->>'namespace' = ?" + (params.size() + 1));
             params.add(namespace);
         }
 
-        String query = String.join(" and ", clauses);
+        String sql = "SELECT * FROM alerts WHERE " + String.join(" AND ", clauses);
 
-        return AlertEntity.<AlertEntity>find(query, params.toArray())
+        Query q = em.createNativeQuery(sql, AlertEntity.class);
+        for (int i = 0; i < params.size(); i++) {
+            q.setParameter(i + 1, params.get(i));
+        }
+
+        return ((List<AlertEntity>) q.getResultList())
             .stream()
             .map(AlertEntityMapper::toDomain)
             .toList();
