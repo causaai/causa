@@ -174,8 +174,8 @@ while [ $ATTEMPTS -lt $MAX_ATTEMPTS ]; do
         break
     fi
     ATTEMPTS=$((ATTEMPTS+1))
-    info "   Attempt $ATTEMPTS/$MAX_ATTEMPTS - Not ready yet, waiting 5 seconds..."
-    sleep 5
+    info "   Attempt $ATTEMPTS/$MAX_ATTEMPTS - Not ready yet, waiting 10 seconds..."
+    sleep 10
 done
 
 if [ "$READY" = true ]; then
