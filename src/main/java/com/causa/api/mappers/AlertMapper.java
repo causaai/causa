@@ -75,7 +75,7 @@ public class AlertMapper {
             .alertName(alertName)
             .alertTimestamp(timestamp)
             .severity(AlertSeverity.fromString(severityStr))
-            .status(AlertStatus.FIRING)
+            .status(AlertStatus.PROCESSING)   // initial Causa status; updated by service layer
             .workloadInfo(WorkloadInfo.of(podName, containerName, namespace, clusterName, workloadType))
             .workloadName(containerName != null ? containerName : "")
             .alertMetadata(AlertMetadata.of(labels, annotations, alertSource))

@@ -66,13 +66,24 @@ public final class Alert {
     public AlertMetadata getAlertMetadata() { return alertMetadata; }
 
     /**
-     * Cooldown deduplication key: {@code alertName:podName} or
-     * {@code alertName:namespace} when podName is null.
+     * Cooldown deduplication key.
+     *
+     * <p>Format: {@code alertName:clusterName:namespace:workloadName:podName}
+     *
+     * <p>{@code alertName} and {@code workloadName} are always present — an alert without
+     * a workload name is rejected by the service layer before reaching this point.
+     * {@code clusterName}, {@code namespace}, and {@code podName} contribute empty string
+     * when absent; the key remains distinct without artificial fallback values.
      */
     public String getCooldownKey() {
-        String pod = workloadInfo.podName();
-        String ns  = workloadInfo.namespace();
-        return alertName + ":" + (pod != null ? pod : ns);
+        String cluster   = orEmpty(workloadInfo.clusterName());
+        String namespace = orEmpty(workloadInfo.namespace());
+        String pod       = orEmpty(workloadInfo.podName());
+        return alertName + ":" + cluster + ":" + namespace + ":" + workloadName + ":" + pod;
+    }
+
+    private static String orEmpty(String value) {
+        return value != null ? value : "";
     }
 
     public static Builder builder() { return new Builder(); }

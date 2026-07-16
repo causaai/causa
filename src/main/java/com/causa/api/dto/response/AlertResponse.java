@@ -35,13 +35,16 @@ public record AlertResponse(
         accepted.forEach((id, diagId) -> entries.add(new AlertEntry(id, "ACCEPTED", diagId, null)));
         rejected.forEach((id, reason) -> entries.add(new AlertEntry(id, "REJECTED", null, reason)));
 
-        int acc = accepted.size();
-        int rej = rejected.size();
+        int acc   = accepted.size();
+        int rej   = rejected.size();
         int total = acc + rej;
 
         String status;
         String message;
-        if (acc == total) {
+        if (total == 0) {
+            status  = AlertConstants.Response.EMPTY;
+            message = "No alerts in payload";
+        } else if (acc == total) {
             status  = AlertConstants.Response.ACCEPTED;
             message = String.format("All %d alerts accepted and diagnostics initiated", acc);
         } else if (acc > 0) {

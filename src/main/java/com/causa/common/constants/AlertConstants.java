@@ -49,8 +49,9 @@ public final class AlertConstants {
         private Response() {}
 
         public static final String ACCEPTED = "accepted";
-        public static final String PARTIAL = "partial";
+        public static final String PARTIAL  = "partial";
         public static final String REJECTED = "rejected";
+        public static final String EMPTY    = "empty";
     }
 
     /**
@@ -123,14 +124,16 @@ public final class AlertConstants {
     }
 
     /**
-     * Alert Status
+     * Alert processing status — Causa lifecycle stored in the {@code status} DB column.
      *
-     * <p>Defines the status of an alert from Prometheus Alertmanager.
+     * <p>Values: ACCEPTED, REJECTED, PROCESSING, PROCESSED
      */
     public enum AlertStatus {
 
-        FIRING("firing"),
-        RESOLVED("resolved");
+        ACCEPTED("ACCEPTED"),
+        REJECTED("REJECTED"),
+        PROCESSING("PROCESSING"),
+        PROCESSED("PROCESSED");
 
         private final String value;
 
@@ -138,35 +141,20 @@ public final class AlertConstants {
             this.value = value;
         }
 
-        /**
-         * Returns the string value of this status.
-         *
-         * @return the status value
-         */
         public String getValue() {
             return value;
         }
 
-        /**
-         * Converts a string to an AlertStatus enum value (case-insensitive).
-         *
-         * @param value the string value
-         * @return the corresponding AlertStatus
-         * @throws IllegalArgumentException if the value doesn't match any status
-         */
         public static AlertStatus fromString(String value) {
             if (value == null || value.isBlank()) {
                 throw new IllegalArgumentException("Alert status value cannot be null or blank");
             }
-
-            String normalized = value.trim().toLowerCase();
-
+            String normalized = value.trim().toUpperCase();
             for (AlertStatus status : AlertStatus.values()) {
                 if (status.value.equals(normalized)) {
                     return status;
                 }
             }
-
             throw new IllegalArgumentException("Unknown alert status: " + value);
         }
     }
