@@ -4,6 +4,7 @@ import com.causa.api.dto.request.AlertWebhookRequest;
 import com.causa.common.constants.AlertConstants;
 import com.causa.common.constants.AlertConstants.AlertSeverity;
 import com.causa.common.constants.AlertConstants.AlertStatus;
+import com.causa.common.utils.IdUtils;
 import com.causa.config.AlertConfig;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Alert.AlertMetadata;
@@ -54,9 +55,12 @@ public class AlertMapper {
         String alertName   = labels.get(AlertConstants.Labels.ALERT_NAME);
         String severityStr = labels.getOrDefault(AlertConstants.Labels.SEVERITY, defaultSeverity);
 
-        // Workload fields — annotations first (as declared in PrometheusRule), labels as fallback
-        String containerName = getWithFallback(annotations, labels, AlertConstants.Labels.CONTAINER);
-        String podName       = getWithFallback(annotations, labels, AlertConstants.Labels.POD);
+        // Workload fields — annotations first (PrometheusRule uses container_name / pod_name as annotation
+        // keys), label keys (container / pod) used as fallback for older or custom alert sources.
+        String containerName = getAnnotationOrLabel(annotations, labels,
+            AlertConstants.Labels.CONTAINER_NAME, AlertConstants.Labels.CONTAINER);
+        String podName       = getAnnotationOrLabel(annotations, labels,
+            AlertConstants.Labels.POD_NAME, AlertConstants.Labels.POD);
         String namespace     = getWithFallback(annotations, labels, AlertConstants.Labels.NAMESPACE);
         String clusterName   = getWithFallback(annotations, labels, AlertConstants.Labels.CLUSTER_NAME);
         String workloadType  = getWithFallback(annotations, labels, AlertConstants.Labels.WORKLOAD_TYPE);
@@ -67,7 +71,7 @@ public class AlertMapper {
 
         Instant timestamp  = parseTimestamp(item.getStartsAt());
         String fingerprint = item.getFingerprint();
-        String alertId     = generateAlertId(containerName, timestamp);
+        String alertId     = IdUtils.generateAlertId();
 
         return Alert.builder()
             .alertId(alertId)
@@ -86,7 +90,18 @@ public class AlertMapper {
     // Helpers
     // -------------------------------------------------------------------------
 
-    /** Checks primary map first, falls back to secondary. Returns null if absent in both. */
+    /**
+     * Looks up {@code annotationKey} in annotations first, then {@code labelKey} in labels.
+     * Used for fields where the annotation key and label key differ
+     * (e.g. {@code container_name} vs {@code container}, {@code pod_name} vs {@code pod}).
+     */
+    private String getAnnotationOrLabel(Map<String, String> annotations, Map<String, String> labels,
+                                        String annotationKey, String labelKey) {
+        String value = annotations.get(annotationKey);
+        return value != null ? value : labels.get(labelKey);
+    }
+
+    /** Checks primary map first, falls back to secondary using the same key. Returns null if absent in both. */
     private String getWithFallback(Map<String, String> primary, Map<String, String> secondary, String key) {
         String value = primary.get(key);
         return value != null ? value : secondary.get(key);
@@ -101,8 +116,4 @@ public class AlertMapper {
         }
     }
 
-    private String generateAlertId(String containerName, Instant timestamp) {
-        String safe = (containerName != null && !containerName.isBlank()) ? containerName : "unknown";
-        return safe + "-" + timestamp.toEpochMilli();
-    }
 }

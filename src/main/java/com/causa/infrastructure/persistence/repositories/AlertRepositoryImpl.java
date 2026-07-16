@@ -32,7 +32,7 @@ public class AlertRepositoryImpl implements AlertRepository {
     @Transactional
     public Alert save(Alert alert) {
         try {
-            AlertEntityMapper.toEntityWithStatus(alert, AlertEntityMapper.STATUS_PROCESSING, null)
+            AlertEntityMapper.toEntityWithStatus(alert, AlertEntityMapper.STATUS_ACCEPTED, null)
                 .persist();
             return alert;
         } catch (Exception e) {
