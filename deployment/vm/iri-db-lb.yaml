@@ -20,4 +20,3 @@ spec:
     # This targets the active primary pod managed by CNPG
     cnpg.io/cluster: iri-db
     cnpg.io/instanceRole: primary
-  
