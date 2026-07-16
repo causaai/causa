@@ -6,6 +6,8 @@ import com.causa.common.constants.AlertConstants.AlertSeverity;
 import com.causa.common.constants.AlertConstants.AlertStatus;
 import com.causa.config.AlertConfig;
 import com.causa.core.domain.Alert;
+import com.causa.core.domain.Alert.AlertMetadata;
+import com.causa.core.domain.Alert.WorkloadInfo;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -16,8 +18,12 @@ import java.util.Map;
 /**
  * Alert Mapper
  *
- * <p>Maps Prometheus Alertmanager webhook DTOs to domain Alert objects.
- * <p>Handles label extraction, timestamp parsing, and alert ID generation.
+ * <p>Maps Prometheus Alertmanager webhook DTOs to domain {@link Alert} objects.
+ *
+ * <p>All workload fields ({@code container_name}, {@code pod_name}, {@code namespace},
+ * {@code cluster_name}, {@code workload_type}) and {@code alert_source} are extracted
+ * from annotations first, then labels as fallback. Values remain {@code null} when
+ * not present in either.
  *
  * @since 0.0.1
  */
@@ -31,109 +37,72 @@ public class AlertMapper {
         this.defaultSeverity = alertConfig.filterSeverity();
     }
 
-    /**
-     * Maps an Alertmanager webhook request to a list of domain Alert objects.
-     *
-     * @param request the webhook request
-     * @return list of domain Alert objects
-     */
     public List<Alert> toDomainList(AlertWebhookRequest request) {
         if (request == null || request.getAlerts() == null) {
             return List.of();
         }
-
         return request.getAlerts().stream()
             .map(this::toDomain)
             .toList();
     }
 
-    /**
-     * Maps a single Alertmanager alert item to a domain Alert.
-     *
-     * <p>Validation ensures container and namespace are always present.
-     * <p>Severity defaults to configured value if missing.
-     * <p>Uses Prometheus fingerprint as alert ID for global uniqueness and idempotency.
-     *
-     * @param item the alert item from the webhook payload
-     * @return the domain Alert object
-     */
     public Alert toDomain(AlertWebhookRequest.AlertItem item) {
-        Map<String, String> labels = item.getLabels();
-        Map<String, String> annotations = item.getAnnotations();
+        Map<String, String> labels      = item.getLabels()      != null ? item.getLabels()      : Map.of();
+        Map<String, String> annotations = item.getAnnotations() != null ? item.getAnnotations() : Map.of();
 
-        // Required fields (validated before this is called)
-        String alertName = labels.get(AlertConstants.Labels.ALERT_NAME);
-        String container = labels.get(AlertConstants.Labels.CONTAINER);
-        String namespace = getLabelWithFallback(labels, annotations, AlertConstants.Labels.NAMESPACE);
-
-        // Optional fields
-        String pod = labels.get(AlertConstants.Labels.POD);
+        // Core alert fields — from labels
+        String alertName   = labels.get(AlertConstants.Labels.ALERT_NAME);
         String severityStr = labels.getOrDefault(AlertConstants.Labels.SEVERITY, defaultSeverity);
 
-        Instant timestamp = parseTimestamp(item.getStartsAt());
+        // Workload fields — annotations first (as declared in PrometheusRule), labels as fallback
+        String containerName = getWithFallback(annotations, labels, AlertConstants.Labels.CONTAINER);
+        String podName       = getWithFallback(annotations, labels, AlertConstants.Labels.POD);
+        String namespace     = getWithFallback(annotations, labels, AlertConstants.Labels.NAMESPACE);
+        String clusterName   = getWithFallback(annotations, labels, AlertConstants.Labels.CLUSTER_NAME);
+        String workloadType  = getWithFallback(annotations, labels, AlertConstants.Labels.WORKLOAD_TYPE);
 
-        // Use Prometheus fingerprint as alert ID (globally unique, deterministic)
-        // Fallback to generated ID if fingerprint is missing (shouldn't happen with Alertmanager v4)
-        String alertId = Alert.generateAlertId(container, timestamp);
+        // alert_source — from annotations, default to "prometheus"
+        String alertSource = annotations.getOrDefault(
+            AlertConstants.Labels.ALERT_SOURCE, AlertMetadata.DEFAULT_SOURCE);
+
+        Instant timestamp  = parseTimestamp(item.getStartsAt());
+        String fingerprint = item.getFingerprint();
+        String alertId     = generateAlertId(containerName, timestamp);
 
         return Alert.builder()
             .alertId(alertId)
-            .timestamp(timestamp)
+            .sourceAlertId(fingerprint != null ? fingerprint : alertId)
             .alertName(alertName)
+            .alertTimestamp(timestamp)
             .severity(AlertSeverity.fromString(severityStr))
-            .podName(pod)
-            .containerName(container)
-            .namespace(namespace)
-            .status(AlertStatus.fromString(item.getStatus()))
-            .hasDiagnostics(false)
-            .labels(labels)
-            .annotations(annotations)
+            .status(AlertStatus.FIRING)
+            .workloadInfo(WorkloadInfo.of(podName, containerName, namespace, clusterName, workloadType))
+            .workloadName(containerName != null ? containerName : "")
+            .alertMetadata(AlertMetadata.of(labels, annotations, alertSource))
             .build();
     }
 
-    /**
-     * Extracts a label with fallback to annotations if not found in labels.
-     *
-     * <p>Some Alertmanager configurations put namespace/pod in annotations rather than labels.
-     *
-     * @param labels the labels map
-     * @param annotations the annotations map
-     * @param key the key to search for
-     * @return the value from labels or annotations
-     */
-    private String getLabelWithFallback(Map<String, String> labels,
-                                        Map<String, String> annotations,
-                                        String key) {
-        String value = labels.get(key);
-        if (value != null) {
-            return value;
-        }
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
 
-        if (annotations != null) {
-            return annotations.get(key);
-        }
-
-        return null;
+    /** Checks primary map first, falls back to secondary. Returns null if absent in both. */
+    private String getWithFallback(Map<String, String> primary, Map<String, String> secondary, String key) {
+        String value = primary.get(key);
+        return value != null ? value : secondary.get(key);
     }
 
-    /**
-     * Parses an ISO 8601 timestamp from Alertmanager.
-     *
-     * <p>Falls back to current time if parsing fails.
-     *
-     * @param isoTimestamp the ISO timestamp string
-     * @return the parsed Instant, or current time if parsing fails
-     */
-    private Instant parseTimestamp(String isoTimestamp) {
-        if (isoTimestamp == null || isoTimestamp.isBlank()) {
-            return Instant.now();
-        }
-
+    private Instant parseTimestamp(String iso) {
+        if (iso == null || iso.isBlank()) return Instant.now();
         try {
-            return Instant.parse(isoTimestamp);
+            return Instant.parse(iso);
         } catch (Exception e) {
-            // Log warning and fallback to current time
             return Instant.now();
         }
+    }
+
+    private String generateAlertId(String containerName, Instant timestamp) {
+        String safe = (containerName != null && !containerName.isBlank()) ? containerName : "unknown";
+        return safe + "-" + timestamp.toEpochMilli();
     }
 }
