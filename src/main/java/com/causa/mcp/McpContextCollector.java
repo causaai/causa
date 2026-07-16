@@ -62,20 +62,20 @@ public class McpContextCollector {
     public DiagnosticContext collectContext(Alert alert) {
         log.info(LogMessages.Mcp.MCP_CONTEXT_COLLECTION_START)
             .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
-            .field(McpConstants.LogFields.POD_NAME, alert.getPodName())
-            .field(McpConstants.LogFields.NAMESPACE, alert.getNamespace())
+            .field(McpConstants.LogFields.POD_NAME, alert.getWorkloadInfo().podName())
+            .field(McpConstants.LogFields.NAMESPACE, alert.getWorkloadInfo().namespace())
             .log();
 
         DiagnosticContext.Builder contextBuilder = DiagnosticContext.builder()
-            .podName(alert.getPodName())
-            .containerName(alert.getContainerName())
-            .namespace(alert.getNamespace());
+            .podName(alert.getWorkloadInfo().podName())
+            .containerName(alert.getWorkloadInfo().containerName())
+            .namespace(alert.getWorkloadInfo().namespace());
 
-        String resolvedContainerName = alert.getContainerName();
+        String resolvedContainerName = alert.getWorkloadInfo().containerName();
         String fullPodYaml = null; // Keep full YAML for container name extraction
 
         // Kubernetes context collection
-        if (alert.getPodName() != null && !alert.getPodName().isBlank()) {
+        if (alert.getWorkloadInfo().podName() != null && !alert.getWorkloadInfo().podName().isBlank()) {
             fullPodYaml = collectKubernetesPodStatus(alert, contextBuilder);
 
             // Try to extract container name from pod status if not in alert
@@ -102,7 +102,7 @@ public class McpContextCollector {
         }
 
         // Cryostat context collection (requires pod name)
-        if (alert.getPodName() != null && !alert.getPodName().isBlank()) {
+        if (alert.getWorkloadInfo().podName() != null && !alert.getWorkloadInfo().podName().isBlank()) {
             collectCryostatContext(contextBuilder, alert);
         }
 
@@ -136,8 +136,8 @@ public class McpContextCollector {
             );
 
             ObjectNode arguments = objectMapper.createObjectNode();
-            arguments.put(McpConstants.Arguments.NAME, alert.getPodName());
-            arguments.put(McpConstants.Arguments.NAMESPACE, alert.getNamespace());
+            arguments.put(McpConstants.Arguments.NAME, alert.getWorkloadInfo().podName());
+            arguments.put(McpConstants.Arguments.NAMESPACE, alert.getWorkloadInfo().namespace());
 
             JsonNode result = callMcpTool(
                 mcpConfig.kubernetes().endpoint() + McpConstants.Paths.MCP_ENDPOINT,
@@ -152,8 +152,8 @@ public class McpContextCollector {
 
             log.info(LogMessages.Mcp.MCP_K8S_POD_STATUS)
                 .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
-                .field(McpConstants.LogFields.POD_NAME, alert.getPodName())
-                .field(McpConstants.LogFields.NAMESPACE, alert.getNamespace())
+                .field(McpConstants.LogFields.POD_NAME, alert.getWorkloadInfo().podName())
+                .field(McpConstants.LogFields.NAMESPACE, alert.getWorkloadInfo().namespace())
                 .field(McpConstants.LogFields.STATUS, podPhase)
                 .log();
 
@@ -187,8 +187,8 @@ public class McpContextCollector {
             );
 
             ObjectNode arguments = objectMapper.createObjectNode();
-            arguments.put(McpConstants.Arguments.FIELD_SELECTOR, McpConstants.Format.INVOLVED_OBJECT_NAME_PREFIX + alert.getPodName());
-            arguments.put(McpConstants.Arguments.NAMESPACE, alert.getNamespace());
+            arguments.put(McpConstants.Arguments.FIELD_SELECTOR, McpConstants.Format.INVOLVED_OBJECT_NAME_PREFIX + alert.getWorkloadInfo().podName());
+            arguments.put(McpConstants.Arguments.NAMESPACE, alert.getWorkloadInfo().namespace());
 
             JsonNode result = callMcpTool(
                 mcpConfig.kubernetes().endpoint() + McpConstants.Paths.MCP_ENDPOINT,
@@ -202,7 +202,7 @@ public class McpContextCollector {
 
             log.info(LogMessages.Mcp.MCP_K8S_POD_EVENTS)
                 .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
-                .field(McpConstants.LogFields.POD_NAME, alert.getPodName())
+                .field(McpConstants.LogFields.POD_NAME, alert.getWorkloadInfo().podName())
                 .log();
 
             return eventsText;
@@ -230,11 +230,11 @@ public class McpContextCollector {
             );
 
             ObjectNode arguments = objectMapper.createObjectNode();
-            arguments.put(McpConstants.Arguments.NAME, alert.getPodName());
-            arguments.put(McpConstants.Arguments.NAMESPACE, alert.getNamespace());
+            arguments.put(McpConstants.Arguments.NAME, alert.getWorkloadInfo().podName());
+            arguments.put(McpConstants.Arguments.NAMESPACE, alert.getWorkloadInfo().namespace());
             arguments.put(McpConstants.Arguments.TAIL_LINES, McpConstants.Defaults.DEFAULT_TAIL_LINES);
-            if (alert.getContainerName() != null && !alert.getContainerName().isBlank()) {
-                arguments.put(McpConstants.Arguments.CONTAINER, alert.getContainerName());
+            if (alert.getWorkloadInfo().containerName() != null && !alert.getWorkloadInfo().containerName().isBlank()) {
+                arguments.put(McpConstants.Arguments.CONTAINER, alert.getWorkloadInfo().containerName());
             }
 
             JsonNode result = callMcpTool(
@@ -249,8 +249,8 @@ public class McpContextCollector {
 
             log.info(LogMessages.Mcp.MCP_K8S_POD_LOGS)
                 .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
-                .field(McpConstants.LogFields.POD_NAME, alert.getPodName())
-                .field(McpConstants.LogFields.CONTAINER, alert.getContainerName())
+                .field(McpConstants.LogFields.POD_NAME, alert.getWorkloadInfo().podName())
+                .field(McpConstants.LogFields.CONTAINER, alert.getWorkloadInfo().containerName())
                 .log();
 
             return logsText;
@@ -780,8 +780,8 @@ public class McpContextCollector {
 
             ObjectNode arguments = objectMapper.createObjectNode();
             arguments.put(McpConstants.Arguments.CONTAINER_NAME, containerName);
-            if (alert.getNamespace() != null) {
-                arguments.put(McpConstants.Arguments.NAMESPACE, alert.getNamespace());
+            if (alert.getWorkloadInfo().namespace() != null) {
+                arguments.put(McpConstants.Arguments.NAMESPACE, alert.getWorkloadInfo().namespace());
             }
 
             JsonNode result = callMcpTool(
@@ -816,8 +816,8 @@ public class McpContextCollector {
 
             ObjectNode arguments = objectMapper.createObjectNode();
             arguments.put(McpConstants.Arguments.CONTAINER_NAME, containerName);
-            if (alert.getNamespace() != null) {
-                arguments.put(McpConstants.Arguments.NAMESPACE, alert.getNamespace());
+            if (alert.getWorkloadInfo().namespace() != null) {
+                arguments.put(McpConstants.Arguments.NAMESPACE, alert.getWorkloadInfo().namespace());
             }
 
             JsonNode result = callMcpTool(
@@ -851,7 +851,7 @@ public class McpContextCollector {
      * @param alert the alert
      */
     private void collectCryostatContext(DiagnosticContext.Builder builder, Alert alert) {
-        String podName = alert.getPodName();
+        String podName = alert.getWorkloadInfo().podName();
 
         // GC analysis
         String gcResult = callCryostatToolWithRetry(

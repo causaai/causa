@@ -19,11 +19,17 @@ public final class AlertConstants {
     public static final class Labels {
         private Labels() {}
 
-        public static final String ALERT_NAME = "alertname";
-        public static final String SEVERITY = "severity";
-        public static final String NAMESPACE = "namespace";
-        public static final String POD = "pod";
-        public static final String CONTAINER = "container";
+        public static final String ALERT_NAME    = "alertname";
+        public static final String SEVERITY      = "severity";
+        public static final String NAMESPACE     = "namespace";
+        public static final String POD           = "pod";
+        public static final String CONTAINER     = "container";
+        /** Annotation key for cluster name. */
+        public static final String CLUSTER_NAME  = "cluster_name";
+        /** Annotation key for workload type (e.g. Deployment, StatefulSet). */
+        public static final String WORKLOAD_TYPE = "workload_type";
+        /** Annotation key for alert source. Defaults to "prometheus" when absent. */
+        public static final String ALERT_SOURCE  = "alert_source";
     }
 
 

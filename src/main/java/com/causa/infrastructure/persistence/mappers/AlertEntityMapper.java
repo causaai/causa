@@ -2,120 +2,159 @@ package com.causa.infrastructure.persistence.mappers;
 
 import com.causa.common.constants.AlertConstants.AlertSeverity;
 import com.causa.common.constants.AlertConstants.AlertStatus;
-import com.causa.common.utils.JsonUtils;
 import com.causa.core.domain.Alert;
+import com.causa.core.domain.Alert.AlertMetadata;
+import com.causa.core.domain.Alert.WorkloadInfo;
 import com.causa.infrastructure.persistence.entity.AlertEntity;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
+import java.time.ZoneOffset;
+import java.util.Map;
 
 /**
  * Alert Entity Mapper
  *
- * <p>Maps between Alert domain model and AlertEntity JPA entity.
- * <p>Uses JsonUtils for Map&lt;String, String&gt; ↔ JsonNode conversion.
+ * <p>Maps between the {@link Alert} domain model and {@link AlertEntity} JPA entity.
+ *
+ * <p>Column mapping:
+ * <pre>
+ *   workload_info  JSONB  ← { pod_name, container_name, namespace, cluster_name, workload_type }
+ *   workload_name         ← workloadInfo.containerName  (denormalised for index lookups)
+ *   alert_metadata JSONB  ← { labels, annotations, alert_source }
+ * </pre>
  *
  * @since 0.0.1
  */
 public final class AlertEntityMapper {
 
-    private AlertEntityMapper() {
-        // Prevent instantiation
-    }
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    public static final String STATUS_ACCEPTED   = "ACCEPTED";
+    public static final String STATUS_REJECTED   = "REJECTED";
+    public static final String STATUS_PROCESSING = "PROCESSING";
+    public static final String STATUS_PROCESSED  = "PROCESSED";
+
+    private AlertEntityMapper() {}
 
     /**
-     * Converts domain Alert to AlertEntity.
+     * Converts a domain {@link Alert} to an {@link AlertEntity} with an explicit
+     * Causa processing status and optional rejection reason stored in alert_metadata.
      *
-     * @param alert the domain alert
-     * @return the alert entity
+     * @param alert            the domain alert
+     * @param processingStatus ACCEPTED / REJECTED / PROCESSING / PROCESSED
+     * @param rejectionReason  stored under {@code alert_metadata.rejection_reason}; null for non-rejected alerts
      */
-    public static AlertEntity toEntity(Alert alert) {
-        if (alert == null) {
-            return null;
-        }
+    public static AlertEntity toEntityWithStatus(Alert alert, String processingStatus, String rejectionReason) {
+        if (alert == null) return null;
 
         AlertEntity entity = new AlertEntity();
+
+        // Scalar columns
         entity.setId(alert.getAlertId());
-        entity.setSourceAlertId(alert.getAlertId());  // Using alertId as sourceAlertId for now
+        entity.setSourceAlertId(alert.getSourceAlertId() != null
+            ? alert.getSourceAlertId() : alert.getAlertId());
         entity.setAlertName(alert.getAlertName());
-        entity.setAlertTimestamp(alert.getTimestamp() != null ?
-            java.time.OffsetDateTime.ofInstant(alert.getTimestamp(), java.time.ZoneOffset.UTC) : null);
-        entity.setSeverity(alert.getSeverity().getValue());
-        entity.setStatus(alert.getStatus().getValue());
-        entity.setContainerName(alert.getContainerName());
+        entity.setAlertTimestamp(alert.getAlertTimestamp() != null
+            ? alert.getAlertTimestamp().atOffset(ZoneOffset.UTC) : null);
+        entity.setSeverity(alert.getSeverity() != null ? alert.getSeverity().getValue() : null);
+        entity.setStatus(processingStatus);
 
-        // Build containerInfo JSON from pod/namespace/container
-        com.fasterxml.jackson.databind.node.ObjectNode containerInfo =
-            com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
-        if (alert.getPodName() != null) {
-            containerInfo.put("pod", alert.getPodName());
-        }
-        if (alert.getNamespace() != null) {
-            containerInfo.put("namespace", alert.getNamespace());
-        }
-        if (alert.getContainerName() != null) {
-            containerInfo.put("name", alert.getContainerName());
-        }
-        entity.setContainerInfo(containerInfo);
+        // workload_info JSONB
+        WorkloadInfo wi = alert.getWorkloadInfo();
+        ObjectNode workloadNode = MAPPER.createObjectNode();
+        workloadNode.put("pod_name",       wi.podName());
+        workloadNode.put("container_name", wi.containerName());
+        workloadNode.put("namespace",      wi.namespace());
+        workloadNode.put("cluster_name",   wi.clusterName());
+        workloadNode.put("workload_type",  wi.workloadType());
+        entity.setWorkloadInfo(workloadNode);
 
-        // Build alertMetadata JSON from labels and annotations
-        com.fasterxml.jackson.databind.node.ObjectNode metadata =
-            com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
-        metadata.set("labels", JsonUtils.mapToJsonNode(alert.getLabels()));
-        metadata.set("annotations", JsonUtils.mapToJsonNode(alert.getAnnotations()));
-        entity.setAlertMetadata(metadata);
+        // workload_name — denormalised container name
+        entity.setWorkloadName(wi.containerName() != null ? wi.containerName() : "");
+
+        // alert_metadata JSONB
+        AlertMetadata am = alert.getAlertMetadata();
+        ObjectNode metaNode = MAPPER.createObjectNode();
+        metaNode.set("labels",       toJsonNode(am.labels()));
+        metaNode.set("annotations",  toJsonNode(am.annotations()));
+        metaNode.put("alert_source", am.alertSource());
+        if (rejectionReason != null) {
+            metaNode.put("rejection_reason", rejectionReason);
+        }
+        entity.setAlertMetadata(metaNode);
 
         return entity;
     }
 
     /**
-     * Converts AlertEntity to domain Alert.
-     *
-     * @param entity the alert entity
-     * @return the domain alert
+     * Convenience overload — uses {@code ACCEPTED} status, no rejection reason.
+     */
+    public static AlertEntity toEntity(Alert alert) {
+        return toEntityWithStatus(alert, STATUS_ACCEPTED, null);
+    }
+
+    /**
+     * Converts an {@link AlertEntity} back to a domain {@link Alert}.
      */
     public static Alert toDomain(AlertEntity entity) {
-        if (entity == null) {
-            return null;
+        if (entity == null) return null;
+
+        // Unpack workload_info JSONB
+        String podName       = null;
+        String containerName = entity.getWorkloadName(); // fallback to denormalised column
+        String namespace     = null;
+        String clusterName   = null;
+        String workloadType  = null;
+        if (entity.getWorkloadInfo() != null) {
+            var wi       = entity.getWorkloadInfo();
+            podName      = wi.path("pod_name").asText(null);
+            containerName = wi.path("container_name").asText(containerName);
+            namespace    = wi.path("namespace").asText(null);
+            clusterName  = wi.path("cluster_name").asText(null);
+            workloadType = wi.path("workload_type").asText(null);
         }
 
-        // Extract pod and namespace from containerInfo JSON
-        String podName = null;
-        String namespace = null;
-        if (entity.getContainerInfo() != null) {
-            com.fasterxml.jackson.databind.JsonNode containerInfo = entity.getContainerInfo();
-            if (containerInfo.has("pod")) {
-                podName = containerInfo.get("pod").asText();
-            }
-            if (containerInfo.has("namespace")) {
-                namespace = containerInfo.get("namespace").asText();
-            }
-        }
-
-        // Extract labels and annotations from alertMetadata JSON
-        java.util.Map<String, String> labels = java.util.Map.of();
-        java.util.Map<String, String> annotations = java.util.Map.of();
+        // Unpack alert_metadata JSONB
+        Map<String, String> labels      = Map.of();
+        Map<String, String> annotations = Map.of();
+        String alertSource = AlertMetadata.DEFAULT_SOURCE;
         if (entity.getAlertMetadata() != null) {
-            com.fasterxml.jackson.databind.JsonNode metadata = entity.getAlertMetadata();
-            if (metadata.has("labels")) {
-                labels = JsonUtils.jsonNodeToMap(metadata.get("labels"));
-            }
-            if (metadata.has("annotations")) {
-                annotations = JsonUtils.jsonNodeToMap(metadata.get("annotations"));
-            }
+            var am  = entity.getAlertMetadata();
+            labels      = jsonNodeToMap(am.get("labels"));
+            annotations = jsonNodeToMap(am.get("annotations"));
+            alertSource = am.path("alert_source").asText(AlertMetadata.DEFAULT_SOURCE);
         }
 
         return Alert.builder()
             .alertId(entity.getId())
-            .timestamp(entity.getAlertTimestamp() != null ?
-                entity.getAlertTimestamp().toInstant() : null)
+            .sourceAlertId(entity.getSourceAlertId())
             .alertName(entity.getAlertName())
+            .alertTimestamp(entity.getAlertTimestamp() != null
+                ? entity.getAlertTimestamp().toInstant() : null)
             .severity(AlertSeverity.fromString(entity.getSeverity()))
-            .podName(podName)
-            .containerName(entity.getContainerName())
-            .namespace(namespace)
             .status(AlertStatus.fromString(entity.getStatus()))
-            .hasDiagnostics(false)  // This field is not in the new entity structure
-            .labels(labels)
-            .annotations(annotations)
+            .workloadInfo(WorkloadInfo.of(podName, containerName, namespace, clusterName, workloadType))
+            .workloadName(entity.getWorkloadName())
+            .alertMetadata(AlertMetadata.of(labels, annotations, alertSource))
             .build();
     }
 
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    private static com.fasterxml.jackson.databind.JsonNode toJsonNode(Map<String, String> map) {
+        if (map == null || map.isEmpty()) return MAPPER.createObjectNode();
+        ObjectNode node = MAPPER.createObjectNode();
+        map.forEach(node::put);
+        return node;
+    }
+
+    private static Map<String, String> jsonNodeToMap(com.fasterxml.jackson.databind.JsonNode node) {
+        if (node == null || node.isNull() || !node.isObject()) return Map.of();
+        java.util.Map<String, String> result = new java.util.LinkedHashMap<>();
+        node.fields().forEachRemaining(e -> result.put(e.getKey(), e.getValue().asText()));
+        return java.util.Collections.unmodifiableMap(result);
+    }
 }
