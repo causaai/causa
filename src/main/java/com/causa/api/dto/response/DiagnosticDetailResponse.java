@@ -51,8 +51,11 @@ public record DiagnosticDetailResponse(
     @JsonProperty("validation_result")
     String validationResult,
 
-    @JsonProperty("validation_data")
-    Object validationData
+    @JsonProperty("validation_score")
+    Double validationScore,
+
+    @JsonProperty("validation_summary")
+    String validationSummary
 ) {
 
     // -------------------------------------------------------------------------
@@ -189,12 +192,28 @@ public record DiagnosticDetailResponse(
         }
 
         // Parse validationData JSON string into an object so it renders as nested JSON (not escaped string)
-        Object validationDataObj = null;
+        // Extract validation summary fields
+        Double validationScore = null;
+        String validationSummary = null;
+
         if (diagnostic.getValidationData() != null && !diagnostic.getValidationData().isBlank()) {
             try {
-                validationDataObj = MAPPER.readValue(diagnostic.getValidationData(), Object.class);
+                var validationData = MAPPER.readTree(diagnostic.getValidationData());
+                var finalVerdict = validationData.get("finalVerdict");
+                if (finalVerdict != null) {
+                    // Extract confidence as score (0-1)
+                    if (finalVerdict.has("confidence")) {
+                        validationScore = finalVerdict.get("confidence").asDouble();
+                    }
+                    // Extract user-friendly explanation as summary
+                    if (finalVerdict.has("userFriendlyExplanation")) {
+                        validationSummary = finalVerdict.get("userFriendlyExplanation").asText();
+                    } else if (finalVerdict.has("explanation")) {
+                        validationSummary = finalVerdict.get("explanation").asText();
+                    }
+                }
             } catch (Exception ignored) {
-                validationDataObj = diagnostic.getValidationData();
+                // Keep null if parsing fails
             }
         }
 
@@ -210,7 +229,8 @@ public record DiagnosticDetailResponse(
             recommendations,
             llmNotes,
             diagnostic.getValidationResult(),
-            validationDataObj
+            validationScore,
+            validationSummary
         );
     }
 

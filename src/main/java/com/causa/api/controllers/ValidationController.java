@@ -1,11 +1,10 @@
 package com.causa.api.controllers;
 
-import com.causa.api.dto.response.ValidationDetailResponse;
+import com.causa.api.dto.response.SimplifiedValidationResponse;
 import com.causa.api.dto.response.ErrorResponse;
 import com.causa.common.constants.ApiConstants;
 import com.causa.common.logging.CausaLogger;
 import com.causa.core.domain.Diagnostic;
-import com.causa.core.domain.validation.DualValidationResult;
 import com.causa.core.services.DiagnosticService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.inject.Inject;
@@ -98,12 +97,12 @@ public class ValidationController {
                 .build();
         }
 
-        // Parse validation data JSON
-        DualValidationResult validationResult;
+        // Build simplified validation response
+        SimplifiedValidationResponse response;
         try {
-            validationResult = objectMapper.readValue(
+            response = SimplifiedValidationResponse.from(
                 diagnostic.getValidationData(),
-                DualValidationResult.class
+                objectMapper
             );
         } catch (Exception e) {
             log.error("Failed to parse validation data")
@@ -115,15 +114,9 @@ public class ValidationController {
                 .build();
         }
 
-        // Build validation response
-        ValidationDetailResponse response = ValidationDetailResponse.from(
-            diagnosticId,
-            validationResult
-        );
-
         log.info("Validation detail retrieved")
             .field("diagnosticId", diagnosticId)
-            .field("finalStatus", response.finalVerdict().status())
+            .field("finalStatus", response.finalVerdict() != null ? response.finalVerdict().status() : "null")
             .log();
 
         return Response.ok(response).build();
