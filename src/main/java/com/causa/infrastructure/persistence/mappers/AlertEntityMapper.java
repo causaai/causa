@@ -52,8 +52,7 @@ public final class AlertEntityMapper {
 
         // Scalar columns
         entity.setId(alert.getAlertId());
-        entity.setSourceAlertId(alert.getSourceAlertId() != null
-            ? alert.getSourceAlertId() : alert.getAlertId());
+        entity.setSourceAlertId(alert.getSourceAlertId());
         entity.setAlertName(alert.getAlertName());
         entity.setAlertTimestamp(alert.getAlertTimestamp() != null
             ? alert.getAlertTimestamp().atOffset(ZoneOffset.UTC) : null);

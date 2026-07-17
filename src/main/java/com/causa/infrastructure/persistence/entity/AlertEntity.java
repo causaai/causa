@@ -33,7 +33,7 @@ public class AlertEntity extends BaseEntity {
     @Column(nullable = false, length = 21)
     private String id;
 
-    @Column(nullable = false, length = 255)
+    @Column(length = 255)
     private String sourceAlertId;
 
     @Column(nullable = false, length = 255)

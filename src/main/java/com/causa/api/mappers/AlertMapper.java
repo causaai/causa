@@ -75,7 +75,7 @@ public class AlertMapper {
 
         return Alert.builder()
             .alertId(alertId)
-            .sourceAlertId(fingerprint != null ? fingerprint : alertId)
+            .sourceAlertId(fingerprint != null && !fingerprint.isBlank() ? fingerprint : null)
             .alertName(alertName)
             .alertTimestamp(timestamp)
             .severity(AlertSeverity.fromString(severityStr))

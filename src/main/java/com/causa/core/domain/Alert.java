@@ -14,7 +14,7 @@ import java.util.Objects;
  * <p>One field per schema column:
  * <pre>
  *   id               → alertId
- *   source_alert_id  → sourceAlertId
+ *   source_alert_id  → sourceAlertId   (nullable — set from Prometheus fingerprint; null if absent)
  *   alert_name       → alertName
  *   alert_timestamp  → alertTimestamp
  *   severity         → severity          (critical / warning / info)

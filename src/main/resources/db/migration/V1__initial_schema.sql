@@ -22,7 +22,7 @@
 
 CREATE TABLE IF NOT EXISTS alerts (
     id               VARCHAR(21)              NOT NULL,
-    source_alert_id  VARCHAR(255)             NOT NULL,
+    source_alert_id  VARCHAR(255),
     alert_name       VARCHAR(255)             NOT NULL,
     alert_timestamp  TIMESTAMP WITH TIME ZONE,
     severity         VARCHAR(32),
