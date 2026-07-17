@@ -44,8 +44,7 @@ public final class DiagnosticContext {
     private final String containerAnalysis;
 
     // VM — Filesystem MCP
-    private final String logDirectoryListing;
-    private final String gcLogContent;
+    private final String libertyLogs;
 
     // VM — JMX MCP
     private final String heapStatus;
@@ -72,8 +71,7 @@ public final class DiagnosticContext {
         this.threadAnalysis = builder.threadAnalysis;
         this.exceptionAnalysis = builder.exceptionAnalysis;
         this.containerAnalysis = builder.containerAnalysis;
-        this.logDirectoryListing = builder.logDirectoryListing;
-        this.gcLogContent = builder.gcLogContent;
+        this.libertyLogs = builder.libertyLogs;
         this.heapStatus = builder.heapStatus;
         this.gcActivity = builder.gcActivity;
         this.threadState = builder.threadState;
@@ -145,14 +143,6 @@ public final class DiagnosticContext {
         return containerAnalysis;
     }
 
-    public String getLogDirectoryListing() {
-        return logDirectoryListing;
-    }
-
-    public String getGcLogContent() {
-        return gcLogContent;
-    }
-
     public String getHeapStatus() {
         return heapStatus;
     }
@@ -179,6 +169,10 @@ public final class DiagnosticContext {
 
     public String getJvmRuntimeInfo() {
         return jvmRuntimeInfo;
+    }
+
+    public String getLibertyLogs() {
+        return libertyLogs;
     }
 
     /**
@@ -215,10 +209,10 @@ public final class DiagnosticContext {
     /**
      * Checks if any Filesystem MCP context was collected.
      *
-     * @return true if directory listing or GC log content is present
+     *  @return true if liberty logs are present
      */
     public boolean hasFilesystemContext() {
-        return isNotBlank(logDirectoryListing) || isNotBlank(gcLogContent);
+        return isNotBlank(libertyLogs);
     }
 
     /**
@@ -303,8 +297,7 @@ public final class DiagnosticContext {
 
     private void appendVmSections(StringBuilder sb) {
         // Filesystem MCP context
-        appendSection(sb, ContextConstants.SECTION_VM_LOG_DIR_LISTING,   logDirectoryListing);
-        appendSection(sb, ContextConstants.SECTION_VM_GC_LOG_CONTENT,    gcLogContent);
+        appendSection(sb, ContextConstants.SECTION_LIBERTY_LOGS, libertyLogs);
 
         // JMX MCP context
         appendSection(sb, ContextConstants.SECTION_VM_HEAP_STATUS,       heapStatus);
@@ -370,8 +363,7 @@ public final class DiagnosticContext {
         private String threadAnalysis;
         private String exceptionAnalysis;
         private String containerAnalysis;
-        private String logDirectoryListing;
-        private String gcLogContent;
+        private String libertyLogs;
         private String heapStatus;
         private String gcActivity;
         private String threadState;
@@ -459,13 +451,8 @@ public final class DiagnosticContext {
 
         // VM — Filesystem MCP
 
-        public Builder logDirectoryListing(String logDirectoryListing) {
-            this.logDirectoryListing = logDirectoryListing;
-            return this;
-        }
-
-        public Builder gcLogContent(String gcLogContent) {
-            this.gcLogContent = gcLogContent;
+        public Builder libertyLogs(String libertyLogs) {
+            this.libertyLogs = libertyLogs;
             return this;
         }
 

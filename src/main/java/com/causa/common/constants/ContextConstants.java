@@ -38,6 +38,7 @@ public final class ContextConstants {
     public static final String SECTION_THREAD_ANALYSIS = "THREAD ANALYSIS (Cryostat JFR)";
     public static final String SECTION_EXCEPTION_ANALYSIS = "EXCEPTION ANALYSIS (Cryostat JFR)";
     public static final String SECTION_CONTAINER_ANALYSIS = "CONTAINER RESOURCE ANALYSIS (Cryostat JFR)";
+    public static final String SECTION_LIBERTY_LOGS = "LIBERTY APPLICATION LOGS (Filesystem MCP)";
 
     // Identity field labels
     public static final String LABEL_POD = "Pod";

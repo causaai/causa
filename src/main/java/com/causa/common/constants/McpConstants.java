@@ -155,6 +155,7 @@ public final class McpConstants {
         public static final String POD_STATUS = "\n=== POD STATUS ===";
         public static final String KUBERNETES_EVENTS = "\n=== KUBERNETES EVENTS (for pod: %s) ===";
         public static final String POD_LOGS = "\n=== POD LOGS (last 5 lines) ===";
+        public static final String LIBERTY_LOGS = "\n=== LIBERTY LOGS ===";
     }
 
     /**
@@ -170,6 +171,8 @@ public final class McpConstants {
         public static final String UNABLE_TO_GET_CRYOSTAT_ANALYSIS = "Unable to retrieve Cryostat %s analysis: %s";
         public static final String CRYOSTAT_RECORDING_CREATED = "Cryostat recording created, retrying after delay";
         public static final String CRYOSTAT_MAX_RETRIES_EXCEEDED = "Cryostat max retries exceeded for %s";
+        public static final String UNABLE_TO_LIST_LIBERTY_LOGS_DIR = "Unable to list Liberty logs directory: %s";
+        public static final String UNABLE_TO_READ_LIBERTY_LOG_FILE = "Unable to read Liberty log file: %s";
 
         public static final String MCP_INITIALIZE_FAILED = "MCP initialize failed with status: %d, body: %s";
         public static final String MCP_TOOL_CALL_FAILED = "MCP tool call failed with status: %d, body: %s";
@@ -303,5 +306,27 @@ public final class McpConstants {
 
         public static final String RECORDING_CREATED_STATUS = "RECORDING_CREATED";
         public static final String STATUS_FIELD = "status";
+    }
+
+    /**
+     * Filesystem MCP-specific constants
+     */
+    public static final class Filesystem {
+        private Filesystem() {}
+
+        /** Prefix used by @modelcontextprotocol/server-filesystem for file entries in list_directory output. */
+        public static final String FILE_PREFIX = "[FILE] ";
+        /** Prefix used by @modelcontextprotocol/server-filesystem for directory entries. */
+        public static final String DIR_PREFIX = "[DIR] ";
+        public static final String FFDC_DIR = "ffdc";
+        public static final String MESSAGES_LOG = "messages.log";
+        public static final String TRACE_LOG = "trace.log";
+        public static final String JIT_LOG_PREFIX = "jit.log.";
+        public static final String MESSAGES_ARCHIVE_PREFIX = "messages_";
+        public static final String TRACE_ARCHIVE_PREFIX = "trace_";
+        public static final int ALERT_WINDOW_MINUTES = 5;
+        public static final long MAX_MESSAGES_TRACE_BYTES = 64L * 1024L * 1024L;
+        public static final long MAX_FFDC_BYTES = 2L * 1024L * 1024L;
+        public static final long MAX_JIT_BYTES = 1L * 1024L * 1024L;
     }
 }
