@@ -26,6 +26,7 @@ import com.causa.mcp.McpContextCollector;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.transaction.UserTransaction;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 
@@ -73,6 +74,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     private final LLMConfig llmConfig;
     private final ObjectMapper objectMapper;
     private final Validator validator;
+    private final UserTransaction userTransaction;
 
     @Inject
     public DiagnosticServiceImpl(DiagnosticRepository diagnosticRepository,
@@ -82,7 +84,8 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                                   PromptSender promptSender,
                                   LLMConfig llmConfig,
                                   ObjectMapper objectMapper,
-                                  Validator validator) {
+                                  Validator validator,
+                                  UserTransaction userTransaction) {
         this.diagnosticRepository = diagnosticRepository;
         this.alertRepository      = alertRepository;
         this.mcpContextCollector  = mcpContextCollector;
@@ -91,6 +94,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
         this.llmConfig            = llmConfig;
         this.objectMapper         = objectMapper;
         this.validator            = validator;
+        this.userTransaction      = userTransaction;
     }
 
     // =========================================================================
@@ -169,10 +173,14 @@ public class DiagnosticServiceImpl implements DiagnosticService {
 
         try {
             // ── Step 1: PENDING → IN_PROGRESS; alert → PROCESSING ───────────
-            updateDiagnosticStatus(pending, DiagnosticStatus.IN_PROGRESS);
-            alertRepository.updateProcessingStatus(alertId, AlertEntityMapper.STATUS_PROCESSING);
+            // Each DB call needs its own transaction — this thread has no CDI context,
+            // so @Transactional interceptors don't fire. Use UserTransaction explicitly.
+            inTx(() -> {
+                updateDiagnosticStatus(pending, DiagnosticStatus.IN_PROGRESS);
+                alertRepository.updateProcessingStatus(alertId, AlertEntityMapper.STATUS_PROCESSING);
+            });
 
-            // ── Step 2: Collect MCP context ──────────────────────────────────
+            // ── Step 2: Collect MCP context (no DB, no tx needed) ────────────
             log.info(LogMessages.Diagnostic.CONTEXT_COLLECTION_STARTED)
                 .field(LogFields.DIAGNOSTIC_ID, diagnosticId)
                 .field(LogFields.ALERT_ID, alertId)
@@ -188,7 +196,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                 .field(LogFields.HAS_CRYOSTAT_CONTEXT, context.hasCryostatContext())
                 .log();
 
-            // ── Step 3: LLM root cause analysis ─────────────────────────────
+            // ── Step 3: LLM root cause analysis (no DB, no tx needed) ────────
             String contextStr = context.toString();
             String separator  = ContextConstants.SEPARATOR_CHAR.repeat(ContextConstants.SEPARATOR_LENGTH);
 
@@ -203,9 +211,8 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             RootCauseAnalysis rca = performRca(alert, contextStr);
 
             // ── Step 4: IN_PROGRESS → VALIDATING; persist RCA ────────────────
-            // RCA is now stored → visible via GET /diagnostics/{id}
             Diagnostic withRca = buildWithRca(pending, DiagnosticStatus.VALIDATING, rca);
-            diagnosticRepository.update(withRca);
+            inTx(() -> diagnosticRepository.update(withRca));
 
             log.info("Diagnostic status → VALIDATING; RCA persisted")
                 .field(LogFields.DIAGNOSTIC_ID, diagnosticId)
@@ -213,7 +220,6 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                 .log();
 
             // ── Step 5: VALIDATING → COMPLETED; alert → PROCESSED ────────────
-            // Validation is a future extension — marking COMPLETED directly for now
             Diagnostic completed = Diagnostic.builder()
                 .diagnosticId(withRca.getDiagnosticId())
                 .alertId(withRca.getAlertId())
@@ -223,8 +229,10 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                 .faultDomain(withRca.getFaultDomain())
                 .rootCauseAnalysis(withRca.getRootCauseAnalysis())
                 .build();
-            diagnosticRepository.update(completed);
-            alertRepository.updateProcessingStatus(alertId, AlertEntityMapper.STATUS_PROCESSED);
+            inTx(() -> {
+                diagnosticRepository.update(completed);
+                alertRepository.updateProcessingStatus(alertId, AlertEntityMapper.STATUS_PROCESSED);
+            });
 
             log.info(LogMessages.Diagnostic.DIAGNOSTIC_PIPELINE_DONE)
                 .field(LogFields.DIAGNOSTIC_ID, diagnosticId)
@@ -238,19 +246,42 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                 .exception(e)
                 .log();
 
-            // Mark diagnostic FAILED
-            safeUpdateStatus(pending, DiagnosticStatus.FAILED);
-
-            // Mark alert PROCESSED regardless — it was received and attempted
-            try {
+            // Mark diagnostic FAILED and alert PROCESSED in a single tx
+            safeInTx(() -> {
+                safeUpdateStatus(pending, DiagnosticStatus.FAILED);
                 alertRepository.updateProcessingStatus(alertId, AlertEntityMapper.STATUS_PROCESSED);
-            } catch (Exception ex) {
-                log.error(LogMessages.Alert.ALERT_UPDATE_FAILED)
-                    .field(LogFields.ALERT_ID, alertId)
-                    .exception(ex)
-                    .log();
-            }
+            });
         }
+    }
+
+    /**
+     * Runs {@code work} inside an explicit JTA transaction.
+     * Required because the background thread has no CDI context — {@code @Transactional}
+     * interceptors don't fire on plain {@link ExecutorService} threads.
+     */
+    private void inTx(TxRunnable work) throws Exception {
+        userTransaction.begin();
+        try {
+            work.run();
+            userTransaction.commit();
+        } catch (Exception e) {
+            try { userTransaction.rollback(); } catch (Exception rb) { /* ignore */ }
+            throw e;
+        }
+    }
+
+    /** {@link #inTx} variant that swallows exceptions — used in the catch block. */
+    private void safeInTx(TxRunnable work) {
+        try { inTx(work); } catch (Exception e) {
+            log.error("Failed to persist pipeline failure state")
+                .exception(e)
+                .log();
+        }
+    }
+
+    @FunctionalInterface
+    private interface TxRunnable {
+        void run() throws Exception;
     }
 
     // =========================================================================

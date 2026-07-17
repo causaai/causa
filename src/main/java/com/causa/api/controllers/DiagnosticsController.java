@@ -30,7 +30,7 @@ import java.util.Optional;
  *
  * @since 0.0.1
  */
-@Path("/")
+@Path(ApiConstants.Paths.Diagnostics.BASE)
 @Produces(MediaType.APPLICATION_JSON)
 public class DiagnosticsController {
 
@@ -55,7 +55,6 @@ public class DiagnosticsController {
     // -------------------------------------------------------------------------
 
     @GET
-    @Path(ApiConstants.Paths.Diagnostics.BASE)
     public Response listDiagnostics() {
         log.info(LogMessages.Diagnostic.DIAGNOSTICS_LIST_REQUEST).log();
 

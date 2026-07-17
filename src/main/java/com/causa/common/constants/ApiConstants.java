@@ -97,8 +97,8 @@ public final class ApiConstants {
             private Diagnostics() {}
 
             public static final String BASE       = Version.API_V1 + "/diagnostics";
-            public static final String BY_ID      = Version.API_V1 + "/diagnostics/{id}";
             public static final String PATH_PARAM = "id";
+            public static final String BY_ID      = "/{" + PATH_PARAM + "}";
         }
 
         /**
