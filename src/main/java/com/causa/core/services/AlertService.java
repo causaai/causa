@@ -15,9 +15,9 @@ public interface AlertService {
 
     /**
      * Processes a batch of incoming alerts — applies severity, namespace and cooldown
-     * filtering, persists every alert, and returns the split result.
+     * filtering, persists every alert, and returns accepted alerts.
      */
-    ProcessedAlerts processAlerts(List<Alert> alerts);
+    List<Alert> processAlerts(List<Alert> alerts, Map<String, String> rejectedReasons);
 
     boolean isInCooldown(Alert alert);
 
@@ -29,14 +29,4 @@ public interface AlertService {
      * All non-blank params must match simultaneously.
      */
     List<Alert> getAlerts(String workloadName, String namespace);
-
-    /**
-     * Result of processing a batch of incoming alerts.
-     *
-     * @param accepted alerts that passed all filters — persisted with {@code PROCESSING} status
-     * @param rejected alerts paired with their rejection reason — persisted with {@code REJECTED} status
-     */
-    record ProcessedAlerts(List<Alert> accepted, Map<Alert, String> rejected) {
-        public int total() { return accepted.size() + rejected.size(); }
-    }
 }

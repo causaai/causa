@@ -1,8 +1,7 @@
 package com.causa.api.controllers;
 
 import com.causa.api.dto.request.AlertWebhookRequest;
-import com.causa.api.dto.response.AlertResponse;
-import com.causa.api.dto.response.AlertResponse.AlertEntry;
+import com.causa.api.dto.response.WebhookResponse;
 import com.causa.api.dto.response.ErrorResponse;
 import com.causa.api.mappers.AlertMapper;
 import com.causa.api.validators.AlertWebhookValidator;
@@ -12,7 +11,6 @@ import com.causa.common.logging.LogMessages;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
 import com.causa.core.services.AlertService;
-import com.causa.core.services.AlertService.ProcessedAlerts;
 import com.causa.core.services.DiagnosticService;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.Consumes;
@@ -27,7 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Alert Webhook Controller
+ * Webhook Controller
  *
  * <p>POST /api/v1/webhooks/alerts — receives Prometheus Alertmanager webhooks.
  *
@@ -36,18 +34,18 @@ import java.util.Map;
 @Path(ApiConstants.Paths.Webhooks.ALERTS)
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
-public class AlertWebhookController {
+public class WebhookController {
 
-    private static final CausaLogger log = CausaLogger.getLogger(AlertWebhookController.class);
+    private static final CausaLogger log = CausaLogger.getLogger(WebhookController.class);
 
     private final AlertService alertService;
     private final DiagnosticService diagnosticService;
     private final AlertMapper alertMapper;
 
     @Inject
-    public AlertWebhookController(AlertService alertService,
-                                   DiagnosticService diagnosticService,
-                                   AlertMapper alertMapper) {
+    public WebhookController(AlertService alertService,
+                              DiagnosticService diagnosticService,
+                              AlertMapper alertMapper) {
         this.alertService      = alertService;
         this.diagnosticService = diagnosticService;
         this.alertMapper       = alertMapper;
@@ -77,20 +75,17 @@ public class AlertWebhookController {
         List<Alert> domainAlerts = alertMapper.toDomainList(request);
 
         // Process — filter, persist accepted + rejected
-        ProcessedAlerts processed = alertService.processAlerts(domainAlerts);
+        Map<String, String> rejectedReasons = new LinkedHashMap<>();
+        List<Alert> accepted = alertService.processAlerts(domainAlerts, rejectedReasons);
 
-        // Trigger diagnostics for accepted alerts; build per-alert entry map
+        // Trigger diagnostics for accepted alerts
         Map<String, String> acceptedEntries = new LinkedHashMap<>();
-        for (Alert alert : processed.accepted()) {
+        for (Alert alert : accepted) {
             Diagnostic diagnostic = diagnosticService.triggerDiagnostics(alert);
             acceptedEntries.put(alert.getAlertId(), diagnostic.getDiagnosticId());
         }
 
-        Map<String, String> rejectedEntries = new LinkedHashMap<>();
-        processed.rejected().forEach((alert, reason) ->
-            rejectedEntries.put(alert.getAlertId(), reason));
-
-        AlertResponse body = AlertResponse.of(acceptedEntries, rejectedEntries);
+        WebhookResponse body = WebhookResponse.of(acceptedEntries, rejectedReasons);
 
         log.info(LogMessages.Alert.WEBHOOK_PROCESSED)
             .field("totalReceived", body.totalReceived())

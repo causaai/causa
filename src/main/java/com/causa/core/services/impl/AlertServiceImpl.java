@@ -13,6 +13,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -59,9 +61,8 @@ public class AlertServiceImpl implements AlertService {
     }
 
     @Override
-    public ProcessedAlerts processAlerts(List<Alert> alerts) {
+    public List<Alert> processAlerts(List<Alert> alerts, Map<String, String> rejectedReasons) {
         List<Alert> accepted = new ArrayList<>();
-        Map<Alert, String> rejected = new LinkedHashMap<>();
 
         for (Alert alert : alerts) {
             if (!passesSeverityFilter(alert)) {
@@ -70,7 +71,11 @@ public class AlertServiceImpl implements AlertService {
                     .field("severity", alert.getSeverity().getValue())
                     .field("minimum", minimumSeverity.getValue())
                     .log();
-                rejected.put(alertRepository.saveRejected(alert, "severity"), "severity");
+                String reason = String.format(
+                    "Severity too low — received: %s, minimum required: %s",
+                    alert.getSeverity().getValue(), minimumSeverity.getValue());
+                Alert saved = alertRepository.saveRejected(alert, reason);
+                rejectedReasons.put(saved.getAlertId(), reason);
                 continue;
             }
 
@@ -79,17 +84,31 @@ public class AlertServiceImpl implements AlertService {
                     .field("alertName", alert.getAlertName())
                     .field("namespace", alert.getWorkloadInfo().namespace())
                     .log();
-                rejected.put(alertRepository.saveRejected(alert, "namespace"), "namespace");
+                String reason = String.format(
+                    "Namespace '%s' is in the ignore list",
+                    alert.getWorkloadInfo().namespace());
+                Alert saved = alertRepository.saveRejected(alert, reason);
+                rejectedReasons.put(saved.getAlertId(), reason);
                 continue;
             }
 
             if (isInCooldown(alert)) {
+                String key = alert.getCooldownKey();
+                Instant nextProcessAt = cooldownCache.get(key)
+                    .plusSeconds(alertConfig.cooldownMinutes() * 60L);
+                String nextTime = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss 'UTC'")
+                    .withZone(ZoneOffset.UTC)
+                    .format(nextProcessAt);
                 log.debug(LogMessages.Alert.ALERT_FILTERED_COOLDOWN)
                     .field("alertName", alert.getAlertName())
                     .field("podName", alert.getWorkloadInfo().podName())
-                    .field("cooldownKey", alert.getCooldownKey())
+                    .field("cooldownKey", key)
                     .log();
-                rejected.put(alertRepository.saveRejected(alert, "cooldown"), "cooldown");
+                String reason = String.format(
+                    "Alert is in cooldown — next alert from this workload will be processed at: %s",
+                    nextTime);
+                Alert saved = alertRepository.saveRejected(alert, reason);
+                rejectedReasons.put(saved.getAlertId(), reason);
                 continue;
             }
 
@@ -110,7 +129,7 @@ public class AlertServiceImpl implements AlertService {
                 .log();
         }
 
-        return new ProcessedAlerts(accepted, rejected);
+        return accepted;
     }
 
     @Override

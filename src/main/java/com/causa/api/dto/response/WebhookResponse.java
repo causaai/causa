@@ -3,8 +3,6 @@ package com.causa.api.dto.response;
 import com.causa.common.constants.AlertConstants;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -12,29 +10,18 @@ import java.util.Map;
  *
  * @since 0.0.1
  */
-public record AlertResponse(
+public record WebhookResponse(
     String status,
     String message,
     int totalReceived,
     int totalAccepted,
     int totalRejected,
-    List<AlertEntry> alerts,
+    Map<String, String> accepted,
+    Map<String, String> rejected,
     Instant timestamp
 ) {
 
-    /** Per-alert result entry. */
-    public record AlertEntry(
-        String alertId,
-        String status,
-        String diagnosticId,
-        String rejectionReason
-    ) {}
-
-    public static AlertResponse of(Map<String, String> accepted, Map<String, String> rejected) {
-        List<AlertEntry> entries = new ArrayList<>();
-        accepted.forEach((id, diagId) -> entries.add(new AlertEntry(id, "ACCEPTED", diagId, null)));
-        rejected.forEach((id, reason) -> entries.add(new AlertEntry(id, "REJECTED", null, reason)));
-
+    public static WebhookResponse of(Map<String, String> accepted, Map<String, String> rejected) {
         int acc   = accepted.size();
         int rej   = rejected.size();
         int total = acc + rej;
@@ -55,6 +42,6 @@ public record AlertResponse(
             message = String.format("All %d alerts rejected (severity/namespace/cooldown)", rej);
         }
 
-        return new AlertResponse(status, message, total, acc, rej, entries, Instant.now());
+        return new WebhookResponse(status, message, total, acc, rej, accepted, rejected, Instant.now());
     }
 }
