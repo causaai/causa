@@ -47,7 +47,7 @@ public class AlertsController {
     @GET
     @Path(ApiConstants.Paths.Alerts.BY_ID)
     public Response getAlertById(
-            @PathParam("id")                                           String id,
+            @PathParam(ApiConstants.Paths.Alerts.PATH_PARAM_ID)        String id,
             @QueryParam(ApiConstants.Paths.Alerts.QUERY_WORKLOAD)      String workloadName,
             @QueryParam(ApiConstants.Paths.Alerts.QUERY_NAMESPACE)     String namespace) {
 

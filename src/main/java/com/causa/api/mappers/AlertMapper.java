@@ -61,9 +61,9 @@ public class AlertMapper {
             AlertConstants.Labels.CONTAINER_NAME, AlertConstants.Labels.CONTAINER);
         String podName       = getAnnotationOrLabel(annotations, labels,
             AlertConstants.Labels.POD_NAME, AlertConstants.Labels.POD);
-        String namespace     = getWithFallback(annotations, labels, AlertConstants.Labels.NAMESPACE);
-        String clusterName   = getWithFallback(annotations, labels, AlertConstants.Labels.CLUSTER_NAME);
-        String workloadType  = getWithFallback(annotations, labels, AlertConstants.Labels.WORKLOAD_TYPE);
+        String namespace     = getAnnotationOrLabel(annotations, labels, AlertConstants.Labels.NAMESPACE,    AlertConstants.Labels.NAMESPACE);
+        String clusterName   = getAnnotationOrLabel(annotations, labels, AlertConstants.Labels.CLUSTER_NAME, AlertConstants.Labels.CLUSTER_NAME);
+        String workloadType  = getAnnotationOrLabel(annotations, labels, AlertConstants.Labels.WORKLOAD_TYPE, AlertConstants.Labels.WORKLOAD_TYPE);
 
         // alert_source — from annotations, default to "prometheus"
         String alertSource = annotations.getOrDefault(
@@ -92,19 +92,12 @@ public class AlertMapper {
 
     /**
      * Looks up {@code annotationKey} in annotations first, then {@code labelKey} in labels.
-     * Used for fields where the annotation key and label key differ
-     * (e.g. {@code container_name} vs {@code container}, {@code pod_name} vs {@code pod}).
+     * Pass the same key for both params when the key is identical in both maps.
      */
     private String getAnnotationOrLabel(Map<String, String> annotations, Map<String, String> labels,
                                         String annotationKey, String labelKey) {
         String value = annotations.get(annotationKey);
         return value != null ? value : labels.get(labelKey);
-    }
-
-    /** Checks primary map first, falls back to secondary using the same key. Returns null if absent in both. */
-    private String getWithFallback(Map<String, String> primary, Map<String, String> secondary, String key) {
-        String value = primary.get(key);
-        return value != null ? value : secondary.get(key);
     }
 
     private Instant parseTimestamp(String iso) {

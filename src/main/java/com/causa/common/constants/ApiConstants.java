@@ -82,7 +82,8 @@ public final class ApiConstants {
             private Alerts() {}
 
             public static final String BASE              = Version.API_V1 + "/alerts";
-            public static final String BY_ID             = "/{id}";
+            public static final String PATH_PARAM_ID     = "id";
+            public static final String BY_ID             = "/{" + PATH_PARAM_ID + "}";
             public static final String QUERY_WORKLOAD    = "workload_name";
             public static final String QUERY_NAMESPACE   = "namespace";
         }
