@@ -46,9 +46,9 @@ public class WebhookController {
     public WebhookController(AlertService alertService,
                               DiagnosticService diagnosticService,
                               AlertMapper alertMapper) {
-        this.alertService      = alertService;
+        this.alertService = alertService;
         this.diagnosticService = diagnosticService;
-        this.alertMapper       = alertMapper;
+        this.alertMapper = alertMapper;
     }
 
     @POST

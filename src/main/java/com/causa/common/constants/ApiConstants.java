@@ -75,16 +75,14 @@ public final class ApiConstants {
 
         /**
          * Alert query API.
-         * GET /api/v1/alerts              — all alerts
-         * GET /api/v1/alerts?id=          — single alert by ID
-         * GET /api/v1/alerts?workload_name= — filter by workload name
-         * GET /api/v1/alerts?namespace=   — filter by namespace
+         * GET /api/v1/alerts              — list alerts (optionally filtered by workload_name and/or namespace)
+         * GET /api/v1/alerts/{id}         — single alert by ID
          */
         public static final class Alerts {
             private Alerts() {}
 
             public static final String BASE              = Version.API_V1 + "/alerts";
-            public static final String QUERY_ID          = "id";
+            public static final String BY_ID             = "/{id}";
             public static final String QUERY_WORKLOAD    = "workload_name";
             public static final String QUERY_NAMESPACE   = "namespace";
         }
