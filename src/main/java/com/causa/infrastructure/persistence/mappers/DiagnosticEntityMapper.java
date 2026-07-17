@@ -3,6 +3,7 @@ package com.causa.infrastructure.persistence.mappers;
 import com.causa.common.constants.DiagnosticConstants.DiagnosticStatus;
 import com.causa.common.constants.DiagnosticConstants.FaultDomain;
 import com.causa.core.domain.Diagnostic;
+import com.causa.core.domain.RootCauseAnalysis;
 import com.causa.infrastructure.persistence.entity.AlertEntity;
 import com.causa.infrastructure.persistence.entity.DiagnosticEntity;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -57,22 +58,16 @@ public final class DiagnosticEntityMapper {
             entity.setIssueType(d.getFaultDomain().getValue());
         }
 
-        // rootCauseAnalysis (full JSON string) → rootCauseSummary
-        // Also extract issue_title and issue_description for indexed columns
-        if (d.getRootCauseAnalysis() != null) {
-            entity.setRootCauseSummary(d.getRootCauseAnalysis());
+        // rca (typed) → rootCauseSummary TEXT (JSON serialisation happens only here)
+        // Also extract issue_title / issue_description into their own indexed columns.
+        if (d.getRca() != null) {
             try {
-                JsonNode rcaNode = MAPPER.readTree(d.getRootCauseAnalysis());
-                JsonNode titleNode = rcaNode.get("issue_title");
-                if (titleNode != null && !titleNode.isNull()) {
-                    entity.setIssueTitle(titleNode.asText());
-                }
-                JsonNode descNode = rcaNode.get("issue_description");
-                if (descNode != null && !descNode.isNull()) {
-                    entity.setIssueDescription(descNode.asText());
-                }
+                String rcaJson = MAPPER.writeValueAsString(d.getRca());
+                entity.setRootCauseSummary(rcaJson);
+                entity.setIssueTitle(d.getRca().issueTitle());
+                entity.setIssueDescription(d.getRca().issueDescription());
             } catch (Exception ignored) {
-                // best-effort — entity persists even if RCA JSON is malformed
+                // best-effort — entity persists even if serialisation fails
             }
         }
 
@@ -123,9 +118,13 @@ public final class DiagnosticEntityMapper {
             catch (IllegalArgumentException ignored) {}
         }
 
-        // rootCauseSummary → rootCauseAnalysis
+        // rootCauseSummary TEXT → rca (typed; deserialisation happens only here)
         if (e.getRootCauseSummary() != null) {
-            b.rootCauseAnalysis(e.getRootCauseSummary());
+            try {
+                b.rca(MAPPER.readValue(e.getRootCauseSummary(), RootCauseAnalysis.class));
+            } catch (Exception ignored) {
+                // malformed stored JSON — leave rca null rather than crashing
+            }
         }
 
         // confidenceInfo JSONB { "score": ... } → confidenceScore

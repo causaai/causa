@@ -2,9 +2,8 @@ package com.causa.api.dto.response;
 
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
+import com.causa.core.domain.RootCauseAnalysis;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 
@@ -42,10 +41,9 @@ public record DiagnosticListItemResponse(
     Instant date
 
 ) {
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
     public static DiagnosticListItemResponse from(Diagnostic diagnostic, Alert alert, String clusterName) {
-        String issueTitle  = extractIssueTitle(diagnostic.getRootCauseAnalysis());
+        RootCauseAnalysis rca = diagnostic.getRca();
+        String issueTitle  = rca != null ? rca.issueTitle() : null;
         String workload    = alert != null ? alert.getWorkloadName()               : null;
         String namespace   = alert != null ? alert.getWorkloadInfo().namespace()   : null;
         String severity    = alert != null && alert.getSeverity() != null
@@ -62,17 +60,5 @@ public record DiagnosticListItemResponse(
             cluster,
             diagnostic.getGeneratedAt()
         );
-    }
-
-    /** Extracts {@code issue_title} from the raw RCA JSON string. Returns null if absent or malformed. */
-    private static String extractIssueTitle(String rcaJson) {
-        if (rcaJson == null || rcaJson.isBlank()) return null;
-        try {
-            JsonNode node  = MAPPER.readTree(rcaJson);
-            JsonNode title = node.get("issue_title");
-            return (title != null && !title.isNull()) ? title.asText() : null;
-        } catch (Exception e) {
-            return null;
-        }
     }
 }

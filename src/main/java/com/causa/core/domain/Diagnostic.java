@@ -7,7 +7,6 @@ import com.causa.common.utils.IdUtils;
 import java.time.Instant;
 import java.util.Objects;
 
-
 /**
  * Diagnostic Domain Model
  *
@@ -24,35 +23,37 @@ public final class Diagnostic {
     private final Instant generatedAt;
     private final Float confidenceScore;
     private final FaultDomain faultDomain;
-    private final String rootCauseAnalysis;   // JSON string from LLM — null until pipeline completes
-    private final String validationResult;    // SUPPORTED / PARTIALLY_SUPPORTED / UNSUPPORTED — null until COMPLETED
-    private final String validationData;      // JSON string with validation details — null until COMPLETED
+    /** Typed RCA — null until the pipeline reaches VALIDATING. Serialisation to/from DB is handled exclusively by {@link com.causa.infrastructure.persistence.mappers.DiagnosticEntityMapper}. */
+    private final RootCauseAnalysis rca;
+    private final String validationResult;
+    private final String validationData;
 
     private Diagnostic(Builder builder) {
-        this.diagnosticId      = Objects.requireNonNull(builder.diagnosticId, "diagnosticId cannot be null");
-        this.alertId           = Objects.requireNonNull(builder.alertId, "alertId cannot be null");
-        this.status            = Objects.requireNonNull(builder.status, "status cannot be null");
-        this.generatedAt       = Objects.requireNonNull(builder.generatedAt, "generatedAt cannot be null");
-        this.confidenceScore   = builder.confidenceScore;
-        this.faultDomain       = builder.faultDomain;
-        this.rootCauseAnalysis = builder.rootCauseAnalysis;
-        this.validationResult  = builder.validationResult;
-        this.validationData    = builder.validationData;
+        this.diagnosticId    = Objects.requireNonNull(builder.diagnosticId, "diagnosticId cannot be null");
+        this.alertId         = Objects.requireNonNull(builder.alertId, "alertId cannot be null");
+        this.status          = Objects.requireNonNull(builder.status, "status cannot be null");
+        this.generatedAt     = Objects.requireNonNull(builder.generatedAt, "generatedAt cannot be null");
+        this.confidenceScore = builder.confidenceScore;
+        this.faultDomain     = builder.faultDomain;
+        this.rca             = builder.rca;
+        this.validationResult = builder.validationResult;
+        this.validationData  = builder.validationData;
     }
 
     // -------------------------------------------------------------------------
     // Getters
     // -------------------------------------------------------------------------
 
-    public String getDiagnosticId()      { return diagnosticId; }
-    public String getAlertId()           { return alertId; }
-    public DiagnosticStatus getStatus()  { return status; }
-    public Instant getGeneratedAt()      { return generatedAt; }
-    public Float getConfidenceScore()    { return confidenceScore; }
-    public FaultDomain getFaultDomain()  { return faultDomain; }
-    public String getRootCauseAnalysis() { return rootCauseAnalysis; }
-    public String getValidationResult()  { return validationResult; }
-    public String getValidationData()    { return validationData; }
+    public String getDiagnosticId()         { return diagnosticId; }
+    public String getAlertId()              { return alertId; }
+    public DiagnosticStatus getStatus()     { return status; }
+    public Instant getGeneratedAt()         { return generatedAt; }
+    public Float getConfidenceScore()       { return confidenceScore; }
+    public FaultDomain getFaultDomain()     { return faultDomain; }
+    /** Typed RCA result — null until pipeline reaches VALIDATING/COMPLETED. */
+    public RootCauseAnalysis getRca()       { return rca; }
+    public String getValidationResult()     { return validationResult; }
+    public String getValidationData()       { return validationData; }
 
     /**
      * Generates a unique diagnostic ID: {@code diag_<16-char-alphanumeric>}.
@@ -79,21 +80,21 @@ public final class Diagnostic {
         private Instant generatedAt;
         private Float confidenceScore;
         private FaultDomain faultDomain;
-        private String rootCauseAnalysis;
+        private RootCauseAnalysis rca;
         private String validationResult;
         private String validationData;
 
         private Builder() {}
 
-        public Builder diagnosticId(String v)      { this.diagnosticId = v;      return this; }
-        public Builder alertId(String v)            { this.alertId = v;            return this; }
-        public Builder status(DiagnosticStatus v)   { this.status = v;             return this; }
-        public Builder generatedAt(Instant v)       { this.generatedAt = v;        return this; }
-        public Builder confidenceScore(Float v)     { this.confidenceScore = v;    return this; }
-        public Builder faultDomain(FaultDomain v)   { this.faultDomain = v;        return this; }
-        public Builder rootCauseAnalysis(String v)  { this.rootCauseAnalysis = v;  return this; }
-        public Builder validationResult(String v)   { this.validationResult = v;   return this; }
-        public Builder validationData(String v)     { this.validationData = v;     return this; }
+        public Builder diagnosticId(String v)        { this.diagnosticId = v;    return this; }
+        public Builder alertId(String v)              { this.alertId = v;         return this; }
+        public Builder status(DiagnosticStatus v)     { this.status = v;          return this; }
+        public Builder generatedAt(Instant v)         { this.generatedAt = v;     return this; }
+        public Builder confidenceScore(Float v)       { this.confidenceScore = v; return this; }
+        public Builder faultDomain(FaultDomain v)     { this.faultDomain = v;     return this; }
+        public Builder rca(RootCauseAnalysis v)       { this.rca = v;             return this; }
+        public Builder validationResult(String v)     { this.validationResult = v; return this; }
+        public Builder validationData(String v)       { this.validationData = v;  return this; }
 
         public Diagnostic build() { return new Diagnostic(this); }
     }

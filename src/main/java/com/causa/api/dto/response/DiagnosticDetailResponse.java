@@ -4,7 +4,6 @@ import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
 import com.causa.core.domain.RootCauseAnalysis;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.util.List;
@@ -88,8 +87,6 @@ public record DiagnosticDetailResponse(
     // Factory
     // -------------------------------------------------------------------------
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
     public static DiagnosticDetailResponse from(Diagnostic diagnostic, Alert alert, String clusterName) {
         String cluster = (clusterName != null && !clusterName.isBlank()) ? clusterName : "default";
 
@@ -106,8 +103,8 @@ public record DiagnosticDetailResponse(
             );
         }
 
-        // Parse stored RCA JSON — null until pipeline reaches VALIDATING/COMPLETED
-        RootCauseAnalysis rca = parseRca(diagnostic.getRootCauseAnalysis());
+        // Typed RCA — null until pipeline reaches VALIDATING/COMPLETED
+        RootCauseAnalysis rca = diagnostic.getRca();
 
         DiagnosisInfo diagnosisInfo = null;
         if (rca != null) {
@@ -155,14 +152,5 @@ public record DiagnosticDetailResponse(
             diagnosisInfo,
             diagnostic.getValidationResult()
         );
-    }
-
-    private static RootCauseAnalysis parseRca(String rcaJson) {
-        if (rcaJson == null || rcaJson.isBlank()) return null;
-        try {
-            return MAPPER.readValue(rcaJson, RootCauseAnalysis.class);
-        } catch (Exception e) {
-            return null;
-        }
     }
 }

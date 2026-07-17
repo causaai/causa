@@ -227,7 +227,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                 .generatedAt(withRca.getGeneratedAt())
                 .confidenceScore(withRca.getConfidenceScore())
                 .faultDomain(withRca.getFaultDomain())
-                .rootCauseAnalysis(withRca.getRootCauseAnalysis())
+                .rca(withRca.getRca())
                 .build();
             inTx(() -> {
                 diagnosticRepository.update(completed);
@@ -361,7 +361,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
         return rca;
     }
 
-    /** Builds a new Diagnostic with status + RCA fields extracted from the parsed RCA. */
+    /** Builds a new Diagnostic carrying the typed RCA object — no JSON round-trip here. */
     private Diagnostic buildWithRca(Diagnostic base, DiagnosticStatus status, RootCauseAnalysis rca) {
         Float confidenceScore = (rca.confidenceSummary() != null && rca.confidenceSummary().rcaConfidenceScore() != null)
             ? rca.confidenceSummary().rcaConfidenceScore().floatValue() : null;
@@ -372,10 +372,6 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             catch (IllegalArgumentException ignored) {}
         }
 
-        String rcaJson = null;
-        try { rcaJson = objectMapper.writeValueAsString(rca); }
-        catch (Exception ignored) {}
-
         return Diagnostic.builder()
             .diagnosticId(base.getDiagnosticId())
             .alertId(base.getAlertId())
@@ -383,11 +379,11 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             .generatedAt(base.getGeneratedAt())
             .confidenceScore(confidenceScore)
             .faultDomain(faultDomain)
-            .rootCauseAnalysis(rcaJson)
+            .rca(rca)                      // typed — mapper serialises to TEXT on persist
             .build();
     }
 
-    /** Updates only the status of an existing diagnostic. */
+    /** Updates only the status of an existing diagnostic, carrying all other fields through. */
     private void updateDiagnosticStatus(Diagnostic base, DiagnosticStatus newStatus) {
         Diagnostic updated = Diagnostic.builder()
             .diagnosticId(base.getDiagnosticId())
@@ -396,7 +392,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             .generatedAt(base.getGeneratedAt())
             .confidenceScore(base.getConfidenceScore())
             .faultDomain(base.getFaultDomain())
-            .rootCauseAnalysis(base.getRootCauseAnalysis())
+            .rca(base.getRca())
             .validationResult(base.getValidationResult())
             .validationData(base.getValidationData())
             .build();
