@@ -38,15 +38,33 @@ public class AlertMapper {
         this.defaultSeverity = alertConfig.filterSeverity();
     }
 
+    /**
+     * Maps an Alertmanager webhook request to a list of domain Alert objects.
+     *
+     * @param request the webhook request
+     * @return list of domain Alert objects
+     */
+
     public List<Alert> toDomainList(AlertWebhookRequest request) {
         if (request == null || request.getAlerts() == null) {
             return List.of();
         }
+
         return request.getAlerts().stream()
             .map(this::toDomain)
             .toList();
     }
 
+    /**
+     * Maps a single Alertmanager alert item to a domain Alert.
+     *
+     * <p>Validation ensures container and namespace are always present.
+     * <p>Severity defaults to configured value if missing.
+     * <p>Uses Prometheus fingerprint as alert ID for global uniqueness and idempotency.
+     *
+     * @param item the alert item from the webhook payload
+     * @return the domain Alert object
+     */
     public Alert toDomain(AlertWebhookRequest.AlertItem item) {
         Map<String, String> labels      = item.getLabels()      != null ? item.getLabels()      : Map.of();
         Map<String, String> annotations = item.getAnnotations() != null ? item.getAnnotations() : Map.of();

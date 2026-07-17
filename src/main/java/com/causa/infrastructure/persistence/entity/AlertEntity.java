@@ -88,30 +88,30 @@ public class AlertEntity extends BaseEntity {
     // Getters and Setters
     // -------------------------------------------------------------------------
 
-    public String getId()                           { return id; }
-    public void setId(String v)                     { this.id = v; }
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
 
-    public String getSourceAlertId()                { return sourceAlertId; }
-    public void setSourceAlertId(String v)          { this.sourceAlertId = v; }
+    public String getSourceAlertId() { return sourceAlertId; }
+    public void setSourceAlertId(String sourceAlertId) { this.sourceAlertId = sourceAlertId; }
 
-    public String getAlertName()                    { return alertName; }
-    public void setAlertName(String v)              { this.alertName = v; }
+    public String getAlertName() { return alertName; }
+    public void setAlertName(String alertName) { this.alertName = alertName; }
 
-    public OffsetDateTime getAlertTimestamp()       { return alertTimestamp; }
-    public void setAlertTimestamp(OffsetDateTime v) { this.alertTimestamp = v; }
+    public OffsetDateTime getAlertTimestamp() { return alertTimestamp; }
+    public void setAlertTimestamp(OffsetDateTime alertTimestamp) { this.alertTimestamp = alertTimestamp; }
 
-    public String getSeverity()                     { return severity; }
-    public void setSeverity(String v)               { this.severity = v; }
+    public String getSeverity() { return severity; }
+    public void setSeverity(String severity) { this.severity = severity; }
 
-    public String getStatus()                       { return status; }
-    public void setStatus(String v)                 { this.status = v; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
 
-    public JsonNode getWorkloadInfo()               { return workloadInfo; }
-    public void setWorkloadInfo(JsonNode v)         { this.workloadInfo = v; }
+    public JsonNode getWorkloadInfo() { return workloadInfo; }
+    public void setWorkloadInfo(JsonNode v) { this.workloadInfo = v; }
 
-    public String getWorkloadName()                 { return workloadName; }
-    public void setWorkloadName(String v)           { this.workloadName = v; }
+    public String getWorkloadName() { return workloadName; }
+    public void setWorkloadName(String v) { this.workloadName = v; }
 
-    public JsonNode getAlertMetadata()              { return alertMetadata; }
-    public void setAlertMetadata(JsonNode v)        { this.alertMetadata = v; }
+    public JsonNode getAlertMetadata() { return alertMetadata; }
+    public void setAlertMetadata(JsonNode alertMetadata) { this.alertMetadata = alertMetadata; }
 }

@@ -7,7 +7,10 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Alert Service — Primary Port
+ * Alert Service - Primary Port
+ *
+ * <p>Primary port for alert ingestion use cases.
+ * <p>Framework-agnostic interface with no JAX-RS or Quarkus annotations.
  *
  * @since 0.0.1
  */
