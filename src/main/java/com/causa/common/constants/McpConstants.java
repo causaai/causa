@@ -316,17 +316,10 @@ public final class McpConstants {
 
         /** Prefix used by @modelcontextprotocol/server-filesystem for file entries in list_directory output. */
         public static final String FILE_PREFIX = "[FILE] ";
-        /** Prefix used by @modelcontextprotocol/server-filesystem for directory entries. */
-        public static final String DIR_PREFIX = "[DIR] ";
         public static final String FFDC_DIR = "ffdc";
         public static final String MESSAGES_LOG = "messages.log";
-        public static final String TRACE_LOG = "trace.log";
-        public static final String JIT_LOG_PREFIX = "jit.log.";
         public static final String MESSAGES_ARCHIVE_PREFIX = "messages_";
-        public static final String TRACE_ARCHIVE_PREFIX = "trace_";
-        public static final int ALERT_WINDOW_MINUTES = 5;
         public static final long MAX_MESSAGES_TRACE_BYTES = 64L * 1024L * 1024L;
         public static final long MAX_FFDC_BYTES = 2L * 1024L * 1024L;
-        public static final long MAX_JIT_BYTES = 1L * 1024L * 1024L;
     }
 }
