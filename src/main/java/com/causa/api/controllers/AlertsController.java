@@ -1,6 +1,6 @@
 package com.causa.api.controllers;
 
-import com.causa.api.dto.response.AlertDetailResponse;
+import com.causa.api.dto.response.AlertResponse;
 import com.causa.api.dto.response.ErrorResponse;
 import com.causa.common.constants.ApiConstants;
 import com.causa.common.logging.CausaLogger;
@@ -67,7 +67,7 @@ public class AlertsController {
         return alertService.getAlert(id)
             .map(alert -> {
                 log.info(LogMessages.Alert.ALERTS_GET_FOUND).field("id", id).log();
-                return Response.ok(AlertDetailResponse.from(alert)).build();
+                return Response.ok(AlertResponse.from(alert)).build();
             })
             .orElseGet(() -> {
                 log.warn(LogMessages.Alert.ALERTS_GET_NOT_FOUND).field("id", id).log();
@@ -93,9 +93,9 @@ public class AlertsController {
             .field("namespace", namespace)
             .log();
 
-        List<AlertDetailResponse> results = alertService.getAlerts(workloadName, namespace)
+        List<AlertResponse> results = alertService.getAlerts(workloadName, namespace)
             .stream()
-            .map(AlertDetailResponse::from)
+            .map(AlertResponse::from)
             .toList();
 
         log.info(LogMessages.Alert.ALERTS_GET_FOUND)

@@ -14,7 +14,7 @@ import java.util.Map;
  *
  * @since 0.0.1
  */
-public record AlertDetailResponse(
+public record AlertResponse(
 
     @JsonProperty("id")
     String alertId,
@@ -58,11 +58,11 @@ public record AlertDetailResponse(
         @JsonProperty("workload_type") String workloadType
     ) {}
 
-    public static AlertDetailResponse from(Alert a) {
+    public static AlertResponse from(Alert a) {
         Alert.WorkloadInfo wi = a.getWorkloadInfo();
         Alert.AlertMetadata am = a.getAlertMetadata();
 
-        return new AlertDetailResponse(
+        return new AlertResponse(
             a.getAlertId(),
             a.getSourceAlertId(),
             a.getAlertName(),
