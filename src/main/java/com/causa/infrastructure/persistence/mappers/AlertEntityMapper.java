@@ -2,6 +2,7 @@ package com.causa.infrastructure.persistence.mappers;
 
 import com.causa.common.constants.AlertConstants.AlertSeverity;
 import com.causa.common.constants.AlertConstants.AlertStatus;
+import com.causa.common.utils.JsonUtils;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Alert.AlertMetadata;
 import com.causa.core.domain.Alert.WorkloadInfo;
@@ -75,8 +76,8 @@ public final class AlertEntityMapper {
         // alert_metadata JSONB
         AlertMetadata am = alert.getAlertMetadata();
         ObjectNode metaNode = MAPPER.createObjectNode();
-        metaNode.set("labels",       toJsonNode(am.labels()));
-        metaNode.set("annotations",  toJsonNode(am.annotations()));
+        metaNode.set("labels",       JsonUtils.mapToJsonNode(am.labels()));
+        metaNode.set("annotations",  JsonUtils.mapToJsonNode(am.annotations()));
         metaNode.put("alert_source", am.alertSource());
         if (rejectionReason != null) {
             metaNode.put("rejection_reason", rejectionReason);
@@ -120,8 +121,8 @@ public final class AlertEntityMapper {
         String alertSource = AlertMetadata.DEFAULT_SOURCE;
         if (entity.getAlertMetadata() != null) {
             var am  = entity.getAlertMetadata();
-            labels      = jsonNodeToMap(am.get("labels"));
-            annotations = jsonNodeToMap(am.get("annotations"));
+            labels      = JsonUtils.jsonNodeToMap(am.get("labels"));
+            annotations = JsonUtils.jsonNodeToMap(am.get("annotations"));
             alertSource = am.path("alert_source").asText(AlertMetadata.DEFAULT_SOURCE);
         }
 
@@ -139,21 +140,4 @@ public final class AlertEntityMapper {
             .build();
     }
 
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
-
-    private static com.fasterxml.jackson.databind.JsonNode toJsonNode(Map<String, String> map) {
-        if (map == null || map.isEmpty()) return MAPPER.createObjectNode();
-        ObjectNode node = MAPPER.createObjectNode();
-        map.forEach(node::put);
-        return node;
-    }
-
-    private static Map<String, String> jsonNodeToMap(com.fasterxml.jackson.databind.JsonNode node) {
-        if (node == null || node.isNull() || !node.isObject()) return Map.of();
-        java.util.Map<String, String> result = new java.util.LinkedHashMap<>();
-        node.fields().forEachRemaining(e -> result.put(e.getKey(), e.getValue().asText()));
-        return java.util.Collections.unmodifiableMap(result);
-    }
 }
