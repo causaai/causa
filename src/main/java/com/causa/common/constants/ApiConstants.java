@@ -89,6 +89,19 @@ public final class ApiConstants {
         }
 
         /**
+         * Diagnostics query API.
+         * GET /api/v1/diagnostics        — list all diagnostics (summary)
+         * GET /api/v1/diagnostics/{id}   — full diagnostic detail
+         */
+        public static final class Diagnostics {
+            private Diagnostics() {}
+
+            public static final String BASE       = Version.API_V1 + "/diagnostics";
+            public static final String BY_ID      = Version.API_V1 + "/diagnostics/{id}";
+            public static final String PATH_PARAM = "id";
+        }
+
+        /**
          * Health check paths.
          */
         public static final class Health {

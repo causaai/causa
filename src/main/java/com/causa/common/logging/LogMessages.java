@@ -115,7 +115,8 @@ public final class LogMessages {
         public static final String LLM_CHECK_FAILED = "LLM health check failed";
     }     
     
-    /* Alert ingestion log messages.
+    /**
+     * Alert ingestion log messages.
      */
     public static final class Alert {
         private Alert() {}
@@ -148,25 +149,36 @@ public final class LogMessages {
     public static final class Diagnostic {
         private Diagnostic() {}
 
-        public static final String DIAGNOSTIC_TRIGGERED = "Diagnostic pipeline triggered";
-        public static final String CONTEXT_COLLECTION_STARTED = "Context collection started";
-        public static final String CONTEXT_COLLECTED = "Diagnostic context collected - LLM-ready format";
-        public static final String DIAGNOSIS_TYPE_DETERMINED = "Diagnosis type determined";
-        public static final String ROOT_CAUSE_ANALYSIS_STARTED = "Root cause analysis started";
-        public static final String RCA_VALIDATION_STARTED = "RCA validation started";
-        public static final String DIAGNOSTIC_COMPLETED = "Diagnostic completed";
-        public static final String DIAGNOSTIC_FAILED = "Diagnostic failed";
+        // Lifecycle
+        public static final String DIAGNOSTIC_TRIGGERED       = "Diagnostic pipeline triggered";
+        public static final String DIAGNOSTIC_INITIATED       = "Diagnostic initiated — PENDING saved, pipeline dispatched async";
+        public static final String DIAGNOSTIC_PIPELINE_START  = "Async diagnostic pipeline started";
+        public static final String DIAGNOSTIC_PIPELINE_DONE   = "Async diagnostic pipeline completed";
+        public static final String DIAGNOSTIC_PIPELINE_FAILED = "Async diagnostic pipeline failed";
+        public static final String DIAGNOSTIC_COMPLETED       = "Diagnostic completed";
+        public static final String DIAGNOSTIC_FAILED          = "Diagnostic failed";
 
-        // RCA Prompt Building
-        public static final String RCA_PROMPT_BUILT = "RCA prompt built";
-        public static final String LLM_CONTEXT_BUILT = "LLM context built";
-        public static final String LLM_RESPONSE_RECEIVED = "LLM response received";
-        public static final String RCA_GENERATED_SUCCESS = "RCA generated successfully";
-        public static final String RCA_GENERATION_FAILED = "RCA generation failed";
+        // Context collection
+        public static final String CONTEXT_COLLECTION_STARTED = "Context collection started";
+        public static final String CONTEXT_COLLECTED          = "Diagnostic context collected — LLM-ready format";
+
+        // RCA
+        public static final String ROOT_CAUSE_ANALYSIS_STARTED = "Root cause analysis started";
+        public static final String RCA_PROMPT_BUILT             = "RCA prompt built";
+        public static final String LLM_RESPONSE_RECEIVED        = "LLM response received";
+        public static final String RCA_GENERATED_SUCCESS        = "RCA generated successfully";
+        public static final String RCA_GENERATION_FAILED        = "RCA generation failed";
 
         // Exception messages
         public static final String DIAGNOSTIC_PERSIST_FAILED = "Failed to persist diagnostic";
-        public static final String DIAGNOSTIC_UPDATE_FAILED = "Failed to update diagnostic";
+        public static final String DIAGNOSTIC_UPDATE_FAILED  = "Failed to update diagnostic";
+
+        // Diagnostics query API
+        public static final String DIAGNOSTICS_LIST_REQUEST  = "GET /api/v1/diagnostics request received";
+        public static final String DIAGNOSTICS_LIST_RETURNED = "Diagnostics list returned";
+        public static final String DIAGNOSTIC_GET_REQUEST    = "GET /api/v1/diagnostics/{id} request received";
+        public static final String DIAGNOSTIC_GET_FOUND      = "Diagnostic retrieved successfully";
+        public static final String DIAGNOSTIC_GET_NOT_FOUND  = "Diagnostic not found";
     }
 
     /**

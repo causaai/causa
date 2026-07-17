@@ -2,9 +2,11 @@ package com.causa.core.domain;
 
 import com.causa.common.constants.DiagnosticConstants.DiagnosticStatus;
 import com.causa.common.constants.DiagnosticConstants.FaultDomain;
+import com.causa.common.utils.IdUtils;
 
 import java.time.Instant;
 import java.util.Objects;
+
 
 /**
  * Diagnostic Domain Model
@@ -22,73 +24,54 @@ public final class Diagnostic {
     private final Instant generatedAt;
     private final Float confidenceScore;
     private final FaultDomain faultDomain;
-    private final String rootCauseAnalysis;  // Will be JSON string from LLM
+    private final String rootCauseAnalysis;   // JSON string from LLM — null until pipeline completes
+    private final String validationResult;    // SUPPORTED / PARTIALLY_SUPPORTED / UNSUPPORTED — null until COMPLETED
+    private final String validationData;      // JSON string with validation details — null until COMPLETED
 
     private Diagnostic(Builder builder) {
-        this.diagnosticId = Objects.requireNonNull(builder.diagnosticId, "diagnosticId cannot be null");
-        this.alertId = Objects.requireNonNull(builder.alertId, "alertId cannot be null");
-        this.status = Objects.requireNonNull(builder.status, "status cannot be null");
-        this.generatedAt = Objects.requireNonNull(builder.generatedAt, "generatedAt cannot be null");
-        this.confidenceScore = builder.confidenceScore;  // nullable for PENDING status
-        this.faultDomain = builder.faultDomain;  // nullable for PENDING status
-        this.rootCauseAnalysis = builder.rootCauseAnalysis;  // nullable for PENDING status
+        this.diagnosticId      = Objects.requireNonNull(builder.diagnosticId, "diagnosticId cannot be null");
+        this.alertId           = Objects.requireNonNull(builder.alertId, "alertId cannot be null");
+        this.status            = Objects.requireNonNull(builder.status, "status cannot be null");
+        this.generatedAt       = Objects.requireNonNull(builder.generatedAt, "generatedAt cannot be null");
+        this.confidenceScore   = builder.confidenceScore;
+        this.faultDomain       = builder.faultDomain;
+        this.rootCauseAnalysis = builder.rootCauseAnalysis;
+        this.validationResult  = builder.validationResult;
+        this.validationData    = builder.validationData;
     }
 
+    // -------------------------------------------------------------------------
     // Getters
+    // -------------------------------------------------------------------------
 
-    public String getDiagnosticId() {
-        return diagnosticId;
-    }
-
-    public String getAlertId() {
-        return alertId;
-    }
-
-    public DiagnosticStatus getStatus() {
-        return status;
-    }
-
-    public Instant getGeneratedAt() {
-        return generatedAt;
-    }
-
-    public Float getConfidenceScore() {
-        return confidenceScore;
-    }
-
-    public FaultDomain getFaultDomain() {
-        return faultDomain;
-    }
-
-    public String getRootCauseAnalysis() {
-        return rootCauseAnalysis;
-    }
+    public String getDiagnosticId()      { return diagnosticId; }
+    public String getAlertId()           { return alertId; }
+    public DiagnosticStatus getStatus()  { return status; }
+    public Instant getGeneratedAt()      { return generatedAt; }
+    public Float getConfidenceScore()    { return confidenceScore; }
+    public FaultDomain getFaultDomain()  { return faultDomain; }
+    public String getRootCauseAnalysis() { return rootCauseAnalysis; }
+    public String getValidationResult()  { return validationResult; }
+    public String getValidationData()    { return validationData; }
 
     /**
-     * Generates a deterministic diagnostic ID from alert ID and timestamp.
+     * Generates a unique diagnostic ID: {@code diag_<16-char-alphanumeric>}.
+     * Total length = 21 chars, matching the {@code VARCHAR(21)} PK column.
      *
-     * <p>Format: diag-{alertId}-{epochMillis}
-     *
-     * @param alertId the alert ID
-     * @param timestamp the diagnostic timestamp
-     * @return the generated diagnostic ID
+     * @param alertId   unused — kept for call-site compatibility
+     * @param timestamp unused — kept for call-site compatibility
+     * @return a new unique diagnostic ID
      */
     public static String generateDiagnosticId(String alertId, Instant timestamp) {
-        return "diag-" + alertId + "-" + timestamp.toEpochMilli();
+        return IdUtils.generateDiagnosticId();
     }
 
-    /**
-     * Creates a new builder for constructing Diagnostic instances.
-     *
-     * @return a new Builder instance
-     */
-    public static Builder builder() {
-        return new Builder();
-    }
+    public static Builder builder() { return new Builder(); }
 
-    /**
-     * Builder for constructing immutable Diagnostic instances.
-     */
+    // -------------------------------------------------------------------------
+    // Builder
+    // -------------------------------------------------------------------------
+
     public static final class Builder {
         private String diagnosticId;
         private String alertId;
@@ -97,53 +80,22 @@ public final class Diagnostic {
         private Float confidenceScore;
         private FaultDomain faultDomain;
         private String rootCauseAnalysis;
+        private String validationResult;
+        private String validationData;
 
         private Builder() {}
 
-        public Builder diagnosticId(String diagnosticId) {
-            this.diagnosticId = diagnosticId;
-            return this;
-        }
+        public Builder diagnosticId(String v)      { this.diagnosticId = v;      return this; }
+        public Builder alertId(String v)            { this.alertId = v;            return this; }
+        public Builder status(DiagnosticStatus v)   { this.status = v;             return this; }
+        public Builder generatedAt(Instant v)       { this.generatedAt = v;        return this; }
+        public Builder confidenceScore(Float v)     { this.confidenceScore = v;    return this; }
+        public Builder faultDomain(FaultDomain v)   { this.faultDomain = v;        return this; }
+        public Builder rootCauseAnalysis(String v)  { this.rootCauseAnalysis = v;  return this; }
+        public Builder validationResult(String v)   { this.validationResult = v;   return this; }
+        public Builder validationData(String v)     { this.validationData = v;     return this; }
 
-        public Builder alertId(String alertId) {
-            this.alertId = alertId;
-            return this;
-        }
-
-        public Builder status(DiagnosticStatus status) {
-            this.status = status;
-            return this;
-        }
-
-        public Builder generatedAt(Instant generatedAt) {
-            this.generatedAt = generatedAt;
-            return this;
-        }
-
-        public Builder confidenceScore(Float confidenceScore) {
-            this.confidenceScore = confidenceScore;
-            return this;
-        }
-
-        public Builder faultDomain(FaultDomain faultDomain) {
-            this.faultDomain = faultDomain;
-            return this;
-        }
-
-        public Builder rootCauseAnalysis(String rootCauseAnalysis) {
-            this.rootCauseAnalysis = rootCauseAnalysis;
-            return this;
-        }
-
-        /**
-         * Builds the Diagnostic instance.
-         *
-         * @return the constructed Diagnostic
-         * @throws NullPointerException if any required field is null
-         */
-        public Diagnostic build() {
-            return new Diagnostic(this);
-        }
+        public Diagnostic build() { return new Diagnostic(this); }
     }
 
     @Override

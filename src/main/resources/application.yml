@@ -90,6 +90,10 @@ quarkus:
 
 # Custom Application Configuration
 causa:
+  # Cluster identity — used in Diagnostics API responses
+  cluster:
+    name: ${CAUSA_CLUSTER_NAME:default}
+
   # LLM Configuration (LangChain4J)
   llm:
     provider: ${LLM_PROVIDER:vertex-ai-anthropic}
