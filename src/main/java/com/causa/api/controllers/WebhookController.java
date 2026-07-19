@@ -41,14 +41,17 @@ public class WebhookController {
     private final AlertService alertService;
     private final DiagnosticService diagnosticService;
     private final AlertMapper alertMapper;
+    private final AlertWebhookValidator validator;
 
     @Inject
     public WebhookController(AlertService alertService,
                               DiagnosticService diagnosticService,
-                              AlertMapper alertMapper) {
+                              AlertMapper alertMapper,
+                              AlertWebhookValidator validator) {
         this.alertService = alertService;
         this.diagnosticService = diagnosticService;
         this.alertMapper = alertMapper;
+        this.validator = validator;
     }
 
     @POST
@@ -62,7 +65,7 @@ public class WebhookController {
             .field("receiver", request != null ? request.getReceiver() : "null")
             .log();
 
-        List<String> validationErrors = AlertWebhookValidator.validate(request);
+        List<String> validationErrors = validator.validate(request);
         if (!validationErrors.isEmpty()) {
             log.warn(LogMessages.Alert.ALERT_VALIDATION_FAILED)
                 .field("errors", validationErrors)

@@ -86,6 +86,37 @@ public final class McpConstants {
         public static final String CRYOSTAT_GET_THREAD_ANALYSIS = "get_thread_analysis";
         public static final String CRYOSTAT_GET_EXCEPTION_ANALYSIS = "get_exception_analysis";
         public static final String CRYOSTAT_GET_CONTAINER_ANALYSIS = "get_container_analysis";
+
+        // Filesystem MCP tools
+        public static final String FILESYSTEM_LIST_DIRECTORY = "list_directory";
+        public static final String FILESYSTEM_LIST_DIRECTORY_WITH_SIZES = "list_directory_with_sizes";
+        public static final String FILESYSTEM_READ_FILE = "read_text_file";
+
+        // JMX MCP tools — Memory
+        public static final String JMX_GET_HEAP_STATUS = "getHeapStatus";
+        public static final String JMX_GET_MEMORY_POOLS_BREAKDOWN = "getMemoryPoolsBreakdown";
+
+        // JMX MCP tools — GC
+        public static final String JMX_GET_GC_ACTIVITY = "getGcActivity";
+        public static final String JMX_GET_GC_EFFICIENCY = "getGcEfficiency";
+
+        // JMX MCP tools — Threads
+        public static final String JMX_GET_THREAD_STATE = "getThreadState";
+
+        // JMX MCP tools — CPU & Resources
+        public static final String JMX_GET_CPU_USAGE = "getCpuUsage";
+
+        // JMX MCP tools — Application Behavior
+        public static final String JMX_GET_JVM_RUNTIME_INFO = "getJvmRuntimeInfo";
+
+        // JMX MCP tools — Thread Contention
+        public static final String JMX_GET_THREAD_CONTENTION_ANALYSIS = "getThreadContentionAnalysis";
+
+        // JMX MCP tools — Advanced RCA
+        public static final String JMX_GET_MEMORY_ALLOCATION_RATE = "getMemoryAllocationRate";
+        public static final String JMX_GET_GC_PRESSURE_ANALYSIS = "getGcPressureAnalysis";
+        public static final String JMX_GET_MEMORY_LEAK_INDICATORS = "getMemoryLeakIndicators";
+        public static final String JMX_GET_HEAP_FRAGMENTATION_ANALYSIS = "getHeapFragmentationAnalysis";
     }
 
     /**
@@ -105,6 +136,14 @@ public final class McpConstants {
 
         // Cryostat arguments
         public static final String POD_NAME = "pod_name";
+
+        // Filesystem arguments
+        public static final String PATH = "path";
+
+        // JMX arguments
+        public static final String LOOKBACK = "lookback";
+        public static final String STEP = "step";
+        public static final String WINDOW = "window";
     }
 
     /**
@@ -237,6 +276,9 @@ public final class McpConstants {
         public static final String HAS_K8S_CONTEXT = "hasK8sContext";
         public static final String HAS_KRUIZE_CONTEXT = "hasKruizeContext";
         public static final String HAS_CRYOSTAT_CONTEXT = "hasCryostatContext";
+        public static final String HAS_FILESYSTEM_CONTEXT = "hasFilesystemContext";
+        public static final String HAS_JMX_CONTEXT = "hasJmxContext";
+        public static final String PLATFORM = "platform";
         public static final String RETRY_ATTEMPT = "retryAttempt";
         public static final String DELAY_MS = "delayMs";
         public static final String ANALYSIS_TYPE = "analysisType";

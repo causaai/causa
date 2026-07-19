@@ -43,6 +43,19 @@ public final class ContextConstants {
     public static final String LABEL_POD = "Pod";
     public static final String LABEL_CONTAINER = "Container";
     public static final String LABEL_NAMESPACE = "Namespace";
+    public static final String LABEL_PLATFORM = "Platform";
+    public static final String LABEL_WORKLOAD = "Workload";
     public static final String LABEL_NOT_APPLICABLE = "N/A";
+
+    // VM platform section headers
+    public static final String SECTION_VM_LOG_DIR_LISTING      = "LOG DIRECTORY LISTING (Filesystem MCP)";
+    public static final String SECTION_VM_GC_LOG_CONTENT       = "VERBOSE GC LOG CONTENT (Filesystem MCP)";
+    public static final String SECTION_VM_HEAP_STATUS          = "HEAP STATUS (JMX MCP)";
+    public static final String SECTION_VM_GC_ACTIVITY          = "GC ACTIVITY (JMX MCP)";
+    public static final String SECTION_VM_THREAD_STATE         = "THREAD STATE (JMX MCP)";
+    public static final String SECTION_VM_GC_PRESSURE          = "GC PRESSURE ANALYSIS (JMX MCP)";
+    public static final String SECTION_VM_MEMORY_LEAK          = "MEMORY LEAK INDICATORS (JMX MCP)";
+    public static final String SECTION_VM_THREAD_CONTENTION    = "THREAD CONTENTION ANALYSIS (JMX MCP)";
+    public static final String SECTION_VM_JVM_RUNTIME_INFO     = "JVM RUNTIME INFO (JMX MCP)";
 }
 

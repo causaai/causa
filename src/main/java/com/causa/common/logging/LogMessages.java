@@ -212,5 +212,24 @@ public final class LogMessages {
 
         // Context collection completion
         public static final String MCP_CONTEXT_COLLECTION_COMPLETE = "MCP context collection completed";
+
+        // Platform routing
+        public static final String MCP_PLATFORM_DETECTED = "Deployment platform detected";
+        public static final String MCP_VM_CONTEXT_COLLECTION_START = "VM platform MCP context collection started";
+        public static final String MCP_VM_CONTEXT_COLLECTION_COMPLETE = "VM platform MCP context collection completed";
+
+        // Filesystem MCP
+        public static final String MCP_FILESYSTEM_DIR_LISTING  = "Filesystem directory listing retrieved";
+        public static final String MCP_FILESYSTEM_FILE_CONTENT = "Filesystem file content retrieved";
+        public static final String MCP_FILESYSTEM_SKIPPED      = "Skipping Filesystem MCP calls - not yet implemented";
+
+        // JMX MCP
+        public static final String MCP_JMX_HEAP_STATUS             = "JMX heap status retrieved";
+        public static final String MCP_JMX_GC_ACTIVITY             = "JMX GC activity retrieved";
+        public static final String MCP_JMX_THREAD_STATE            = "JMX thread state retrieved";
+        public static final String MCP_JMX_GC_PRESSURE             = "JMX GC pressure analysis retrieved";
+        public static final String MCP_JMX_MEMORY_LEAK_INDICATORS  = "JMX memory leak indicators retrieved";
+        public static final String MCP_JMX_THREAD_CONTENTION       = "JMX thread contention analysis retrieved";
+        public static final String MCP_JMX_JVM_RUNTIME_INFO        = "JMX JVM runtime info retrieved";
     }
 }

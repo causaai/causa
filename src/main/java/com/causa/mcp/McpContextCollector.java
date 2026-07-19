@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
  * MCP Context Collector
@@ -39,10 +40,13 @@ public class McpContextCollector {
     private final McpConfig mcpConfig;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
+    private final String platform;
 
     @Inject
-    public McpContextCollector(McpConfig mcpConfig) {
+    public McpContextCollector(McpConfig mcpConfig,
+            @ConfigProperty(name = "causa.cluster.target-cluster-type", defaultValue = "cluster") String platform) {
         this.mcpConfig = mcpConfig;
+        this.platform = platform != null ? platform.trim().toLowerCase() : "cluster";
         this.objectMapper = new ObjectMapper();
         this.httpClient = HttpClient.newBuilder()
             .version(HttpClient.Version.HTTP_1_1)
@@ -51,15 +55,38 @@ public class McpContextCollector {
     }
 
     /**
-     * Collects diagnostic context from all MCP servers (Kubernetes, Kruize, Cryostat).
+     * Collects diagnostic context from MCP servers appropriate for the configured platform.
      *
-     * <p>Aggregates pod status, events, logs, resource recommendations, and JFR analysis
-     * into a single {@link DiagnosticContext} object for LLM consumption.
+     * <ul>
+     *   <li>{@code cluster} — calls Kubernetes, Kruize, and Cryostat MCP servers.</li>
+     *   <li>{@code vm} — calls Filesystem MCP and JMX MCP servers.</li>
+     * </ul>
      *
      * @param alert the alert to collect context for
      * @return diagnostic context with all collected data (fields are nullable on failure)
      */
     public DiagnosticContext collectContext(Alert alert) {
+        log.info(LogMessages.Mcp.MCP_PLATFORM_DETECTED)
+            .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+            .field(McpConstants.LogFields.PLATFORM, platform)
+            .log();
+
+        if ("vm".equals(platform)) {
+            return collectContextFromVm(alert);
+        }
+
+        return collectContextFromCluster(alert);
+    }
+
+    // =========================================================================
+    // Cluster path
+    // =========================================================================
+
+    /**
+     * Collects diagnostic context when running on a Kubernetes cluster.
+     * Calls Kubernetes, Kruize, and Cryostat MCP servers.
+     */
+    private DiagnosticContext collectContextFromCluster(Alert alert) {
         log.info(LogMessages.Mcp.MCP_CONTEXT_COLLECTION_START)
             .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
             .field(McpConstants.LogFields.POD_NAME, alert.getWorkloadInfo().podName())
@@ -67,7 +94,9 @@ public class McpContextCollector {
             .log();
 
         DiagnosticContext.Builder contextBuilder = DiagnosticContext.builder()
+            .platform(DiagnosticContext.PLATFORM_CLUSTER)
             .podName(alert.getWorkloadInfo().podName())
+            .workloadName(alert.getWorkloadInfo().containerName())
             .containerName(alert.getWorkloadInfo().containerName())
             .namespace(alert.getWorkloadInfo().namespace());
 
@@ -116,6 +145,134 @@ public class McpContextCollector {
             .log();
 
         return context;
+    }
+
+    // =========================================================================
+    // VM path
+    // =========================================================================
+
+    /**
+     * Collects diagnostic context when running on a VM.
+     * Calls Filesystem MCP and JMX MCP servers.
+     */
+    private DiagnosticContext collectContextFromVm(Alert alert) {
+        log.info(LogMessages.Mcp.MCP_VM_CONTEXT_COLLECTION_START)
+            .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+            .log();
+
+        DiagnosticContext.Builder contextBuilder = DiagnosticContext.builder()
+            .platform(DiagnosticContext.PLATFORM_VM)
+            .workloadName(alert.getWorkloadName());
+
+        // Filesystem MCP context collection
+        collectFilesystemContext(contextBuilder, alert);
+
+        // JMX MCP context collection
+        collectJmxContext(contextBuilder, alert);
+
+        DiagnosticContext context = contextBuilder.build();
+
+        log.info(LogMessages.Mcp.MCP_VM_CONTEXT_COLLECTION_COMPLETE)
+            .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+            .field(McpConstants.LogFields.HAS_FILESYSTEM_CONTEXT, context.hasFilesystemContext())
+            .field(McpConstants.LogFields.HAS_JMX_CONTEXT, context.hasJmxContext())
+            .log();
+
+        return context;
+    }
+
+    /**
+     * Collects Filesystem MCP context for VM deployments.
+     * TODO: Implement real MCP tool calls once the Filesystem MCP server is available.
+     */
+    private void collectFilesystemContext(DiagnosticContext.Builder builder, Alert alert) {
+        log.info(LogMessages.Mcp.MCP_FILESYSTEM_SKIPPED)
+            .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+            .log();
+    }
+
+    /**
+     * Collects JMX MCP context for VM deployments.
+     *
+     * <p>Calls diagnostic tools from the JVM JMX MCP server:
+     * <ol>
+     *   <li>{@code getHeapStatus} — current heap memory status with utilization and trends</li>
+     *   <li>{@code getGcActivity} — GC collection counts and pause times</li>
+     *   <li>{@code getThreadState} — current thread counts and health metrics</li>
+     *   <li>{@code getGcPressureAnalysis} — GC pressure score and recommendations</li>
+     *   <li>{@code getMemoryLeakIndicators} — memory leak likelihood using trend analysis</li>
+     *   <li>{@code getThreadContentionAnalysis} — thread contention and deadlock detection</li>
+     *   <li>{@code getJvmRuntimeInfo} — JVM vendor, version, and heap configuration</li>
+     * </ol>
+     */
+    private void collectJmxContext(DiagnosticContext.Builder builder, Alert alert) {
+        String jmxEndpoint = mcpConfig.jmx().endpoint() + McpConstants.Paths.MCP_ENDPOINT;
+        int jmxTimeout = mcpConfig.jmx().timeoutMs();
+
+        // getHeapStatus
+        builder.heapStatus(callJmxTool(McpConstants.Tools.JMX_GET_HEAP_STATUS, jmxEndpoint, jmxTimeout, alert));
+        log.info(LogMessages.Mcp.MCP_JMX_HEAP_STATUS)
+            .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+            .log();
+
+        // getGcActivity
+        builder.gcActivity(callJmxTool(McpConstants.Tools.JMX_GET_GC_ACTIVITY, jmxEndpoint, jmxTimeout, alert));
+        log.info(LogMessages.Mcp.MCP_JMX_GC_ACTIVITY)
+            .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+            .log();
+
+        // getThreadState
+        builder.threadState(callJmxTool(McpConstants.Tools.JMX_GET_THREAD_STATE, jmxEndpoint, jmxTimeout, alert));
+        log.info(LogMessages.Mcp.MCP_JMX_THREAD_STATE)
+            .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+            .log();
+
+        // getGcPressureAnalysis
+        builder.gcPressureAnalysis(callJmxTool(McpConstants.Tools.JMX_GET_GC_PRESSURE_ANALYSIS, jmxEndpoint, jmxTimeout, alert));
+        log.info(LogMessages.Mcp.MCP_JMX_GC_PRESSURE)
+            .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+            .log();
+
+        // getMemoryLeakIndicators
+        builder.memoryLeakIndicators(callJmxTool(McpConstants.Tools.JMX_GET_MEMORY_LEAK_INDICATORS, jmxEndpoint, jmxTimeout, alert));
+        log.info(LogMessages.Mcp.MCP_JMX_MEMORY_LEAK_INDICATORS)
+            .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+            .log();
+
+        // getThreadContentionAnalysis — reuses JMX MCP server tool
+        builder.threadContentionAnalysis(callJmxTool(McpConstants.Tools.JMX_GET_THREAD_CONTENTION_ANALYSIS, jmxEndpoint, jmxTimeout, alert));
+        log.info(LogMessages.Mcp.MCP_JMX_THREAD_CONTENTION)
+            .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+            .log();
+
+        // getJvmRuntimeInfo
+        builder.jvmRuntimeInfo(callJmxTool(McpConstants.Tools.JMX_GET_JVM_RUNTIME_INFO, jmxEndpoint, jmxTimeout, alert));
+        log.info(LogMessages.Mcp.MCP_JMX_JVM_RUNTIME_INFO)
+            .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+            .log();
+    }
+
+    /**
+     * Calls a single JMX MCP tool with no arguments via JSON-RPC 2.0.
+     *
+     * @return the tool response text, or null on failure
+     */
+    private String callJmxTool(String toolName, String endpoint, int timeoutMs, Alert alert) {
+        try {
+            String sessionId = initializeMcpSession(endpoint, timeoutMs);
+            ObjectNode arguments = objectMapper.createObjectNode();
+
+            JsonNode result = callMcpTool(endpoint, sessionId, toolName, arguments, timeoutMs);
+            return extractTextFromContent(result);
+
+        } catch (Exception e) {
+            log.warn(LogMessages.Mcp.MCP_CALL_FAILED)
+                .field(McpConstants.LogFields.TOOL, toolName)
+                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+                .field(McpConstants.LogFields.ERROR, e.getMessage())
+                .log();
+            return null;
+        }
     }
 
 

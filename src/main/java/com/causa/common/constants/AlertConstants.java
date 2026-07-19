@@ -34,6 +34,7 @@ public final class AlertConstants {
         public static final String CLUSTER_NAME  = "cluster_name";
         /** Annotation key for workload type (e.g. Deployment, StatefulSet). */
         public static final String WORKLOAD_TYPE = "workload_type";
+        public static final String WORKLOAD_NAME = "workload_name";
         /** Annotation key for alert source. Defaults to "prometheus" when absent. */
         public static final String ALERT_SOURCE  = "alert_source";
     }

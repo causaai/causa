@@ -93,6 +93,7 @@ causa:
   # Cluster identity — used in Diagnostics API responses
   cluster:
     name: ${CAUSA_CLUSTER_NAME:default}
+    target-cluster-type: ${CAUSA_CLUSTER_TARGET_TYPE:vm}
 
   # LLM Configuration (LangChain4J)
   llm:
@@ -135,6 +136,14 @@ causa:
       timeout-ms: ${CAUSA_MCP_CRYOSTAT_TIMEOUT:15000}
       retry-delay-ms: ${CAUSA_MCP_CRYOSTAT_RETRY_DELAY:5000}
       max-retries: ${CAUSA_MCP_CRYOSTAT_MAX_RETRIES:3}
+    filesystem:
+      endpoint: ${CAUSA_MCP_FILESYSTEM_ENDPOINT:http://filesystem-mcp-server:8080}
+      health-path: ${CAUSA_MCP_FILESYSTEM_HEALTH_PATH:/healthz}
+      timeout-ms: ${CAUSA_MCP_FILESYSTEM_TIMEOUT:10000}
+    jmx:
+      endpoint: ${CAUSA_MCP_JMX_ENDPOINT:http://jmx-mcp-server:8080}
+      health-path: ${CAUSA_MCP_JMX_HEALTH_PATH:/healthz}
+      timeout-ms: ${CAUSA_MCP_JMX_TIMEOUT:10000}
 
 #   # Feature Flags (Runtime configurable)
 #   features:

@@ -157,7 +157,11 @@ public class AlertServiceImpl implements AlertService {
     }
 
     private boolean passesNamespaceFilter(Alert alert) {
-        return !ignoredNamespaces.contains(alert.getWorkloadInfo().namespace());
+        String namespace = alert.getWorkloadInfo().namespace();
+        if (namespace == null) {
+            return true;
+        }
+        return !ignoredNamespaces.contains(namespace);
     }
 
     @Scheduled(every = "{causa.alerts.cooldown-cleanup-interval}")

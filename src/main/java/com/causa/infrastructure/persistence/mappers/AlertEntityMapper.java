@@ -70,8 +70,8 @@ public final class AlertEntityMapper {
         workloadNode.put("workload_type",  wi.workloadType());
         entity.setWorkloadInfo(workloadNode);
 
-        // workload_name — denormalised container name
-        entity.setWorkloadName(wi.containerName() != null ? wi.containerName() : "");
+        // workload_name — denormalised for index lookups
+        entity.setWorkloadName(alert.getWorkloadName() != null ? alert.getWorkloadName() : "");
 
         // alert_metadata JSONB
         AlertMetadata am = alert.getAlertMetadata();

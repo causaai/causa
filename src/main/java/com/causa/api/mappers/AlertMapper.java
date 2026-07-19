@@ -82,6 +82,7 @@ public class AlertMapper {
         String namespace     = getAnnotationOrLabel(annotations, labels, AlertConstants.Labels.NAMESPACE,    AlertConstants.Labels.NAMESPACE);
         String clusterName   = getAnnotationOrLabel(annotations, labels, AlertConstants.Labels.CLUSTER_NAME, AlertConstants.Labels.CLUSTER_NAME);
         String workloadType  = getAnnotationOrLabel(annotations, labels, AlertConstants.Labels.WORKLOAD_TYPE, AlertConstants.Labels.WORKLOAD_TYPE);
+        String workloadName  = getAnnotationOrLabel(annotations, labels, AlertConstants.Labels.WORKLOAD_NAME, AlertConstants.Labels.WORKLOAD_NAME);
 
         // alert_source — from annotations, default to "prometheus"
         String alertSource = annotations.getOrDefault(
@@ -99,7 +100,7 @@ public class AlertMapper {
             .severity(AlertSeverity.fromString(severityStr))
             .status(AlertStatus.PROCESSING)   // initial Causa status; updated by service layer
             .workloadInfo(WorkloadInfo.of(podName, containerName, namespace, clusterName, workloadType))
-            .workloadName(containerName != null ? containerName : "")
+            .workloadName(workloadName != null ? workloadName : (containerName != null ? containerName : ""))
             .alertMetadata(AlertMetadata.of(labels, annotations, alertSource))
             .build();
     }

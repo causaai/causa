@@ -40,6 +40,22 @@ public interface McpConfig {
     CryostatConfig cryostat();
 
     /**
+     * Filesystem MCP server configuration (VM platform).
+     *
+     * @return the Filesystem MCP config
+     */
+    @WithName("filesystem")
+    FilesystemConfig filesystem();
+
+    /**
+     * JMX MCP server configuration (VM platform).
+     *
+     * @return the JMX MCP config
+     */
+    @WithName("jmx")
+    JmxConfig jmx();
+
+    /**
      * Kubernetes MCP Configuration
      */
     interface KubernetesConfig {
@@ -157,5 +173,37 @@ public interface McpConfig {
         @WithName("max-retries")
         @WithDefault("3")
         int maxRetries();
+    }
+
+    /**
+     * Filesystem MCP Configuration (VM platform)
+     */
+    interface FilesystemConfig {
+        @WithName("endpoint")
+        String endpoint();
+
+        @WithName("health-path")
+        @WithDefault("/healthz")
+        String healthPath();
+
+        @WithName("timeout-ms")
+        @WithDefault("10000")
+        int timeoutMs();
+    }
+
+    /**
+     * JMX MCP Configuration (VM platform)
+     */
+    interface JmxConfig {
+        @WithName("endpoint")
+        String endpoint();
+
+        @WithName("health-path")
+        @WithDefault("/healthz")
+        String healthPath();
+
+        @WithName("timeout-ms")
+        @WithDefault("10000")
+        int timeoutMs();
     }
 }

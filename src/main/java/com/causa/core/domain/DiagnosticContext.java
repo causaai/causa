@@ -17,7 +17,12 @@ import java.util.Objects;
  */
 public final class DiagnosticContext {
 
+    public static final String PLATFORM_CLUSTER = "cluster";
+    public static final String PLATFORM_VM = "vm";
+
     // Identity (from Alert)
+    private final String platform;
+    private final String workloadName;
     private final String podName;
     private final String containerName;
     private final String namespace;
@@ -38,7 +43,22 @@ public final class DiagnosticContext {
     private final String exceptionAnalysis;
     private final String containerAnalysis;
 
+    // VM — Filesystem MCP
+    private final String logDirectoryListing;
+    private final String gcLogContent;
+
+    // VM — JMX MCP
+    private final String heapStatus;
+    private final String gcActivity;
+    private final String threadState;
+    private final String gcPressureAnalysis;
+    private final String memoryLeakIndicators;
+    private final String threadContentionAnalysis;
+    private final String jvmRuntimeInfo;
+
     private DiagnosticContext(Builder builder) {
+        this.platform = builder.platform;
+        this.workloadName = builder.workloadName;
         this.podName = builder.podName;
         this.containerName = builder.containerName;
         this.namespace = builder.namespace;
@@ -52,9 +72,26 @@ public final class DiagnosticContext {
         this.threadAnalysis = builder.threadAnalysis;
         this.exceptionAnalysis = builder.exceptionAnalysis;
         this.containerAnalysis = builder.containerAnalysis;
+        this.logDirectoryListing = builder.logDirectoryListing;
+        this.gcLogContent = builder.gcLogContent;
+        this.heapStatus = builder.heapStatus;
+        this.gcActivity = builder.gcActivity;
+        this.threadState = builder.threadState;
+        this.gcPressureAnalysis = builder.gcPressureAnalysis;
+        this.memoryLeakIndicators = builder.memoryLeakIndicators;
+        this.threadContentionAnalysis = builder.threadContentionAnalysis;
+        this.jvmRuntimeInfo = builder.jvmRuntimeInfo;
     }
 
     // Getters
+
+    public String getPlatform() {
+        return platform;
+    }
+
+    public String getWorkloadName() {
+        return workloadName;
+    }
 
     public String getPodName() {
         return podName;
@@ -108,6 +145,42 @@ public final class DiagnosticContext {
         return containerAnalysis;
     }
 
+    public String getLogDirectoryListing() {
+        return logDirectoryListing;
+    }
+
+    public String getGcLogContent() {
+        return gcLogContent;
+    }
+
+    public String getHeapStatus() {
+        return heapStatus;
+    }
+
+    public String getGcActivity() {
+        return gcActivity;
+    }
+
+    public String getThreadState() {
+        return threadState;
+    }
+
+    public String getGcPressureAnalysis() {
+        return gcPressureAnalysis;
+    }
+
+    public String getMemoryLeakIndicators() {
+        return memoryLeakIndicators;
+    }
+
+    public String getThreadContentionAnalysis() {
+        return threadContentionAnalysis;
+    }
+
+    public String getJvmRuntimeInfo() {
+        return jvmRuntimeInfo;
+    }
+
     /**
      * Checks if any Kubernetes context was collected.
      *
@@ -140,12 +213,37 @@ public final class DiagnosticContext {
     }
 
     /**
+     * Checks if any Filesystem MCP context was collected.
+     *
+     * @return true if directory listing or GC log content is present
+     */
+    public boolean hasFilesystemContext() {
+        return isNotBlank(logDirectoryListing) || isNotBlank(gcLogContent);
+    }
+
+    /**
+     * Checks if any JMX MCP context was collected.
+     *
+     * @return true if any JMX metric is present
+     */
+    public boolean hasJmxContext() {
+        return isNotBlank(heapStatus)
+            || isNotBlank(gcActivity)
+            || isNotBlank(threadState)
+            || isNotBlank(gcPressureAnalysis)
+            || isNotBlank(memoryLeakIndicators)
+            || isNotBlank(threadContentionAnalysis)
+            || isNotBlank(jvmRuntimeInfo);
+    }
+
+    /**
      * Checks if any diagnostic context was collected.
      *
      * @return true if any context field is non-null and non-blank
      */
     public boolean hasAnyContext() {
-        return hasKubernetesContext() || hasKruizeContext() || hasCryostatContext();
+        return hasKubernetesContext() || hasKruizeContext() || hasCryostatContext()
+            || hasFilesystemContext() || hasJmxContext();
     }
 
     /**
@@ -161,15 +259,31 @@ public final class DiagnosticContext {
     public String toString() {
         StringBuilder sb = new StringBuilder();
 
-        // Header and pod details
+        // Header
         sb.append(ContextConstants.HEADER).append(ContextConstants.NEWLINE);
-        sb.append(ContextConstants.LABEL_POD).append(ContextConstants.FIELD_SEPARATOR)
-            .append(podName != null ? podName : ContextConstants.LABEL_NOT_APPLICABLE).append(ContextConstants.NEWLINE);
-        sb.append(ContextConstants.LABEL_CONTAINER).append(ContextConstants.FIELD_SEPARATOR)
-            .append(containerName != null ? containerName : ContextConstants.LABEL_NOT_APPLICABLE).append(ContextConstants.NEWLINE);
-        sb.append(ContextConstants.LABEL_NAMESPACE).append(ContextConstants.FIELD_SEPARATOR)
-            .append(namespace != null ? namespace : ContextConstants.LABEL_NOT_APPLICABLE).append(ContextConstants.NEWLINE).append(ContextConstants.NEWLINE);
+        sb.append(ContextConstants.LABEL_PLATFORM).append(ContextConstants.FIELD_SEPARATOR)
+            .append(platform != null ? platform : ContextConstants.LABEL_NOT_APPLICABLE).append(ContextConstants.NEWLINE);
+        sb.append(ContextConstants.LABEL_WORKLOAD).append(ContextConstants.FIELD_SEPARATOR)
+            .append(workloadName != null ? workloadName : ContextConstants.LABEL_NOT_APPLICABLE).append(ContextConstants.NEWLINE);
 
+        if (PLATFORM_VM.equals(platform)) {
+            sb.append(ContextConstants.NEWLINE);
+            appendVmSections(sb);
+        } else {
+            // Pod details (cluster only)
+            sb.append(ContextConstants.LABEL_POD).append(ContextConstants.FIELD_SEPARATOR)
+                .append(podName != null ? podName : ContextConstants.LABEL_NOT_APPLICABLE).append(ContextConstants.NEWLINE);
+            sb.append(ContextConstants.LABEL_CONTAINER).append(ContextConstants.FIELD_SEPARATOR)
+                .append(containerName != null ? containerName : ContextConstants.LABEL_NOT_APPLICABLE).append(ContextConstants.NEWLINE);
+            sb.append(ContextConstants.LABEL_NAMESPACE).append(ContextConstants.FIELD_SEPARATOR)
+                .append(namespace != null ? namespace : ContextConstants.LABEL_NOT_APPLICABLE).append(ContextConstants.NEWLINE).append(ContextConstants.NEWLINE);
+            appendClusterSections(sb);
+        }
+
+        return sb.toString();
+    }
+
+    private void appendClusterSections(StringBuilder sb) {
         // Kubernetes context
         appendSection(sb, ContextConstants.SECTION_POD_STATUS, podStatus);
         appendSection(sb, ContextConstants.SECTION_POD_EVENTS, podEvents);
@@ -185,8 +299,21 @@ public final class DiagnosticContext {
         appendSection(sb, ContextConstants.SECTION_THREAD_ANALYSIS, threadAnalysis);
         appendSection(sb, ContextConstants.SECTION_EXCEPTION_ANALYSIS, exceptionAnalysis);
         appendSection(sb, ContextConstants.SECTION_CONTAINER_ANALYSIS, containerAnalysis);
+    }
 
-        return sb.toString();
+    private void appendVmSections(StringBuilder sb) {
+        // Filesystem MCP context
+        appendSection(sb, ContextConstants.SECTION_VM_LOG_DIR_LISTING,   logDirectoryListing);
+        appendSection(sb, ContextConstants.SECTION_VM_GC_LOG_CONTENT,    gcLogContent);
+
+        // JMX MCP context
+        appendSection(sb, ContextConstants.SECTION_VM_HEAP_STATUS,       heapStatus);
+        appendSection(sb, ContextConstants.SECTION_VM_GC_ACTIVITY,       gcActivity);
+        appendSection(sb, ContextConstants.SECTION_VM_THREAD_STATE,      threadState);
+        appendSection(sb, ContextConstants.SECTION_VM_GC_PRESSURE,       gcPressureAnalysis);
+        appendSection(sb, ContextConstants.SECTION_VM_MEMORY_LEAK,       memoryLeakIndicators);
+        appendSection(sb, ContextConstants.SECTION_VM_THREAD_CONTENTION, threadContentionAnalysis);
+        appendSection(sb, ContextConstants.SECTION_VM_JVM_RUNTIME_INFO,  jvmRuntimeInfo);
     }
 
     /**
@@ -228,6 +355,8 @@ public final class DiagnosticContext {
      * <p>All context fields are nullable since null represents failed/skipped collection.
      */
     public static final class Builder {
+        private String platform;
+        private String workloadName;
         private String podName;
         private String containerName;
         private String namespace;
@@ -241,8 +370,27 @@ public final class DiagnosticContext {
         private String threadAnalysis;
         private String exceptionAnalysis;
         private String containerAnalysis;
+        private String logDirectoryListing;
+        private String gcLogContent;
+        private String heapStatus;
+        private String gcActivity;
+        private String threadState;
+        private String gcPressureAnalysis;
+        private String memoryLeakIndicators;
+        private String threadContentionAnalysis;
+        private String jvmRuntimeInfo;
 
         private Builder() {}
+
+        public Builder platform(String platform) {
+            this.platform = platform;
+            return this;
+        }
+
+        public Builder workloadName(String workloadName) {
+            this.workloadName = workloadName;
+            return this;
+        }
 
         public Builder podName(String podName) {
             this.podName = podName;
@@ -306,6 +454,55 @@ public final class DiagnosticContext {
 
         public Builder containerAnalysis(String containerAnalysis) {
             this.containerAnalysis = containerAnalysis;
+            return this;
+        }
+
+        // VM — Filesystem MCP
+
+        public Builder logDirectoryListing(String logDirectoryListing) {
+            this.logDirectoryListing = logDirectoryListing;
+            return this;
+        }
+
+        public Builder gcLogContent(String gcLogContent) {
+            this.gcLogContent = gcLogContent;
+            return this;
+        }
+
+        // VM — JMX MCP
+
+        public Builder heapStatus(String heapStatus) {
+            this.heapStatus = heapStatus;
+            return this;
+        }
+
+        public Builder gcActivity(String gcActivity) {
+            this.gcActivity = gcActivity;
+            return this;
+        }
+
+        public Builder threadState(String threadState) {
+            this.threadState = threadState;
+            return this;
+        }
+
+        public Builder gcPressureAnalysis(String gcPressureAnalysis) {
+            this.gcPressureAnalysis = gcPressureAnalysis;
+            return this;
+        }
+
+        public Builder memoryLeakIndicators(String memoryLeakIndicators) {
+            this.memoryLeakIndicators = memoryLeakIndicators;
+            return this;
+        }
+
+        public Builder threadContentionAnalysis(String threadContentionAnalysis) {
+            this.threadContentionAnalysis = threadContentionAnalysis;
+            return this;
+        }
+
+        public Builder jvmRuntimeInfo(String jvmRuntimeInfo) {
+            this.jvmRuntimeInfo = jvmRuntimeInfo;
             return this;
         }
 
