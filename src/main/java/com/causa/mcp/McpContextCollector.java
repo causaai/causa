@@ -97,6 +97,7 @@ public class McpContextCollector {
             .platform(DiagnosticContext.PLATFORM_CLUSTER)
             .podName(alert.getWorkloadInfo().podName())
             .workloadName(alert.getWorkloadInfo().containerName())
+            .podName(alert.getWorkloadInfo().podName())
             .containerName(alert.getWorkloadInfo().containerName())
             .namespace(alert.getWorkloadInfo().namespace());
 
