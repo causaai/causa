@@ -41,11 +41,14 @@ public class McpContextCollector {
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
     private final String platform;
+    private final LibertyLogsContextCollector libertyLogsContextCollector;
 
     @Inject
     public McpContextCollector(McpConfig mcpConfig,
+            LibertyLogsContextCollector libertyLogsContextCollector,
             @ConfigProperty(name = "causa.cluster.target-cluster-type", defaultValue = "cluster") String platform) {
         this.mcpConfig = mcpConfig;
+        this.libertyLogsContextCollector = libertyLogsContextCollector;
         this.platform = platform != null ? platform.trim().toLowerCase() : "cluster";
         this.objectMapper = new ObjectMapper();
         this.httpClient = HttpClient.newBuilder()
@@ -183,13 +186,12 @@ public class McpContextCollector {
     }
 
     /**
-     * Collects Filesystem MCP context for VM deployments.
-     * TODO: Implement real MCP tool calls once the Filesystem MCP server is available.
+     * Collects Filesystem MCP context (Liberty logs) for VM deployments.
      */
     private void collectFilesystemContext(DiagnosticContext.Builder builder, Alert alert) {
-        log.info(LogMessages.Mcp.MCP_FILESYSTEM_SKIPPED)
-            .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
-            .log();
+        String libertyLogs = libertyLogsContextCollector.collectLibertyLogs(
+            alert.getAlertId(), alert.getAlertTimestamp());
+        builder.libertyLogs(libertyLogs);
     }
 
     /**
