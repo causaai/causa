@@ -319,7 +319,7 @@ public final class McpConstants {
         public static final String FFDC_DIR = "ffdc";
         public static final String MESSAGES_LOG = "messages.log";
         public static final String MESSAGES_ARCHIVE_PREFIX = "messages_";
-        public static final long MAX_MESSAGES_TRACE_BYTES = 64L * 1024L * 1024L;
+        public static final long MAX_MESSAGES_TRACE_BYTES = 8L * 1024L * 1024L;
         public static final long MAX_FFDC_BYTES = 2L * 1024L * 1024L;
     }
 }
