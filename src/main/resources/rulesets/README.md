@@ -4,10 +4,17 @@ This directory contains YAML-based rule set definitions for hypothesis validatio
 
 ## Why YAML Rule Sets?
 
-- **Zero-code extensibility**: Add new rule sets without writing Java code
-- **Hot-reload**: Changes take effect automatically (every 30s by default)
-- **Easy to maintain**: Business logic visible in config files, not buried in code
-- **Version control friendly**: Easy to review, diff, and rollback rule changes
+- **Zero-code extensibility**: Add new hypotheses and rule sets without writing Java code.
+- **Configuration-driven**: Validation logic is separated from application code, making the engine generic and reusable.
+- **Hot reload**: Rule changes are picked up automatically (every 30s by default) without restarting the application.
+- **Easy to maintain**: Business rules are visible in YAML instead of being scattered across Java classes.
+- **Version control friendly**: Rules can be reviewed, diffed, audited, and rolled back like any other configuration.
+- **Faster iteration**: Domain experts can tune thresholds, weights, and matching conditions without code changes.
+- **Reusable matching engine**: The same engine supports Kubernetes events, metrics, logs, JVM analysis, Cryostat, Kruize recommendations, and future signal types.
+- **Scalable**: Adding new RCA hypotheses (OOM, CPU throttling, Disk Pressure, Network issues, etc.) only requires adding a new YAML file.
+- **Environment-specific customization**: Different rule sets can be maintained for development, production, or customer-specific deployments.
+- **Reduced deployment risk**: Most validation updates become configuration changes instead of requiring new application builds and deployments.
+- **Future-proof**: Enables continuous refinement of validation logic as new failure patterns and evidence sources are introduced.
 
 ## Creating a New Rule Set
 
