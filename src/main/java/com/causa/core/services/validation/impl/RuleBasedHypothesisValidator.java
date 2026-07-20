@@ -1,6 +1,7 @@
 package com.causa.core.services.validation.impl;
 
 import com.causa.common.logging.CausaLogger;
+import com.causa.common.logging.LogMessages;
 import com.causa.core.domain.RootCauseAnalysis;
 import com.causa.core.services.rules.*;
 import com.causa.core.services.rules.impl.DiagnosticContextSignalExtractor;
@@ -66,33 +67,33 @@ public class RuleBasedHypothesisValidator implements HypothesisValidator {
         RootCauseAnalysis rca,
         String diagnosticContext
     ) {
-        log.info("Validating RCA hypothesis with rule-based approach")
-            .field("issueTitle", rca.issueTitle())
-            .field("anomalyType", rca.anomalyType())
+        log.info(LogMessages.Validation.HYPOTHESIS_VALIDATION_STARTED)
+            .field(LogMessages.Fields.ISSUE_TITLE, rca.issueTitle())
+            .field(LogMessages.Fields.ANOMALY_TYPE, rca.anomalyType())
             .log();
 
         try {
             // Step 1: Extract signals from diagnostic context
             List<Signal> signals = signalExtractor.extractSignals(diagnosticContext);
 
-            log.debug("Signals extracted from diagnostic context")
-                .field("signalCount", signals.size())
+            log.debug(LogMessages.Validation.SIGNALS_EXTRACTED)
+                .field(LogMessages.Fields.SIGNAL_COUNT, signals.size())
                 .log();
 
             // Step 2: Determine hypothesis from RCA
             String hypothesis = determineHypothesis(rca);
 
-            log.debug("Hypothesis identified")
-                .field("hypothesis", hypothesis)
+            log.debug(LogMessages.Validation.HYPOTHESIS_IDENTIFIED)
+                .field(LogMessages.Fields.HYPOTHESIS, hypothesis)
                 .log();
 
             // Step 3: Load appropriate rule set
             RuleSet ruleSet = loadRuleSet(hypothesis);
 
             if (ruleSet == null) {
-                log.warn("No rule set available for hypothesis")
-                    .field("hypothesis", hypothesis)
-                    .field("anomalyType", rca.anomalyType())
+                log.warn(LogMessages.Validation.NO_RULESET_AVAILABLE)
+                    .field(LogMessages.Fields.HYPOTHESIS, hypothesis)
+                    .field(LogMessages.Fields.ANOMALY_TYPE, rca.anomalyType())
                     .log();
 
                 // Return UNKNOWN verdict
@@ -110,22 +111,22 @@ public class RuleBasedHypothesisValidator implements HypothesisValidator {
             // Step 4: Evaluate hypothesis using rule engine
             HypothesisValidationResult result = ruleEngine.validate(hypothesis, ruleSet, signals);
 
-            log.info("Rule-based hypothesis validation completed")
-                .field("hypothesis", hypothesis)
-                .field("status", result.getStatus())
-                .field("confidence", result.getConfidence())
-                .field("score", result.getTotalScore())
-                .field("requiredPassed", result.getRequiredPassed())
-                .field("requiredTotal", result.getRequiredTotal())
-                .field("supportingMatched", result.getSupportingMatched())
-                .field("exclusionMatched", result.getExclusionMatched())
+            log.info(LogMessages.Validation.HYPOTHESIS_VALIDATION_COMPLETED)
+                .field(LogMessages.Fields.HYPOTHESIS, hypothesis)
+                .field(LogMessages.Fields.STATUS, result.getStatus())
+                .field(LogMessages.Fields.CONFIDENCE, result.getConfidence())
+                .field(LogMessages.Fields.SCORE, result.getTotalScore())
+                .field(LogMessages.Fields.REQUIRED_PASSED, result.getRequiredPassed())
+                .field(LogMessages.Fields.REQUIRED_TOTAL, result.getRequiredTotal())
+                .field(LogMessages.Fields.SUPPORTING_MATCHED, result.getSupportingMatched())
+                .field(LogMessages.Fields.EXCLUSION_MATCHED, result.getExclusionMatched())
                 .log();
 
             return result;
 
         } catch (Exception e) {
-            log.error("Rule-based hypothesis validation failed")
-                .field("issueTitle", rca.issueTitle())
+            log.error(LogMessages.Validation.HYPOTHESIS_VALIDATION_FAILED)
+                .field(LogMessages.Fields.ISSUE_TITLE, rca.issueTitle())
                 .exception(e)
                 .log();
 
@@ -221,16 +222,16 @@ public class RuleBasedHypothesisValidator implements HypothesisValidator {
         Optional<RuleSet> yamlRuleSet = yamlRegistry.getRuleSet(hypothesis.toUpperCase());
 
         if (yamlRuleSet.isPresent()) {
-            log.debug("Loaded YAML-based rule set")
-                .field("hypothesis", hypothesis)
-                .field("source", "YAML configuration")
+            log.debug(LogMessages.Validation.YAML_RULESET_LOADED)
+                .field(LogMessages.Fields.HYPOTHESIS, hypothesis)
+                .field(LogMessages.Fields.SOURCE, "YAML configuration")
                 .log();
             return yamlRuleSet.get();
         }
 
-        log.debug("No rule set found for hypothesis - check YAML configuration")
-            .field("hypothesis", hypothesis)
-            .field("expectedLocation", "src/main/resources/rulesets/")
+        log.debug(LogMessages.Validation.NO_RULESET_FOUND)
+            .field(LogMessages.Fields.HYPOTHESIS, hypothesis)
+            .field(LogMessages.Fields.EXPECTED_LOCATION, "src/main/resources/rulesets/")
             .log();
 
         return null;

@@ -5,6 +5,7 @@ import com.causa.api.dto.response.ErrorResponse;
 import com.causa.api.dto.response.MockValidationData;
 import com.causa.common.constants.ApiConstants;
 import com.causa.common.logging.CausaLogger;
+import com.causa.common.logging.LogMessages;
 import com.causa.core.domain.Diagnostic;
 import com.causa.core.services.DiagnosticService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -63,13 +64,13 @@ public class ValidationController {
     @GET
     @Path(ApiConstants.Paths.Validations.BASE)
     public Response getValidationDetails(@QueryParam("diagnosticId") String diagnosticId) {
-        log.info("Validation detail request received")
-            .field("diagnosticId", diagnosticId)
+        log.info(LogMessages.Validation.VALIDATION_DETAIL_REQUESTED)
+            .field(LogMessages.Fields.DIAGNOSTIC_ID, diagnosticId)
             .log();
 
         // Validate input
         if (diagnosticId == null || diagnosticId.isBlank()) {
-            log.warn("Validation request missing diagnosticId parameter").log();
+            log.warn(LogMessages.Validation.VALIDATION_REQUEST_MISSING_ID).log();
             return Response.status(Response.Status.BAD_REQUEST)
                 .entity(ErrorResponse.of(400, "Bad Request", "diagnosticId query parameter is required"))
                 .build();
@@ -78,8 +79,8 @@ public class ValidationController {
         // Get diagnostic
         Optional<Diagnostic> diagnosticOpt = diagnosticService.getDiagnosticById(diagnosticId);
         if (diagnosticOpt.isEmpty()) {
-            log.warn("Diagnostic not found")
-                .field("diagnosticId", diagnosticId)
+            log.warn(LogMessages.Validation.DIAGNOSTIC_NOT_FOUND)
+                .field(LogMessages.Fields.DIAGNOSTIC_ID, diagnosticId)
                 .log();
             return Response.status(Response.Status.NOT_FOUND)
                 .entity(ErrorResponse.of(404, "Not Found", "Diagnostic not found: " + diagnosticId))
@@ -90,8 +91,8 @@ public class ValidationController {
 
         // Check if validation data is available
         if (diagnostic.getValidationData() == null || diagnostic.getValidationData().isBlank()) {
-            log.warn("Validation data not available for diagnostic")
-                .field("diagnosticId", diagnosticId)
+            log.warn(LogMessages.Validation.VALIDATION_DATA_UNAVAILABLE)
+                .field(LogMessages.Fields.DIAGNOSTIC_ID, diagnosticId)
                 .log();
             return Response.status(Response.Status.BAD_REQUEST)
                 .entity(ErrorResponse.of(400, "Bad Request", "Validation data not available for diagnostic: " + diagnosticId))
@@ -106,8 +107,8 @@ public class ValidationController {
                 objectMapper
             );
         } catch (Exception e) {
-            log.error("Failed to parse validation data")
-                .field("diagnosticId", diagnosticId)
+            log.error(LogMessages.Validation.VALIDATION_DATA_PARSE_FAILED)
+                .field(LogMessages.Fields.DIAGNOSTIC_ID, diagnosticId)
                 .exception(e)
                 .log();
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
@@ -115,9 +116,9 @@ public class ValidationController {
                 .build();
         }
 
-        log.info("Validation detail retrieved")
-            .field("diagnosticId", diagnosticId)
-            .field("finalStatus", response.finalVerdict() != null ? response.finalVerdict().status() : "null")
+        log.info(LogMessages.Validation.VALIDATION_DETAIL_RETRIEVED)
+            .field(LogMessages.Fields.DIAGNOSTIC_ID, diagnosticId)
+            .field(LogMessages.Fields.FINAL_STATUS, response.finalVerdict() != null ? response.finalVerdict().status() : "null")
             .log();
 
         return Response.ok(response).build();
