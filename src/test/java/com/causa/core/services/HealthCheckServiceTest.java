@@ -81,6 +81,9 @@ class HealthCheckServiceTest {
     private static final String MCP_ENDPOINT = "http://192.0.2.1";
     private static final String MCP_HEALTH_PATH = "/health";
     private static final int MCP_TIMEOUT = 1; // 1 ms — fail immediately, don't slow down tests
+    private static final String MCP_FILESYSTEM_ENDPOINT = "http://192.0.2.1";
+    private static final String MCP_FILESYSTEM_HEALTH_PATH = "/health";
+    private static final int MCP_FILESYSTEM_TIMEOUT = 1;
 
     @BeforeEach
     void setUp() {
@@ -88,6 +91,7 @@ class HealthCheckServiceTest {
                 databaseConnectionService,
                 dataSource,
                 APP_VERSION,
+                "cluster",
                 MCP_K8S_ENDPOINT,
                 MCP_K8S_HEALTH_PATH,
                 MCP_K8S_TIMEOUT,
@@ -97,6 +101,9 @@ class HealthCheckServiceTest {
                 MCP_CRYOSTAT_HEALTH_ENDPOINT,
                 MCP_CRYOSTAT_HEALTH_PATH,
                 MCP_CRYOSTAT_TIMEOUT,
+                MCP_FILESYSTEM_ENDPOINT,
+                MCP_FILESYSTEM_HEALTH_PATH,
+                MCP_FILESYSTEM_TIMEOUT,
                 llmPromptSender,
                 llmConfig
         );
