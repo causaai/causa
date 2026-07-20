@@ -2,7 +2,6 @@ package com.causa.api.controllers;
 
 import com.causa.api.dto.response.SimplifiedValidationResponse;
 import com.causa.api.dto.response.ErrorResponse;
-import com.causa.api.dto.response.MockValidationData;
 import com.causa.common.constants.ApiConstants;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
@@ -122,39 +121,5 @@ public class ValidationController {
             .log();
 
         return Response.ok(response).build();
-    }
-
-    /**
-     * GET /api/v1/validations/mock
-     *
-     * <p>Returns mock validation data for UI testing.
-     * Uses hardcoded OOM scenario with complete validation.
-     *
-     * @return 200 with SimplifiedValidationResponse
-     */
-    @GET
-    @Path("/validations/mock")
-    public Response getMockValidation() {
-        log.info("Mock validation request received").log();
-
-        try {
-            SimplifiedValidationResponse response = SimplifiedValidationResponse.from(
-                MockValidationData.getOomValidationJson(),
-                objectMapper
-            );
-
-            log.info("Mock validation response created")
-                .field("finalStatus", response.finalVerdict() != null ? response.finalVerdict().status() : "null")
-                .log();
-
-            return Response.ok(response).build();
-        } catch (Exception e) {
-            log.error("Failed to parse mock validation data")
-                .exception(e)
-                .log();
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                .entity(ErrorResponse.of(500, "Internal Server Error", "Failed to generate mock validation data"))
-                .build();
-        }
     }
 }
