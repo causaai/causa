@@ -4,7 +4,6 @@ import com.causa.common.logging.CausaLogger;
 import com.causa.core.domain.RootCauseAnalysis;
 import com.causa.core.services.rules.*;
 import com.causa.core.services.rules.impl.DiagnosticContextSignalExtractor;
-import com.causa.core.services.rules.oom.OomKilledRuleSet;
 import com.causa.core.services.validation.HypothesisValidator;
 import com.causa.rules.yaml.YamlRuleSetRegistry;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -49,21 +48,17 @@ public class RuleBasedHypothesisValidator implements HypothesisValidator {
 
     private final RuleEngine ruleEngine;
     private final SignalExtractor signalExtractor;
-    private final OomKilledRuleSet oomKilledRuleSet;
-    private final Optional<YamlRuleSetRegistry> yamlRegistry;
+    private final YamlRuleSetRegistry yamlRegistry;
 
     @Inject
     public RuleBasedHypothesisValidator(
         RuleEngine ruleEngine,
         DiagnosticContextSignalExtractor signalExtractor,
-        OomKilledRuleSet oomKilledRuleSet,
-        Instance<YamlRuleSetRegistry> yamlRegistryInstance
+        YamlRuleSetRegistry yamlRegistry
     ) {
         this.ruleEngine = ruleEngine;
         this.signalExtractor = signalExtractor;
-        this.oomKilledRuleSet = oomKilledRuleSet;
-        this.yamlRegistry = yamlRegistryInstance.isResolvable() ?
-            Optional.of(yamlRegistryInstance.get()) : Optional.empty();
+        this.yamlRegistry = yamlRegistry;
     }
 
     @Override
@@ -203,49 +198,39 @@ public class RuleBasedHypothesisValidator implements HypothesisValidator {
     /**
      * Load rule set for hypothesis.
      *
-     * <p>Checks YAML-based rule sets first (hot-reloadable), then falls back to
-     * Java-based rule sets.
+     * <p>Uses YAML-based rule sets exclusively (hot-reloadable, configuration-driven).
      *
-     * <p>This allows:
+     * <p>This provides:
      * <ul>
-     *   <li>Zero-code extensibility via YAML files</li>
-     *   <li>Hot-reload of rule changes</li>
-     *   <li>Backwards compatibility with Java-based rules</li>
+     *   <li><strong>Zero-code extensibility</strong> via YAML files</li>
+     *   <li><strong>Hot-reload</strong> of rule changes without redeployment</li>
+     *   <li><strong>Easy addition</strong> of new hypotheses (just add a YAML file)</li>
+     *   <li><strong>No compilation required</strong> for rule updates</li>
      * </ul>
      *
-     * <p>To add a new rule set: just create a YAML file in src/main/resources/rulesets/
+     * <p><strong>To add a new hypothesis:</strong>
+     * <ol>
+     *   <li>Create a YAML file in src/main/resources/rulesets/</li>
+     *   <li>Define hypothesis name, rules, and matching conditions</li>
+     *   <li>Deploy or hot-reload - no code changes needed</li>
+     * </ol>
+     *
+     * <p>Example hypotheses: OOM_KILLED, HIGH_MEMORY_PRESSURE, DISK_PRESSURE, CPU_THROTTLING
      */
     private RuleSet loadRuleSet(String hypothesis) {
-        // First, try YAML registry (hot-reloadable, zero-code)
-        if (yamlRegistry.isPresent()) {
-            Optional<RuleSet> yamlRuleSet = yamlRegistry.get().getRuleSet(hypothesis.toUpperCase());
-            if (yamlRuleSet.isPresent()) {
-                log.debug("Using YAML-based rule set")
-                    .field("hypothesis", hypothesis)
-                    .field("source", "YAML")
-                    .log();
-                return yamlRuleSet.get();
-            }
-        }
+        Optional<RuleSet> yamlRuleSet = yamlRegistry.getRuleSet(hypothesis.toUpperCase());
 
-        // Fallback to Java-based rule sets (backwards compatibility)
-        RuleSet javaRuleSet = switch (hypothesis.toUpperCase()) {
-            case "OOMKILLED", "OOM_KILLED", "OUT_OF_MEMORY" -> oomKilledRuleSet;
-            // Add more Java-based rule sets here if needed
-            default -> null;
-        };
-
-        if (javaRuleSet != null) {
-            log.debug("Using Java-based rule set")
+        if (yamlRuleSet.isPresent()) {
+            log.debug("Loaded YAML-based rule set")
                 .field("hypothesis", hypothesis)
-                .field("source", "Java")
+                .field("source", "YAML configuration")
                 .log();
-            return javaRuleSet;
+            return yamlRuleSet.get();
         }
 
-        log.debug("No rule set found for hypothesis")
+        log.debug("No rule set found for hypothesis - check YAML configuration")
             .field("hypothesis", hypothesis)
-            .field("yamlRegistryAvailable", yamlRegistry.isPresent())
+            .field("expectedLocation", "src/main/resources/rulesets/")
             .log();
 
         return null;
