@@ -191,9 +191,10 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             log.info(LogMessages.Diagnostic.CONTEXT_COLLECTED)
                 .field(Fields.DIAGNOSTIC_ID, diagnosticId)
                 .field(LogFields.ALERT_ID, alertId)
-                .field(LogFields.HAS_K8S_CONTEXT,      context.hasKubernetesContext())
-                .field(LogFields.HAS_KRUIZE_CONTEXT,   context.hasKruizeContext())
-                .field(LogFields.HAS_CRYOSTAT_CONTEXT, context.hasCryostatContext())
+                .field(LogFields.HAS_K8S_CONTEXT,        context.hasKubernetesContext())
+                .field(LogFields.HAS_KRUIZE_CONTEXT,     context.hasKruizeContext())
+                .field(LogFields.HAS_CRYOSTAT_CONTEXT,   context.hasCryostatContext())
+                .field(LogFields.HAS_FILESYSTEM_CONTEXT, context.hasFilesystemContext())
                 .log();
 
             // ── Step 3: LLM root cause analysis (no DB, no tx needed) ────────
