@@ -43,7 +43,6 @@ public final class EncryptionUtils {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final SecretKey MASTER_KEY = resolveMasterKey();
 
-
     /**
      * Encrypts a plaintext string using AES-256-GCM.
      *
