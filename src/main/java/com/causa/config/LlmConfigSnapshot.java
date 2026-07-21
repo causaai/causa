@@ -109,7 +109,8 @@ public final class LlmConfigSnapshot {
         return config.getOrDefault("GOOGLE_APPLICATION_CREDENTIALS", "");
     }
 
-    public String getSkillsEnabled() {
-        return config.getOrDefault("SKILLS_ENABLED", "false");
+    public boolean isSkillsEnabled() {
+        String value = config.getOrDefault("SKILLS_ENABLED", "false");
+        return Boolean.parseBoolean(value);
     }
 }
