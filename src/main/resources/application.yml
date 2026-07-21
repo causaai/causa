@@ -95,10 +95,13 @@ quarkus:
 
 # Custom Application Configuration
 causa:
-  # Encryption key for sensitive configuration values (AES-256-GCM)
-  # CRITICAL: Override with a secure 32-byte key in production via CAUSA_ENCRYPTION_KEY
+  # Encryption key for sensitive configuration values (AES-256-GCM).
+  # Must be a Base64-encoded 32-byte (256-bit) random key.
+  # Generate a production key: openssl rand -base64 32
+  # CRITICAL: Set CAUSA_ENCRYPTION_KEY via Kubernetes secret in production.
+  #           The dev default below is insecure and must never be used outside local development.
   encryption:
-    key: ${CAUSA_ENCRYPTION_KEY:causa-dev-encryption-key-change-me}
+    key: ${CAUSA_ENCRYPTION_KEY:Y2F1c2EtZGV2LWluc2VjdXJlLWRvLW5vdC11c2UtcHI=}
 
   # Cluster identity — used in Diagnostics API responses
   cluster:

@@ -20,8 +20,11 @@ import java.util.Base64;
  * <p>Output format: {@code Base64(IV[12] + ciphertext + GCM_TAG[16])}
  *
  * <p>Master key is read from MicroProfile Config property {@code causa.encryption.key}
- * (env var {@code CAUSA_ENCRYPTION_KEY}). For production, this must be set via Kubernetes secrets.
- * The dev default is insecure and should never be used in production.
+ * (env var {@code CAUSA_ENCRYPTION_KEY}). The value must be a Base64-encoded 32-byte
+ * (256-bit) random key. Generate one with: {@code openssl rand -base64 32}
+ *
+ * <p>The application will refuse to start if the key is missing, not valid Base64,
+ * or does not decode to exactly 32 bytes — preventing silent key weakening.
  *
  * @since 0.0.1
  */
@@ -108,24 +111,38 @@ public final class EncryptionUtils {
 
     /**
      * Retrieves the AES master key from MicroProfile Config.
-     * The key is read from {@code causa.encryption.key} property.
-     * If the key is not exactly 32 bytes, it is padded or truncated to fit.
+     *
+     * <p>Expects a Base64-encoded 32-byte (256-bit) key set via {@code causa.encryption.key}
+     * (env var {@code CAUSA_ENCRYPTION_KEY}). Fails fast on any misconfiguration — missing key,
+     * invalid Base64, or wrong decoded length — so bad configuration is never silently masked.
      *
      * @return the 256-bit AES secret key
+     * @throws EncryptionException if the key is absent, not valid Base64, or not exactly 32 bytes
      */
     private static SecretKey getMasterKey() {
-        String keyString = ConfigProvider.getConfig()
+        String rawKey = ConfigProvider.getConfig()
             .getOptionalValue("causa.encryption.key", String.class)
             .orElseThrow(() -> new EncryptionException(
-                "Encryption key not found. Set CAUSA_ENCRYPTION_KEY environment variable or causa.encryption.key property."));
+                "Encryption key not found. Set CAUSA_ENCRYPTION_KEY to a Base64-encoded 32-byte key. " +
+                "Generate one with: openssl rand -base64 32"));
 
-        byte[] keyBytes = keyString.getBytes(StandardCharsets.UTF_8);
+        byte[] keyBytes;
+        try {
+            keyBytes = Base64.getDecoder().decode(rawKey.trim());
+        } catch (IllegalArgumentException e) {
+            throw new EncryptionException(
+                "Invalid encryption key format: value is not valid Base64. " +
+                "Generate a valid key with: openssl rand -base64 32", e);
+        }
 
-        // Pad or truncate to 32 bytes (256 bits)
-        byte[] normalizedKey = new byte[AES_KEY_SIZE];
-        System.arraycopy(keyBytes, 0, normalizedKey, 0, Math.min(keyBytes.length, AES_KEY_SIZE));
+        if (keyBytes.length != AES_KEY_SIZE) {
+            throw new EncryptionException(
+                "Invalid encryption key length: expected " + AES_KEY_SIZE +
+                " bytes (256 bits) after Base64 decoding, but got " + keyBytes.length + " bytes. " +
+                "Generate a valid key with: openssl rand -base64 32");
+        }
 
-        return new SecretKeySpec(normalizedKey, "AES");
+        return new SecretKeySpec(keyBytes, "AES");
     }
 
     /**
