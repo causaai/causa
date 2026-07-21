@@ -185,6 +185,6 @@ causa:
       provider: ${LLM_PROVIDER:vertex-ai-anthropic}
       model-name: ${LLM_MODEL_NAME:claude-sonnet-4-6}
       vertex:
-        project-id: ${VERTEX_PROJECT_ID:itpc-gcp-cp-pe-eng-claude}
+        project-id: ${VERTEX_PROJECT_ID:}
         location: ${VERTEX_LOCATION:us-east5}
 
