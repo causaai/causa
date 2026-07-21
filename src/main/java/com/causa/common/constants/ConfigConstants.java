@@ -87,6 +87,11 @@ public final class ConfigConstants {
         .map(KeyDef::name)
         .collect(Collectors.toUnmodifiableSet());
 
+    /** All known categories derived from the registry (llm, alerts, cluster). */
+    public static final Set<String> VALID_CATEGORIES = REGISTRY.stream()
+        .map(KeyDef::category)
+        .collect(Collectors.toUnmodifiableSet());
+
     /** Sensitive keys that require encryption in DB and masking in API responses. */
     private static final Set<String> SENSITIVE_KEYS = REGISTRY.stream()
         .filter(KeyDef::sensitive)

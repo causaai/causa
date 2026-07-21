@@ -49,13 +49,21 @@ public class ConfigController {
      * Lists all configuration entries, optionally filtered by category.
      *
      * @param category optional category filter (llm, alerts, cluster)
-     * @return list of config entries (sensitive values masked)
+     * @return list of config entries (sensitive values masked), or 400 for an unknown category
      */
     @GET
     public Response listConfigs(@QueryParam(ApiConstants.Paths.Configs.QUERY_CATEGORY) String category) {
         log.info("GET /api/v1/configs")
             .field(ConfigConstants.LogFields.CATEGORY, category)
             .log();
+
+        if (category != null && !category.isBlank()
+                && !ConfigConstants.VALID_CATEGORIES.contains(category.toLowerCase())) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                .entity("Unknown category: " + category +
+                        ". Valid categories: " + ConfigConstants.VALID_CATEGORIES)
+                .build();
+        }
 
         List<ConfigurationRepository.ConfigEntry> entries = category != null && !category.isBlank()
             ? configService.getByCategory(category.toLowerCase())
@@ -97,11 +105,11 @@ public class ConfigController {
     /**
      * POST /api/v1/configs
      * Upserts configuration values.
-     * All-or-nothing validation: if any key is invalid or any value fails type validation,
-     * the entire request is rejected.
+     * Entries are validated and applied individually: valid entries are persisted and returned
+     * in {@code updated}, invalid entries are returned in {@code rejected} and skipped.
      *
      * @param request the config update request
-     * @return updated and rejected keys
+     * @return updated keys that were applied and rejected keys that failed validation
      */
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
