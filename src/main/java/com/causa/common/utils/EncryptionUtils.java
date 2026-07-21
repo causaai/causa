@@ -23,8 +23,9 @@ import java.util.Base64;
  * (env var {@code CAUSA_ENCRYPTION_KEY}). The value must be a Base64-encoded 32-byte
  * (256-bit) random key. Generate one with: {@code openssl rand -base64 32}
  *
- * <p>The application will refuse to start if the key is missing, not valid Base64,
- * or does not decode to exactly 32 bytes — preventing silent key weakening.
+ * <p>The master key is resolved and validated once at class initialisation. The application
+ * will refuse to start if the key is missing, not valid Base64, or does not decode to exactly
+ * 32 bytes — preventing silent key weakening.
  *
  * @since 0.0.1
  */
@@ -38,6 +39,9 @@ public final class EncryptionUtils {
     private static final int GCM_IV_LENGTH = 12;  // 96 bits recommended for GCM
     private static final int GCM_TAG_LENGTH = 128; // 128 bits auth tag
     private static final int AES_KEY_SIZE = 32;    // 256 bits
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final SecretKey MASTER_KEY = resolveMasterKey();
 
     /**
      * Encrypts a plaintext string using AES-256-GCM.
@@ -53,11 +57,10 @@ public final class EncryptionUtils {
 
         try {
             byte[] iv = generateIV();
-            SecretKey key = getMasterKey();
 
             Cipher cipher = Cipher.getInstance(ALGORITHM);
             GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
-            cipher.init(Cipher.ENCRYPT_MODE, key, gcmSpec);
+            cipher.init(Cipher.ENCRYPT_MODE, MASTER_KEY, gcmSpec);
 
             byte[] ciphertext = cipher.doFinal(plaintext.getBytes(StandardCharsets.UTF_8));
 
@@ -95,11 +98,9 @@ public final class EncryptionUtils {
             byte[] ciphertextBytes = new byte[byteBuffer.remaining()];
             byteBuffer.get(ciphertextBytes);
 
-            SecretKey key = getMasterKey();
-
             Cipher cipher = Cipher.getInstance(ALGORITHM);
             GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
-            cipher.init(Cipher.DECRYPT_MODE, key, gcmSpec);
+            cipher.init(Cipher.DECRYPT_MODE, MASTER_KEY, gcmSpec);
 
             byte[] plaintext = cipher.doFinal(ciphertextBytes);
             return new String(plaintext, StandardCharsets.UTF_8);
@@ -110,7 +111,7 @@ public final class EncryptionUtils {
     }
 
     /**
-     * Retrieves the AES master key from MicroProfile Config.
+     * Resolves and validates the AES master key from MicroProfile Config at class load time.
      *
      * <p>Expects a Base64-encoded 32-byte (256-bit) key set via {@code causa.encryption.key}
      * (env var {@code CAUSA_ENCRYPTION_KEY}). Fails fast on any misconfiguration — missing key,
@@ -119,7 +120,7 @@ public final class EncryptionUtils {
      * @return the 256-bit AES secret key
      * @throws EncryptionException if the key is absent, not valid Base64, or not exactly 32 bytes
      */
-    private static SecretKey getMasterKey() {
+    private static SecretKey resolveMasterKey() {
         String rawKey = ConfigProvider.getConfig()
             .getOptionalValue("causa.encryption.key", String.class)
             .orElseThrow(() -> new EncryptionException(
@@ -152,7 +153,7 @@ public final class EncryptionUtils {
      */
     private static byte[] generateIV() {
         byte[] iv = new byte[GCM_IV_LENGTH];
-        new SecureRandom().nextBytes(iv);
+        SECURE_RANDOM.nextBytes(iv);
         return iv;
     }
 
