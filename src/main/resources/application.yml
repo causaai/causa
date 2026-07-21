@@ -47,6 +47,11 @@ quarkus:
     enabled: true
     path: banner.txt
 
+  # Config - disable validation for custom causa.* properties
+  config:
+    mapping:
+      validate-unknown: false
+
   # ============================================================
   # Database Configuration (PostgreSQL + Agroal Connection Pool)
   # ============================================================
@@ -90,6 +95,11 @@ quarkus:
 
 # Custom Application Configuration
 causa:
+  # Encryption key for sensitive configuration values (AES-256-GCM)
+  # CRITICAL: Override with a secure 32-byte key in production via CAUSA_ENCRYPTION_KEY
+  encryption:
+    key: ${CAUSA_ENCRYPTION_KEY:causa-dev-encryption-key-change-me}
+
   # Cluster identity — used in Diagnostics API responses
   cluster:
     name: ${CAUSA_CLUSTER_NAME:default}
@@ -112,6 +122,8 @@ causa:
       location: ${VERTEX_LOCATION:}
     bob:
       shell-path: bob
+    google-application-credentials: ${GOOGLE_APPLICATION_CREDENTIALS:}
+    skills-enabled: ${CAUSA_SKILLS_ENABLED:false}
 
   # Alert Configuration
   alerts:
@@ -170,6 +182,6 @@ causa:
       provider: ${LLM_PROVIDER:vertex-ai-anthropic}
       model-name: ${LLM_MODEL_NAME:claude-sonnet-4-6}
       vertex:
-        project-id: ${VERTEX_PROJECT_ID:}
+        project-id: ${VERTEX_PROJECT_ID:itpc-gcp-cp-pe-eng-claude}
         location: ${VERTEX_LOCATION:us-east5}
 

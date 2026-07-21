@@ -196,3 +196,21 @@ CREATE TABLE IF NOT EXISTS health_checks (
 
 -- Crucial for the 15-day pruning process execution window
 CREATE INDEX IF NOT EXISTS idx_health_cleanup ON health_checks (created_at);
+
+
+-- =============================================================================
+-- PG LISTEN/NOTIFY for Distributed Config Cache Invalidation
+-- =============================================================================
+
+-- Notify function: broadcasts cache invalidation events
+CREATE OR REPLACE FUNCTION notify_config_change() RETURNS trigger AS $$
+BEGIN
+    PERFORM pg_notify('config_cache_channel', 'reload');
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger: fires after any modification to configurations table
+CREATE TRIGGER trg_config_notify
+    AFTER INSERT OR UPDATE OR DELETE ON configurations
+    FOR EACH STATEMENT EXECUTE FUNCTION notify_config_change();

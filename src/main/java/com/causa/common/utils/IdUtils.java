@@ -47,6 +47,14 @@ public final class IdUtils {
         return "diag_" + randomAlphanumeric16();
     }
 
+    /**
+     * Generates a unique configuration ID: {@code cnfg_<16-char-alphanumeric>}.
+     * Total length = 21 chars.
+     */
+    public static String generateConfigurationId() {
+        return "cnfg_" + randomAlphanumeric16();
+    }
+
     /** Returns 16 alphanumeric characters from a SecureRandom source. */
     private static String randomAlphanumeric16() {
         return RandomStringUtils.secure().nextAlphanumeric(16);

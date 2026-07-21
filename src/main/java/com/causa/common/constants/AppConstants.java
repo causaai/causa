@@ -15,17 +15,21 @@ public final class AppConstants {
 
     /**
      * Startup priority constants for CDI observer ordering.
+     * Lower numbers execute first.
      *
      * @since 0.0.1
      */
     public static final class StartupConstants {
         private StartupConstants() {}
 
-        /** LLM initialization priority. */
-        public static final int LLM_PRIORITY = 10;
-
         /** Database connection pool initialization priority. */
-        public static final int DATABASE_PRIORITY = 20;
+        public static final int DATABASE_PRIORITY = 10;
+
+        /** Configuration loading from DB+ENV priority. */
+        public static final int CONFIG_PRIORITY = 20;
+
+        /** LLM initialization priority (depends on config). */
+        public static final int LLM_PRIORITY = 30;
     }
 
     /**

@@ -111,6 +111,21 @@ public final class ApiConstants {
             public static final String READINESS = "/q/health/ready";
             public static final String HEALTHZ = Version.API_V1 + "/healthz";
         }
+
+        /**
+         * Configuration management API.
+         * GET  /api/v1/configs              — list all configs (optional ?category filter)
+         * GET  /api/v1/configs/{key}        — single config by key
+         * POST /api/v1/configs              — upsert config values
+         */
+        public static final class Configs {
+            private Configs() {}
+
+            public static final String BASE = Version.API_V1 + "/configs";
+            public static final String PATH_PARAM_KEY = "key";
+            public static final String BY_KEY = "/{" + PATH_PARAM_KEY + "}";
+            public static final String QUERY_CATEGORY = "category";
+        }
     }
 
     /**
