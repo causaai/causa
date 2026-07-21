@@ -35,7 +35,7 @@ public final class ConfigConstants {
      * Value types for config entries — used for validation.
      */
     public enum ValueType {
-        STRING, INTEGER, DOUBLE
+        STRING, INTEGER, DOUBLE, BOOLEAN
     }
 
     /**
@@ -69,7 +69,7 @@ public final class ConfigConstants {
         key("VERTEX_LOCATION",                 "llm", ValueType.STRING,  false, "causa.llm.vertex.location"),
         key("BOB_SHELL_PATH",                  "llm", ValueType.STRING,  false, "causa.llm.bob.shell-path"),
         key("GOOGLE_APPLICATION_CREDENTIALS",  "llm", ValueType.STRING,  true,  "causa.llm.google-application-credentials"),
-        key("SKILLS_ENABLED",                  "llm", ValueType.STRING,  false, "causa.llm.skills-enabled"),
+        key("SKILLS_ENABLED",                  "llm", ValueType.BOOLEAN, false, "causa.llm.skills-enabled"),
 
         // Alert Configuration (4 keys)
         key("ALERT_FILTER_SEVERITY",           "alerts", ValueType.STRING,  false, "causa.alerts.filter-severity"),
@@ -102,6 +102,12 @@ public final class ConfigConstants {
     /** Double-type keys for validation. */
     private static final Set<String> DOUBLE_KEYS = REGISTRY.stream()
         .filter(k -> k.type() == ValueType.DOUBLE)
+        .map(KeyDef::name)
+        .collect(Collectors.toUnmodifiableSet());
+
+    /** Boolean-type keys for validation. */
+    private static final Set<String> BOOLEAN_KEYS = REGISTRY.stream()
+        .filter(k -> k.type() == ValueType.BOOLEAN)
         .map(KeyDef::name)
         .collect(Collectors.toUnmodifiableSet());
 
@@ -157,6 +163,16 @@ public final class ConfigConstants {
      */
     public static boolean isDoubleKey(String key) {
         return DOUBLE_KEYS.contains(key);
+    }
+
+    /**
+     * Checks if a config key expects a boolean value (true/false).
+     *
+     * @param key the config key
+     * @return true if the key's value type is BOOLEAN
+     */
+    public static boolean isBooleanKey(String key) {
+        return BOOLEAN_KEYS.contains(key);
     }
 
     /**

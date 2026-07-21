@@ -48,4 +48,20 @@ public final class ValidationUtils {
             return false;
         }
     }
+
+    /**
+     * Checks if a string is a valid boolean value.
+     * Only accepts "true" or "false" (case-insensitive) to prevent ambiguous values
+     * like "yes", "1", or "on" from silently passing through.
+     *
+     * @param value the string to validate
+     * @return true if the value is exactly "true" or "false" (case-insensitive)
+     */
+    public static boolean isValidBoolean(String value) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        String lower = value.strip().toLowerCase();
+        return lower.equals("true") || lower.equals("false");
+    }
 }
