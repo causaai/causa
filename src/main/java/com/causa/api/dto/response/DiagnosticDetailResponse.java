@@ -192,18 +192,12 @@ public record DiagnosticDetailResponse(
             diagnostic.getDiagnosticId(),
             diagnostic.getStatus() != null ? diagnostic.getStatus().getValue() : null,
             diagnostic.getAlertId(),
-            alert != null ? alert.getAlertName()                                                : null,
-            alert != null && alert.getSeverity() != null ? capitalise(alert.getSeverity().getValue()) : null,
-            alert != null ? alert.getAlertTimestamp()                                           : null,
+            alert != null ? alert.getAlertName()                                          : null,
+            alert != null && alert.getSeverity() != null ? alert.getSeverity().getValue() : null,
+            alert != null ? alert.getAlertTimestamp()                                     : null,
             workloadInfo,
             diagnosisInfo,
             validationInfo
         );
-    }
-
-    /** Capitalises first letter only — e.g. "critical" → "Critical". */
-    private static String capitalise(String value) {
-        if (value == null || value.isBlank()) return value;
-        return Character.toUpperCase(value.charAt(0)) + value.substring(1).toLowerCase();
     }
 }

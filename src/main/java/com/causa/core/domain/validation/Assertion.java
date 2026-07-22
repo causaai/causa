@@ -1,5 +1,7 @@
 package com.causa.core.domain.validation;
 
+import com.causa.common.constants.ValidationConstants;
+
 /**
  * Represents an atomic claim extracted from RCA output.
  *
@@ -33,16 +35,16 @@ public record Assertion(
      */
     public Assertion {
         if (id == null || id.isBlank()) {
-            throw new IllegalArgumentException("Assertion ID cannot be blank");
+            throw new IllegalArgumentException(ValidationConstants.ErrorMessages.ASSERTION_ID_BLANK);
         }
         if (text == null || text.isBlank()) {
-            throw new IllegalArgumentException("Assertion text cannot be blank");
+            throw new IllegalArgumentException(ValidationConstants.ErrorMessages.ASSERTION_TEXT_BLANK);
         }
         if (type == null) {
-            throw new IllegalArgumentException("Assertion type cannot be null");
+            throw new IllegalArgumentException(ValidationConstants.ErrorMessages.ASSERTION_TYPE_NULL);
         }
         if (source == null) {
-            throw new IllegalArgumentException("Assertion source cannot be null");
+            throw new IllegalArgumentException(ValidationConstants.ErrorMessages.ASSERTION_SOURCE_NULL);
         }
     }
 

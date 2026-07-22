@@ -44,8 +44,6 @@ public final class DiagnosticConstants {
         public static final String HAS_K8S_CONTEXT      = "hasK8sContext";
         public static final String HAS_KRUIZE_CONTEXT   = "hasKruizeContext";
         public static final String HAS_CRYOSTAT_CONTEXT = "hasCryostatContext";
-        public static final String VALIDATION_RESULT    = "validationResult";
-        public static final String CONFIDENCE_SCORE     = "confidenceScore";
     }
 
     // Logging format constants
