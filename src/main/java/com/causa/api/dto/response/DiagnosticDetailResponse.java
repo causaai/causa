@@ -43,9 +43,6 @@ public record DiagnosticDetailResponse(
     @JsonProperty("diagnosis")
     DiagnosisInfo diagnosis,
 
-    @JsonProperty("validation_result")
-    String validationResult,
-
     @JsonProperty("validation")
     ValidationInfo validation
 
@@ -200,7 +197,6 @@ public record DiagnosticDetailResponse(
             alert != null ? alert.getAlertTimestamp()                                           : null,
             workloadInfo,
             diagnosisInfo,
-            diagnostic.getValidationResult(),
             validationInfo
         );
     }
