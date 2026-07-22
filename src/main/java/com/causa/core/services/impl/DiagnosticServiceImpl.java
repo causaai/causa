@@ -6,6 +6,7 @@ import com.causa.common.constants.DiagnosticConstants.Fields;
 import com.causa.common.constants.DiagnosticConstants.LogFields;
 import com.causa.common.constants.JsonParsingConstants;
 import com.causa.common.constants.ContextConstants;
+import com.causa.common.constants.ValidationConstants;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
 import com.causa.common.utils.IdUtils;
@@ -507,9 +508,9 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             .field("validationSummary", validatedRCA.summary().toSummaryString())
             .field("isValid", validatedRCA.isValid())
             .field("isHighConfidence", validatedRCA.isHighConfidence())
-            .field(LogFields.SUPPORTED_COUNT, validatedRCA.getSupportedAssertions().size())
-            .field(LogFields.UNSUPPORTED_COUNT, validatedRCA.getUnsupportedAssertions().size())
-            .field(LogFields.UNKNOWN_COUNT, validatedRCA.getUnknownAssertions().size())
+            .field(ValidationConstants.LogFields.SUPPORTED_COUNT, validatedRCA.getSupportedAssertions().size())
+            .field(ValidationConstants.LogFields.UNSUPPORTED_COUNT, validatedRCA.getUnsupportedAssertions().size())
+            .field(ValidationConstants.LogFields.UNKNOWN_COUNT, validatedRCA.getUnknownAssertions().size())
             .log();
 
         return validatedRCA;
@@ -728,8 +729,8 @@ public class DiagnosticServiceImpl implements DiagnosticService {
 
             log.info("Diagnostic updated with validation results")
                 .field(LogFields.DIAGNOSTIC_ID, diagnostic.getDiagnosticId())
-                .field(LogFields.VALIDATION_RESULT, validationResult)
-                .field(LogFields.CONFIDENCE_SCORE, validatedRCA.summary().averageConfidence())
+                .field(ValidationConstants.LogFields.VALIDATION_RESULT, validationResult)
+                .field(ValidationConstants.LogFields.CONFIDENCE_SCORE, validatedRCA.summary().averageConfidence())
                 .log();
 
             return updated;

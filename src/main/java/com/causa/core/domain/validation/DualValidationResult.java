@@ -1,5 +1,6 @@
 package com.causa.core.domain.validation;
 
+import com.causa.common.constants.ValidationConstants;
 import com.causa.core.services.rules.HypothesisValidationResult;
 
 /**
@@ -39,13 +40,16 @@ public record DualValidationResult(
          */
         public double validationScore() {
             if (totalAssertions == 0) {
-                return 0.0;
+                return ValidationConstants.Thresholds.MIN_CONFIDENCE;
             }
-            double weightedScore = (supportedAssertions * 1.0) +
-                                   (partiallySupportedAssertions * 0.5) +
-                                   (unknownAssertions * 0.0) +
-                                   (unsupportedAssertions * -0.5);
-            return Math.max(0.0, Math.min(1.0, weightedScore / totalAssertions));
+            double weightedScore = (supportedAssertions * ValidationConstants.ScoringWeights.SUPPORTED_WEIGHT) +
+                                   (partiallySupportedAssertions * ValidationConstants.ScoringWeights.PARTIALLY_SUPPORTED_WEIGHT) +
+                                   (unknownAssertions * ValidationConstants.ScoringWeights.UNKNOWN_WEIGHT) +
+                                   (unsupportedAssertions * ValidationConstants.ScoringWeights.UNSUPPORTED_WEIGHT);
+            return Math.max(
+                ValidationConstants.Thresholds.MIN_CONFIDENCE,
+                Math.min(ValidationConstants.Thresholds.MAX_CONFIDENCE, weightedScore / totalAssertions)
+            );
         }
     }
 

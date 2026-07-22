@@ -1,5 +1,7 @@
 package com.causa.core.domain.validation;
 
+import com.causa.common.constants.ValidationConstants;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -34,13 +36,14 @@ public record ValidationResult(
      */
     public ValidationResult {
         if (assertion == null) {
-            throw new IllegalArgumentException("Assertion cannot be null");
+            throw new IllegalArgumentException(ValidationConstants.ErrorMessages.VALIDATION_ASSERTION_NULL);
         }
         if (status == null) {
-            throw new IllegalArgumentException("Validation status cannot be null");
+            throw new IllegalArgumentException(ValidationConstants.ErrorMessages.VALIDATION_STATUS_NULL);
         }
-        if (confidence < 0.0 || confidence > 1.0) {
-            throw new IllegalArgumentException("Confidence must be between 0.0 and 1.0");
+        if (confidence < ValidationConstants.Thresholds.MIN_CONFIDENCE ||
+            confidence > ValidationConstants.Thresholds.MAX_CONFIDENCE) {
+            throw new IllegalArgumentException(ValidationConstants.ErrorMessages.VALIDATION_CONFIDENCE_RANGE);
         }
         if (supportingEvidence == null) {
             supportingEvidence = Collections.emptyList();
