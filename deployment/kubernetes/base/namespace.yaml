@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: diagnostics-tool
-  labels:
-    app.kubernetes.io/name: causa
-    app.kubernetes.io/component: namespace

@@ -3,8 +3,7 @@ kind: ConfigMap
 metadata:
   name: causa-config
 data:
-  # Kind-specific configuration
-  CAUSA_PORT: "8080"
   CAUSA_LOG_LEVEL: "DEBUG"
   # Environment marker
   CLUSTER_TYPE: "kind"
+

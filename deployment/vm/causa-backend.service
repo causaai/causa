@@ -1,0 +1,46 @@
+[Unit]
+Description=Causa Backend
+Documentation=https://github.com/causaai/causa-backend
+After=network-online.target
+Wants=network-online.target
+# Reset the burst counter every 5 minutes so the service keeps retrying
+# indefinitely — even if DB creds are wrong at boot it will keep trying
+# until they become valid (e.g. after a secret rotation or DB comes up)
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=__VM_USER__
+WorkingDirectory=__VM_DIR__
+
+# All credentials and config loaded from .env
+EnvironmentFile=__VM_DIR__/.env
+
+# JVM tuning — override by setting JAVA_OPTS in your .env
+Environment="JAVA_OPTS=-Xms256m -Xmx512m -XX:+UseG1GC"
+
+# __JAR_PATH__ is replaced by deploy.sh with the resolved absolute jar path
+ExecStart=java -jar __JAR_PATH__ $JAVA_OPTS
+
+# Restart on ANY non-zero exit — covers DB connection failures,
+# missing env vars, Flyway errors, and all other startup crashes
+Restart=always
+# Wait 15s between restarts so we don't hammer the DB on repeated failures
+RestartSec=15s
+
+# Allow enough time for JVM + Flyway migrations on startup
+TimeoutStartSec=120s
+
+# Graceful shutdown
+TimeoutStopSec=30s
+KillMode=mixed
+KillSignal=SIGTERM
+
+# Logs visible via: journalctl -u causa-backend -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=causa-backend
+
+[Install]
+WantedBy=multi-user.target

@@ -13,16 +13,18 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Alert Service Implementation
- *
- * <p>Implements alert processing with severity filtering, namespace filtering, and cooldown deduplication.
- * <p>Uses an in-memory cooldown cache with scheduled cleanup.
  *
  * @since 0.0.1
  */
@@ -59,7 +61,7 @@ public class AlertServiceImpl implements AlertService {
     }
 
     @Override
-    public List<Alert> processAlerts(List<Alert> alerts) {
+    public List<Alert> processAlerts(List<Alert> alerts, Map<String, String> rejectedReasons) {
         List<Alert> accepted = new ArrayList<>();
 
         for (Alert alert : alerts) {
@@ -69,44 +71,61 @@ public class AlertServiceImpl implements AlertService {
                     .field("severity", alert.getSeverity().getValue())
                     .field("minimum", minimumSeverity.getValue())
                     .log();
+                String reason = String.format(
+                    "Severity too low — received: %s, minimum required: %s",
+                    alert.getSeverity().getValue(), minimumSeverity.getValue());
+                Alert saved = alertRepository.saveRejected(alert, reason);
+                rejectedReasons.put(saved.getAlertId(), reason);
                 continue;
             }
 
             if (!passesNamespaceFilter(alert)) {
                 log.debug(LogMessages.Alert.ALERT_FILTERED_NAMESPACE)
                     .field("alertName", alert.getAlertName())
-                    .field("namespace", alert.getNamespace())
+                    .field("namespace", alert.getWorkloadInfo().namespace())
                     .log();
+                String reason = String.format(
+                    "Namespace '%s' is in the ignore list",
+                    alert.getWorkloadInfo().namespace());
+                Alert saved = alertRepository.saveRejected(alert, reason);
+                rejectedReasons.put(saved.getAlertId(), reason);
                 continue;
             }
 
             if (isInCooldown(alert)) {
+                String key = alert.getCooldownKey();
+                Instant nextProcessAt = cooldownCache.get(key)
+                    .plusSeconds(alertConfig.cooldownMinutes() * 60L);
+                String nextTime = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss 'UTC'")
+                    .withZone(ZoneOffset.UTC)
+                    .format(nextProcessAt);
                 log.debug(LogMessages.Alert.ALERT_FILTERED_COOLDOWN)
                     .field("alertName", alert.getAlertName())
-                    .field("podName", alert.getPodName())
-                    .field("cooldownKey", alert.getCooldownKey())
+                    .field("podName", alert.getWorkloadInfo().podName())
+                    .field("cooldownKey", key)
                     .log();
+                String reason = String.format(
+                    "Alert is in cooldown — next alert from this workload will be processed at: %s",
+                    nextTime);
+                Alert saved = alertRepository.saveRejected(alert, reason);
+                rejectedReasons.put(saved.getAlertId(), reason);
                 continue;
             }
 
-            // Record cooldown timestamp
             cooldownCache.put(alert.getCooldownKey(), Instant.now());
-
-            // Persist alert to database
-            Alert savedAlert = alertRepository.save(alert);
-
-            accepted.add(savedAlert);
+            Alert saved = alertRepository.save(alert);
+            accepted.add(saved);
 
             log.info(LogMessages.Alert.ALERT_ACCEPTED)
-                .field("alertId", alert.getAlertId())
-                .field("alertName", alert.getAlertName())
-                .field("severity", alert.getSeverity().getValue())
-                .field("namespace", alert.getNamespace())
-                .field("podName", alert.getPodName())
+                .field("alertId", saved.getAlertId())
+                .field("alertName", saved.getAlertName())
+                .field("severity", saved.getSeverity().getValue())
+                .field("namespace", saved.getWorkloadInfo().namespace())
+                .field("podName", saved.getWorkloadInfo().podName())
                 .log();
 
             log.debug(LogMessages.Alert.ALERT_PERSISTED)
-                .field("alertId", savedAlert.getAlertId())
+                .field("alertId", saved.getAlertId())
                 .log();
         }
 
@@ -117,15 +136,20 @@ public class AlertServiceImpl implements AlertService {
     public boolean isInCooldown(Alert alert) {
         String key = alert.getCooldownKey();
         Instant lastSeen = cooldownCache.get(key);
+        if (lastSeen == null) return false;
+        long cooldownSeconds = alertConfig.cooldownMinutes() * 60L;
+        return Instant.now().isBefore(lastSeen.plusSeconds(cooldownSeconds));
+    }
 
-        if (lastSeen == null) {
-            return false;
-        }
+    @Override
+    public Optional<Alert> getAlert(String alertId) {
+        return alertRepository.findById(alertId);
+    }
 
-        long cooldownMinutes = alertConfig.cooldownMinutes();
-        Instant cooldownExpiry = lastSeen.plusSeconds(cooldownMinutes * 60L);
-
-        return Instant.now().isBefore(cooldownExpiry);
+    @Override
+    public List<Alert> getAlerts(String workloadName, String namespace) {
+        // Delegates to repository which applies all non-blank filters with AND logic
+        return alertRepository.findByFilters(workloadName, namespace);
     }
 
     private boolean passesSeverityFilter(Alert alert) {
@@ -133,27 +157,22 @@ public class AlertServiceImpl implements AlertService {
     }
 
     private boolean passesNamespaceFilter(Alert alert) {
-        return !ignoredNamespaces.contains(alert.getNamespace());
+        String namespace = alert.getWorkloadInfo().namespace();
+        if (namespace == null) {
+            return true;
+        }
+        return !ignoredNamespaces.contains(namespace);
     }
 
-    /**
-     * Scheduled cleanup of expired cooldown entries.
-     *
-     * <p>Interval is configurable via causa.alerts.cooldown-cleanup-interval (default: 5m).
-     * <p>Prevents unbounded memory growth by removing expired entries.
-     */
     @Scheduled(every = "{causa.alerts.cooldown-cleanup-interval}")
     void cleanupCooldownCache() {
-        int beforeSize = cooldownCache.size();
+        int before = cooldownCache.size();
         long cooldownSeconds = alertConfig.cooldownMinutes() * 60L;
         Instant cutoff = Instant.now().minusSeconds(cooldownSeconds);
-
-        cooldownCache.entrySet().removeIf(entry -> entry.getValue().isBefore(cutoff));
-
-        int removedEntries = beforeSize - cooldownCache.size();
+        cooldownCache.entrySet().removeIf(e -> e.getValue().isBefore(cutoff));
 
         log.debug(LogMessages.Alert.COOLDOWN_CACHE_CLEANUP)
-            .field("removedEntries", removedEntries)
+            .field("removedEntries", before - cooldownCache.size())
             .field("remainingEntries", cooldownCache.size())
             .log();
     }

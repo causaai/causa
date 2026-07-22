@@ -74,6 +74,34 @@ public final class ApiConstants {
         }
 
         /**
+         * Alert query API.
+         * GET /api/v1/alerts              — list alerts (optionally filtered by workload_name and/or namespace)
+         * GET /api/v1/alerts/{id}         — single alert by ID
+         */
+        public static final class Alerts {
+            private Alerts() {}
+
+            public static final String BASE              = Version.API_V1 + "/alerts";
+            public static final String PATH_PARAM_ID     = "id";
+            public static final String BY_ID             = "/{" + PATH_PARAM_ID + "}";
+            public static final String QUERY_WORKLOAD    = "workload_name";
+            public static final String QUERY_NAMESPACE   = "namespace";
+        }
+
+        /**
+         * Diagnostics query API.
+         * GET /api/v1/diagnostics        — list all diagnostics (summary)
+         * GET /api/v1/diagnostics/{id}   — full diagnostic detail
+         */
+        public static final class Diagnostics {
+            private Diagnostics() {}
+
+            public static final String BASE       = Version.API_V1 + "/diagnostics";
+            public static final String PATH_PARAM = "id";
+            public static final String BY_ID      = "/{" + PATH_PARAM + "}";
+        }
+
+        /**
          * Health check paths.
          */
         public static final class Health {
@@ -82,6 +110,21 @@ public final class ApiConstants {
             public static final String LIVENESS = "/q/health/live";
             public static final String READINESS = "/q/health/ready";
             public static final String HEALTHZ = Version.API_V1 + "/healthz";
+        }
+
+        /**
+         * Configuration management API.
+         * GET  /api/v1/configs              — list all configs (optional ?category filter)
+         * GET  /api/v1/configs/{key}        — single config by key
+         * POST /api/v1/configs              — upsert config values
+         */
+        public static final class Configs {
+            private Configs() {}
+
+            public static final String BASE = Version.API_V1 + "/configs";
+            public static final String PATH_PARAM_KEY = "key";
+            public static final String BY_KEY = "/{" + PATH_PARAM_KEY + "}";
+            public static final String QUERY_CATEGORY = "category";
         }
     }
 

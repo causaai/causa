@@ -19,11 +19,24 @@ public final class AlertConstants {
     public static final class Labels {
         private Labels() {}
 
-        public static final String ALERT_NAME = "alertname";
-        public static final String SEVERITY = "severity";
-        public static final String NAMESPACE = "namespace";
-        public static final String POD = "pod";
-        public static final String CONTAINER = "container";
+        // Prometheus label keys
+        public static final String ALERT_NAME    = "alertname";
+        public static final String SEVERITY      = "severity";
+        public static final String NAMESPACE     = "namespace";
+        public static final String POD           = "pod";           // label key
+        public static final String CONTAINER     = "container";     // label key
+
+        // Annotation keys (as declared in the PrometheusRule)
+        public static final String CONTAINER_NAME = "container_name"; // annotation key
+        public static final String POD_NAME        = "pod_name";       // annotation key
+
+        /** Annotation key for cluster name. */
+        public static final String CLUSTER_NAME  = "cluster_name";
+        /** Annotation key for workload type (e.g. Deployment, StatefulSet). */
+        public static final String WORKLOAD_TYPE = "workload_type";
+        public static final String WORKLOAD_NAME = "workload_name";
+        /** Annotation key for alert source. Defaults to "prometheus" when absent. */
+        public static final String ALERT_SOURCE  = "alert_source";
     }
 
 
@@ -43,8 +56,9 @@ public final class AlertConstants {
         private Response() {}
 
         public static final String ACCEPTED = "accepted";
-        public static final String PARTIAL = "partial";
+        public static final String PARTIAL  = "partial";
         public static final String REJECTED = "rejected";
+        public static final String EMPTY    = "empty";
     }
 
     /**
@@ -117,14 +131,16 @@ public final class AlertConstants {
     }
 
     /**
-     * Alert Status
+     * Alert processing status — Causa lifecycle stored in the {@code status} DB column.
      *
-     * <p>Defines the status of an alert from Prometheus Alertmanager.
+     * <p>Values: ACCEPTED, REJECTED, PROCESSING, PROCESSED
      */
     public enum AlertStatus {
 
-        FIRING("firing"),
-        RESOLVED("resolved");
+        ACCEPTED("ACCEPTED"),
+        REJECTED("REJECTED"),
+        PROCESSING("PROCESSING"),
+        PROCESSED("PROCESSED");
 
         private final String value;
 
@@ -132,35 +148,20 @@ public final class AlertConstants {
             this.value = value;
         }
 
-        /**
-         * Returns the string value of this status.
-         *
-         * @return the status value
-         */
         public String getValue() {
             return value;
         }
 
-        /**
-         * Converts a string to an AlertStatus enum value (case-insensitive).
-         *
-         * @param value the string value
-         * @return the corresponding AlertStatus
-         * @throws IllegalArgumentException if the value doesn't match any status
-         */
         public static AlertStatus fromString(String value) {
             if (value == null || value.isBlank()) {
                 throw new IllegalArgumentException("Alert status value cannot be null or blank");
             }
-
-            String normalized = value.trim().toLowerCase();
-
+            String normalized = value.trim().toUpperCase();
             for (AlertStatus status : AlertStatus.values()) {
                 if (status.value.equals(normalized)) {
                     return status;
                 }
             }
-
             throw new IllegalArgumentException("Unknown alert status: " + value);
         }
     }

@@ -55,11 +55,23 @@ public class ChatModelFactory {
     @Produces
     @ApplicationScoped
     public ChatModel chatModel() {
+        String provider = config.provider().orElse(null);
+
+        if (provider == null || provider.isBlank()) {
+            log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
+                .field(LLMConstants.ConfigKeys.MISSING_CONFIG, "LLM_PROVIDER")
+                .log();
+            throw new LLMException(
+                LLMConstants.ErrorMessages.LLM_CONFIG_NOT_AVAILABLE,
+                LLMConstants.ErrorTypes.MISSING_CONFIGURATION
+            );
+        }
+
         log.info(LogMessages.LLM.LLM_FACTORY_INITIALIZING)
-            .field(LLMConstants.Fields.PROVIDER, config.provider())
+            .field(LLMConstants.Fields.PROVIDER, provider)
             .log();
 
-        return switch (config.provider().toLowerCase()) {
+        return switch (provider.toLowerCase()) {
             case LLMConstants.Provider.ANTHROPIC -> buildAnthropicModel();
             case LLMConstants.Provider.VERTEX_AI_ANTHROPIC -> buildVertexAiAnthropicModel();
             // Future providers:
@@ -67,10 +79,10 @@ public class ChatModelFactory {
             // case LLMConstants.Provider.OLLAMA -> buildOllamaModel();
             default -> {
                 log.error(LogMessages.LLM.UNSUPPORTED_PROVIDER)
-                    .field(LLMConstants.Fields.PROVIDER, config.provider())
+                    .field(LLMConstants.Fields.PROVIDER, provider)
                     .log();
                 throw new LLMException(
-                    String.format(LLMConstants.ErrorMessages.UNSUPPORTED_PROVIDER_TEMPLATE, config.provider()),
+                    String.format(LLMConstants.ErrorMessages.UNSUPPORTED_PROVIDER_TEMPLATE, provider),
                     LLMConstants.ErrorTypes.UNSUPPORTED_PROVIDER
                 );
             }
@@ -84,21 +96,23 @@ public class ChatModelFactory {
      * @throws LLMException if API key is missing
      */
     private ChatModel buildAnthropicModel() {
-        String apiKey = config.apiKey().orElseThrow(() -> {
-            log.error(LogMessages.LLM.MISSING_CONFIGURATION)
+        String apiKey = config.apiKey().filter(k -> !k.isBlank()).orElse(null);
+        if (apiKey == null) {
+            log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
                 .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.ANTHROPIC)
                 .field(LLMConstants.ConfigKeys.MISSING_CONFIG, LLMConstants.ConfigKeys.LLM_API_KEY)
                 .log();
-            return new LLMException(
+            throw new LLMException(
                 LLMConstants.ErrorMessages.API_KEY_REQUIRED + LLMConstants.Provider.ANTHROPIC,
                 LLMConstants.ErrorTypes.MISSING_CONFIGURATION
             );
-        });
+        }
 
+        String modelName = config.modelName().orElse("");
         log.info(LogMessages.LLM.LLM_PROVIDER_DETECTED)
             .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.ANTHROPIC)
             .field(LLMConstants.Fields.AUTH_TYPE, LLMConstants.AuthModes.API_KEY)
-            .field(LLMConstants.Fields.MODEL, config.modelName())
+            .field(LLMConstants.Fields.MODEL, modelName)
             .field(LLMConstants.Fields.TEMPERATURE, config.temperature())
             .field(LLMConstants.Fields.MAX_TOKENS, config.maxTokens())
             .field(LLMConstants.Fields.CACHE_ENABLED, true)
@@ -106,7 +120,7 @@ public class ChatModelFactory {
 
         return AnthropicChatModel.builder()
             .apiKey(apiKey)
-            .modelName(config.modelName())
+            .modelName(modelName)
             .temperature(config.temperature())
             .maxTokens(config.maxTokens())
             .timeout(Duration.ofSeconds(config.timeoutSeconds()))
@@ -123,23 +137,25 @@ public class ChatModelFactory {
      * @throws LLMException if project ID is missing
      */
     private ChatModel buildVertexAiAnthropicModel() {
-        String projectId = config.vertex().projectId().orElseThrow(() -> {
-            log.error(LogMessages.LLM.MISSING_CONFIGURATION)
+        String projectId = config.vertex().projectId().filter(p -> !p.isBlank()).orElse(null);
+        if (projectId == null) {
+            log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
                 .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.VERTEX_AI_ANTHROPIC)
                 .field(LLMConstants.ConfigKeys.MISSING_CONFIG, LLMConstants.ConfigKeys.VERTEX_PROJECT_ID)
                 .log();
-            return new LLMException(
+            throw new LLMException(
                 LLMConstants.ErrorMessages.VERTEX_PROJECT_ID_REQUIRED + LLMConstants.Provider.VERTEX_AI_ANTHROPIC,
                 LLMConstants.ErrorTypes.MISSING_CONFIGURATION
             );
-        });
+        }
 
-        String location = config.vertex().location();
+        String location = config.vertex().location().orElse("us-east5");
+        String modelName = config.modelName().orElse("");
 
         log.info(LogMessages.LLM.LLM_PROVIDER_DETECTED)
             .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.VERTEX_AI_ANTHROPIC)
             .field(LLMConstants.Fields.AUTH_TYPE, LLMConstants.AuthModes.ADC)
-            .field(LLMConstants.Fields.MODEL, config.modelName())
+            .field(LLMConstants.Fields.MODEL, modelName)
             .field(LLMConstants.Fields.VERTEX_PROJECT_ID, projectId)
             .field(LLMConstants.Fields.VERTEX_LOCATION, location)
             .field(LLMConstants.Fields.TEMPERATURE, config.temperature())
@@ -149,7 +165,7 @@ public class ChatModelFactory {
         return VertexAiAnthropicChatModel.builder()
             .project(projectId)
             .location(location)
-            .modelName(config.modelName())
+            .modelName(modelName)
             .maxTokens(config.maxTokens())
             .logRequests(true)
             .logResponses(true)

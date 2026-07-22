@@ -6,14 +6,17 @@ import com.causa.core.domain.Diagnostic;
 import com.causa.core.ports.DiagnosticRepository;
 import com.causa.infrastructure.persistence.entity.DiagnosticEntity;
 import com.causa.infrastructure.persistence.mappers.DiagnosticEntityMapper;
+import io.quarkus.panache.common.Sort;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
+
+import java.util.List;
+import java.util.Optional;
 
 /**
  * Diagnostic Repository Implementation
  *
- * <p>Panache-based implementation of the DiagnosticRepository port.
- * <p>Uses Panache Repository pattern for cleaner, type-safe queries.
+ * <p>Panache-based implementation of {@link DiagnosticRepository}.
  *
  * @since 0.0.1
  */
@@ -24,11 +27,12 @@ public class DiagnosticRepositoryImpl implements DiagnosticRepository {
     @Transactional
     public Diagnostic save(Diagnostic diagnostic) {
         try {
-            DiagnosticEntity entity = DiagnosticEntityMapper.toEntity(diagnostic);
-            entity.persist();
+            DiagnosticEntityMapper.toEntity(diagnostic).persist();
             return diagnostic;
         } catch (Exception e) {
-            throw new DiagnosticException(LogMessages.Diagnostic.DIAGNOSTIC_PERSIST_FAILED + ": " + diagnostic.getDiagnosticId(), "PersistenceError", e);
+            throw new DiagnosticException(
+                LogMessages.Diagnostic.DIAGNOSTIC_PERSIST_FAILED + ": " + diagnostic.getDiagnosticId(),
+                "PersistenceError", e);
         }
     }
 
@@ -36,11 +40,26 @@ public class DiagnosticRepositoryImpl implements DiagnosticRepository {
     @Transactional
     public Diagnostic update(Diagnostic diagnostic) {
         try {
-            DiagnosticEntity entity = DiagnosticEntityMapper.toEntity(diagnostic);
-            DiagnosticEntity.getEntityManager().merge(entity);
+            DiagnosticEntity.getEntityManager().merge(DiagnosticEntityMapper.toEntity(diagnostic));
             return diagnostic;
         } catch (Exception e) {
-            throw new DiagnosticException(LogMessages.Diagnostic.DIAGNOSTIC_UPDATE_FAILED + ": " + diagnostic.getDiagnosticId(), "UpdateError", e);
+            throw new DiagnosticException(
+                LogMessages.Diagnostic.DIAGNOSTIC_UPDATE_FAILED + ": " + diagnostic.getDiagnosticId(),
+                "UpdateError", e);
         }
+    }
+
+    @Override
+    public List<Diagnostic> findAll() {
+        return DiagnosticEntity.<DiagnosticEntity>listAll(Sort.by("createdAt").descending())
+            .stream()
+            .map(DiagnosticEntityMapper::toDomain)
+            .toList();
+    }
+
+    @Override
+    public Optional<Diagnostic> findById(String diagnosticId) {
+        return DiagnosticEntity.<DiagnosticEntity>findByIdOptional(diagnosticId)
+            .map(DiagnosticEntityMapper::toDomain);
     }
 }

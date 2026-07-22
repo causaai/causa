@@ -5,13 +5,23 @@ import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-import java.time.Instant;
+import java.time.OffsetDateTime;
 
 /**
- * Alert JPA Entity
+ * Alert JPA Entity — maps to the {@code alerts} table.
  *
- * <p>Database entity for storing alerts in the persistence layer.
- * <p>Extends {@link BaseEntity} for automatic created_at/updated_at timestamps.
+ * <p>Column mapping:
+ * <pre>
+ *   id               ← id
+ *   source_alert_id  ← sourceAlertId
+ *   alert_name       ← alertName
+ *   alert_timestamp  ← alertTimestamp
+ *   severity         ← severity
+ *   status           ← status           (ACCEPTED / REJECTED / PROCESSING / PROCESSED)
+ *   workload_info    ← workloadInfo     JSONB: pod_name, container_name, namespace, cluster_name, workload_type
+ *   workload_name    ← workloadName     denormalised container name for fast index lookups
+ *   alert_metadata   ← alertMetadata   JSONB: labels, annotations, alert_source
+ * </pre>
  *
  * @since 0.0.1
  */
@@ -19,160 +29,89 @@ import java.time.Instant;
 @Table(name = "alerts")
 public class AlertEntity extends BaseEntity {
 
-    // Database column name constants
-    public static final class Columns {
-        private Columns() {}
+    @Id
+    @Column(nullable = false, length = 21)
+    private String id;
 
-        public static final String ALERT_ID = "alert_id";
-        public static final String TIMESTAMP = "timestamp";
-        public static final String ALERT_NAME = "alert_name";
-        public static final String SEVERITY = "severity";
-        public static final String POD_NAME = "pod_name";
-        public static final String CONTAINER_NAME = "container_name";
-        public static final String NAMESPACE = "namespace";
-        public static final String STATUS = "status";
-        public static final String HAS_DIAGNOSTICS = "has_diagnostics";
-        public static final String LABELS = "labels";
-        public static final String ANNOTATIONS = "annotations";
-    }
+    @Column(length = 255)
+    private String sourceAlertId;
 
-    // Field name constants for Panache queries
+    @Column(nullable = false, length = 255)
+    private String alertName;
+
+    @Column
+    private OffsetDateTime alertTimestamp;
+
+    @Column(length = 32)
+    private String severity;
+
+    /** ACCEPTED / REJECTED / PROCESSING / PROCESSED */
+    @Column(nullable = false, length = 32)
+    private String status;
+
+    /**
+     * workload_info JSONB.
+     * Shape: {@code { "pod_name": "...", "container_name": "...", "namespace": "...",
+     *                  "cluster_name": "...", "workload_type": "..." }}
+     * Values are null where not available from the alert payload.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "workload_info", nullable = false, columnDefinition = "jsonb")
+    private JsonNode workloadInfo;
+
+    /** Denormalised container name for fast indexed lookups (maps to {@code workload_name} column). */
+    @Column(nullable = false, length = 255)
+    private String workloadName;
+
+    /**
+     * alert_metadata JSONB.
+     * Shape: {@code { "labels": {...}, "annotations": {...}, "alert_source": "prometheus" }}
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private JsonNode alertMetadata;
+
+    // -------------------------------------------------------------------------
+    // HQL field name constants — use in Panache queries to avoid magic strings
+    // -------------------------------------------------------------------------
+
     public static final class Fields {
         private Fields() {}
 
-        public static final String ALERT_ID = "alertId";
-        public static final String TIMESTAMP = "timestamp";
-        public static final String CONTAINER_NAME = "containerName";
-        public static final String NAMESPACE = "namespace";
-        public static final String SEVERITY = "severity";
-        public static final String HAS_DIAGNOSTICS = "hasDiagnostics";
-        public static final String LABELS = "labels";
-        public static final String ANNOTATIONS = "annotations";
+        public static final String ALERT_ID      = "id";
+        public static final String ALERT_NAME    = "alertName";
+        public static final String STATUS        = "status";
+        public static final String WORKLOAD_NAME = "workloadName";
     }
 
-    @Id
-    @Column(name = Columns.ALERT_ID, nullable = false, length = 512)
-    private String alertId;
-
-    @Column(name = Columns.TIMESTAMP, nullable = false)
-    private Instant timestamp;
-
-    @Column(name = Columns.ALERT_NAME, nullable = false, length = 255)
-    private String alertName;
-
-    @Column(name = Columns.SEVERITY, nullable = false, length = 20)
-    private String severity;
-
-    @Column(name = Columns.POD_NAME, length = 255)
-    private String podName;
-
-    @Column(name = Columns.CONTAINER_NAME, nullable = false, length = 255)
-    private String containerName;
-
-    @Column(name = Columns.NAMESPACE, nullable = false, length = 255)
-    private String namespace;
-
-    @Column(name = Columns.STATUS, nullable = false, length = 20)
-    private String status;
-
-    @Column(name = Columns.HAS_DIAGNOSTICS, nullable = false)
-    private Boolean hasDiagnostics = false;
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = Columns.LABELS, columnDefinition = "jsonb")
-    private JsonNode labels;
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = Columns.ANNOTATIONS, columnDefinition = "jsonb")
-    private JsonNode annotations;
-
+    // -------------------------------------------------------------------------
     // Getters and Setters
+    // -------------------------------------------------------------------------
 
-    public String getAlertId() {
-        return alertId;
-    }
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
 
-    public void setAlertId(String alertId) {
-        this.alertId = alertId;
-    }
+    public String getSourceAlertId() { return sourceAlertId; }
+    public void setSourceAlertId(String sourceAlertId) { this.sourceAlertId = sourceAlertId; }
 
-    public Instant getTimestamp() {
-        return timestamp;
-    }
+    public String getAlertName() { return alertName; }
+    public void setAlertName(String alertName) { this.alertName = alertName; }
 
-    public void setTimestamp(Instant timestamp) {
-        this.timestamp = timestamp;
-    }
+    public OffsetDateTime getAlertTimestamp() { return alertTimestamp; }
+    public void setAlertTimestamp(OffsetDateTime alertTimestamp) { this.alertTimestamp = alertTimestamp; }
 
-    public String getAlertName() {
-        return alertName;
-    }
+    public String getSeverity() { return severity; }
+    public void setSeverity(String severity) { this.severity = severity; }
 
-    public void setAlertName(String alertName) {
-        this.alertName = alertName;
-    }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
 
-    public String getSeverity() {
-        return severity;
-    }
+    public JsonNode getWorkloadInfo() { return workloadInfo; }
+    public void setWorkloadInfo(JsonNode v) { this.workloadInfo = v; }
 
-    public void setSeverity(String severity) {
-        this.severity = severity;
-    }
+    public String getWorkloadName() { return workloadName; }
+    public void setWorkloadName(String v) { this.workloadName = v; }
 
-    public String getPodName() {
-        return podName;
-    }
-
-    public void setPodName(String podName) {
-        this.podName = podName;
-    }
-
-    public String getContainerName() {
-        return containerName;
-    }
-
-    public void setContainerName(String containerName) {
-        this.containerName = containerName;
-    }
-
-    public String getNamespace() {
-        return namespace;
-    }
-
-    public void setNamespace(String namespace) {
-        this.namespace = namespace;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public Boolean getHasDiagnostics() {
-        return hasDiagnostics;
-    }
-
-    public void setHasDiagnostics(Boolean hasDiagnostics) {
-        this.hasDiagnostics = hasDiagnostics;
-    }
-
-    public JsonNode getLabels() {
-        return labels;
-    }
-
-    public void setLabels(JsonNode labels) {
-        this.labels = labels;
-    }
-
-    public JsonNode getAnnotations() {
-        return annotations;
-    }
-
-    public void setAnnotations(JsonNode annotations) {
-        this.annotations = annotations;
-    }
+    public JsonNode getAlertMetadata() { return alertMetadata; }
+    public void setAlertMetadata(JsonNode alertMetadata) { this.alertMetadata = alertMetadata; }
 }

@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.Statement;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -67,9 +68,22 @@ class HealthCheckServiceTest {
     private HealthCheckService healthCheckService;
 
     private static final String APP_VERSION = "0.0.1";
-    private static final String MCP_ENDPOINT = "http://localhost:8081";
+    private static final String MCP_K8S_ENDPOINT = "http://localhost:8081";
+    private static final String MCP_K8S_HEALTH_PATH = "/health";
+    private static final int MCP_K8S_TIMEOUT = 5000;
+    private static final String MCP_KRUIZE_ENDPOINT = "http://localhost:8082";
+    private static final String MCP_KRUIZE_HEALTH_PATH = "/health";
+    private static final int MCP_KRUIZE_TIMEOUT = 5000;
+    private static final String MCP_CRYOSTAT_HEALTH_ENDPOINT = "http://localhost:8083";
+    private static final String MCP_CRYOSTAT_HEALTH_PATH = "/health";
+    private static final int MCP_CRYOSTAT_TIMEOUT = 5000;
+    // 192.0.2.1 is RFC 5737 TEST-NET — guaranteed non-routable, always results in connection failure
+    private static final String MCP_ENDPOINT = "http://192.0.2.1";
     private static final String MCP_HEALTH_PATH = "/health";
-    private static final int MCP_TIMEOUT = 5000;
+    private static final int MCP_TIMEOUT = 1; // 1 ms — fail immediately, don't slow down tests
+    private static final String MCP_FILESYSTEM_ENDPOINT = "http://192.0.2.1";
+    private static final String MCP_FILESYSTEM_HEALTH_PATH = "/health";
+    private static final int MCP_FILESYSTEM_TIMEOUT = 1;
 
     @BeforeEach
     void setUp() {
@@ -77,9 +91,19 @@ class HealthCheckServiceTest {
                 databaseConnectionService,
                 dataSource,
                 APP_VERSION,
-                MCP_ENDPOINT,
-                MCP_HEALTH_PATH,
-                MCP_TIMEOUT,
+                "cluster",
+                MCP_K8S_ENDPOINT,
+                MCP_K8S_HEALTH_PATH,
+                MCP_K8S_TIMEOUT,
+                MCP_KRUIZE_ENDPOINT,
+                MCP_KRUIZE_HEALTH_PATH,
+                MCP_KRUIZE_TIMEOUT,
+                MCP_CRYOSTAT_HEALTH_ENDPOINT,
+                MCP_CRYOSTAT_HEALTH_PATH,
+                MCP_CRYOSTAT_TIMEOUT,
+                MCP_FILESYSTEM_ENDPOINT,
+                MCP_FILESYSTEM_HEALTH_PATH,
+                MCP_FILESYSTEM_TIMEOUT,
                 llmPromptSender,
                 llmConfig
         );
@@ -192,7 +216,7 @@ class HealthCheckServiceTest {
             // Given
             when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(true);
-            when(llmConfig.modelName()).thenReturn("claude-sonnet-4-6");
+            when(llmConfig.modelName()).thenReturn(Optional.of("claude-sonnet-4-6"));
             
             LLMResponse mockResponse = new LLMResponse(
                     "OK",
@@ -216,6 +240,40 @@ class HealthCheckServiceTest {
             assertTrue(llmHealth.getMessage().contains("claude-sonnet-4-6"));
             assertNotNull(llmHealth.getLatencyMs());
             assertTrue(llmHealth.getLatencyMs() >= 0);
+
+            verify(llmPromptSender).isReady();
+            verify(llmPromptSender).send(any(LLMRequest.class));
+        }
+
+        @Test
+        @DisplayName("Should return UP with 'unknown' fallback when modelName is absent")
+        void shouldReturnUpWithUnknownFallbackWhenModelNameAbsent() {
+            // Given
+            when(databaseConnectionService.isReady()).thenReturn(false);
+            when(llmPromptSender.isReady()).thenReturn(true);
+            when(llmConfig.modelName()).thenReturn(Optional.empty());
+
+            LLMResponse mockResponse = new LLMResponse(
+                    "OK",
+                    "unknown",
+                    11L,
+                    4L,
+                    0L,
+                    0L,
+                    100L
+            );
+            when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(mockResponse);
+
+            // When
+            HealthCheckResponseDto response = healthCheckService.getSystemHealth();
+
+            // Then
+            assertNotNull(response);
+            ComponentHealthDto llmHealth = response.getComponents().get(HealthCheckConstants.ComponentNames.LLM_PROVIDER);
+            assertNotNull(llmHealth);
+            assertEquals(AppConstants.HealthStatus.UP.getValue(), llmHealth.getStatus());
+            assertTrue(llmHealth.getMessage().contains("unknown"),
+                    "Expected message to contain 'unknown' fallback, but was: " + llmHealth.getMessage());
 
             verify(llmPromptSender).isReady();
             verify(llmPromptSender).send(any(LLMRequest.class));
@@ -323,7 +381,7 @@ class HealthCheckServiceTest {
 
             // Given - LLM UP
             when(llmPromptSender.isReady()).thenReturn(true);
-            when(llmConfig.modelName()).thenReturn("claude-sonnet-4-6");
+            when(llmConfig.modelName()).thenReturn(Optional.of("claude-sonnet-4-6"));
             LLMResponse mockResponse = new LLMResponse("OK", "claude-sonnet-4-6", 11L, 4L, 0L, 0L, 100L);
             when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(mockResponse);
 
@@ -344,7 +402,7 @@ class HealthCheckServiceTest {
 
             // Given - LLM UP
             when(llmPromptSender.isReady()).thenReturn(true);
-            when(llmConfig.modelName()).thenReturn("claude-sonnet-4-6");
+            when(llmConfig.modelName()).thenReturn(Optional.of("claude-sonnet-4-6"));
             LLMResponse mockResponse = new LLMResponse("OK", "claude-sonnet-4-6", 11L, 4L, 0L, 0L, 100L);
             when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(mockResponse);
 

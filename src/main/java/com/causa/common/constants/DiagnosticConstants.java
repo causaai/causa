@@ -14,6 +14,49 @@ public final class DiagnosticConstants {
     }
 
     /**
+     * Field name constants for structured logging
+     */
+    public static final String FIELD_ALERT_ID = "alertId";
+    public static final String FIELD_DIAGNOSTIC_ID = "diagnosticId";
+    public static final String FIELD_STATUS = "status";
+    public static final String FIELD_SYSTEM_PROMPT_LENGTH = "systemPromptLength";
+    public static final String FIELD_USER_PROMPT_LENGTH = "userPromptLength";
+    public static final String FIELD_CONTEXT_LENGTH = "contextLength";
+
+    /**
+     * Logging field names for diagnostics.
+     */
+    public static final class Fields {
+        private Fields() {}
+
+        public static final String DIAGNOSTIC_ID = "diagnosticId";
+    }
+
+    /**
+     * Structured logging field name constants for the diagnostic pipeline.
+     */
+    public static final class LogFields {
+        private LogFields() {}
+
+        public static final String DIAGNOSTIC_ID        = "diagnosticId";
+        public static final String ALERT_ID             = "alertId";
+        public static final String STATUS               = "status";
+        public static final String HAS_K8S_CONTEXT      = "hasK8sContext";
+        public static final String HAS_KRUIZE_CONTEXT   = "hasKruizeContext";
+        public static final String HAS_CRYOSTAT_CONTEXT = "hasCryostatContext";
+        public static final String VALIDATION_RESULT    = "validationResult";
+        public static final String CONFIDENCE_SCORE     = "confidenceScore";
+    }
+
+    // Logging format constants
+    public static final int SEPARATOR_LENGTH = 80;
+    public static final String SEPARATOR_CHAR = "=";
+    public static final String CONTEXT_HEADER = "COLLECTED DIAGNOSTIC CONTEXT (LLM-Ready)";
+    public static final String NEWLINE = "\n";
+
+
+
+    /**
      * Diagnostic Status
      *
      * <p>Defines the lifecycle status of a diagnostic analysis.
@@ -22,6 +65,7 @@ public final class DiagnosticConstants {
 
         PENDING("PENDING"),
         IN_PROGRESS("IN_PROGRESS"),
+        VALIDATING("VALIDATING"),
         COMPLETED("COMPLETED"),
         FAILED("FAILED");
 

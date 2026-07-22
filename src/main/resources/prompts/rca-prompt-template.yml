@@ -197,6 +197,7 @@ vertex-ai-anthropic:
 
     {
       "issue_title": "<Concise one-line summary (max 100 chars)>",
+      "issue_summary": "<1-2 sentence AI summary in very simple language of what happened and why. Example: 'The app ran out of memory and crashed because it was handling more data than it was configured to handle.' No technical jargon — write as if explaining to a non-technical person.>",
       "issue_description": "<NON-TECHNICAL description for general users (2-4 sentences). Use plain English: 'ran out of memory', 'stopped working', 'memory usage too high'. Avoid: GC, JVM, heap, OOM, pod, container, Kubernetes terms.>",
       "technical_description": "<DETAILED technical analysis for developers (6-10 sentences). Include: memory values, GC behavior, allocation patterns, heap pools, container limits. Reference all available signals (logs, metrics, JFR, events). Provide complete technical narrative of failure sequence.>",
       "anomaly_type": "<EXACTLY ONE OF: OOM_KILLED | POSSIBLE_OOM_KILLED | POSSIBLE_GC_PAUSE | HEALTHY>",
@@ -254,7 +255,7 @@ vertex-ai-anthropic:
     2. **Anomaly Categorization**: Use EXACTLY ONE of the allowed types. Do NOT use HEALTHY if there are memory issues, high memory pressure (>75%), or GC problems.
     3. **Evidence Requirements**: All evidences MUST be directly observable in provided signals. Supporting logs MUST be verbatim quotes from APPLICATION_LOGS. Do NOT construct, assume, or infer evidence.
     4. **Signal Handling**: Work with whatever signals are provided. Note missing signals in llm_notes and adjust confidence scores. Do not assume data that wasn't provided.
-    5. **Language**: issue_description: Plain, non-technical language for general users. technical_description: Full technical detail for developers.
+    5. **Language**: issue_summary: 1-2 sentences, plain everyday language, no jargon — the simplest possible explanation of what happened and why. issue_description: Plain, non-technical language for general users. technical_description: Full technical detail for developers.
     6. **Recommendations Structure**: Provide EXACTLY 3 recommendations with solution_type: "Immediate Mitigation", "Validate & Monitor", "Root Cause Fix". Each must have solution_confidence_score (0.0-1.0) and solution_alerts array (populate only when confidence < 0.7 or critical data missing).
     7. **Implementation Notes**: Must be detailed step-by-step instructions with actual commands, file paths, code locations, and monitoring queries. Include placeholders like <deployment-name>, <namespace>, <pod-name> that users can replace.
     8. **Solution Alerts**: Add alerts ONLY when solution confidence is low (<0.7). Explicitly state which signals are missing and how it impacts the solution reliability. Example: "APPLICATION_LOGS not available - cannot pinpoint exact memory leak location"
@@ -461,6 +462,7 @@ direct-anthropic:
 
     {
       "issue_title": "<Concise one-line summary (max 100 chars)>",
+      "issue_summary": "<1-2 sentence AI summary in very simple language of what happened and why. Example: 'The app ran out of memory and crashed because it was handling more data than it was configured to handle.' No technical jargon — write as if explaining to a non-technical person.>",
       "issue_description": "<NON-TECHNICAL description for general users (2-4 sentences). Use plain English: 'ran out of memory', 'stopped working', 'memory usage too high'. Avoid: GC, JVM, heap, OOM, pod, container, Kubernetes terms.>",
       "technical_description": "<DETAILED technical analysis for developers (6-10 sentences). Include: memory values, GC behavior, allocation patterns, heap pools, container limits. Reference all available signals (logs, metrics, JFR, events). Provide complete technical narrative of failure sequence.>",
       "anomaly_type": "<EXACTLY ONE OF: OOM_KILLED | POSSIBLE_OOM_KILLED | POSSIBLE_GC_PAUSE | HEALTHY>",
@@ -518,7 +520,7 @@ direct-anthropic:
     2. **Anomaly Categorization**: Use EXACTLY ONE of the allowed types. Do NOT use HEALTHY if there are memory issues, high memory pressure (>75%), or GC problems.
     3. **Evidence Requirements**: All evidences MUST be directly observable in provided signals. Supporting logs MUST be verbatim quotes from APPLICATION_LOGS. Do NOT construct, assume, or infer evidence.
     4. **Signal Handling**: Work with whatever signals are provided. Note missing signals in llm_notes and adjust confidence scores. Do not assume data that wasn't provided.
-    5. **Language**: issue_description: Plain, non-technical language for general users. technical_description: Full technical detail for developers.
+    5. **Language**: issue_summary: 1-2 sentences, plain everyday language, no jargon — the simplest possible explanation of what happened and why. issue_description: Plain, non-technical language for general users. technical_description: Full technical detail for developers.
     6. **Recommendations Structure**: Provide EXACTLY 3 recommendations with solution_type: "Immediate Mitigation", "Validate & Monitor", "Root Cause Fix". Each must have solution_confidence_score (0.0-1.0) and solution_alerts array (populate only when confidence < 0.7 or critical data missing).
     7. **Implementation Notes**: Must be detailed step-by-step instructions with actual commands, file paths, code locations, and monitoring queries. Include placeholders like <deployment-name>, <namespace>, <pod-name> that users can replace.
     8. **Solution Alerts**: Add alerts ONLY when solution confidence is low (<0.7). Explicitly state which signals are missing and how it impacts the solution reliability. Example: "APPLICATION_LOGS not available - cannot pinpoint exact memory leak location"
@@ -725,6 +727,7 @@ bob:
 
     {
       "issue_title": "<Concise one-line summary (max 100 chars)>",
+      "issue_summary": "<1-2 sentence AI summary in very simple language of what happened and why. Example: 'The app ran out of memory and crashed because it was handling more data than it was configured to handle.' No technical jargon — write as if explaining to a non-technical person.>",
       "issue_description": "<NON-TECHNICAL description for general users (2-4 sentences). Use plain English: 'ran out of memory', 'stopped working', 'memory usage too high'. Avoid: GC, JVM, heap, OOM, pod, container, Kubernetes terms.>",
       "technical_description": "<DETAILED technical analysis for developers (6-10 sentences). Include: memory values, GC behavior, allocation patterns, heap pools, container limits. Reference all available signals (logs, metrics, JFR, events). Provide complete technical narrative of failure sequence.>",
       "anomaly_type": "<EXACTLY ONE OF: OOM_KILLED | POSSIBLE_OOM_KILLED | POSSIBLE_GC_PAUSE | HEALTHY>",
@@ -782,7 +785,7 @@ bob:
     2. **Anomaly Categorization**: Use EXACTLY ONE of the allowed types. Do NOT use HEALTHY if there are memory issues, high memory pressure (>75%), or GC problems.
     3. **Evidence Requirements**: All evidences MUST be directly observable in provided signals. Supporting logs MUST be verbatim quotes from APPLICATION_LOGS. Do NOT construct, assume, or infer evidence.
     4. **Signal Handling**: Work with whatever signals are provided. Note missing signals in llm_notes and adjust confidence scores. Do not assume data that wasn't provided.
-    5. **Language**: issue_description: Plain, non-technical language for general users. technical_description: Full technical detail for developers.
+    5. **Language**: issue_summary: 1-2 sentences, plain everyday language, no jargon — the simplest possible explanation of what happened and why. issue_description: Plain, non-technical language for general users. technical_description: Full technical detail for developers.
     6. **Recommendations Structure**: Provide EXACTLY 3 recommendations with solution_type: "Immediate Mitigation", "Validate & Monitor", "Root Cause Fix". Each must have solution_confidence_score (0.0-1.0) and solution_alerts array (populate only when confidence < 0.7 or critical data missing).
     7. **Implementation Notes**: Must be detailed step-by-step instructions with actual commands, file paths, code locations, and monitoring queries. Include placeholders like <deployment-name>, <namespace>, <pod-name> that users can replace.
     8. **Solution Alerts**: Add alerts ONLY when solution confidence is low (<0.7). Explicitly state which signals are missing and how it impacts the solution reliability. Example: "APPLICATION_LOGS not available - cannot pinpoint exact memory leak location"
