@@ -29,7 +29,7 @@ public class ConfigurationRepositoryImpl implements ConfigurationRepository {
     }
 
     @Override
-    @Transactional
+    @Transactional(Transactional.TxType.SUPPORTS)
     public List<ConfigEntry> findAll() {
         return ConfigurationEntity.<ConfigurationEntity>listAll()
             .stream()

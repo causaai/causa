@@ -1,6 +1,7 @@
 package com.causa.common.constants;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -89,7 +90,7 @@ public final class ConfigConstants {
 
     /** All known categories derived from the registry (llm, alerts, cluster). */
     public static final Set<String> VALID_CATEGORIES = REGISTRY.stream()
-        .map(KeyDef::category)
+        .map(k -> k.category().toLowerCase(Locale.ROOT))
         .collect(Collectors.toUnmodifiableSet());
 
     /** Sensitive keys that require encryption in DB and masking in API responses. */
@@ -135,7 +136,7 @@ public final class ConfigConstants {
     public static String categoryOf(String key) {
         return REGISTRY.stream()
             .filter(k -> k.name().equals(key))
-            .map(KeyDef::category)
+            .map(k -> k.category().toLowerCase(Locale.ROOT))
             .findFirst()
             .orElse(null);
     }

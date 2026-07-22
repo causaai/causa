@@ -74,6 +74,13 @@ public class ConfigServiceImpl implements ConfigService {
 
     @Override
     public void update(String key, String value) {
+        if (key == null || key.isBlank()) {
+            throw new IllegalArgumentException("Config key must not be null or blank");
+        }
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("Config value must not be null or blank for key: " + key);
+        }
+
         boolean isSensitive = ConfigConstants.isSensitive(key);
         String valueToStore = isSensitive ? EncryptionUtils.encrypt(value) : value;
 
