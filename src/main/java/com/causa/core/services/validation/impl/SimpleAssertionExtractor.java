@@ -26,7 +26,6 @@ import java.util.stream.Collectors;
  * @since 0.0.1
  */
 @ApplicationScoped
-@io.quarkus.arc.properties.UnlessBuildProperty(name = "causa.validation.assertion-extractor", stringValue = "llm")
 public class SimpleAssertionExtractor implements AssertionExtractor {
 
     private static final CausaLogger log = CausaLogger.getLogger(SimpleAssertionExtractor.class);
