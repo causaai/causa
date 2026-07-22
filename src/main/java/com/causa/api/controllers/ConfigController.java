@@ -114,15 +114,15 @@ public class ConfigController {
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     public Response updateConfigs(ConfigUpdateRequest request) {
-        log.info("POST /api/v1/configs")
-            .field("keys_count", request.configs().size())
-            .log();
-
         if (request.configs() == null || request.configs().isEmpty()) {
             return Response.status(Response.Status.BAD_REQUEST)
                 .entity("No configs provided")
                 .build();
         }
+
+        log.info("POST /api/v1/configs")
+            .field("keys_count", request.configs().size())
+            .log();
 
         List<ConfigResponse> updated = new ArrayList<>();
         List<ConfigUpdateResponse.RejectedConfig> rejected = new ArrayList<>();

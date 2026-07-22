@@ -55,11 +55,10 @@ public class ConfigurationRepositoryImpl implements ConfigurationRepository {
             .firstResultOptional();
 
         if (existing.isPresent()) {
-            // Update existing entry
+            // Managed entity — mutations are flushed automatically at transaction commit
             ConfigurationEntity entity = existing.get();
             entity.setConfigValue(value);
             entity.setEncrypted(encrypted);
-            entity.persist();
         } else {
             // Insert new entry
             ConfigurationEntity entity = new ConfigurationEntity();
