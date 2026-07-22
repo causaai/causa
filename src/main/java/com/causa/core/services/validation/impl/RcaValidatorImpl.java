@@ -192,14 +192,13 @@ public class RcaValidatorImpl implements RcaValidator {
                 case UNKNOWN -> "❓";
             };
 
-            log.info(String.format("  [%d] %s %s | Status: %s, Confidence: %.2f, Evidence: %d supporting / %d refuting",
+            log.info(String.format("  [%d] %s %s | Status: %s, Confidence: %.2f, Evidence: %d supporting",
                     i+1,
                     statusIcon,
                     result.assertion().text(),
                     result.status(),
                     result.confidence(),
-                    result.supportingEvidence().size(),
-                    result.refutingEvidence().size()))
+                    result.supportingEvidence().size()))
                 .field("assertionId", result.assertion().id())
                 .log();
         }
@@ -271,7 +270,6 @@ public class RcaValidatorImpl implements RcaValidator {
                      separator + "\n" +
                      "Final Status: " + dualValidation.finalVerdict().status() + "\n" +
                      "Final Confidence: " + String.format("%.2f", dualValidation.finalVerdict().confidence()) + "\n" +
-                     "Strategy: " + dualValidation.finalVerdict().strategy() + "\n" +
                      "PATH A Confidence: " + String.format("%.2f", dualValidation.assertionBasedVerdict().confidence()) + "\n" +
                      "PATH B Confidence: " + String.format("%.2f", dualValidation.ruleBasedVerdict().getConfidence()) + "\n" +
                      separator)
@@ -317,18 +315,12 @@ public class RcaValidatorImpl implements RcaValidator {
 
         // Recommendations don't need validation - they are suggestions
         if (assertion.type() == Assertion.AssertionType.RECOMMENDATION) {
-            return ValidationResult.unknown(
-                assertion,
-                "Recommendations are not validated against evidence"
-            );
+            return ValidationResult.unknown(assertion, "Recommendations are not validated");
         }
 
         // No evidence found
         if (evidence.isEmpty()) {
-            return ValidationResult.unknown(
-                assertion,
-                "No evidence found in diagnostic context"
-            );
+            return ValidationResult.unknown(assertion, "No evidence found in diagnostic context");
         }
 
         // Separate supporting vs refuting evidence
@@ -340,21 +332,13 @@ public class RcaValidatorImpl implements RcaValidator {
         supportingEvidence.addAll(evidence);
 
         // Calculate confidence based on evidence strength
-        double confidence = calculateConfidence(supportingEvidence, refutingEvidence);
+        double confidence = calculateConfidence(supportingEvidence, new ArrayList<>());
 
         // Determine validation status
         ValidationResult.ValidationStatus status = determineStatus(
             confidence,
             supportingEvidence.size(),
-            refutingEvidence.size()
-        );
-
-        // Generate explanation
-        String explanation = generateExplanation(
-            status,
-            confidence,
-            supportingEvidence.size(),
-            refutingEvidence.size()
+            0
         );
 
         return new ValidationResult(
@@ -363,7 +347,7 @@ public class RcaValidatorImpl implements RcaValidator {
             confidence,
             supportingEvidence,
             refutingEvidence,
-            java.util.Optional.of(explanation)
+            Optional.empty()
         );
     }
 

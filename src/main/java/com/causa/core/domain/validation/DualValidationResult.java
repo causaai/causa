@@ -55,7 +55,8 @@ public record DualValidationResult(
     public record FinalVerdict(
         ValidationResult.ValidationStatus status,
         double confidence,
-        String technicalExplanation
+        AggregationStrategy strategy,
+        String explanation
     ) {
         public enum AggregationStrategy {
             /**
@@ -77,6 +78,14 @@ public record DualValidationResult(
              * Rule-based takes priority (deterministic wins).
              */
             RULE_BASED_PRIORITY
+        }
+
+        public boolean isSupported() {
+            return status == ValidationResult.ValidationStatus.SUPPORTED;
+        }
+
+        public boolean isHighConfidence() {
+            return confidence >= 0.8;
         }
     }
 

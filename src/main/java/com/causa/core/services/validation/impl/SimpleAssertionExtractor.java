@@ -154,7 +154,7 @@ public class SimpleAssertionExtractor implements AssertionExtractor {
         String id = generateAssertionId(sentence);
         Assertion.AssertionType type = classifyAssertion(sentence, source);
 
-        return Assertion.of(id, sentence, type, source, relatedField);
+        return Assertion.of(id, sentence, type, source);
     }
 
     /**
