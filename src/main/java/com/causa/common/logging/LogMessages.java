@@ -167,6 +167,7 @@ public final class LogMessages {
         public static final String LLM_RESPONSE_RECEIVED        = "LLM response received";
         public static final String RCA_GENERATED_SUCCESS        = "RCA generated successfully";
         public static final String RCA_GENERATION_FAILED        = "RCA generation failed";
+        public static final String RCA_VALIDATION_STARTED       = "RCA validation started";
 
         // RCA Prompt Building
         public static final String RCA_PROMPT_BUILT = "RCA prompt built";

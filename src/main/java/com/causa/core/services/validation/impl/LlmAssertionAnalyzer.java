@@ -63,9 +63,9 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
     /**
      * Determines the model type for template selection based on LLM configuration.
      */
-    private String determineModelType(LLMConfig config) {
-        String provider = config.getProvider().orElse("");
-        String modelName = config.getModelName().orElse("");
+    private String determineModelType(com.causa.config.LlmConfigSnapshot config) {
+        String provider = config.getProvider();
+        String modelName = config.getModelName();
 
         // Check for BOB/Granite models
         if (!modelName.isEmpty() && (
