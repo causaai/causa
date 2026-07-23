@@ -16,6 +16,7 @@ import java.util.Optional;
  * @param context Additional context to prepend to the system prompt (optional, e.g., RAG results)
  * @param modelOverride Override the configured default model (optional)
  * @param enableCaching Whether to use prompt caching (optional, defaults to config)
+ * @param enableSkills Whether to expose skills to the LLM (optional, defaults to true)
  * @param maxTokens Maximum response tokens (optional, defaults to config)
  * @param temperature Sampling temperature 0.0-1.0 (optional, defaults to config)
  * @since 0.0.1
@@ -26,6 +27,7 @@ public record LLMRequest(
     Optional<String> context,
     Optional<String> modelOverride,
     Optional<Boolean> enableCaching,
+    Optional<Boolean> enableSkills,
     Optional<Integer> maxTokens,
     Optional<Double> temperature
 ) {
@@ -40,6 +42,7 @@ public record LLMRequest(
         context = context != null ? context : Optional.empty();
         modelOverride = modelOverride != null ? modelOverride : Optional.empty();
         enableCaching = enableCaching != null ? enableCaching : Optional.empty();
+        enableSkills = enableSkills != null ? enableSkills : Optional.of(true);
         maxTokens = maxTokens != null ? maxTokens : Optional.empty();
         temperature = temperature != null ? temperature : Optional.empty();
 
@@ -85,7 +88,7 @@ public record LLMRequest(
      */
     public static LLMRequest of(String prompt) {
         return new LLMRequest(prompt, Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.of(true), Optional.empty(), Optional.empty());
     }
 
     /**
@@ -107,6 +110,7 @@ public record LLMRequest(
         private Optional<String> context = Optional.empty();
         private Optional<String> modelOverride = Optional.empty();
         private Optional<Boolean> enableCaching = Optional.empty();
+        private Optional<Boolean> enableSkills = Optional.of(true);
         private Optional<Integer> maxTokens = Optional.empty();
         private Optional<Double> temperature = Optional.empty();
 
@@ -134,6 +138,11 @@ public record LLMRequest(
             return this;
         }
 
+        public Builder enableSkills(boolean enableSkills) {
+            this.enableSkills = Optional.of(enableSkills);
+            return this;
+        }
+
         public Builder maxTokens(int maxTokens) {
             this.maxTokens = Optional.of(maxTokens);
             return this;
@@ -146,7 +155,7 @@ public record LLMRequest(
 
         public LLMRequest build() {
             return new LLMRequest(prompt, systemPrompt, context, modelOverride,
-                    enableCaching, maxTokens, temperature);
+                    enableCaching, enableSkills, maxTokens, temperature);
         }
     }
 }

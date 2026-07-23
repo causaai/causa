@@ -167,4 +167,29 @@ public interface LLMConfig {
         @WithDefault("bob")
         String shellPath();
     }
+
+    /**
+     * Skills configuration.
+     *
+     * @return the skills config
+     */
+    @WithName("skills")
+    SkillsConfig skills();
+
+    /**
+     * Skills configuration.
+     *
+     * <p>Controls whether the skills system is globally enabled.
+     * Can be overridden per-request via {@link com.causa.core.domain.LLMRequest#enableSkills()}.
+     */
+    interface SkillsConfig {
+        /**
+         * Whether skills are globally enabled.
+         *
+         * @return {@code true} if skills are enabled (default {@code true})
+         */
+        @WithName("enabled")
+        @WithDefault("true")
+        boolean enabled();
+    }
 }
