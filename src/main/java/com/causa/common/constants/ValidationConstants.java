@@ -30,6 +30,16 @@ public final class ValidationConstants {
         public static final String VALIDATION_ASSERTION_NULL = "Assertion cannot be null";
         public static final String VALIDATION_STATUS_NULL = "Validation status cannot be null";
         public static final String VALIDATION_CONFIDENCE_RANGE = "Confidence must be between 0.0 and 1.0";
+
+        // Evidence validation errors
+        public static final String EVIDENCE_SOURCE_BLANK = "Evidence source cannot be blank";
+        public static final String EVIDENCE_TYPE_NULL = "Evidence type cannot be null";
+        public static final String EVIDENCE_SNIPPET_BLANK = "Evidence snippet cannot be blank";
+        public static final String EVIDENCE_RELEVANCE_RANGE = "Relevance score must be between 0.0 and 1.0";
+
+        // ValidatedRCA errors
+        public static final String VALIDATED_RCA_ORIGINAL_NULL = "Original RCA cannot be null";
+        public static final String VALIDATED_RCA_SUMMARY_NULL = "Validation summary cannot be null";
     }
 
     /**

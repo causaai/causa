@@ -1,5 +1,7 @@
 package com.causa.core.domain.validation;
 
+import com.causa.common.constants.ValidationConstants;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -30,16 +32,17 @@ public record Evidence(
      */
     public Evidence {
         if (source == null || source.isBlank()) {
-            throw new IllegalArgumentException("Evidence source cannot be blank");
+            throw new IllegalArgumentException(ValidationConstants.ErrorMessages.EVIDENCE_SOURCE_BLANK);
         }
         if (type == null) {
-            throw new IllegalArgumentException("Evidence type cannot be null");
+            throw new IllegalArgumentException(ValidationConstants.ErrorMessages.EVIDENCE_TYPE_NULL);
         }
         if (snippet == null || snippet.isBlank()) {
-            throw new IllegalArgumentException("Evidence snippet cannot be blank");
+            throw new IllegalArgumentException(ValidationConstants.ErrorMessages.EVIDENCE_SNIPPET_BLANK);
         }
-        if (relevanceScore < 0.0 || relevanceScore > 1.0) {
-            throw new IllegalArgumentException("Relevance score must be between 0.0 and 1.0");
+        if (relevanceScore < ValidationConstants.Thresholds.MIN_CONFIDENCE ||
+            relevanceScore > ValidationConstants.Thresholds.MAX_CONFIDENCE) {
+            throw new IllegalArgumentException(ValidationConstants.ErrorMessages.EVIDENCE_RELEVANCE_RANGE);
         }
         if (structuredData == null) {
             structuredData = Optional.empty();

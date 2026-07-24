@@ -104,7 +104,7 @@ public record DualValidationResult(
      * Check if validation has high confidence.
      */
     public boolean isHighConfidence() {
-        return finalVerdict.confidence() >= 0.8;
+        return finalVerdict.confidence() >= ValidationConstants.Thresholds.HIGH_CONFIDENCE_THRESHOLD;
     }
 
     /**
