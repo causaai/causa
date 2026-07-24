@@ -1,6 +1,7 @@
 package com.causa.llm.skill;
 
 import com.causa.common.logging.CausaLogger;
+import com.causa.common.logging.LogMessages;
 import com.causa.config.LLMConfig;
 import dev.langchain4j.skills.ClassPathSkillLoader;
 import dev.langchain4j.skills.FileSystemSkillLoader;
@@ -54,15 +55,21 @@ public class SkillsConfiguration {
     @ApplicationScoped
     public Skills produceSkills() {
 
+        // --- 0. Short-circuit when skills are globally disabled ---
+        if (!config.skills().enabled()) {
+            log.info(LogMessages.Skills.SKILLS_DISABLED).log();
+            return Skills.from(List.of());
+        }
+
         // --- 1. Load bundled classpath skills ---
         List<Skill> bundled = new ArrayList<>();
         try {
             bundled = ClassPathSkillLoader.loadSkills(SKILLS_CLASSPATH);
-            log.info("Bundled classpath skills loaded")
+            log.info(LogMessages.Skills.CLASSPATH_SKILLS_LOADED)
                     .field("bundled_count", bundled.size())
                     .log();
         } catch (Exception e) {
-            log.error("Failed to load bundled skills from classpath")
+            log.error(LogMessages.Skills.CLASSPATH_SKILLS_FAILED)
                     .exception(e)
                     .log();
         }
@@ -71,22 +78,22 @@ public class SkillsConfiguration {
         List<Skill> external = new ArrayList<>();
         String skillsDir = config.skills().skillsDir().filter(s -> !s.isBlank()).orElse(null);
         if (skillsDir == null) {
-            log.info("No external skills directory configured (LLM_SKILLS_DIR not set)").log();
+            log.info(LogMessages.Skills.SKILLS_DIR_NOT_SET).log();
         } else {
             Path dir = Path.of(skillsDir);
             if (!Files.isDirectory(dir)) {
-                log.info("External skills directory does not exist, skipping")
+                log.info(LogMessages.Skills.FS_SKILLS_DIR_MISSING)
                         .field("skills_dir", skillsDir)
                         .log();
             } else {
                 try {
                     external = new ArrayList<>(FileSystemSkillLoader.loadSkills(dir));
-                    log.info("External filesystem skills loaded")
+                    log.info(LogMessages.Skills.FS_SKILLS_LOADED)
                             .field("skills_dir", skillsDir)
                             .field("external_count", external.size())
                             .log();
                 } catch (Exception e) {
-                    log.error("Failed to load external skills from filesystem")
+                    log.error(LogMessages.Skills.FS_SKILLS_FAILED)
                             .field("skills_dir", skillsDir)
                             .exception(e)
                             .log();
@@ -103,7 +110,7 @@ public class SkillsConfiguration {
             merged.put(s.name(), s);
         }
 
-        log.info("Skills merged")
+        log.info(LogMessages.Skills.SKILLS_MERGED)
                 .field("bundled_count", bundled.size())
                 .field("external_count", external.size())
                 .field("merged_count", merged.size())

@@ -244,4 +244,20 @@ public final class LogMessages {
         public static final String MCP_FILESYSTEM_FILE_SKIPPED_WINDOW = "Skipping Liberty log file — outside alert time window";
         public static final String MCP_FILESYSTEM_FFDC_LIST = "Filesystem MCP list_directory_with_sizes called for Liberty FFDC directory";
     }
+
+    /**
+     * Skills loading log messages.
+     */
+    public static final class Skills {
+        private Skills() {}
+
+        public static final String SKILLS_DISABLED         = "Skills globally disabled; skipping classpath and filesystem loading";
+        public static final String SKILLS_DIR_NOT_SET      = "No external skills directory configured";
+        public static final String CLASSPATH_SKILLS_LOADED = "Bundled classpath skills loaded";
+        public static final String CLASSPATH_SKILLS_FAILED = "Failed to load bundled skills from classpath";
+        public static final String FS_SKILLS_DIR_MISSING   = "External skills directory does not exist, skipping";
+        public static final String FS_SKILLS_LOADED        = "External filesystem skills loaded";
+        public static final String FS_SKILLS_FAILED        = "Failed to load external skills from filesystem";
+        public static final String SKILLS_MERGED           = "Skills merged";
+    }
 }
