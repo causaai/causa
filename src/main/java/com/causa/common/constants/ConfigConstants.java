@@ -9,7 +9,7 @@ import java.util.stream.Collectors;
  * Configuration Constants Registry
  *
  * <p>Central source of truth for all runtime-configurable application settings.
- * Defines 21 known configuration keys with their metadata (category, type, sensitivity).
+ * Defines 22 known configuration keys with their metadata (category, type, sensitivity).
  *
  * <p>Keys are seeded from DB at startup. Missing keys are resolved from MicroProfile Config
  * (ENV → system props → application.yml) and persisted to the DB for subsequent boots.
@@ -55,7 +55,7 @@ public final class ConfigConstants {
      * Adding a new key = one line here.
      */
     private static final List<KeyDef> REGISTRY = List.of(
-        // LLM Configuration (15 keys)
+        // LLM Configuration (16 keys)
         key("LLM_PROVIDER",                    "llm", ValueType.STRING,  false, "causa.llm.provider"),
         key("LLM_MODEL_NAME",                  "llm", ValueType.STRING,  false, "causa.llm.model-name"),
         key("LLM_BASE_URL",                    "llm", ValueType.STRING,  false, "causa.llm.base-url"),
@@ -71,6 +71,7 @@ public final class ConfigConstants {
         key("BOB_SHELL_PATH",                  "llm", ValueType.STRING,  false, "causa.llm.bob.shell-path"),
         key("GOOGLE_APPLICATION_CREDENTIALS",  "llm", ValueType.STRING,  true,  "causa.llm.google-application-credentials"),
         key("LLM_SKILLS_ENABLED",              "llm", ValueType.BOOLEAN, false, "causa.llm.skills.enabled"),
+        key("LLM_SKILLS_DIR",                  "llm", ValueType.STRING,  false, "causa.llm.skills.skills-dir"),
 
         // Alert Configuration (4 keys)
         key("ALERT_FILTER_SEVERITY",           "alerts", ValueType.STRING,  false, "causa.alerts.filter-severity"),
