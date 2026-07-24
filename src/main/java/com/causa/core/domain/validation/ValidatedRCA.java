@@ -1,5 +1,6 @@
 package com.causa.core.domain.validation;
 
+import com.causa.common.constants.ValidationConstants;
 import com.causa.core.domain.RootCauseAnalysis;
 
 import java.time.Instant;
@@ -40,7 +41,7 @@ public record ValidatedRCA(
      */
     public ValidatedRCA {
         if (originalRca == null) {
-            throw new IllegalArgumentException("Original RCA cannot be null");
+            throw new IllegalArgumentException(ValidationConstants.ErrorMessages.VALIDATED_RCA_ORIGINAL_NULL);
         }
         if (validationResults == null) {
             validationResults = Collections.emptyList();
@@ -48,7 +49,7 @@ public record ValidatedRCA(
             validationResults = Collections.unmodifiableList(new ArrayList<>(validationResults));
         }
         if (summary == null) {
-            throw new IllegalArgumentException("Validation summary cannot be null");
+            throw new IllegalArgumentException(ValidationConstants.ErrorMessages.VALIDATED_RCA_SUMMARY_NULL);
         }
         // dualValidation can be null for backward compatibility
         if (validatedAt == null) {
@@ -75,9 +76,9 @@ public record ValidatedRCA(
      */
     public boolean isHighConfidence() {
         if (dualValidation != null) {
-            return dualValidation.finalVerdict().confidence() >= 0.8;
+            return dualValidation.finalVerdict().confidence() >= ValidationConstants.Thresholds.HIGH_CONFIDENCE_THRESHOLD;
         }
-        return summary.averageConfidence() >= 0.8; // Backward compatibility
+        return summary.averageConfidence() >= ValidationConstants.Thresholds.HIGH_CONFIDENCE_THRESHOLD; // Backward compatibility
     }
 
     /**

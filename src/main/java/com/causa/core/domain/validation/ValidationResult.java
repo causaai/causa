@@ -133,7 +133,7 @@ public record ValidationResult(
      * Returns true if strong evidence was found (high confidence).
      */
     public boolean hasStrongEvidence() {
-        return confidence >= 0.8;
+        return confidence >= ValidationConstants.Thresholds.HIGH_CONFIDENCE_THRESHOLD;
     }
 
     /**
