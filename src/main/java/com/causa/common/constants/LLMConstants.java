@@ -147,6 +147,7 @@ public final class LLMConstants {
         public static final int MAX_TOKENS = 8192;
         public static final int TIMEOUT_SECONDS = 60;
         public static final int CHAT_MEMORY_SIZE = 10;
+        public static final int MAX_TOOL_ITERATIONS = 5;
         public static final String AUTH_TYPE = "API_KEY";
         // Valid regions for Claude on Vertex AI: us-east5, us-central1, europe-west1, asia-southeast1
         // Note: 'global' is NOT a valid location for Claude models
@@ -180,6 +181,10 @@ public final class LLMConstants {
         public static final String REQUEST_FAILED_TEMPLATE = "LLM request failed: %s";
         public static final String TEMPERATURE_RANGE_MESSAGE = "temperature must be between 0.0 and 1.0 inclusive";
         public static final String MAX_TOKENS_RANGE_MESSAGE = "maxTokens must be greater than 0";
+        public static final String NO_USER_MESSAGE = "No UserMessage found in conversation";
+        public static final String TOOL_NOT_FOUND_TEMPLATE = "Tool not found: %s";
+        public static final String TOOL_EXECUTION_FAILED_TEMPLATE = "Tool execution failed: %s: %s";
+        public static final String MAX_TOOL_ITERATIONS_TEMPLATE = "LLM did not produce a text response after %d tool iterations";
     }
 
     /**
