@@ -108,45 +108,6 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
                 .value("java.lang.OutOfMemoryError: Java heap space")
                 .build()
         );
-        // ==============================================
-        // END HARDCODED TEST DATA
-        // ==============================================
-
-        /* ORIGINAL CODE - UNCOMMENT IN PRODUCTION
-        if (diagnosticContext == null || diagnosticContext.isBlank()) {
-            return List.of();
-        }
-
-        List<Signal> signals = new ArrayList<>();
-
-        log.debug("Extracting signals from diagnostic context")
-            .field("contextLength", diagnosticContext.length())
-            .log();
-
-        // Extract Kubernetes Event signals
-        signals.addAll(extractKubernetesEventSignals(diagnosticContext));
-
-        // Extract Container Status signals
-        signals.addAll(extractContainerStatusSignals(diagnosticContext));
-
-        // Extract Pod Status signals
-        signals.addAll(extractPodStatusSignals(diagnosticContext));
-
-        // Extract Memory/Metric signals
-        signals.addAll(extractMetricSignals(diagnosticContext));
-
-        // Extract Log Pattern signals
-        signals.addAll(extractLogPatternSignals(diagnosticContext));
-
-        // Extract Kruize Recommendation signals
-        signals.addAll(extractKruizeSignals(diagnosticContext));
-
-        log.info("Signal extraction completed")
-            .field("totalSignals", signals.size())
-            .log();
-
-        return signals;
-        */
     }
 
     private List<Signal> extractKubernetesEventSignals(String context) {
