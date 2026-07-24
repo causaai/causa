@@ -42,7 +42,7 @@ public record LLMRequest(
         context = context != null ? context : Optional.empty();
         modelOverride = modelOverride != null ? modelOverride : Optional.empty();
         enableCaching = enableCaching != null ? enableCaching : Optional.empty();
-        enableSkills = enableSkills != null ? enableSkills : Optional.of(true);
+        enableSkills = enableSkills != null ? enableSkills : Optional.empty();
         maxTokens = maxTokens != null ? maxTokens : Optional.empty();
         temperature = temperature != null ? temperature : Optional.empty();
 
@@ -88,7 +88,7 @@ public record LLMRequest(
      */
     public static LLMRequest of(String prompt) {
         return new LLMRequest(prompt, Optional.empty(), Optional.empty(), Optional.empty(),
-                Optional.empty(), Optional.of(true), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     /**
@@ -110,7 +110,7 @@ public record LLMRequest(
         private Optional<String> context = Optional.empty();
         private Optional<String> modelOverride = Optional.empty();
         private Optional<Boolean> enableCaching = Optional.empty();
-        private Optional<Boolean> enableSkills = Optional.of(true);
+        private Optional<Boolean> enableSkills = Optional.empty();
         private Optional<Integer> maxTokens = Optional.empty();
         private Optional<Double> temperature = Optional.empty();
 

@@ -70,7 +70,7 @@ public final class ConfigConstants {
         key("VERTEX_LOCATION",                 "llm", ValueType.STRING,  false, "causa.llm.vertex.location"),
         key("BOB_SHELL_PATH",                  "llm", ValueType.STRING,  false, "causa.llm.bob.shell-path"),
         key("GOOGLE_APPLICATION_CREDENTIALS",  "llm", ValueType.STRING,  true,  "causa.llm.google-application-credentials"),
-        key("SKILLS_ENABLED",                  "llm", ValueType.BOOLEAN, false, "causa.llm.skills-enabled"),
+        key("LLM_SKILLS_ENABLED",              "llm", ValueType.BOOLEAN, false, "causa.llm.skills.enabled"),
 
         // Alert Configuration (4 keys)
         key("ALERT_FILTER_SEVERITY",           "alerts", ValueType.STRING,  false, "causa.alerts.filter-severity"),
