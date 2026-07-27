@@ -35,11 +35,6 @@ public final class LogMessages {
         // Startup
         public static final String LLM_FACTORY_INITIALIZING = "Initializing LLM chat model factory";
         public static final String LLM_PROVIDER_DETECTED = "LLM provider detected";
-        public static final String LLM_READY = "LLM ready";
-        public static final String LLM_STARTUP_FAILED = "LLM startup failed";
-        public static final String CONNECTIVITY_CHECK_START = "Verifying LLM connectivity";
-        public static final String CONNECTIVITY_CHECK_SUCCESS = "LLM connectivity verified";
-        public static final String CONNECTIVITY_CHECK_FAILED = "LLM connectivity check failed";
 
         // Prompt operations
         public static final String PROMPT_SEND_START = "Sending prompt to LLM";

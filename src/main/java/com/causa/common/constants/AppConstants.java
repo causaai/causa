@@ -30,9 +30,6 @@ public final class AppConstants {
 
         /** Configuration loading from DB+ENV priority. */
         public static final int CONFIG_PRIORITY = 20;
-
-        /** LLM initialization priority (depends on config). */
-        public static final int LLM_PRIORITY = 30;
     }
 
     /**
