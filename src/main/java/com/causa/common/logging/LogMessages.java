@@ -17,6 +17,7 @@ public final class LogMessages {
 
     // Global messages
     public static final String UNEXPECTED_ERROR = "Unexpected error occurred";
+    public static final String APP_STARTED = "Causa Backend started";
 
     public static final class Health {
         private Health() {}

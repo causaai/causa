@@ -22,6 +22,9 @@ public final class AppConstants {
     public static final class StartupConstants {
         private StartupConstants() {}
 
+        /** Application version banner log priority — runs before all other startup observers. */
+        public static final int APP_VERSION_PRIORITY = 1;
+
         /** Database connection pool initialization priority. */
         public static final int DATABASE_PRIORITY = 10;
 

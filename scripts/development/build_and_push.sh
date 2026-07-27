@@ -18,7 +18,7 @@ usage() {
     echo "  -i IMAGE_NAME    Full image name (registry/repository:tag)"
     echo "  -r REGISTRY      Container registry (default: quay.io)"
     echo "  -n REPO_NAME     Repository name (default: causa/causa-backend)"
-    echo "  -t TAG           Image tag (default: latest) - used only if -i is not provided"
+    echo "  -t TAG           Image tag (default: version from pom.xml) - used only if -i is not provided"
     echo "  -b BUILD         Build image true/false (default: true)"
     echo "  -p PUSH          Push image true/false (default: false)"
     echo "  -l PLATFORMS     Target platforms (default: linux/amd64,linux/arm64)"
@@ -30,7 +30,7 @@ usage() {
     echo "  IMAGE_NAME       Full image name"
     echo "  REGISTRY         Container registry"
     echo "  REPO_NAME        Repository name"
-    echo "  IMAGE_TAG        Image tag"
+    echo "  IMAGE_TAG        Image tag (default: version from pom.xml)"
     echo "  BUILD_IMAGE      Build image (true/false)"
     echo "  PUSH_IMAGE       Push image (true/false)"
     echo "  PLATFORMS        Target platforms"
@@ -80,10 +80,27 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Resolve application version from pom.xml (used as the default image tag).
+# If the version contains SNAPSHOT, appends a UTC timestamp so each dev build
+# gets a unique, sortable tag (e.g. 0.0.1-SNAPSHOT-20250127143012).
+resolve_app_version() {
+    local ver="latest"
+    if [ -f "pom.xml" ]; then
+        ver=$(grep -m1 '<version>' pom.xml | sed 's|.*<version>\(.*\)</version>.*|\1|' | tr -d '[:space:]')
+        ver="${ver:-latest}"
+    fi
+    if [[ "$ver" == *SNAPSHOT* ]]; then
+        local ts
+        ts=$(date -u +"%Y%m%d%H%M%S")
+        ver="${ver}-${ts}"
+    fi
+    echo "$ver"
+}
+
 # Default values from environment or hardcoded defaults
 REGISTRY="${REGISTRY:-quay.io}"
 REPO_NAME="${REPO_NAME:-causa/causa-backend}"
-IMAGE_TAG="${IMAGE_TAG:-latest}"
+IMAGE_TAG="${IMAGE_TAG:-$(resolve_app_version)}"
 BUILD_IMAGE="${BUILD_IMAGE:-true}"
 PUSH_IMAGE="${PUSH_IMAGE:-false}"
 PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"

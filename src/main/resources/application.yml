@@ -5,7 +5,6 @@
 quarkus:
   application:
     name: ${CAUSA_APP_NAME:causa-backend}
-    version: 0.0.1
 
   # HTTP Server Configuration 
   http:
@@ -17,10 +16,9 @@ quarkus:
       methods: ${CAUSA_CORS_METHODS:GET,POST,PUT,DELETE,OPTIONS}
       headers: ${CAUSA_CORS_HEADERS:*}
 
-  # OpenAPI/Swagger Configuration 
+  # OpenAPI/Swagger Configuration
   smallrye-openapi:
     info-title: Causa Backend API
-    info-version: 0.0.1
 
   # Swagger UI Configuration 
   swagger-ui:
