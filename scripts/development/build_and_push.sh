@@ -80,13 +80,25 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# Resolve the project root pom.xml relative to this script's location,
+# regardless of the working directory the script is invoked from.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
 # Resolve application version from pom.xml (used as the default image tag).
+# Uses mvn help:evaluate for an authoritative project.version read — avoids
+# accidentally picking up a parent or plugin <version> via grep.
 # If the version contains SNAPSHOT, appends a UTC timestamp so each dev build
 # gets a unique, sortable tag (e.g. 0.0.1-SNAPSHOT-20250127143012).
 resolve_app_version() {
+    local pom="${PROJECT_ROOT}/pom.xml"
     local ver="latest"
-    if [ -f "pom.xml" ]; then
-        ver=$(grep -m1 '<version>' pom.xml | sed 's|.*<version>\(.*\)</version>.*|\1|' | tr -d '[:space:]')
+    if [ -f "${pom}" ]; then
+        local mvnw="${PROJECT_ROOT}/mvnw"
+        local mvn_cmd="mvn"
+        [ -f "${mvnw}" ] && mvn_cmd="${mvnw}"
+        ver=$(cd "${PROJECT_ROOT}" && \
+              ${mvn_cmd} help:evaluate -Dexpression=project.version -q -DforceStdout 2>/dev/null)
         ver="${ver:-latest}"
     fi
     if [[ "$ver" == *SNAPSHOT* ]]; then
@@ -159,17 +171,20 @@ if [ -z "$IMAGE_NAME" ]; then
     IMAGE_NAME="${REGISTRY}/${REPO_NAME}:${IMAGE_TAG}"
 fi
 
-# Validate that we're in the correct directory
-if [ ! -f "pom.xml" ]; then
-    print_error "pom.xml not found. Please run this script from the project root directory."
+# Validate project root structure
+if [ ! -f "${PROJECT_ROOT}/pom.xml" ]; then
+    print_error "pom.xml not found at ${PROJECT_ROOT}."
     exit 1
 fi
 
 # Check if Maven wrapper exists
-if [ ! -f "./mvnw" ]; then
-    print_error "Maven wrapper (mvnw) not found. Please ensure you're in the project root."
+if [ ! -f "${PROJECT_ROOT}/mvnw" ]; then
+    print_error "Maven wrapper (mvnw) not found at ${PROJECT_ROOT}."
     exit 1
 fi
+
+# Run all Maven commands from the project root
+cd "${PROJECT_ROOT}"
 
 # Make Maven wrapper executable
 chmod +x ./mvnw
