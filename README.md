@@ -45,7 +45,7 @@ Built with **Quarkus 3.36.1** on **Java 21**, powered by **LangChain4J 1.15.1**,
 
 ## Running the Application in Dev Mode
 
-Dev mode enables live-code reload and auto-wires **Quarkus Dev Services** — if a running PostgreSQL instance is not detected on the configured URL, Quarkus will attempt to spin up a temporary container automatically.
+Dev mode enables live-code reload and autowires **Quarkus Dev Services** — if a running PostgreSQL instance is not detected on the configured URL, Quarkus will attempt to spin up a temporary container automatically.
 
 ```bash
 ./mvnw compile quarkus:dev
