@@ -108,7 +108,7 @@ causa:
 
   # LLM Configuration (LangChain4J)
   llm:
-    provider: ${LLM_PROVIDER:vertex-ai-anthropic}
+    provider: ${LLM_PROVIDER:}
     model-name: ${LLM_MODEL_NAME:}
     base-url: ${LLM_BASE_URL:}
     auth-type: ${LLM_AUTH_TYPE:}

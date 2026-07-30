@@ -2,7 +2,7 @@ package com.causa.llm.skill;
 
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
-import com.causa.config.LLMConfig;
+import com.causa.config.AppConfig;
 import dev.langchain4j.skills.ClassPathSkillLoader;
 import dev.langchain4j.skills.FileSystemSkillLoader;
 import dev.langchain4j.skills.Skill;
@@ -39,11 +39,11 @@ public class SkillsConfiguration {
     private static final CausaLogger log = CausaLogger.getLogger(SkillsConfiguration.class);
     private static final String SKILLS_CLASSPATH = "skills";
 
-    private final LLMConfig config;
+    private final AppConfig appConfig;
 
     @Inject
-    public SkillsConfiguration(LLMConfig config) {
-        this.config = config;
+    public SkillsConfiguration(AppConfig appConfig) {
+        this.appConfig = appConfig;
     }
 
     /**
@@ -56,7 +56,7 @@ public class SkillsConfiguration {
     public Skills produceSkills() {
 
         // --- 0. Short-circuit when skills are globally disabled ---
-        if (!config.skills().enabled()) {
+        if (!appConfig.getLlmConfig().isSkillsEnabled()) {
             log.info(LogMessages.Skills.SKILLS_DISABLED).log();
             return Skills.from(List.of());
         }
@@ -76,8 +76,8 @@ public class SkillsConfiguration {
 
         // --- 2. Load optional filesystem skills ---
         List<Skill> external = new ArrayList<>();
-        String skillsDir = config.skills().skillsDir().filter(s -> !s.isBlank()).orElse(null);
-        if (skillsDir == null) {
+        String skillsDir = appConfig.getLlmConfig().getSkillsDir();
+        if (skillsDir == null || skillsDir.isBlank()) {
             log.info(LogMessages.Skills.SKILLS_DIR_NOT_SET).log();
         } else {
             Path dir = Path.of(skillsDir);

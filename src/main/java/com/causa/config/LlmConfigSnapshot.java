@@ -113,4 +113,8 @@ public final class LlmConfigSnapshot {
         String value = config.getOrDefault("LLM_SKILLS_ENABLED", "true");
         return Boolean.parseBoolean(value);
     }
+
+    public String getSkillsDir() {
+        return config.getOrDefault("LLM_SKILLS_DIR", "");
+    }
 }

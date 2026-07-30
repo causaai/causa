@@ -5,7 +5,7 @@ import com.causa.common.constants.AlertConstants;
 import com.causa.common.constants.AlertConstants.AlertSeverity;
 import com.causa.common.constants.AlertConstants.AlertStatus;
 import com.causa.common.utils.IdUtils;
-import com.causa.config.AlertConfig;
+import com.causa.config.AppConfig;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Alert.AlertMetadata;
 import com.causa.core.domain.Alert.WorkloadInfo;
@@ -31,11 +31,11 @@ import java.util.Map;
 @ApplicationScoped
 public class AlertMapper {
 
-    private final String defaultSeverity;
+    private final AppConfig appConfig;
 
     @Inject
-    public AlertMapper(AlertConfig alertConfig) {
-        this.defaultSeverity = alertConfig.filterSeverity();
+    public AlertMapper(AppConfig appConfig) {
+        this.appConfig = appConfig;
     }
 
     /**
@@ -71,7 +71,7 @@ public class AlertMapper {
 
         // Core alert fields — from labels
         String alertName   = labels.get(AlertConstants.Labels.ALERT_NAME);
-        String severityStr = labels.getOrDefault(AlertConstants.Labels.SEVERITY, defaultSeverity);
+        String severityStr = labels.getOrDefault(AlertConstants.Labels.SEVERITY, appConfig.getAlertConfig().getFilterSeverity());
 
         // Workload fields — annotations first (PrometheusRule uses container_name / pod_name as annotation
         // keys), label keys (container / pod) used as fallback for older or custom alert sources.

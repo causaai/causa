@@ -4,7 +4,8 @@ import com.causa.api.dto.ComponentHealthDto;
 import com.causa.api.dto.HealthCheckResponseDto;
 import com.causa.common.constants.AppConstants;
 import com.causa.common.constants.HealthCheckConstants;
-import com.causa.config.LLMConfig;
+import com.causa.config.AppConfig;
+import com.causa.config.LlmConfigSnapshot;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
 import com.causa.infrastructure.persistence.DatabaseConnectionService;
@@ -20,8 +21,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.Statement;
-import java.util.Optional;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -63,7 +62,10 @@ class HealthCheckServiceTest {
     private LangChainPromptSender llmPromptSender;
 
     @Mock
-    private LLMConfig llmConfig;
+    private AppConfig appConfig;
+
+    @Mock
+    private LlmConfigSnapshot llmConfigSnapshot;
 
     private HealthCheckService healthCheckService;
 
@@ -105,7 +107,7 @@ class HealthCheckServiceTest {
                 MCP_FILESYSTEM_HEALTH_PATH,
                 MCP_FILESYSTEM_TIMEOUT,
                 llmPromptSender,
-                llmConfig
+                appConfig
         );
     }
 
@@ -216,7 +218,9 @@ class HealthCheckServiceTest {
             // Given
             when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(true);
-            when(llmConfig.modelName()).thenReturn(Optional.of("claude-sonnet-4-6"));
+            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
+            when(llmConfigSnapshot.getProvider()).thenReturn("bob");
+            when(llmConfigSnapshot.getModelName()).thenReturn("bob");
             
             LLMResponse mockResponse = new LLMResponse(
                     "OK",
@@ -237,7 +241,7 @@ class HealthCheckServiceTest {
             ComponentHealthDto llmHealth = response.getComponents().get(HealthCheckConstants.ComponentNames.LLM_PROVIDER);
             assertNotNull(llmHealth);
             assertEquals(AppConstants.HealthStatus.UP.getValue(), llmHealth.getStatus());
-            assertTrue(llmHealth.getMessage().contains("claude-sonnet-4-6"));
+            assertTrue(llmHealth.getMessage().contains("bob"));
             assertNotNull(llmHealth.getLatencyMs());
             assertTrue(llmHealth.getLatencyMs() >= 0);
 
@@ -251,7 +255,9 @@ class HealthCheckServiceTest {
             // Given
             when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(true);
-            when(llmConfig.modelName()).thenReturn(Optional.empty());
+            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
+            when(llmConfigSnapshot.getProvider()).thenReturn("bob");
+            when(llmConfigSnapshot.getModelName()).thenReturn("");
 
             LLMResponse mockResponse = new LLMResponse(
                     "OK",
@@ -381,8 +387,10 @@ class HealthCheckServiceTest {
 
             // Given - LLM UP
             when(llmPromptSender.isReady()).thenReturn(true);
-            when(llmConfig.modelName()).thenReturn(Optional.of("claude-sonnet-4-6"));
-            LLMResponse mockResponse = new LLMResponse("OK", "claude-sonnet-4-6", 11L, 4L, 0L, 0L, 100L);
+            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
+            when(llmConfigSnapshot.getProvider()).thenReturn("bob");
+            when(llmConfigSnapshot.getModelName()).thenReturn("bob");
+            LLMResponse mockResponse = new LLMResponse("OK", "bob", 11L, 4L, 0L, 0L, 100L);
             when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(mockResponse);
 
             // When
@@ -402,8 +410,10 @@ class HealthCheckServiceTest {
 
             // Given - LLM UP
             when(llmPromptSender.isReady()).thenReturn(true);
-            when(llmConfig.modelName()).thenReturn(Optional.of("claude-sonnet-4-6"));
-            LLMResponse mockResponse = new LLMResponse("OK", "claude-sonnet-4-6", 11L, 4L, 0L, 0L, 100L);
+            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
+            when(llmConfigSnapshot.getProvider()).thenReturn("bob");
+            when(llmConfigSnapshot.getModelName()).thenReturn("bob");
+            LLMResponse mockResponse = new LLMResponse("OK", "bob", 11L, 4L, 0L, 0L, 100L);
             when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(mockResponse);
 
             // When

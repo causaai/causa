@@ -9,7 +9,7 @@ import com.causa.common.constants.HealthCheckConstants;
 import com.causa.common.constants.LLMConstants;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
-import com.causa.config.LLMConfig;
+import com.causa.config.AppConfig;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
 import com.causa.core.ports.llm.PromptSender;
@@ -68,7 +68,7 @@ public class HealthCheckService {
     private final String mcpFilesystemHealthPath;
     private final int mcpFilesystemTimeout;
     private final PromptSender llmPromptSender;
-    private final LLMConfig llmConfig;
+    private final AppConfig appConfig;
 
     @Inject
     public HealthCheckService(
@@ -89,7 +89,7 @@ public class HealthCheckService {
             @ConfigProperty(name = "causa.mcp.filesystem.health-path") String mcpFilesystemHealthPath,
             @ConfigProperty(name = "causa.mcp.filesystem.timeout-ms") int mcpFilesystemTimeout,
             PromptSender llmPromptSender,
-            LLMConfig llmConfig) {
+            AppConfig appConfig) {
         this.databaseConnectionService = databaseConnectionService;
         this.dataSource = dataSource;
         this.applicationVersion = applicationVersion;
@@ -107,7 +107,7 @@ public class HealthCheckService {
         this.mcpFilesystemHealthPath = mcpFilesystemHealthPath;
         this.mcpFilesystemTimeout = mcpFilesystemTimeout;
         this.llmPromptSender = llmPromptSender;
-        this.llmConfig = llmConfig;
+        this.appConfig = appConfig;
     }
 
     /**
@@ -343,8 +343,11 @@ public class HealthCheckService {
             }
 
             long latency = System.currentTimeMillis() - startTime;
+            String provider = appConfig.getLlmConfig().getProvider();
+            String modelName = appConfig.getLlmConfig().getModelName();
+            String displayName = (modelName != null && !modelName.isBlank()) ? modelName : "unknown";
             String message = String.format(LLMConstants.Messages.LLM_CONNECTED_FORMAT,
-                    llmConfig.modelName().orElse("unknown"));
+                    provider + " / " + displayName);
 
             log.info(LogMessages.HealthCheck.LLM_CHECK_PASSED)
                 .field(ApiConstants.LogFields.LATENCY_MS, latency)
