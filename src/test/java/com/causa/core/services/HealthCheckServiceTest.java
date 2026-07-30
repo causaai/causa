@@ -241,7 +241,8 @@ class HealthCheckServiceTest {
             ComponentHealthDto llmHealth = response.getComponents().get(HealthCheckConstants.ComponentNames.LLM_PROVIDER);
             assertNotNull(llmHealth);
             assertEquals(AppConstants.HealthStatus.UP.getValue(), llmHealth.getStatus());
-            assertTrue(llmHealth.getMessage().contains("bob"));
+            assertTrue(llmHealth.getMessage().contains("bob / bob"),
+                    "Expected message to contain 'bob / bob' (provider / model), but was: " + llmHealth.getMessage());
             assertNotNull(llmHealth.getLatencyMs());
             assertTrue(llmHealth.getLatencyMs() >= 0);
 

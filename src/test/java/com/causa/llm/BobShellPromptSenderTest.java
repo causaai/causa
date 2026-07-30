@@ -77,18 +77,20 @@ class BobShellPromptSenderTest {
         }
 
         @Test
-        @DisplayName("Should read shell path from config lazily on each use")
+        @DisplayName("Should read shell path from config lazily — not during construction")
         void shouldReadShellPathFromConfigLazily() {
             // Given
             when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
             when(llmConfigSnapshot.getApiKey()).thenReturn("test-api-key");
 
-            // When
+            // When — only construction, no send() or isReady() call
             bobShellPromptSender = new BobShellPromptSender(appConfig);
 
-            // Then
+            // Then — getBobShellPath() must NOT be called during construction;
+            // it is deferred until checkAvailability() / executeBobShell() are invoked.
             assertNotNull(bobShellPromptSender);
             verify(appConfig).getLlmConfig();
+            verify(llmConfigSnapshot, never()).getBobShellPath();
         }
 
         @Test
