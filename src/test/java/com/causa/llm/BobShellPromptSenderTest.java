@@ -17,19 +17,21 @@ import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for {@link BobShellPromptSender}.
- * 
- * <p>Tests the BOB Shell integration following the same patterns as LangChainPromptSender tests.
- * These are unit tests that verify the business logic without actually calling BOB Shell CLI.
- * 
+ *
+ * <p>Tests the public API contract of {@link BobShellPromptSender} using Mockito
+ * to mock the {@link LLMConfig} dependency.  The BOB Shell binary itself is never
+ * invoked — {@link BobShellPromptSender#isReady()} will return {@code false} in a
+ * test environment where the CLI is not present, and the tests exercise the
+ * resulting error-handling paths.
+ *
  * <p>Test Coverage:
  * <ul>
- *   <li>Initialization and configuration</li>
- *   <li>Readiness checks</li>
- *   <li>Request building</li>
- *   <li>Response parsing</li>
- *   <li>Token extraction</li>
- *   <li>Error handling</li>
- *   <li>Large prompt handling</li>
+ *   <li>Constructor — reads {@code apiKey} eagerly, shell path lazily</li>
+ *   <li>{@code isReady()} — returns false when CLI absent; caches true once found</li>
+ *   <li>{@code send()} — throws {@link LLMException} when not ready</li>
+ *   <li>{@link LLMRequest} builder — validates prompt, handles optional fields</li>
+ *   <li>BOB Shell output-format constants — field names match the actual JSON structure</li>
+ *   <li>CLI flag / env-var constants — exact string values expected by the CLI</li>
  * </ul>
  *
  * @since 0.0.1
@@ -58,8 +60,8 @@ class BobShellPromptSenderTest {
     }
 
     @Nested
-    @DisplayName("Initialization Tests")
-    class InitializationTests {
+    @DisplayName("Constructor Tests")
+    class ConstructorTests {
 
         @Test
         @DisplayName("Should initialize with valid configuration")
@@ -71,7 +73,6 @@ class BobShellPromptSenderTest {
             // When
             bobShellPromptSender = new BobShellPromptSender(appConfig);
 
-            // Then
             assertNotNull(bobShellPromptSender);
             verify(appConfig).getLlmConfig();
         }
@@ -103,7 +104,6 @@ class BobShellPromptSenderTest {
             // When
             bobShellPromptSender = new BobShellPromptSender(appConfig);
 
-            // Then
             assertNotNull(bobShellPromptSender);
             verify(appConfig).getLlmConfig();
         }
@@ -124,9 +124,53 @@ class BobShellPromptSenderTest {
         }
     }
 
+    // -------------------------------------------------------------------------
+    // isReady()
+    //
+    // checkAvailability() spawns a real ProcessBuilder. We control whether it
+    // finds the binary by pointing shellPath() at a guaranteed-absent path.
+    // -------------------------------------------------------------------------
+
     @Nested
-    @DisplayName("Readiness Tests")
-    class ReadinessTests {
+    @DisplayName("isReady() Tests")
+    class IsReadyTests {
+
+        @Test
+        @DisplayName("isReady() returns false when shellPath points to a non-existent binary")
+        void isReadyReturnsFalseWhenBinaryAbsent() {
+            // Point to a path that will never exist — ProcessBuilder throws IOException
+            when(llmConfig.apiKey()).thenReturn(Optional.of("key"));
+            when(llmConfig.bob()).thenReturn(bobConfig);
+            when(bobConfig.shellPath()).thenReturn("/nonexistent/path/to/bob-does-not-exist");
+
+            bobShellPromptSender = new BobShellPromptSender(llmConfig);
+
+            assertFalse(bobShellPromptSender.isReady());
+        }
+
+        @Test
+        @DisplayName("isReady() must not throw regardless of environment")
+        void isReadyNeverThrows() {
+            when(llmConfig.apiKey()).thenReturn(Optional.of("key"));
+            when(llmConfig.bob()).thenReturn(bobConfig);
+            when(bobConfig.shellPath()).thenReturn("/nonexistent/path/to/bob-does-not-exist");
+
+            bobShellPromptSender = new BobShellPromptSender(llmConfig);
+
+            assertDoesNotThrow(() -> bobShellPromptSender.isReady());
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // send() — error paths that do not require the CLI
+    //
+    // We point shellPath at a non-existent binary so isReady() is always false,
+    // meaning send() hits the "not ready" guard without ever spawning a process.
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("send() Error Path Tests")
+    class SendErrorPathTests {
 
         @BeforeEach
         void setUpReadiness() {
@@ -135,34 +179,41 @@ class BobShellPromptSenderTest {
         }
 
         @Test
-        @DisplayName("Should check BOB Shell availability")
-        void shouldCheckBobShellAvailability() {
-            // When
-            boolean isReady = bobShellPromptSender.isReady();
+        @DisplayName("send() throws LLMException when isReady() is false (binary absent)")
+        void sendThrowsWhenNotReady() {
+            LLMRequest request = LLMRequest.builder("Diagnose the OOM event").build();
 
-            // Then
-            // Note: isReady() actively checks if BOB Shell CLI is available
-            // Result depends on whether BOB Shell is installed in the environment
-            // This is a unit test, so we just verify the method can be called
-            assertNotNull(bobShellPromptSender);
+            // isReady() → false (binary missing) → send() throws before touching the CLI
+            assertThrows(LLMException.class, () -> bobShellPromptSender.send(request));
+        }
+
+        @Test
+        @DisplayName("send() throws LLMException specifically — not a generic RuntimeException")
+        void sendThrowsLLMExceptionSpecifically() {
+            LLMRequest request = LLMRequest.builder("Diagnose the OOM event").build();
+
+            Exception thrown = assertThrows(Exception.class, () -> bobShellPromptSender.send(request));
+
+            assertInstanceOf(LLMException.class, thrown,
+                    "Expected LLMException but got: " + thrown.getClass().getName());
         }
     }
 
+    // -------------------------------------------------------------------------
+    // LLMRequest builder — used by callers before passing to send()
+    // -------------------------------------------------------------------------
+
     @Nested
-    @DisplayName("Request Building Tests")
-    class RequestBuildingTests {
+    @DisplayName("LLMRequest Builder Tests")
+    class LlmRequestBuilderTests {
 
         @Test
-        @DisplayName("Should build simple prompt correctly")
-        void shouldBuildSimplePromptCorrectly() {
-            // Given
-            String userPrompt = "What is 2+2?";
-            LLMRequest request = LLMRequest.builder(userPrompt)
-                .build();
+        @DisplayName("Builder accepts a non-blank prompt and defaults optional fields to empty")
+        void buildsMinimalRequest() {
+            LLMRequest request = LLMRequest.builder("What is 2+2?").build();
 
-            // Then
             assertNotNull(request);
-            assertEquals(userPrompt, request.prompt());
+            assertEquals("What is 2+2?", request.prompt());
             assertTrue(request.systemPrompt().isEmpty());
             assertTrue(request.context().isEmpty());
         }
@@ -380,45 +431,196 @@ class BobShellPromptSenderTest {
             assertThrows(IllegalArgumentException.class, () -> {
                 LLMRequest.builder("")
                     .build();
-            });
+
+            assertTrue(request.systemPrompt().isPresent());
+            assertEquals("You are a Kubernetes SRE assistant", request.systemPrompt().get());
+        }
+
+        @Test
+        @DisplayName("Builder stores context when provided")
+        void buildsRequestWithContext() {
+            LLMRequest request = LLMRequest.builder("Continue analysis")
+                    .context("Pod was OOM-killed three times in the last hour")
+                    .build();
+
+            assertTrue(request.context().isPresent());
+            assertEquals("Pod was OOM-killed three times in the last hour", request.context().get());
+        }
+
+        @Test
+        @DisplayName("Builder handles very large prompts without truncation")
+        void buildsLargePrompt() {
+            String largePrompt = "x".repeat(120_000);
+            LLMRequest request = LLMRequest.builder(largePrompt).build();
+
+            assertEquals(120_000, request.prompt().length());
+        }
+
+        @Test
+        @DisplayName("Builder rejects blank prompt with IllegalArgumentException")
+        void rejectsBlankPrompt() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> LLMRequest.builder("").build());
+        }
+
+        @Test
+        @DisplayName("Builder rejects null-equivalent (all-whitespace) prompt")
+        void rejectsWhitespacePrompt() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> LLMRequest.builder("   ").build());
         }
     }
 
+    // -------------------------------------------------------------------------
+    // BOB Shell output-format constants
+    //
+    // These tests guard against accidental renaming of constants whose string
+    // values must exactly match the JSON produced by the BOB Shell CLI binary.
+    // If the binary changes its output format the constants must be updated here
+    // first — failing tests will make the mismatch visible immediately.
+    // -------------------------------------------------------------------------
+
     @Nested
-    @DisplayName("Constants Tests")
-    class ConstantsTests {
+    @DisplayName("Output Format Constants Tests")
+    class OutputFormatConstantsTests {
 
         @Test
-        @DisplayName("Should use correct model name")
-        void shouldUseCorrectModelName() {
-            assertEquals("bob", LLMConstants.Provider.IBM_BOB);
-        }
-
-        @Test
-        @DisplayName("Should use correct CLI flags")
-        void shouldUseCorrectCliFlags() {
-            assertEquals("--accept-license", LLMConstants.BobShell.FLAG_ACCEPT_LICENSE);
-            assertEquals("--yolo", LLMConstants.BobShell.FLAG_YOLO);
-            assertEquals("-o", LLMConstants.BobShell.FLAG_OUTPUT_JSON);
-            assertEquals("-p", LLMConstants.BobShell.FLAG_PROMPT);
-            assertEquals("json", LLMConstants.BobShell.OUTPUT_FORMAT_JSON);
-        }
-
-        @Test
-        @DisplayName("Should use correct output marker")
-        void shouldUseCorrectOutputMarker() {
+        @DisplayName("OUTPUT_MARKER must be the literal '---output---' sentinel")
+        void outputMarkerValue() {
             assertEquals("---output---", LLMConstants.BobShell.OUTPUT_MARKER);
         }
 
         @Test
-        @DisplayName("Should use correct environment variable name")
-        void shouldUseCorrectEnvironmentVariableName() {
+        @DisplayName("JSON field path: top-level stats wrapper is 'stats'")
+        void statsFieldName() {
+            assertEquals("stats", LLMConstants.BobShell.JSON_FIELD_STATS);
+        }
+
+        @Test
+        @DisplayName("JSON field path: stats → models")
+        void modelsFieldName() {
+            assertEquals("models", LLMConstants.BobShell.JSON_FIELD_MODELS);
+        }
+
+        @Test
+        @DisplayName("JSON field path: stats.models → premium")
+        void premiumFieldName() {
+            assertEquals("premium", LLMConstants.BobShell.JSON_FIELD_PREMIUM);
+        }
+
+        @Test
+        @DisplayName("JSON field path: stats.models.premium → tokens")
+        void tokensFieldName() {
+            assertEquals("tokens", LLMConstants.BobShell.JSON_FIELD_TOKENS);
+        }
+
+        @Test
+        @DisplayName("JSON field path: tokens.prompt (input token count)")
+        void promptTokensFieldName() {
+            // The CLI emits 'prompt' not 'promptTokens'
+            assertEquals("prompt", LLMConstants.BobShell.JSON_FIELD_PROMPT_TOKENS);
+        }
+
+        @Test
+        @DisplayName("JSON field path: tokens.candidates (output token count)")
+        void completionTokensFieldName() {
+            // The CLI emits 'candidates' not 'completionTokens'
+            assertEquals("candidates", LLMConstants.BobShell.JSON_FIELD_COMPLETION_TOKENS);
+        }
+
+        @Test
+        @DisplayName("JSON field path: tokens.total (combined token count)")
+        void totalTokensFieldName() {
+            // The CLI emits 'total' not 'tokensUsed'
+            assertEquals("total", LLMConstants.BobShell.JSON_FIELD_TOKENS_USED);
+        }
+
+        @Test
+        @DisplayName("A well-formed stats JSON block contains all expected field names")
+        void wellFormedStatsJsonContainsAllFields() {
+            // Build a sample JSON string that mirrors actual BOB Shell output
+            String statsJson = "{"
+                    + "\"" + LLMConstants.BobShell.JSON_FIELD_STATS + "\": {"
+                    + "  \"" + LLMConstants.BobShell.JSON_FIELD_MODELS + "\": {"
+                    + "    \"" + LLMConstants.BobShell.JSON_FIELD_PREMIUM + "\": {"
+                    + "      \"" + LLMConstants.BobShell.JSON_FIELD_TOKENS + "\": {"
+                    + "        \"" + LLMConstants.BobShell.JSON_FIELD_PROMPT_TOKENS + "\": 15,"
+                    + "        \"" + LLMConstants.BobShell.JSON_FIELD_COMPLETION_TOKENS + "\": 8,"
+                    + "        \"" + LLMConstants.BobShell.JSON_FIELD_TOKENS_USED + "\": 23"
+                    + "      }}}}}"
+                    ;
+
+            // Every field name constant appears in the constructed JSON
+            assertTrue(statsJson.contains("\"stats\""));
+            assertTrue(statsJson.contains("\"models\""));
+            assertTrue(statsJson.contains("\"premium\""));
+            assertTrue(statsJson.contains("\"tokens\""));
+            assertTrue(statsJson.contains("\"prompt\""));
+            assertTrue(statsJson.contains("\"candidates\""));
+            assertTrue(statsJson.contains("\"total\""));
+        }
+
+        @Test
+        @DisplayName("Output without stats block must NOT match stats field constant")
+        void noStatsFieldInPlainOutput() {
+            String plainOutput = "---output---\nHello, I am Bob!\n---output---\n";
+            assertFalse(plainOutput.contains(LLMConstants.BobShell.JSON_FIELD_STATS));
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // CLI flags / environment-variable constants
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("CLI Flag and Environment Constants Tests")
+    class CliConstantsTests {
+
+        @Test
+        @DisplayName("Provider name used in process args must be 'bob'")
+        void providerName() {
+            assertEquals("bob", LLMConstants.Provider.IBM_BOB);
+        }
+
+        @Test
+        @DisplayName("--accept-license flag value")
+        void acceptLicenseFlag() {
+            assertEquals("--accept-license", LLMConstants.BobShell.FLAG_ACCEPT_LICENSE);
+        }
+
+        @Test
+        @DisplayName("--yolo flag value")
+        void yoloFlag() {
+            assertEquals("--yolo", LLMConstants.BobShell.FLAG_YOLO);
+        }
+
+        @Test
+        @DisplayName("-o flag enables JSON output mode")
+        void outputJsonFlag() {
+            assertEquals("-o", LLMConstants.BobShell.FLAG_OUTPUT_JSON);
+        }
+
+        @Test
+        @DisplayName("JSON output format argument value")
+        void outputFormatJson() {
+            assertEquals("json", LLMConstants.BobShell.OUTPUT_FORMAT_JSON);
+        }
+
+        @Test
+        @DisplayName("-p flag for inline prompt")
+        void promptFlag() {
+            assertEquals("-p", LLMConstants.BobShell.FLAG_PROMPT);
+        }
+
+        @Test
+        @DisplayName("API key env-var name used when injecting credentials into the process")
+        void apiKeyEnvVarName() {
             assertEquals("BOBSHELL_API_KEY", LLMConstants.BobShell.ENV_API_KEY_NAME);
         }
 
         @Test
-        @DisplayName("Should use correct default timeout")
-        void shouldUseCorrectDefaultTimeout() {
+        @DisplayName("Default process timeout is 180 seconds")
+        void defaultTimeout() {
             assertEquals(180, LLMConstants.BobShell.DEFAULT_TIMEOUT_SECONDS);
         }
 
