@@ -17,6 +17,7 @@ public final class LogMessages {
 
     // Global messages
     public static final String UNEXPECTED_ERROR = "Unexpected error occurred";
+    public static final String APP_STARTED = "Causa Backend started";
 
     public static final class Health {
         private Health() {}
@@ -34,11 +35,6 @@ public final class LogMessages {
         // Startup
         public static final String LLM_FACTORY_INITIALIZING = "Initializing LLM chat model factory";
         public static final String LLM_PROVIDER_DETECTED = "LLM provider detected";
-        public static final String LLM_READY = "LLM ready";
-        public static final String LLM_STARTUP_FAILED = "LLM startup failed";
-        public static final String CONNECTIVITY_CHECK_START = "Verifying LLM connectivity";
-        public static final String CONNECTIVITY_CHECK_SUCCESS = "LLM connectivity verified";
-        public static final String CONNECTIVITY_CHECK_FAILED = "LLM connectivity check failed";
 
         // Prompt operations
         public static final String PROMPT_SEND_START = "Sending prompt to LLM";
@@ -110,12 +106,16 @@ public final class LogMessages {
         public static final String MCP_CRYOSTAT_CHECK_STARTED = "MCP Cryostat health check started";
         public static final String MCP_CRYOSTAT_CHECK_PASSED = "MCP Cryostat health check passed";
         public static final String MCP_CRYOSTAT_CHECK_FAILED = "MCP Cryostat health check failed";
+        public static final String MCP_FILESYSTEM_CHECK_STARTED = "MCP Filesystem health check started";
+        public static final String MCP_FILESYSTEM_CHECK_PASSED = "MCP Filesystem health check passed";
+        public static final String MCP_FILESYSTEM_CHECK_FAILED = "MCP Filesystem health check failed";
         public static final String LLM_CHECK_STARTED = "LLM health check started";
         public static final String LLM_CHECK_PASSED = "LLM health check passed";
         public static final String LLM_CHECK_FAILED = "LLM health check failed";
     }     
     
-    /* Alert ingestion log messages.
+    /**
+     * Alert ingestion log messages.
      */
     public static final class Alert {
         private Alert() {}
@@ -131,10 +131,15 @@ public final class LogMessages {
         public static final String COOLDOWN_CACHE_CLEANUP = "Cooldown cache cleanup completed";
         public static final String ALERT_PERSISTED = "Alert persisted to database";
 
+        // Alerts API
+        public static final String ALERTS_GET_REQUEST   = "GET /api/v1/alerts request received";
+        public static final String ALERTS_GET_FOUND     = "Alert(s) retrieved successfully";
+        public static final String ALERTS_GET_NOT_FOUND = "Alert not found";
+
         // Exception messages
         public static final String ALERT_PERSIST_FAILED = "Failed to persist alert";
-        public static final String ALERT_UPDATE_FAILED = "Failed to update alert";
-        public static final String ALERT_NOT_FOUND = "Alert not found";
+        public static final String ALERT_UPDATE_FAILED  = "Failed to update alert";
+        public static final String ALERT_NOT_FOUND      = "Alert not found";
     }
 
     /**
@@ -143,25 +148,36 @@ public final class LogMessages {
     public static final class Diagnostic {
         private Diagnostic() {}
 
-        public static final String DIAGNOSTIC_TRIGGERED = "Diagnostic pipeline triggered";
-        public static final String CONTEXT_COLLECTION_STARTED = "Context collection started";
-        public static final String CONTEXT_COLLECTED = "Diagnostic context collected - LLM-ready format";
-        public static final String DIAGNOSIS_TYPE_DETERMINED = "Diagnosis type determined";
-        public static final String ROOT_CAUSE_ANALYSIS_STARTED = "Root cause analysis started";
-        public static final String RCA_VALIDATION_STARTED = "RCA validation started";
-        public static final String DIAGNOSTIC_COMPLETED = "Diagnostic completed";
-        public static final String DIAGNOSTIC_FAILED = "Diagnostic failed";
+        // Lifecycle
+        public static final String DIAGNOSTIC_TRIGGERED       = "Diagnostic pipeline triggered";
+        public static final String DIAGNOSTIC_INITIATED       = "Diagnostic initiated — PENDING saved, pipeline dispatched async";
+        public static final String DIAGNOSTIC_PIPELINE_START  = "Async diagnostic pipeline started";
+        public static final String DIAGNOSTIC_PIPELINE_DONE   = "Async diagnostic pipeline completed";
+        public static final String DIAGNOSTIC_PIPELINE_FAILED = "Async diagnostic pipeline failed";
+        public static final String DIAGNOSTIC_COMPLETED       = "Diagnostic completed";
+        public static final String DIAGNOSTIC_FAILED          = "Diagnostic failed";
 
-        // RCA Prompt Building
-        public static final String RCA_PROMPT_BUILT = "RCA prompt built";
-        public static final String LLM_CONTEXT_BUILT = "LLM context built";
-        public static final String LLM_RESPONSE_RECEIVED = "LLM response received";
-        public static final String RCA_GENERATED_SUCCESS = "RCA generated successfully";
-        public static final String RCA_GENERATION_FAILED = "RCA generation failed";
+        // Context collection
+        public static final String CONTEXT_COLLECTION_STARTED = "Context collection started";
+        public static final String CONTEXT_COLLECTED          = "Diagnostic context collected — LLM-ready format";
+
+        // RCA
+        public static final String ROOT_CAUSE_ANALYSIS_STARTED = "Root cause analysis started";
+        public static final String RCA_PROMPT_BUILT             = "RCA prompt built";
+        public static final String LLM_RESPONSE_RECEIVED        = "LLM response received";
+        public static final String RCA_GENERATED_SUCCESS        = "RCA generated successfully";
+        public static final String RCA_GENERATION_FAILED        = "RCA generation failed";
 
         // Exception messages
         public static final String DIAGNOSTIC_PERSIST_FAILED = "Failed to persist diagnostic";
-        public static final String DIAGNOSTIC_UPDATE_FAILED = "Failed to update diagnostic";
+        public static final String DIAGNOSTIC_UPDATE_FAILED  = "Failed to update diagnostic";
+
+        // Diagnostics query API
+        public static final String DIAGNOSTICS_LIST_REQUEST  = "GET /api/v1/diagnostics request received";
+        public static final String DIAGNOSTICS_LIST_RETURNED = "Diagnostics list returned";
+        public static final String DIAGNOSTIC_GET_REQUEST    = "GET /api/v1/diagnostics/{id} request received";
+        public static final String DIAGNOSTIC_GET_FOUND      = "Diagnostic retrieved successfully";
+        public static final String DIAGNOSTIC_GET_NOT_FOUND  = "Diagnostic not found";
     }
 
     /**
@@ -195,5 +211,49 @@ public final class LogMessages {
 
         // Context collection completion
         public static final String MCP_CONTEXT_COLLECTION_COMPLETE = "MCP context collection completed";
+
+        // Platform routing
+        public static final String MCP_PLATFORM_DETECTED = "Deployment platform detected";
+        public static final String MCP_VM_CONTEXT_COLLECTION_START = "VM platform MCP context collection started";
+        public static final String MCP_VM_CONTEXT_COLLECTION_COMPLETE = "VM platform MCP context collection completed";
+
+        // Filesystem MCP
+        public static final String MCP_FILESYSTEM_DIR_LISTING  = "Filesystem directory listing retrieved";
+        public static final String MCP_FILESYSTEM_FILE_CONTENT = "Filesystem file content retrieved";
+        public static final String MCP_FILESYSTEM_SKIPPED      = "Skipping Filesystem MCP calls - not yet implemented";
+
+        // JMX MCP
+        public static final String MCP_JMX_HEAP_STATUS             = "JMX heap status retrieved";
+        public static final String MCP_JMX_GC_ACTIVITY             = "JMX GC activity retrieved";
+        public static final String MCP_JMX_THREAD_STATE            = "JMX thread state retrieved";
+        public static final String MCP_JMX_GC_PRESSURE             = "JMX GC pressure analysis retrieved";
+        public static final String MCP_JMX_MEMORY_LEAK_INDICATORS  = "JMX memory leak indicators retrieved";
+        public static final String MCP_JMX_THREAD_CONTENTION       = "JMX thread contention analysis retrieved";
+        public static final String MCP_JMX_JVM_RUNTIME_INFO        = "JMX JVM runtime info retrieved";
+
+        // Filesystem MCP (Liberty logs)
+        public static final String MCP_FILESYSTEM_LIST_DIRECTORY = "Filesystem MCP list_directory_with_sizes called for Liberty logs";
+        public static final String MCP_FILESYSTEM_READ_FILE = "Filesystem MCP read_text_file called for Liberty log file";
+        public static final String MCP_FILESYSTEM_LIBERTY_LOGS_COLLECTED = "Liberty log files collected via Filesystem MCP";
+        public static final String MCP_FILESYSTEM_SKIPPED_NO_POD = "Skipping Filesystem MCP calls - no pod name in alert";
+        public static final String MCP_FILESYSTEM_FILE_SKIPPED_SIZE = "Skipping Liberty log file — exceeds size threshold";
+        public static final String MCP_FILESYSTEM_FILE_SKIPPED_WINDOW = "Skipping Liberty log file — outside alert time window";
+        public static final String MCP_FILESYSTEM_FFDC_LIST = "Filesystem MCP list_directory_with_sizes called for Liberty FFDC directory";
+    }
+
+    /**
+     * Skills loading log messages.
+     */
+    public static final class Skills {
+        private Skills() {}
+
+        public static final String SKILLS_DISABLED         = "Skills globally disabled; skipping classpath and filesystem loading";
+        public static final String SKILLS_DIR_NOT_SET      = "No external skills directory configured";
+        public static final String CLASSPATH_SKILLS_LOADED = "Bundled classpath skills loaded";
+        public static final String CLASSPATH_SKILLS_FAILED = "Failed to load bundled skills from classpath";
+        public static final String FS_SKILLS_DIR_MISSING   = "External skills directory does not exist, skipping";
+        public static final String FS_SKILLS_LOADED        = "External filesystem skills loaded";
+        public static final String FS_SKILLS_FAILED        = "Failed to load external skills from filesystem";
+        public static final String SKILLS_MERGED           = "Skills merged";
     }
 }

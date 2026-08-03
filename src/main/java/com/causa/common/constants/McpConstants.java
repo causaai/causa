@@ -86,6 +86,37 @@ public final class McpConstants {
         public static final String CRYOSTAT_GET_THREAD_ANALYSIS = "get_thread_analysis";
         public static final String CRYOSTAT_GET_EXCEPTION_ANALYSIS = "get_exception_analysis";
         public static final String CRYOSTAT_GET_CONTAINER_ANALYSIS = "get_container_analysis";
+
+        // Filesystem MCP tools
+        public static final String FILESYSTEM_LIST_DIRECTORY = "list_directory";
+        public static final String FILESYSTEM_LIST_DIRECTORY_WITH_SIZES = "list_directory_with_sizes";
+        public static final String FILESYSTEM_READ_FILE = "read_text_file";
+
+        // JMX MCP tools — Memory
+        public static final String JMX_GET_HEAP_STATUS = "getHeapStatus";
+        public static final String JMX_GET_MEMORY_POOLS_BREAKDOWN = "getMemoryPoolsBreakdown";
+
+        // JMX MCP tools — GC
+        public static final String JMX_GET_GC_ACTIVITY = "getGcActivity";
+        public static final String JMX_GET_GC_EFFICIENCY = "getGcEfficiency";
+
+        // JMX MCP tools — Threads
+        public static final String JMX_GET_THREAD_STATE = "getThreadState";
+
+        // JMX MCP tools — CPU & Resources
+        public static final String JMX_GET_CPU_USAGE = "getCpuUsage";
+
+        // JMX MCP tools — Application Behavior
+        public static final String JMX_GET_JVM_RUNTIME_INFO = "getJvmRuntimeInfo";
+
+        // JMX MCP tools — Thread Contention
+        public static final String JMX_GET_THREAD_CONTENTION_ANALYSIS = "getThreadContentionAnalysis";
+
+        // JMX MCP tools — Advanced RCA
+        public static final String JMX_GET_MEMORY_ALLOCATION_RATE = "getMemoryAllocationRate";
+        public static final String JMX_GET_GC_PRESSURE_ANALYSIS = "getGcPressureAnalysis";
+        public static final String JMX_GET_MEMORY_LEAK_INDICATORS = "getMemoryLeakIndicators";
+        public static final String JMX_GET_HEAP_FRAGMENTATION_ANALYSIS = "getHeapFragmentationAnalysis";
     }
 
     /**
@@ -106,6 +137,14 @@ public final class McpConstants {
 
         // Cryostat arguments
         public static final String POD_NAME = "pod_name";
+
+        // Filesystem arguments
+        public static final String PATH = "path";
+
+        // JMX arguments
+        public static final String LOOKBACK = "lookback";
+        public static final String STEP = "step";
+        public static final String WINDOW = "window";
     }
 
     /**
@@ -117,6 +156,7 @@ public final class McpConstants {
         public static final String POD_STATUS = "\n=== POD STATUS ===";
         public static final String KUBERNETES_EVENTS = "\n=== KUBERNETES EVENTS (for pod: %s) ===";
         public static final String POD_LOGS = "\n=== POD LOGS (last 5 lines) ===";
+        public static final String LIBERTY_LOGS = "\n=== LIBERTY LOGS ===";
     }
 
     /**
@@ -132,6 +172,8 @@ public final class McpConstants {
         public static final String UNABLE_TO_GET_CRYOSTAT_ANALYSIS = "Unable to retrieve Cryostat %s analysis: %s";
         public static final String CRYOSTAT_RECORDING_CREATED = "Cryostat recording created, retrying after delay";
         public static final String CRYOSTAT_MAX_RETRIES_EXCEEDED = "Cryostat max retries exceeded for %s";
+        public static final String UNABLE_TO_LIST_LIBERTY_LOGS_DIR = "Unable to list Liberty logs directory: %s";
+        public static final String UNABLE_TO_READ_LIBERTY_LOG_FILE = "Unable to read Liberty log file: %s";
 
         public static final String MCP_INITIALIZE_FAILED = "MCP initialize failed with status: %d, body: %s";
         public static final String MCP_TOOL_CALL_FAILED = "MCP tool call failed with status: %d, body: %s";
@@ -245,6 +287,9 @@ public final class McpConstants {
         public static final String HAS_K8S_CONTEXT = "hasK8sContext";
         public static final String HAS_KRUIZE_CONTEXT = "hasKruizeContext";
         public static final String HAS_CRYOSTAT_CONTEXT = "hasCryostatContext";
+        public static final String HAS_FILESYSTEM_CONTEXT = "hasFilesystemContext";
+        public static final String HAS_JMX_CONTEXT = "hasJmxContext";
+        public static final String PLATFORM = "platform";
         public static final String RETRY_ATTEMPT = "retryAttempt";
         public static final String DELAY_MS = "delayMs";
         public static final String ANALYSIS_TYPE = "analysisType";
@@ -269,5 +314,20 @@ public final class McpConstants {
 
         public static final String RECORDING_CREATED_STATUS = "RECORDING_CREATED";
         public static final String STATUS_FIELD = "status";
+    }
+
+    /**
+     * Filesystem MCP-specific constants
+     */
+    public static final class Filesystem {
+        private Filesystem() {}
+
+        /** Prefix used by @modelcontextprotocol/server-filesystem for file entries in list_directory output. */
+        public static final String FILE_PREFIX = "[FILE] ";
+        public static final String FFDC_DIR = "ffdc";
+        public static final String MESSAGES_LOG = "messages.log";
+        public static final String MESSAGES_ARCHIVE_PREFIX = "messages_";
+        public static final long MAX_MESSAGES_TRACE_BYTES = 8L * 1024L * 1024L;
+        public static final long MAX_FFDC_BYTES = 2L * 1024L * 1024L;
     }
 }

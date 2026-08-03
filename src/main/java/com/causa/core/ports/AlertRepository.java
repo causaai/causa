@@ -2,29 +2,34 @@ package com.causa.core.ports;
 
 import com.causa.core.domain.Alert;
 
+import java.util.List;
+import java.util.Optional;
+
 /**
- * Alert Repository - Secondary Port
- *
- * <p>Repository interface for alert persistence operations.
- * <p>Framework-agnostic interface with no JPA or database-specific annotations.
+ * Alert Repository — Secondary Port
  *
  * @since 0.0.1
  */
 public interface AlertRepository {
 
-    /**
-     * Saves an alert to the persistence layer.
-     *
-     * @param alert the alert to save
-     * @return the saved alert
-     */
     Alert save(Alert alert);
 
-    /**
-     * Updates the has_diagnostics flag for an alert.
-     *
-     * @param alertId the alert ID
-     * @param hasDiagnostics the new value
-     */
+    Alert saveRejected(Alert alert, String reason);
+
     void updateHasDiagnostics(String alertId, boolean hasDiagnostics);
+
+    void updateProcessingStatus(String alertId, String status);
+
+    Optional<Alert> findById(String alertId);
+
+    List<Alert> findAll();
+
+    /**
+     * Returns all alerts that match ALL non-null/non-blank parameters (AND logic).
+     * A null or blank value for any parameter means that filter is skipped.
+     *
+     * @param workloadName filter by {@code workload_name} column (exact match); null = skip
+     * @param namespace    filter by {@code workload_info->>'namespace'} (exact match); null = skip
+     */
+    List<Alert> findByFilters(String workloadName, String namespace);
 }

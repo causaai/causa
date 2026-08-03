@@ -4,8 +4,11 @@ import com.causa.api.dto.request.AlertWebhookRequest;
 import com.causa.common.constants.AlertConstants;
 import com.causa.common.constants.AlertConstants.AlertSeverity;
 import com.causa.common.constants.AlertConstants.AlertStatus;
-import com.causa.config.AlertConfig;
+import com.causa.common.utils.IdUtils;
+import com.causa.config.AppConfig;
 import com.causa.core.domain.Alert;
+import com.causa.core.domain.Alert.AlertMetadata;
+import com.causa.core.domain.Alert.WorkloadInfo;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -16,19 +19,23 @@ import java.util.Map;
 /**
  * Alert Mapper
  *
- * <p>Maps Prometheus Alertmanager webhook DTOs to domain Alert objects.
- * <p>Handles label extraction, timestamp parsing, and alert ID generation.
+ * <p>Maps Prometheus Alertmanager webhook DTOs to domain {@link Alert} objects.
+ *
+ * <p>All workload fields ({@code container_name}, {@code pod_name}, {@code namespace},
+ * {@code cluster_name}, {@code workload_type}) and {@code alert_source} are extracted
+ * from annotations first, then labels as fallback. Values remain {@code null} when
+ * not present in either.
  *
  * @since 0.0.1
  */
 @ApplicationScoped
 public class AlertMapper {
 
-    private final String defaultSeverity;
+    private final AppConfig appConfig;
 
     @Inject
-    public AlertMapper(AlertConfig alertConfig) {
-        this.defaultSeverity = alertConfig.filterSeverity();
+    public AlertMapper(AppConfig appConfig) {
+        this.appConfig = appConfig;
     }
 
     /**
@@ -37,6 +44,7 @@ public class AlertMapper {
      * @param request the webhook request
      * @return list of domain Alert objects
      */
+
     public List<Alert> toDomainList(AlertWebhookRequest request) {
         if (request == null || request.getAlerts() == null) {
             return List.of();
@@ -58,82 +66,66 @@ public class AlertMapper {
      * @return the domain Alert object
      */
     public Alert toDomain(AlertWebhookRequest.AlertItem item) {
-        Map<String, String> labels = item.getLabels();
-        Map<String, String> annotations = item.getAnnotations();
+        Map<String, String> labels      = item.getLabels()      != null ? item.getLabels()      : Map.of();
+        Map<String, String> annotations = item.getAnnotations() != null ? item.getAnnotations() : Map.of();
 
-        // Required fields (validated before this is called)
-        String alertName = labels.get(AlertConstants.Labels.ALERT_NAME);
-        String container = labels.get(AlertConstants.Labels.CONTAINER);
-        String namespace = getLabelWithFallback(labels, annotations, AlertConstants.Labels.NAMESPACE);
+        // Core alert fields — from labels
+        String alertName   = labels.get(AlertConstants.Labels.ALERT_NAME);
+        String severityStr = labels.getOrDefault(AlertConstants.Labels.SEVERITY, appConfig.getAlertConfig().getFilterSeverity());
 
-        // Optional fields
-        String pod = labels.get(AlertConstants.Labels.POD);
-        String severityStr = labels.getOrDefault(AlertConstants.Labels.SEVERITY, defaultSeverity);
+        // Workload fields — annotations first (PrometheusRule uses container_name / pod_name as annotation
+        // keys), label keys (container / pod) used as fallback for older or custom alert sources.
+        String containerName = getAnnotationOrLabel(annotations, labels,
+            AlertConstants.Labels.CONTAINER_NAME, AlertConstants.Labels.CONTAINER);
+        String podName       = getAnnotationOrLabel(annotations, labels,
+            AlertConstants.Labels.POD_NAME, AlertConstants.Labels.POD);
+        String namespace     = getAnnotationOrLabel(annotations, labels, AlertConstants.Labels.NAMESPACE,    AlertConstants.Labels.NAMESPACE);
+        String clusterName   = getAnnotationOrLabel(annotations, labels, AlertConstants.Labels.CLUSTER_NAME, AlertConstants.Labels.CLUSTER_NAME);
+        String workloadType  = getAnnotationOrLabel(annotations, labels, AlertConstants.Labels.WORKLOAD_TYPE, AlertConstants.Labels.WORKLOAD_TYPE);
+        String workloadName  = getAnnotationOrLabel(annotations, labels, AlertConstants.Labels.WORKLOAD_NAME, AlertConstants.Labels.WORKLOAD_NAME);
 
-        Instant timestamp = parseTimestamp(item.getStartsAt());
+        // alert_source — from annotations, default to "prometheus"
+        String alertSource = annotations.getOrDefault(
+            AlertConstants.Labels.ALERT_SOURCE, AlertMetadata.DEFAULT_SOURCE);
 
-        // Use Prometheus fingerprint as alert ID (globally unique, deterministic)
-        // Fallback to generated ID if fingerprint is missing (shouldn't happen with Alertmanager v4)
-        String alertId = Alert.generateAlertId(container, timestamp);
+        Instant timestamp  = parseTimestamp(item.getStartsAt());
+        String fingerprint = item.getFingerprint();
+        String alertId     = IdUtils.generateAlertId();
 
         return Alert.builder()
             .alertId(alertId)
-            .timestamp(timestamp)
+            .sourceAlertId(fingerprint != null && !fingerprint.isBlank() ? fingerprint : null)
             .alertName(alertName)
+            .alertTimestamp(timestamp)
             .severity(AlertSeverity.fromString(severityStr))
-            .podName(pod)
-            .containerName(container)
-            .namespace(namespace)
-            .status(AlertStatus.fromString(item.getStatus()))
-            .hasDiagnostics(false)
-            .labels(labels)
-            .annotations(annotations)
+            .status(AlertStatus.PROCESSING)   // initial Causa status; updated by service layer
+            .workloadInfo(WorkloadInfo.of(podName, containerName, namespace, clusterName, workloadType))
+            .workloadName(workloadName != null ? workloadName : (containerName != null ? containerName : ""))
+            .alertMetadata(AlertMetadata.of(labels, annotations, alertSource))
             .build();
     }
 
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
     /**
-     * Extracts a label with fallback to annotations if not found in labels.
-     *
-     * <p>Some Alertmanager configurations put namespace/pod in annotations rather than labels.
-     *
-     * @param labels the labels map
-     * @param annotations the annotations map
-     * @param key the key to search for
-     * @return the value from labels or annotations
+     * Looks up {@code annotationKey} in annotations first, then {@code labelKey} in labels.
+     * Pass the same key for both params when the key is identical in both maps.
      */
-    private String getLabelWithFallback(Map<String, String> labels,
-                                        Map<String, String> annotations,
-                                        String key) {
-        String value = labels.get(key);
-        if (value != null) {
-            return value;
-        }
-
-        if (annotations != null) {
-            return annotations.get(key);
-        }
-
-        return null;
+    private String getAnnotationOrLabel(Map<String, String> annotations, Map<String, String> labels,
+                                        String annotationKey, String labelKey) {
+        String value = annotations.get(annotationKey);
+        return value != null ? value : labels.get(labelKey);
     }
 
-    /**
-     * Parses an ISO 8601 timestamp from Alertmanager.
-     *
-     * <p>Falls back to current time if parsing fails.
-     *
-     * @param isoTimestamp the ISO timestamp string
-     * @return the parsed Instant, or current time if parsing fails
-     */
-    private Instant parseTimestamp(String isoTimestamp) {
-        if (isoTimestamp == null || isoTimestamp.isBlank()) {
-            return Instant.now();
-        }
-
+    private Instant parseTimestamp(String iso) {
+        if (iso == null || iso.isBlank()) return Instant.now();
         try {
-            return Instant.parse(isoTimestamp);
+            return Instant.parse(iso);
         } catch (Exception e) {
-            // Log warning and fallback to current time
             return Instant.now();
         }
     }
+
 }

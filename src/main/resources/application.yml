@@ -5,7 +5,6 @@
 quarkus:
   application:
     name: ${CAUSA_APP_NAME:causa-backend}
-    version: 0.0.1
 
   # HTTP Server Configuration 
   http:
@@ -17,10 +16,9 @@ quarkus:
       methods: ${CAUSA_CORS_METHODS:GET,POST,PUT,DELETE,OPTIONS}
       headers: ${CAUSA_CORS_HEADERS:*}
 
-  # OpenAPI/Swagger Configuration 
+  # OpenAPI/Swagger Configuration
   smallrye-openapi:
     info-title: Causa Backend API
-    info-version: 0.0.1
 
   # Swagger UI Configuration 
   swagger-ui:
@@ -46,6 +44,11 @@ quarkus:
   banner:
     enabled: true
     path: banner.txt
+
+  # Config - disable validation for custom causa.* properties
+  config:
+    mapping:
+      validate-unknown: false
 
   # ============================================================
   # Database Configuration (PostgreSQL + Agroal Connection Pool)
@@ -90,9 +93,22 @@ quarkus:
 
 # Custom Application Configuration
 causa:
+  # Encryption key for sensitive configuration values (AES-256-GCM).
+  # Must be a Base64-encoded 32-byte (256-bit) random key.
+  # Generate a production key: openssl rand -base64 32
+  # CRITICAL: Set CAUSA_ENCRYPTION_KEY via Kubernetes secret in production.
+  #           The dev default below is insecure and must never be used outside local development.
+  encryption:
+    key: ${CAUSA_ENCRYPTION_KEY:Y2F1c2EtZGV2LWluc2VjdXJlLWRvLW5vdC11c2UtcHI=}
+
+  # Cluster identity — used in Diagnostics API responses
+  cluster:
+    name: ${CAUSA_CLUSTER_NAME:default}
+    target-cluster-type: ${CAUSA_CLUSTER_TARGET_TYPE:vm}
+
   # LLM Configuration (LangChain4J)
   llm:
-    provider: ${LLM_PROVIDER:vertex-ai-anthropic}
+    provider: ${LLM_PROVIDER:}
     model-name: ${LLM_MODEL_NAME:}
     base-url: ${LLM_BASE_URL:}
     auth-type: ${LLM_AUTH_TYPE:}
@@ -107,6 +123,10 @@ causa:
       location: ${VERTEX_LOCATION:}
     bob:
       shell-path: bob
+    skills:
+      enabled: ${LLM_SKILLS_ENABLED:true}
+      skills-dir: ${LLM_SKILLS_DIR:}
+    google-application-credentials: ${GOOGLE_APPLICATION_CREDENTIALS:}
 
   # Alert Configuration
   alerts:
@@ -131,6 +151,16 @@ causa:
       timeout-ms: ${CAUSA_MCP_CRYOSTAT_TIMEOUT:15000}
       retry-delay-ms: ${CAUSA_MCP_CRYOSTAT_RETRY_DELAY:5000}
       max-retries: ${CAUSA_MCP_CRYOSTAT_MAX_RETRIES:3}
+    filesystem:
+      endpoint: ${CAUSA_MCP_FILESYSTEM_ENDPOINT:http://filesystem-mcp-server:8080}
+      health-path: ${CAUSA_MCP_FILESYSTEM_HEALTH_PATH:/healthz}
+      timeout-ms: ${CAUSA_MCP_FILESYSTEM_TIMEOUT:10000}
+      liberty-logs-dir: ${CAUSA_MCP_FILESYSTEM_LIBERTY_LOGS_DIR:/logs}
+      alert-window-minutes: ${CAUSA_MCP_FILESYSTEM_ALERT_WINDOW_MINUTES:5}
+    jmx:
+      endpoint: ${CAUSA_MCP_JMX_ENDPOINT:http://jmx-mcp-server:8080}
+      health-path: ${CAUSA_MCP_JMX_HEALTH_PATH:/healthz}
+      timeout-ms: ${CAUSA_MCP_JMX_TIMEOUT:10000}
 
 #   # Feature Flags (Runtime configurable)
 #   features:

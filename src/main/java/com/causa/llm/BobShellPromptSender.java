@@ -4,15 +4,12 @@ import com.causa.common.constants.LLMConstants;
 import com.causa.common.exceptions.LLMException;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
-import com.causa.config.LLMConfig;
+import com.causa.config.AppConfig;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
 import com.causa.core.ports.llm.PromptSender;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.quarkus.arc.properties.IfBuildProperty;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -33,27 +30,21 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * <p>Requires BOBSHELL_API_KEY environment variable for authentication.
  *
- * <p>TEMPORARY: Using @Named for testing - RESTORE BEFORE PR
- * <p>This bean is conditionally enabled only when {@code causa.llm.provider} is set to "bob".
- * When disabled, {@link LangChainPromptSender} is used instead.
+ * <p>This is a plain class (not a CDI bean) instantiated by {@link UnifiedPromptSender}.
  *
  * @since 0.0.1
  */
-@ApplicationScoped
-@IfBuildProperty(name = "causa.llm.provider", stringValue = "bob")
 public class BobShellPromptSender implements PromptSender {
 
     private static final CausaLogger log = CausaLogger.getLogger(BobShellPromptSender.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
-    
-    private final LLMConfig config;
+
+    private final AppConfig appConfig;
     private final AtomicBoolean ready = new AtomicBoolean(false);
 
-    @Inject
-    public BobShellPromptSender(LLMConfig config) {
-        this.config = config;
-        // api-key and timeout-seconds are shared with other providers — read from top-level LLMConfig
-        if (config.apiKey().orElse("").isBlank()) {
+    public BobShellPromptSender(AppConfig appConfig) {
+        this.appConfig = appConfig;
+        if (appConfig.getLlmConfig().getApiKey().isBlank()) {
             log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
                 .field(LLMConstants.ConfigKeys.MISSING_CONFIG, LLMConstants.ConfigKeys.LLM_API_KEY)
                 .log();
@@ -148,7 +139,7 @@ public class BobShellPromptSender implements PromptSender {
      */
     private boolean checkAvailability() {
         try {
-            ProcessBuilder pb = new ProcessBuilder(config.bob().shellPath(), LLMConstants.BobShell.VERSION_FLAG);
+            ProcessBuilder pb = new ProcessBuilder(appConfig.getLlmConfig().getBobShellPath(), LLMConstants.BobShell.VERSION_FLAG);
             Process process = pb.start();
             boolean completed = process.waitFor(
                 LLMConstants.BobShell.VERSION_CHECK_TIMEOUT_SECONDS,
@@ -164,7 +155,7 @@ public class BobShellPromptSender implements PromptSender {
             int exitCode = process.exitValue();
             if (exitCode == 0) {
                 log.info(LogMessages.LLM.BOB_SHELL_AVAILABLE)
-                    .field(LLMConstants.BobShell.LOG_FIELD_SHELL_PATH, config.bob().shellPath())
+                    .field(LLMConstants.BobShell.LOG_FIELD_SHELL_PATH, appConfig.getLlmConfig().getBobShellPath())
                     .log();
                 return true;
             } else {
@@ -214,7 +205,7 @@ public class BobShellPromptSender implements PromptSender {
     private String executeBobShell(String prompt) throws LLMException, InterruptedException {
         try {
             // Fail fast — there is no point spawning a process without a valid API key
-            String apiKey = config.apiKey().orElse("").trim();
+            String apiKey = appConfig.getLlmConfig().getApiKey().trim();
             if (apiKey.isBlank()) {
                 throw new LLMException(
                     LLMConstants.ErrorMessages.API_KEY_REQUIRED + LLMConstants.Provider.IBM_BOB,
@@ -224,7 +215,7 @@ public class BobShellPromptSender implements PromptSender {
 
             // Always use stdin mode for reliability and consistency
             ProcessBuilder pb = new ProcessBuilder(
-                config.bob().shellPath(),
+                appConfig.getLlmConfig().getBobShellPath(),
                 LLMConstants.BobShell.FLAG_ACCEPT_LICENSE,
                 LLMConstants.BobShell.FLAG_YOLO,
                 LLMConstants.BobShell.FLAG_OUTPUT_JSON,
@@ -245,7 +236,7 @@ public class BobShellPromptSender implements PromptSender {
             }
             
             // Wait for completion with timeout
-            int timeoutSeconds = config.timeoutSeconds();
+            int timeoutSeconds = appConfig.getLlmConfig().getTimeoutSeconds();
             boolean completed = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
             
             if (!completed) {

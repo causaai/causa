@@ -2,29 +2,25 @@ package com.causa.core.ports;
 
 import com.causa.core.domain.Diagnostic;
 
+import java.util.List;
+import java.util.Optional;
+
 /**
- * Diagnostic Repository - Secondary Port
- *
- * <p>Repository interface for diagnostic persistence operations.
- * <p>Framework-agnostic interface with no JPA or database-specific annotations.
+ * Diagnostic Repository — Secondary Port
  *
  * @since 0.0.1
  */
 public interface DiagnosticRepository {
 
-    /**
-     * Saves a diagnostic to the persistence layer.
-     *
-     * @param diagnostic the diagnostic to save
-     * @return the saved diagnostic
-     */
+    /** Persists a new diagnostic row. */
     Diagnostic save(Diagnostic diagnostic);
 
-    /**
-     * Updates an existing diagnostic.
-     *
-     * @param diagnostic the diagnostic to update
-     * @return the updated diagnostic
-     */
+    /** Merges an existing diagnostic row (status updates, RCA, validation). */
     Diagnostic update(Diagnostic diagnostic);
+
+    /** Returns all diagnostics ordered by {@code created_at} descending. */
+    List<Diagnostic> findAll();
+
+    /** Finds a diagnostic by its application-generated ID. */
+    Optional<Diagnostic> findById(String diagnosticId);
 }

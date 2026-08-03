@@ -4,7 +4,8 @@ import com.causa.api.dto.ComponentHealthDto;
 import com.causa.api.dto.HealthCheckResponseDto;
 import com.causa.common.constants.AppConstants;
 import com.causa.common.constants.HealthCheckConstants;
-import com.causa.config.LLMConfig;
+import com.causa.config.AppConfig;
+import com.causa.config.LlmConfigSnapshot;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
 import com.causa.infrastructure.persistence.DatabaseConnectionService;
@@ -20,8 +21,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.Statement;
-import java.util.Optional;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -63,7 +62,10 @@ class HealthCheckServiceTest {
     private LangChainPromptSender llmPromptSender;
 
     @Mock
-    private LLMConfig llmConfig;
+    private AppConfig appConfig;
+
+    @Mock
+    private LlmConfigSnapshot llmConfigSnapshot;
 
     private HealthCheckService healthCheckService;
 
@@ -81,6 +83,9 @@ class HealthCheckServiceTest {
     private static final String MCP_ENDPOINT = "http://192.0.2.1";
     private static final String MCP_HEALTH_PATH = "/health";
     private static final int MCP_TIMEOUT = 1; // 1 ms — fail immediately, don't slow down tests
+    private static final String MCP_FILESYSTEM_ENDPOINT = "http://192.0.2.1";
+    private static final String MCP_FILESYSTEM_HEALTH_PATH = "/health";
+    private static final int MCP_FILESYSTEM_TIMEOUT = 1;
 
     @BeforeEach
     void setUp() {
@@ -88,6 +93,7 @@ class HealthCheckServiceTest {
                 databaseConnectionService,
                 dataSource,
                 APP_VERSION,
+                "cluster",
                 MCP_K8S_ENDPOINT,
                 MCP_K8S_HEALTH_PATH,
                 MCP_K8S_TIMEOUT,
@@ -97,8 +103,11 @@ class HealthCheckServiceTest {
                 MCP_CRYOSTAT_HEALTH_ENDPOINT,
                 MCP_CRYOSTAT_HEALTH_PATH,
                 MCP_CRYOSTAT_TIMEOUT,
+                MCP_FILESYSTEM_ENDPOINT,
+                MCP_FILESYSTEM_HEALTH_PATH,
+                MCP_FILESYSTEM_TIMEOUT,
                 llmPromptSender,
-                llmConfig
+                appConfig
         );
     }
 
@@ -209,7 +218,9 @@ class HealthCheckServiceTest {
             // Given
             when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(true);
-            when(llmConfig.modelName()).thenReturn(Optional.of("claude-sonnet-4-6"));
+            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
+            when(llmConfigSnapshot.getProvider()).thenReturn("bob");
+            when(llmConfigSnapshot.getModelName()).thenReturn("bob");
             
             LLMResponse mockResponse = new LLMResponse(
                     "OK",
@@ -230,7 +241,8 @@ class HealthCheckServiceTest {
             ComponentHealthDto llmHealth = response.getComponents().get(HealthCheckConstants.ComponentNames.LLM_PROVIDER);
             assertNotNull(llmHealth);
             assertEquals(AppConstants.HealthStatus.UP.getValue(), llmHealth.getStatus());
-            assertTrue(llmHealth.getMessage().contains("claude-sonnet-4-6"));
+            assertTrue(llmHealth.getMessage().contains("bob / bob"),
+                    "Expected message to contain 'bob / bob' (provider / model), but was: " + llmHealth.getMessage());
             assertNotNull(llmHealth.getLatencyMs());
             assertTrue(llmHealth.getLatencyMs() >= 0);
 
@@ -244,7 +256,9 @@ class HealthCheckServiceTest {
             // Given
             when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(true);
-            when(llmConfig.modelName()).thenReturn(Optional.empty());
+            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
+            when(llmConfigSnapshot.getProvider()).thenReturn("bob");
+            when(llmConfigSnapshot.getModelName()).thenReturn("");
 
             LLMResponse mockResponse = new LLMResponse(
                     "OK",
@@ -374,8 +388,10 @@ class HealthCheckServiceTest {
 
             // Given - LLM UP
             when(llmPromptSender.isReady()).thenReturn(true);
-            when(llmConfig.modelName()).thenReturn(Optional.of("claude-sonnet-4-6"));
-            LLMResponse mockResponse = new LLMResponse("OK", "claude-sonnet-4-6", 11L, 4L, 0L, 0L, 100L);
+            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
+            when(llmConfigSnapshot.getProvider()).thenReturn("bob");
+            when(llmConfigSnapshot.getModelName()).thenReturn("bob");
+            LLMResponse mockResponse = new LLMResponse("OK", "bob", 11L, 4L, 0L, 0L, 100L);
             when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(mockResponse);
 
             // When
@@ -395,8 +411,10 @@ class HealthCheckServiceTest {
 
             // Given - LLM UP
             when(llmPromptSender.isReady()).thenReturn(true);
-            when(llmConfig.modelName()).thenReturn(Optional.of("claude-sonnet-4-6"));
-            LLMResponse mockResponse = new LLMResponse("OK", "claude-sonnet-4-6", 11L, 4L, 0L, 0L, 100L);
+            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
+            when(llmConfigSnapshot.getProvider()).thenReturn("bob");
+            when(llmConfigSnapshot.getModelName()).thenReturn("bob");
+            LLMResponse mockResponse = new LLMResponse("OK", "bob", 11L, 4L, 0L, 0L, 100L);
             when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(mockResponse);
 
             // When
