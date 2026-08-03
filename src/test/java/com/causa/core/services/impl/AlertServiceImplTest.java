@@ -2,7 +2,8 @@ package com.causa.core.services.impl;
 
 import com.causa.common.constants.AlertConstants.AlertSeverity;
 import com.causa.common.constants.AlertConstants.AlertStatus;
-import com.causa.config.AlertConfig;
+import com.causa.config.AlertConfigSnapshot;
+import com.causa.config.AppConfig;
 import com.causa.core.domain.Alert;
 import com.causa.core.ports.AlertRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,7 +36,10 @@ import static org.mockito.Mockito.*;
 class AlertServiceImplTest {
 
     @Mock
-    private AlertConfig alertConfig;
+    private AppConfig appConfig;
+
+    @Mock
+    private AlertConfigSnapshot alertConfig;
 
     @Mock
     private AlertRepository alertRepository;
@@ -44,12 +48,13 @@ class AlertServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(alertConfig.filterSeverity()).thenReturn("warning");
-        lenient().when(alertConfig.cooldownMinutes()).thenReturn(15);
-        lenient().when(alertConfig.ignoreNamespaces()).thenReturn(
-                Optional.of(List.of("kube-system", "istio-system")));
+        lenient().when(appConfig.getAlertConfig()).thenReturn(alertConfig);
+        lenient().when(alertConfig.getFilterSeverity()).thenReturn("warning");
+        lenient().when(alertConfig.getCooldownMinutes()).thenReturn(15);
+        lenient().when(alertConfig.getIgnoreNamespaces()).thenReturn(
+                List.of("kube-system", "istio-system"));
 
-        alertService = new AlertServiceImpl(alertConfig, alertRepository);
+        alertService = new AlertServiceImpl(appConfig, alertRepository);
         alertService.init(); // package-private, accessible from same package
     }
 
@@ -363,11 +368,12 @@ class AlertServiceImplTest {
         @Test
         @DisplayName("Should work with empty ignore namespaces list")
         void shouldWorkWithEmptyIgnoreNamespaces() {
-            when(alertConfig.filterSeverity()).thenReturn("critical");
-            when(alertConfig.cooldownMinutes()).thenReturn(10);
-            when(alertConfig.ignoreNamespaces()).thenReturn(Optional.empty());
+            when(appConfig.getAlertConfig()).thenReturn(alertConfig);
+            when(alertConfig.getFilterSeverity()).thenReturn("critical");
+            when(alertConfig.getCooldownMinutes()).thenReturn(10);
+            when(alertConfig.getIgnoreNamespaces()).thenReturn(List.of());
 
-            AlertServiceImpl service = new AlertServiceImpl(alertConfig, alertRepository);
+            AlertServiceImpl service = new AlertServiceImpl(appConfig, alertRepository);
             service.init(); // package-private, accessible from same package
 
             Alert alert = buildAlert("a1", AlertSeverity.CRITICAL, "any-namespace", "pod-1");

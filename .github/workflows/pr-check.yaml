@@ -25,3 +25,20 @@ jobs:
       - name: Compile with Maven (skip tests)
         run: mvn clean compile -DskipTests
 
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Run tests with Maven
+        run: ./mvnw clean test

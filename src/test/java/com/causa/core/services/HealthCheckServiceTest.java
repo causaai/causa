@@ -63,7 +63,7 @@ class HealthCheckServiceTest {
     private Statement statement;
 
     @Mock
-    private LangChainPromptSender llmPromptSender;
+    private PromptSender llmPromptSender;
 
     @Mock
     private AppConfig appConfig;
@@ -226,6 +226,8 @@ class HealthCheckServiceTest {
             when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
             when(llmConfigSnapshot.getProvider()).thenReturn("bob");
             when(llmConfigSnapshot.getModelName()).thenReturn("");
+            when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(
+                    new LLMResponse("OK", "bob", 1L, 1L, 0L, 0L, 10L));
 
             HealthCheckResponseDto response = healthCheckService.getSystemHealth();
 
@@ -364,7 +366,6 @@ class HealthCheckServiceTest {
             when(statement.execute("SELECT 1")).thenReturn(true);
             // LLM UP
             when(llmPromptSender.isReady()).thenReturn(true);
-            when(llmConfig.modelName()).thenReturn(Optional.of("claude-sonnet-4-6"));
             when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(
                     new LLMResponse("OK", "claude-sonnet-4-6", 10L, 4L, 0L, 0L, 50L));
             // MCP → DOWN (192.0.2.1 + 1ms timeout → instant fail)
@@ -470,7 +471,7 @@ class HealthCheckServiceTest {
                     MCP_DEAD_ENDPOINT, MCP_HEALTH_PATH, MCP_TIMEOUT_MS,
                     MCP_DEAD_ENDPOINT, MCP_HEALTH_PATH, MCP_TIMEOUT_MS,
                     llmPromptSender,
-                    llmConfig
+                    appConfig
             );
         }
 

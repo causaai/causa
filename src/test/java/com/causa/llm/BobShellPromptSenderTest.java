@@ -1,6 +1,7 @@
 package com.causa.llm;
 
 import com.causa.common.constants.LLMConstants;
+import com.causa.common.exceptions.LLMException;
 import com.causa.config.AppConfig;
 import com.causa.config.LlmConfigSnapshot;
 import com.causa.core.domain.LLMRequest;
@@ -54,7 +55,9 @@ class BobShellPromptSenderTest {
      */
     private void setupDefaultMocks() {
         lenient().when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
-        lenient().when(llmConfigSnapshot.getBobShellPath()).thenReturn(LLMConstants.Provider.IBM_BOB);
+        // Use a guaranteed-absent path so ProcessBuilder throws IOException immediately
+        // and isReady() returns false without spawning a real process or hanging.
+        lenient().when(llmConfigSnapshot.getBobShellPath()).thenReturn("/nonexistent/bob-does-not-exist");
         lenient().when(llmConfigSnapshot.getApiKey()).thenReturn("test-api-key");
         lenient().when(llmConfigSnapshot.getTimeoutSeconds()).thenReturn(LLMConstants.BobShell.DEFAULT_TIMEOUT_SECONDS);
     }
@@ -138,25 +141,16 @@ class BobShellPromptSenderTest {
         @Test
         @DisplayName("isReady() returns false when shellPath points to a non-existent binary")
         void isReadyReturnsFalseWhenBinaryAbsent() {
-            // Point to a path that will never exist — ProcessBuilder throws IOException
-            when(llmConfig.apiKey()).thenReturn(Optional.of("key"));
-            when(llmConfig.bob()).thenReturn(bobConfig);
-            when(bobConfig.shellPath()).thenReturn("/nonexistent/path/to/bob-does-not-exist");
-
-            bobShellPromptSender = new BobShellPromptSender(llmConfig);
-
+            setupDefaultMocks();
+            bobShellPromptSender = new BobShellPromptSender(appConfig);
             assertFalse(bobShellPromptSender.isReady());
         }
 
         @Test
         @DisplayName("isReady() must not throw regardless of environment")
         void isReadyNeverThrows() {
-            when(llmConfig.apiKey()).thenReturn(Optional.of("key"));
-            when(llmConfig.bob()).thenReturn(bobConfig);
-            when(bobConfig.shellPath()).thenReturn("/nonexistent/path/to/bob-does-not-exist");
-
-            bobShellPromptSender = new BobShellPromptSender(llmConfig);
-
+            setupDefaultMocks();
+            bobShellPromptSender = new BobShellPromptSender(appConfig);
             assertDoesNotThrow(() -> bobShellPromptSender.isReady());
         }
     }
@@ -428,12 +422,8 @@ class BobShellPromptSenderTest {
         @DisplayName("Should validate prompt is not empty")
         void shouldValidatePromptIsNotEmpty() {
             // When/Then
-            assertThrows(IllegalArgumentException.class, () -> {
-                LLMRequest.builder("")
-                    .build();
-
-            assertTrue(request.systemPrompt().isPresent());
-            assertEquals("You are a Kubernetes SRE assistant", request.systemPrompt().get());
+            assertThrows(IllegalArgumentException.class, () ->
+                LLMRequest.builder("").build());
         }
 
         @Test

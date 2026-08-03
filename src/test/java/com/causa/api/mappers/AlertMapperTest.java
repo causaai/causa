@@ -2,7 +2,8 @@ package com.causa.api.mappers;
 
 import com.causa.api.dto.request.AlertWebhookRequest;
 import com.causa.common.constants.AlertConstants.AlertSeverity;
-import com.causa.config.AlertConfig;
+import com.causa.config.AlertConfigSnapshot;
+import com.causa.config.AppConfig;
 import com.causa.core.domain.Alert;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 /**
@@ -29,14 +31,18 @@ import static org.mockito.Mockito.when;
 class AlertMapperTest {
 
     @Mock
-    private AlertConfig alertConfig;
+    private AppConfig appConfig;
+
+    @Mock
+    private AlertConfigSnapshot alertConfig;
 
     private AlertMapper alertMapper;
 
     @BeforeEach
     void setUp() {
-        when(alertConfig.filterSeverity()).thenReturn("warning");
-        alertMapper = new AlertMapper(alertConfig);
+        lenient().when(appConfig.getAlertConfig()).thenReturn(alertConfig);
+        lenient().when(alertConfig.getFilterSeverity()).thenReturn("warning");
+        alertMapper = new AlertMapper(appConfig);
     }
 
     private AlertWebhookRequest.AlertItem buildItem(Map<String, String> labels, Map<String, String> annotations) {
