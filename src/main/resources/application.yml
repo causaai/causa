@@ -104,7 +104,7 @@ causa:
   # Cluster identity — used in Diagnostics API responses
   cluster:
     name: ${CAUSA_CLUSTER_NAME:default}
-    target-cluster-type: ${CAUSA_CLUSTER_TARGET_TYPE:vm}
+    target-cluster-type: ${CAUSA_CLUSTER_TARGET_TYPE:cluster}
 
   # LLM Configuration (LangChain4J)
   llm:

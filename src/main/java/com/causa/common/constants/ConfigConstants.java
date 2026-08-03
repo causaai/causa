@@ -84,6 +84,9 @@ public final class ConfigConstants {
         key("CLUSTER_TYPE",                    "cluster", ValueType.STRING, false, "causa.cluster.target-cluster-type")
     );
 
+    /** Keys that cannot be updated at runtime via the API — must be set via ENV/application.yml. */
+    private static final Set<String> ENV_ONLY_KEYS = Set.of("CLUSTER_TYPE");
+
     /** All known config keys as an immutable set. */
     public static final Set<String> ALL_KNOWN_KEYS = REGISTRY.stream()
         .map(KeyDef::name)
@@ -126,6 +129,17 @@ public final class ConfigConstants {
      */
     public static boolean isValidKey(String key) {
         return ALL_KNOWN_KEYS.contains(key);
+    }
+
+    /**
+     * Checks if a config key cannot be updated at runtime via the API.
+     * Such keys must be set via ENV/application.yml.
+     *
+     * @param key the config key to check
+     * @return true if the key is not updatable at runtime
+     */
+    public static boolean isEnvOnly(String key) {
+        return ENV_ONLY_KEYS.contains(key);
     }
 
     /**
