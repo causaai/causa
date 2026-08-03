@@ -110,7 +110,7 @@ public final class LlmConfigSnapshot {
     }
 
     public boolean isSkillsEnabled() {
-        String value = config.getOrDefault("LLM_SKILLS_ENABLED", "true");
+        String value = config.getOrDefault("LLM_SKILLS_ENABLED", "false");
         return Boolean.parseBoolean(value);
     }
 

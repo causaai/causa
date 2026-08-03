@@ -6,9 +6,9 @@ Skills extend the LLM with on-demand knowledge loaded at runtime. The LLM receiv
 
 ### Global toggle
 
-| Property | Env var | Default | Description |
-|---|---|---|---|
-| `causa.llm.skills.enabled` | `LLM_SKILLS_ENABLED` | `true` | Enable or disable skills globally |
+| Property                   | Env var              | Default | Description                       |
+|----------------------------|----------------------|---------|-----------------------------------|
+| `causa.llm.skills.enabled` | `LLM_SKILLS_ENABLED` | `false` | Enable or disable skills globally |
 
 Set in `deployment/kubernetes/base/configmap.yaml`:
 ```yaml

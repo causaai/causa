@@ -197,20 +197,20 @@ All keys are also manageable at runtime via the Config API (see [Runtime Config 
 
 ### LLM Provider
 
-| Environment Variable | Description | Default | Example / Notes |
-|---|---|---|---|
-| `LLM_PROVIDER` | Active LLM provider | `vertex-ai-anthropic` | `anthropic` \| `vertex-ai-anthropic` \| `bob` |
-| `LLM_MODEL_NAME` | Model identifier | *(empty — must be set)* | `claude-opus-4-5` |
-| `LLM_API_KEY` | Anthropic API key — required when provider is `anthropic` (**secret**) | *(empty)* | `sk-ant-api03-...` |
-| `LLM_TEMPERATURE` | Sampling temperature | `0.1` | Range `0.0`–`1.0` |
-| `LLM_MAX_TOKENS` | Maximum output tokens | `8192` | — |
-| `LLM_TIMEOUT_SECONDS` | Per-request LLM timeout (seconds) | `180` | Increase for slow models |
-| `LLM_CHAT_MEMORY_SIZE` | Conversation history window (messages) | `10` | `25` recommended for deep analysis |
-| `LLM_SKILLS_ENABLED` | Enable/disable bundled diagnostic skills | `true` | Set `false` to disable all skills |
-| `LLM_SKILLS_DIR` | Path to a directory of user-supplied skills | *(empty — uses bundled skills)* | `/etc/causa/skills` |
-| `LLM_AUTH_TYPE` | Auth type override for custom providers | *(empty)* | Provider-specific |
-| `LLM_BASE_URL` | Base URL override for OpenAI-compatible endpoints | *(empty)* | `https://api.openai.com/v1` |
-| `LLM_CUSTOM_HEADERS` | Extra HTTP headers as JSON object | `{}` | `{"X-Custom": "value"}` |
+| Environment Variable | Description | Default                         | Example / Notes                               |
+|---|---|---------------------------------|-----------------------------------------------|
+| `LLM_PROVIDER` | Active LLM provider | `vertex-ai-anthropic`           | `anthropic` \| `vertex-ai-anthropic` \| `bob` |
+| `LLM_MODEL_NAME` | Model identifier | *(empty — must be set)*         | `claude-opus-4-5`                             |
+| `LLM_API_KEY` | Anthropic API key — required when provider is `anthropic` (**secret**) | *(empty)*                       | `sk-ant-api03-...`                            |
+| `LLM_TEMPERATURE` | Sampling temperature | `0.1`                           | Range `0.0`–`1.0`                             |
+| `LLM_MAX_TOKENS` | Maximum output tokens | `8192`                          | —                                             |
+| `LLM_TIMEOUT_SECONDS` | Per-request LLM timeout (seconds) | `180`                           | Increase for slow models                      |
+| `LLM_CHAT_MEMORY_SIZE` | Conversation history window (messages) | `10`                            | `25` recommended for deep analysis            |
+| `LLM_SKILLS_ENABLED` | Enable/disable bundled diagnostic skills | `false`                         | Set `true` to enable all skills               |
+| `LLM_SKILLS_DIR` | Path to a directory of user-supplied skills | *(empty — uses bundled skills)* | `/etc/causa/skills`                           |
+| `LLM_AUTH_TYPE` | Auth type override for custom providers | *(empty)*                       | Provider-specific                             |
+| `LLM_BASE_URL` | Base URL override for OpenAI-compatible endpoints | *(empty)*                       | `https://api.openai.com/v1`                   |
+| `LLM_CUSTOM_HEADERS` | Extra HTTP headers as JSON object | `{}`                            | `{"X-Custom": "value"}`                       |
 
 ### Vertex AI (when `LLM_PROVIDER=vertex-ai-anthropic`)
 
