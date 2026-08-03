@@ -124,7 +124,7 @@ causa:
     bob:
       shell-path: bob
     skills:
-      enabled: ${LLM_SKILLS_ENABLED:true}
+      enabled: ${LLM_SKILLS_ENABLED:false}
       skills-dir: ${LLM_SKILLS_DIR:}
     google-application-credentials: ${GOOGLE_APPLICATION_CREDENTIALS:}
 
