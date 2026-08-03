@@ -26,6 +26,7 @@ public final class DiagnosticContext {
     private final String podStatus;
     private final String podEvents;
     private final String podLogs;
+    private final String previousPodLogs;
 
     // Kruize MCP context
     private final String costRecommendations;
@@ -45,6 +46,7 @@ public final class DiagnosticContext {
         this.podStatus = builder.podStatus;
         this.podEvents = builder.podEvents;
         this.podLogs = builder.podLogs;
+        this.previousPodLogs = builder.previousPodLogs;
         this.costRecommendations = builder.costRecommendations;
         this.performanceRecommendations = builder.performanceRecommendations;
         this.gcAnalysis = builder.gcAnalysis;
@@ -78,6 +80,10 @@ public final class DiagnosticContext {
 
     public String getPodLogs() {
         return podLogs;
+    }
+
+    public String getPreviousPodLogs() {
+        return previousPodLogs;
     }
 
     public String getCostRecommendations() {
@@ -114,7 +120,7 @@ public final class DiagnosticContext {
      * @return true if pod status, events, or logs are present
      */
     public boolean hasKubernetesContext() {
-        return isNotBlank(podStatus) || isNotBlank(podEvents) || isNotBlank(podLogs);
+        return isNotBlank(podStatus) || isNotBlank(podEvents) || isNotBlank(podLogs) || isNotBlank(previousPodLogs);
     }
 
     /**
@@ -174,6 +180,7 @@ public final class DiagnosticContext {
         appendSection(sb, ContextConstants.SECTION_POD_STATUS, podStatus);
         appendSection(sb, ContextConstants.SECTION_POD_EVENTS, podEvents);
         appendSection(sb, ContextConstants.SECTION_POD_LOGS, podLogs);
+        appendSection(sb, ContextConstants.SECTION_PREVIOUS_POD_LOGS, previousPodLogs);
 
         // Kruize context
         appendSection(sb, ContextConstants.SECTION_COST_RECOMMENDATIONS, costRecommendations);
@@ -234,6 +241,7 @@ public final class DiagnosticContext {
         private String podStatus;
         private String podEvents;
         private String podLogs;
+        private String previousPodLogs;
         private String costRecommendations;
         private String performanceRecommendations;
         private String gcAnalysis;
@@ -271,6 +279,11 @@ public final class DiagnosticContext {
 
         public Builder podLogs(String podLogs) {
             this.podLogs = podLogs;
+            return this;
+        }
+
+        public Builder previousPodLogs(String previousPodLogs) {
+            this.previousPodLogs = previousPodLogs;
             return this;
         }
 

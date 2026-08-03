@@ -31,6 +31,7 @@ public final class ContextConstants {
     public static final String SECTION_POD_STATUS = "POD STATUS";
     public static final String SECTION_POD_EVENTS = "POD EVENTS";
     public static final String SECTION_POD_LOGS = "POD LOGS (recent)";
+    public static final String SECTION_PREVIOUS_POD_LOGS = "PREVIOUS CONTAINER LOGS (pre-crash)";
     public static final String SECTION_COST_RECOMMENDATIONS = "RESOURCE COST RECOMMENDATIONS (Kruize)";
     public static final String SECTION_PERF_RECOMMENDATIONS = "RESOURCE PERFORMANCE RECOMMENDATIONS (Kruize)";
     public static final String SECTION_GC_ANALYSIS = "GC ANALYSIS (Cryostat JFR)";

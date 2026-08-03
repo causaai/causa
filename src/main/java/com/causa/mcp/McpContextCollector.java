@@ -85,7 +85,8 @@ public class McpContextCollector {
             }
 
             contextBuilder.podEvents(collectKubernetesPodEvents(alert));
-            contextBuilder.podLogs(collectKubernetesPodLogs(alert));
+            contextBuilder.podLogs(collectKubernetesPodLogs(alert, false));
+            contextBuilder.previousPodLogs(collectKubernetesPodLogs(alert, true));
         } else {
             log.info(LogMessages.Mcp.MCP_SKIPPED_NO_POD)
                 .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
@@ -222,7 +223,7 @@ public class McpContextCollector {
      *
      * @return formatted log text (last 25 lines), or null on failure
      */
-    private String collectKubernetesPodLogs(Alert alert) {
+    private String collectKubernetesPodLogs(Alert alert, boolean previous) {
         try {
             String sessionId = initializeMcpSession(
                 mcpConfig.kubernetes().endpoint() + McpConstants.Paths.MCP_ENDPOINT,
@@ -233,6 +234,9 @@ public class McpContextCollector {
             arguments.put(McpConstants.Arguments.NAME, alert.getPodName());
             arguments.put(McpConstants.Arguments.NAMESPACE, alert.getNamespace());
             arguments.put(McpConstants.Arguments.TAIL_LINES, McpConstants.Defaults.DEFAULT_TAIL_LINES);
+            if (previous) {
+                arguments.put(McpConstants.Arguments.PREVIOUS, true);
+            }
             if (alert.getContainerName() != null && !alert.getContainerName().isBlank()) {
                 arguments.put(McpConstants.Arguments.CONTAINER, alert.getContainerName());
             }
@@ -586,12 +590,18 @@ public class McpContextCollector {
         String memoryLimit = null;
         String cpuRequest = null;
         String memoryRequest = null;
+        String lastTerminatedReason = null;
+        String lastTerminatedExitCode = null;
+        String lastTerminatedAt = null;
+        String containerImage = null;
 
         // State machine for parsing
         boolean inStatus = false;
         boolean inContainerStatuses = false;
         boolean readingFirstContainerStatus = false;
         boolean inStateSection = false;
+        boolean inLastStateSection = false;
+        boolean inLastStateTerminated = false;
 
         boolean inSpec = false;
         boolean inSpecContainers = false;
@@ -632,14 +642,15 @@ public class McpContextCollector {
             }
 
             if (inContainerStatuses) {
-                // Found start of first container in containerStatuses
-                if (trimmed.startsWith(McpConstants.Yaml.ITEM_PREFIX) && indent == containerStatusBaseIndent + 2) {
+                // Found start of first container in containerStatuses (list items may be at same indent or +2)
+                if (trimmed.startsWith(McpConstants.Yaml.ITEM_PREFIX)
+                        && (indent == containerStatusBaseIndent || indent == containerStatusBaseIndent + 2)) {
                     readingFirstContainerStatus = true;
                     currentIndent = indent;
                     continue;
                 }
 
-                // Stop if we hit another top-level key at same indent as containerStatuses
+                // Stop if we hit another top-level key at or below containerStatuses indent (not a list item)
                 if (indent <= containerStatusBaseIndent && !trimmed.isEmpty() && !trimmed.startsWith(McpConstants.Yaml.ITEM_PREFIX)) {
                     inContainerStatuses = false;
                     readingFirstContainerStatus = false;
@@ -650,6 +661,11 @@ public class McpContextCollector {
                         restartCount = trimmed.split(McpConstants.Yaml.COLON_SEPARATOR, McpConstants.Yaml.COLON_SPLIT_LIMIT)[1].trim();
                     } else if (trimmed.equals(McpConstants.Yaml.STATE_FIELD)) {
                         inStateSection = true;
+                        inLastStateSection = false;
+                        inLastStateTerminated = false;
+                    } else if (trimmed.equals(McpConstants.Yaml.LAST_STATE_FIELD)) {
+                        inLastStateSection = true;
+                        inStateSection = false;
                     } else if (inStateSection && trimmed.equals(McpConstants.Yaml.RUNNING_STATE)) {
                         state = "Running";
                     } else if (inStateSection && trimmed.equals(McpConstants.Yaml.WAITING_STATE)) {
@@ -659,6 +675,14 @@ public class McpContextCollector {
                     } else if (inStateSection && trimmed.startsWith(McpConstants.Yaml.STARTED_AT_FIELD)) {
                         startedAt = trimmed.split(McpConstants.Yaml.COLON_SEPARATOR, McpConstants.Yaml.COLON_SPLIT_LIMIT)[1].trim().replace("\"", "");
                         inStateSection = false;
+                    } else if (inLastStateSection && trimmed.equals(McpConstants.Yaml.TERMINATED_STATE)) {
+                        inLastStateTerminated = true;
+                    } else if (inLastStateTerminated && trimmed.startsWith(McpConstants.Yaml.REASON_PREFIX)) {
+                        lastTerminatedReason = trimmed.split(McpConstants.Yaml.COLON_SEPARATOR, McpConstants.Yaml.COLON_SPLIT_LIMIT)[1].trim();
+                    } else if (inLastStateTerminated && trimmed.startsWith(McpConstants.Yaml.EXIT_CODE_FIELD)) {
+                        lastTerminatedExitCode = trimmed.split(McpConstants.Yaml.COLON_SEPARATOR, McpConstants.Yaml.COLON_SPLIT_LIMIT)[1].trim();
+                    } else if (inLastStateTerminated && trimmed.startsWith(McpConstants.Yaml.FINISHED_AT_FIELD)) {
+                        lastTerminatedAt = trimmed.split(McpConstants.Yaml.COLON_SEPARATOR, McpConstants.Yaml.COLON_SPLIT_LIMIT)[1].trim().replace("\"", "");
                     }
                 }
             }
@@ -677,15 +701,18 @@ public class McpContextCollector {
             }
 
             if (inSpecContainers) {
-                // Found start of first container in spec.containers
-                if (trimmed.startsWith(McpConstants.Yaml.ITEM_PREFIX) && indent == specContainerBaseIndent + 2) {
+                // Found start of first container in spec.containers (list items may be at same indent or +2)
+                if (trimmed.startsWith(McpConstants.Yaml.ITEM_PREFIX)
+                        && (indent == specContainerBaseIndent || indent == specContainerBaseIndent + 2)) {
                     readingFirstSpecContainer = true;
                     currentIndent = indent;
                     continue;
                 }
 
                 if (readingFirstSpecContainer) {
-                    if (trimmed.equals(McpConstants.Yaml.RESOURCES_SECTION)) {
+                    if (containerImage == null && trimmed.startsWith(McpConstants.Yaml.IMAGE_FIELD)) {
+                        containerImage = trimmed.split(McpConstants.Yaml.COLON_SEPARATOR, McpConstants.Yaml.COLON_SPLIT_LIMIT)[1].trim();
+                    } else if (trimmed.equals(McpConstants.Yaml.RESOURCES_SECTION)) {
                         inResources = true;
                     } else if (inResources && trimmed.equals(McpConstants.Yaml.LIMITS_SECTION)) {
                         inLimits = true;
@@ -716,6 +743,19 @@ public class McpContextCollector {
             summary.append("Started At: ").append(startedAt).append("\n");
         }
         summary.append("Restart Count: ").append(restartCount != null ? restartCount : "0").append("\n");
+        if (containerImage != null) {
+            summary.append("Image: ").append(containerImage).append("\n");
+        }
+        if (lastTerminatedReason != null) {
+            summary.append("\nLast Terminated State:\n");
+            summary.append("  Reason: ").append(lastTerminatedReason).append("\n");
+            if (lastTerminatedExitCode != null) {
+                summary.append("  Exit Code: ").append(lastTerminatedExitCode).append("\n");
+            }
+            if (lastTerminatedAt != null) {
+                summary.append("  Finished At: ").append(lastTerminatedAt).append("\n");
+            }
+        }
         summary.append("\nResource Limits:\n");
         summary.append("  CPU: ").append(cpuLimit != null ? cpuLimit : "not set").append("\n");
         summary.append("  Memory: ").append(memoryLimit != null ? memoryLimit : "not set").append("\n");

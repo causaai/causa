@@ -98,6 +98,7 @@ public final class McpConstants {
         public static final String NAMESPACE = "namespace";
         public static final String CONTAINER = "container";
         public static final String TAIL_LINES = "tailLines";
+        public static final String PREVIOUS = "previous";
         public static final String FIELD_SELECTOR = "fieldSelector";
 
         // Kruize arguments
@@ -213,6 +214,13 @@ public final class McpConstants {
         public static final String CPU_FIELD = "cpu:";
         public static final String MEMORY_FIELD = "memory:";
         public static final String STATE_FIELD = "state:";
+        public static final String LAST_STATE_FIELD = "lastState:";
+        public static final String EXIT_CODE_FIELD = "exitCode:";
+        public static final String FINISHED_AT_FIELD = "finishedAt:";
+        public static final String IMAGE_FIELD = "image:";
+        public static final String ENV_FIELD = "env:";
+        public static final String ENV_NAME_FIELD = "name:";
+        public static final String ENV_VALUE_FIELD = "value:";
         public static final String HOST_IP_FIELD = "hostIP:";
         public static final String ITEM_PREFIX = "- ";
         public static final String COLON_SEPARATOR = ":";
