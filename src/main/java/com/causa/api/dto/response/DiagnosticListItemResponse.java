@@ -25,6 +25,9 @@ public record DiagnosticListItemResponse(
     @JsonProperty("issue")
     String issue,
 
+    @JsonProperty("issue_summary")
+    String issueSummary,
+
     @JsonProperty("workload_name")
     String workloadName,
 
@@ -43,17 +46,19 @@ public record DiagnosticListItemResponse(
 ) {
     public static DiagnosticListItemResponse from(Diagnostic diagnostic, Alert alert, String clusterName) {
         RootCauseAnalysis rca = diagnostic.getRca();
-        String issueTitle  = rca != null ? rca.issueTitle() : null;
-        String workload    = alert != null ? alert.getWorkloadName()               : null;
-        String namespace   = alert != null ? alert.getWorkloadInfo().namespace()   : null;
-        String severity    = alert != null && alert.getSeverity() != null
-                             ? alert.getSeverity().getValue() : null;
-        String cluster     = (clusterName != null && !clusterName.isBlank()) ? clusterName : "default";
+        String issueTitle   = rca != null ? rca.issueTitle()   : null;
+        String issueSummary = rca != null ? rca.issueSummary() : null;
+        String workload     = alert != null ? alert.getWorkloadName()               : null;
+        String namespace    = alert != null ? alert.getWorkloadInfo().namespace()   : null;
+        String severity     = alert != null && alert.getSeverity() != null
+                              ? alert.getSeverity().getValue() : null;
+        String cluster      = (clusterName != null && !clusterName.isBlank()) ? clusterName : "default";
 
         return new DiagnosticListItemResponse(
             diagnostic.getDiagnosticId(),
             diagnostic.getStatus() != null ? diagnostic.getStatus().getValue() : null,
             issueTitle,
+            issueSummary,
             workload,
             namespace,
             severity,
