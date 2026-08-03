@@ -91,7 +91,7 @@ class ConfigSnapshotTests {
             assertThat(s.getTimeoutSeconds()).isEqualTo(180);
             assertThat(s.getChatMemorySize()).isEqualTo(10);
             assertThat(s.getBobShellPath()).isEqualTo("bob");
-            assertThat(s.isSkillsEnabled()).isTrue();
+            assertThat(s.isSkillsEnabled()).isFalse();
             assertThat(s.getCustomHeaders()).isEqualTo("{}");
         }
 
