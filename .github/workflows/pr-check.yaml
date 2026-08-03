@@ -1,4 +1,4 @@
-name: PR Validation - Build Project Without Tests
+name: PR Validation - Build Project and Run Functional Tests
 
 on:
   pull_request:
@@ -26,7 +26,7 @@ jobs:
         run: mvn clean compile -DskipTests
 
   test:
-    name: Run Tests
+    name: Run Functional Tests
     runs-on: ubuntu-latest
 
     steps:
