@@ -139,7 +139,8 @@ public class ConfigController {
 
             // Check if key is env-only (cannot be updated at runtime via the API)
             if (ConfigConstants.isEnvOnly(key)) {
-                rejected.add(new ConfigUpdateResponse.RejectedConfig(key, "This key cannot be updated at runtime via the API"));
+                rejected.add(new ConfigUpdateResponse.RejectedConfig(key,
+                    key + " cannot be updated at runtime. Set it via environment variable or configmap during startup."));
                 continue;
             }
 
