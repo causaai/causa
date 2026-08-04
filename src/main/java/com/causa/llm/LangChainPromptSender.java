@@ -288,6 +288,13 @@ public class LangChainPromptSender implements PromptSender {
                                     e.getClass().getSimpleName(), e.getMessage())));
                 }
             }
+
+            // After all tool results are in the conversation, re-anchor the output format.
+            // Without this, the LLM enters a conversational state and prepends prose
+            // (e.g. "Now let me analyse...") before the JSON object.
+            messages.add(UserMessage.from(
+                    "All skill context has been loaded. Now respond with ONLY the raw JSON object. "
+                    + "Start with `{` and end with `}`. No preamble, no markdown, no explanatory text."));
         }
 
         // Max iterations reached without a text response — runaway tool loop

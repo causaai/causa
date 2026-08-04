@@ -364,31 +364,39 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     /**
      * Parses the LLM JSON response into a RootCauseAnalysis object.
      *
-     * <p>Handles markdown code blocks case-insensitively (```json, ```JSON, ```json5, etc.)
-     * by removing entire first line if it starts with backticks.
+     * <p>Strips any opening code fence (```json, ```JSON, ```json5, ``` etc.) by
+     * skipping the entire first line if it starts with triple backticks — the language
+     * tag is ignored, so all variants are handled uniformly.
+     * Also tolerates prose preamble emitted by the LLM after tool calls by
+     * extracting only the outermost { ... } block.
      *
      * @param responseText the LLM response text (should be JSON)
      * @return the parsed RCA
      */
     private RootCauseAnalysis parseRcaResponse(String responseText) throws Exception {
-        // Clean the response - remove markdown code blocks if present
         String jsonText = responseText.trim();
 
-        // Handle opening code block case-insensitively
+        // Strip opening code fence — handles ```json, ```JSON, ```json5, ``` etc.
+        // Checking only the ``` prefix means the language tag is irrelevant.
         if (jsonText.startsWith(JsonParsingConstants.CODE_BLOCK_PREFIX)) {
-            // Remove entire first line (handles ```json, ```JSON, ```json5, etc.)
-            int firstNewline = jsonText.indexOf('\n');
-            if (firstNewline > 0) {
-                jsonText = jsonText.substring(firstNewline + 1);
+            int nl = jsonText.indexOf('\n');
+            if (nl > 0) jsonText = jsonText.substring(nl + 1).trim();
+        }
+
+        // Strip closing code fence
+        if (jsonText.endsWith(JsonParsingConstants.CODE_BLOCK_PREFIX)) {
+            jsonText = jsonText.substring(0, jsonText.length() - JsonParsingConstants.CODE_BLOCK_PREFIX_LENGTH).trim();
+        }
+
+        // When skills/tools are active the LLM may emit preamble prose before the JSON object.
+        // Extract only the outermost { ... } to tolerate that.
+        int firstBrace = jsonText.indexOf('{');
+        int lastBrace  = jsonText.lastIndexOf('}');
+        if (firstBrace > 0 || (firstBrace == 0 && lastBrace != jsonText.length() - 1)) {
+            if (firstBrace >= 0 && lastBrace > firstBrace) {
+                jsonText = jsonText.substring(firstBrace, lastBrace + 1);
             }
         }
-
-        // Handle closing code block
-        if (jsonText.endsWith(JsonParsingConstants.CODE_BLOCK_PREFIX)) {
-            jsonText = jsonText.substring(0, jsonText.length() - JsonParsingConstants.CODE_BLOCK_PREFIX_LENGTH);
-        }
-
-        jsonText = jsonText.trim();
 
         // Parse JSON to RootCauseAnalysis
         RootCauseAnalysis rca = objectMapper.readValue(jsonText, RootCauseAnalysis.class);
