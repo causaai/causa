@@ -388,14 +388,12 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             jsonText = jsonText.substring(0, jsonText.length() - JsonParsingConstants.CODE_BLOCK_PREFIX_LENGTH).trim();
         }
 
-        // When skills/tools are active the LLM may emit preamble prose before the JSON object.
-        // Extract only the outermost { ... } to tolerate that.
+        // Skip any leading prose and let Jackson parse from the first '{'.
+        // Using the streaming parser correctly handles '}' inside string values,
+        // unlike a hand-rolled brace counter.
         int firstBrace = jsonText.indexOf('{');
-        int lastBrace  = jsonText.lastIndexOf('}');
-        if (firstBrace > 0 || (firstBrace == 0 && lastBrace != jsonText.length() - 1)) {
-            if (firstBrace >= 0 && lastBrace > firstBrace) {
-                jsonText = jsonText.substring(firstBrace, lastBrace + 1);
-            }
+        if (firstBrace > 0) {
+            jsonText = jsonText.substring(firstBrace);
         }
 
         // Parse JSON to RootCauseAnalysis
