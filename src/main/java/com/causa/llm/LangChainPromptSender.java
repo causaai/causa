@@ -290,11 +290,9 @@ public class LangChainPromptSender implements PromptSender {
             }
 
             // After all tool results are in the conversation, re-anchor the output format.
-            // Without this, the LLM enters a conversational state and prepends prose
+            // Without this, the LLM enters a conversational state and generates leading prose
             // (e.g. "Now let me analyse...") before the JSON object.
-            messages.add(UserMessage.from(
-                    "All skill context has been loaded. Now respond with ONLY the raw JSON object. "
-                    + "Start with `{` and end with `}`. No preamble, no markdown, no explanatory text."));
+            messages.add(UserMessage.from(LLMConstants.Messages.POST_TOOL_JSON_CONSTRAINT));
         }
 
         // Max iterations reached without a text response — runaway tool loop

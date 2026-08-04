@@ -241,5 +241,13 @@ public final class LLMConstants {
         public static final String LLM_ERROR_FORMAT = "LLM health check failed: %s";
         public static final String LLM_CONFIG_NOT_AVAILABLE = "LLM config not available";
         public static final String LLM_CONNECTION_FAILED = "LLM connection failed";
+
+        /**
+         * Injected after tool results to re-anchor JSON-only output format.
+         * Prevents leading prose when the LLM is in a conversational state post tool loop.
+         */
+        public static final String POST_TOOL_JSON_CONSTRAINT =
+                "All skill context has been loaded. Now respond with ONLY the raw JSON object. "
+                + "Start with `{` and end with `}`. No preamble, no markdown, no explanatory text.";
     }
 }
