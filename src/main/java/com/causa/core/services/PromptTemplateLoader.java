@@ -83,7 +83,13 @@ public class PromptTemplateLoader {
             }
 
             if (modelTemplate == null) {
-                modelTemplate = defaultTemplate != null ? defaultTemplate : prompts.get(0);
+                if (defaultTemplate != null) {
+                    modelTemplate = defaultTemplate;
+                } else {
+                    throw new IllegalStateException(
+                        String.format("No prompt template configured for model type '%s' in %s",
+                            modelType, templatePath));
+                }
             }
 
             return new PromptTemplate(
