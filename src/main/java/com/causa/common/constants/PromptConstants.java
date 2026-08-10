@@ -14,6 +14,11 @@ public final class PromptConstants {
     }
 
     /**
+     * Template file paths
+     */
+    public static final String TEMPLATE_PATH_RCA = "/prompts/rca-prompt-template.yml";
+
+    /**
      * YAML template keys
      */
     public static final String KEY_SYSTEM_PROMPT = "system_prompt";
@@ -21,6 +26,8 @@ public final class PromptConstants {
     public static final String KEY_NAME = "name";
     public static final String KEY_VERSION = "version";
     public static final String KEY_DESCRIPTION = "description";
+    public static final String KEY_PROMPTS = "prompts";
+    public static final String KEY_MODELS = "models";
 
     /**
      * Default model type fallback - uses the same value as LLMConstants.Provider.VERTEX_AI_ANTHROPIC

@@ -1,14 +1,17 @@
 package com.causa.core.services;
 
-import com.causa.common.constants.PromptConstants;
-import com.causa.config.RcaConfig;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import org.yaml.snakeyaml.Yaml;
-
 import java.io.InputStream;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import org.yaml.snakeyaml.Yaml;
+
+import com.causa.common.constants.PromptConstants;
+import com.causa.config.RcaConfig;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
 /**
  * Prompt Template Loader
@@ -29,6 +32,16 @@ public class PromptTemplateLoader {
         String configuredPath = rcaConfig.templatePath();
         // Normalize path - ensure it has leading "/" for classloader resource lookup
         this.templatePath = configuredPath.startsWith("/") ? configuredPath : "/" + configuredPath;
+    }
+
+    /**
+     * Constructor for direct path usage (non-CDI, for assertion extraction/analysis).
+     *
+     * @param templatePath the direct path to the template file
+     */
+    public PromptTemplateLoader(String templatePath) {
+        // Normalize path - ensure it has leading "/" for classloader resource lookup
+        this.templatePath = templatePath.startsWith("/") ? templatePath : "/" + templatePath;
     }
 
     /**
@@ -56,17 +69,38 @@ public class PromptTemplateLoader {
             }
 
             Yaml yaml = new Yaml();
-            Map<String, Object> templates = yaml.load(is);
+            Map<String, Object> root = yaml.load(is);
 
-            Map<String, Object> modelTemplate = (Map<String, Object>) templates.get(modelType);
+            List<Map<String, Object>> prompts =
+                (List<Map<String, Object>>) root.get(PromptConstants.KEY_PROMPTS);
+            if (prompts == null || prompts.isEmpty()) {
+                throw new IllegalStateException(
+                    String.format("No prompts list found in %s", templatePath));
+            }
+
+            Map<String, Object> modelTemplate = null;
+            Map<String, Object> defaultTemplate = null;
+
+            for (Map<String, Object> entry : prompts) {
+                List<String> models = (List<String>) entry.get(PromptConstants.KEY_MODELS);
+                if (models == null) continue;
+
+                if (models.contains(modelType)) {
+                    modelTemplate = entry;
+                    break;
+                }
+                if (defaultTemplate == null && models.contains(PromptConstants.DEFAULT_MODEL_TYPE)) {
+                    defaultTemplate = entry;
+                }
+            }
+
             if (modelTemplate == null) {
-                // Fallback to default if model-specific template not found
-                modelTemplate = (Map<String, Object>) templates.get(PromptConstants.DEFAULT_MODEL_TYPE);
-                if (modelTemplate == null) {
+                if (defaultTemplate != null) {
+                    modelTemplate = defaultTemplate;
+                } else {
                     throw new IllegalStateException(
-                        String.format("Default prompt template (%s) not found in %s",
-                            PromptConstants.DEFAULT_MODEL_TYPE, templatePath)
-                    );
+                        String.format("No prompt template configured for model type '%s' in %s",
+                            modelType, templatePath));
                 }
             }
 
