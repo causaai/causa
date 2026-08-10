@@ -28,6 +28,8 @@ public final class PromptConstants {
     public static final String KEY_NAME = "name";
     public static final String KEY_VERSION = "version";
     public static final String KEY_DESCRIPTION = "description";
+    public static final String KEY_PROMPTS = "prompts";
+    public static final String KEY_MODELS = "models";
 
     // Verification guidance keys
     public static final String KEY_VERIFICATION_OBSERVATION = "verification_observation";

@@ -78,7 +78,7 @@ public final class McpConstants {
 
         // Kruize MCP tools
         public static final String KRUIZE_GET_COST_RECOMMENDATIONS = "getCostOptimizedRecommendations";
-        public static final String KRUIZE_GET_PERF_RECOMMENDATIONS = "getPerformanceOptimizedRecommendations";
+        public static final String KRUIZE_GET_PERF_RECOMMENDATIONS = "listAllRecommendations";
 
         // Cryostat MCP tools
         public static final String CRYOSTAT_GET_GC_ANALYSIS = "get_gc_analysis";
