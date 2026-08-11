@@ -44,8 +44,9 @@ public class RcaPromptBuilder {
         ModelType modelType = determineModelType(
                 llmConfig.provider().orElse(""), llmConfig.modelName().orElse(""));
 
-        // Load appropriate template
-        PromptTemplateLoader.PromptTemplate template = templateLoader.loadTemplate(modelType.getTemplateName());
+        // Load appropriate template using provider and model name
+        PromptTemplateLoader.PromptTemplate template = templateLoader.loadTemplate(
+                modelType.getTemplateName(), llmConfig.modelName().orElse(""));
 
         // Render the prompt with context (alert details already in context)
         return template.render(mcpContext);
@@ -59,7 +60,8 @@ public class RcaPromptBuilder {
     public String getSystemPrompt() {
         ModelType modelType = determineModelType(
                 llmConfig.provider().orElse(""), llmConfig.modelName().orElse(""));
-        PromptTemplateLoader.PromptTemplate template = templateLoader.loadTemplate(modelType.getTemplateName());
+        PromptTemplateLoader.PromptTemplate template = templateLoader.loadTemplate(
+                modelType.getTemplateName(), llmConfig.modelName().orElse(""));
         return template.systemPrompt();
     }
 

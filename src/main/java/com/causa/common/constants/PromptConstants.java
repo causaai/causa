@@ -22,6 +22,7 @@ public final class PromptConstants {
     public static final String KEY_VERSION = "version";
     public static final String KEY_DESCRIPTION = "description";
     public static final String KEY_PROMPTS = "prompts";
+    public static final String KEY_PROVIDERS = "providers";
     public static final String KEY_MODELS = "models";
 
     /**

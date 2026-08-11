@@ -2,10 +2,11 @@
 # Shared prompts with model array — define once, apply to multiple models
 
 prompts:
-  - models: ["vertex-ai-anthropic", "anthropic", "bob", "ollama"]
-    name: "rca-prompt"
+  - name: "rca-prompt"
     version: "1.0"
     description: "Root Cause Analysis for Kubernetes pod issues"
+    providers: ["vertex-ai-anthropic", "anthropic", "bob", "ollama"]
+    models: ["claude-sonnet-*", "claude-opus-*", "claude-haiku-*", "llama*"]
 
     system_prompt: |
       You are an expert Root Cause Analysis (RCA) engine specializing in Kubernetes pod memory issues. Analyze multiple data sources and provide comprehensive, evidence-based root cause analysis with confidence scoring and solution justification.
