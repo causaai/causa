@@ -57,7 +57,7 @@ class DiagnosticServiceImplTest {
     private com.causa.core.ports.llm.PromptSender promptSender;
 
     @Mock
-    private com.causa.config.LLMConfig llmConfig;
+    private com.causa.config.AppConfig appConfig;
 
     @Mock
     private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
@@ -66,22 +66,23 @@ class DiagnosticServiceImplTest {
     private jakarta.validation.Validator validator;
 
     @Mock
-    private jakarta.transaction.UserTransaction userTransaction;
+    private jakarta.enterprise.inject.Instance<com.causa.core.services.validation.RcaValidator> rcaValidatorInstance;
 
     private DiagnosticServiceImpl diagnosticService;
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.when(rcaValidatorInstance.isResolvable()).thenReturn(false);
         diagnosticService = new DiagnosticServiceImpl(
                 diagnosticRepository,
                 alertRepository,
                 mcpContextCollector,
                 rcaPromptBuilder,
                 promptSender,
-                llmConfig,
+                appConfig,
                 objectMapper,
                 validator,
-                userTransaction
+                rcaValidatorInstance
         );
     }
 
