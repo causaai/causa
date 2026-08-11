@@ -349,6 +349,16 @@ public class DiagnosticServiceImpl implements DiagnosticService {
         }
         json = json.trim();
 
+        // Extract JSON object if LLM returned text before/after the JSON
+        int jsonStart = json.indexOf('{');
+        int jsonEnd = json.lastIndexOf('}');
+        if (jsonStart > 0 && jsonEnd > jsonStart) {
+            log.warn("LLM response contained non-JSON prefix, extracting JSON object")
+                .field("prefixLength", jsonStart)
+                .log();
+            json = json.substring(jsonStart, jsonEnd + 1);
+        }
+
         RootCauseAnalysis rca = objectMapper.readValue(json, RootCauseAnalysis.class);
 
         Set<ConstraintViolation<RootCauseAnalysis>> violations = validator.validate(rca);

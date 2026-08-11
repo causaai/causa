@@ -1,97 +1,29 @@
-# RCA Prompt Template Configuration
-# Shared prompts with model array — define once, apply to multiple models
-
 prompts:
-  - models: ["vertex-ai-anthropic", "anthropic", "bob", "ollama"]
-    name: "rca-prompt"
-    version: "1.0"
-    description: "Root Cause Analysis for Kubernetes pod issues"
+- description: OLD 797-line Root Cause Analysis prompt (for comparison testing)
+  models:
+  - vertex-ai-anthropic
+  - anthropic
+  - bob
+  - ollama
+  name: rca-prompt-old
+  system_prompt: 'You are an expert Root Cause Analysis (RCA) engine specializing in Kubernetes pod memory issues. Analyze multiple data sources and provide comprehensive, evidence-based root cause analysis with confidence scoring and solution justification.
 
-    system_prompt: |
-      You are an expert Root Cause Analysis (RCA) engine for Kubernetes pod memory issues. You MUST respond with ONLY a single valid JSON object. No prose, no markdown, no code fences, no explanatory text — start your response with { and end with }. Any text outside the JSON object will cause a parsing failure.
-
-    user_prompt: |
-      **CRITICAL: Return ONLY valid JSON. Start with `{` and end with `}`. No markdown, no code blocks, no explanatory text outside the JSON structure.**
-
-      ## CONTEXT DATA
-
-      {{context}}
-
-      ## ANOMALY CLASSIFICATION
-
-      Classify into EXACTLY ONE (apply in order, stop at first match):
-
-      1. **OOM_KILLED**: OOMKilled event OR exit code 137 OR OutOfMemoryError + restart evidence
-      2. **POSSIBLE_OOM_KILLED**: OutOfMemoryError without OOMKilled event, memory ≥90%, heap pools >90%, or allocation failures
-      3. **POSSIBLE_GC_PAUSE**: GC pauses >100ms, GC frequency >10/min, GC overhead >10%, or memory 75-90% with GC pressure
-      4. **HEALTHY**: ONLY if no OOM/GC issues, memory <75%, no restarts, no memory warnings
-
-      Do NOT classify as HEALTHY if ANY memory issues exist, even if pod is Running.
-
-      ## ANALYSIS STEPS
-
-      1. **Classify** the anomaly using the rules above
-      2. **Identify root cause**: For OOM — find what caused memory exhaustion (leaks, unbounded structures, undersized limits). For GC — find configuration issues (wrong GC algorithm, undersized heap)
-      3. **Collect evidence**: Use ONLY data present in the provided signals. Quote logs verbatim. Do not invent evidence. If no logs exist, state "No direct supporting logs present"
-      4. **Formulate 3 solutions** (see structure below)
-      5. **Score confidence** based on signal completeness
-
-      ## SOLUTION REQUIREMENTS
-
-      Provide EXACTLY 3 recommendations:
-
-      1. **Immediate Mitigation**: Quick resource adjustments (e.g., increase memory limits). Include kubectl commands with placeholders.
-      2. **Validate & Monitor**: Post-fix monitoring steps. Specify metrics to watch, commands to run, and success criteria (e.g., memory <80%, zero restarts for 24h).
-      3. **Root Cause Fix**: Permanent code/config changes. Include specific file locations, code patterns, and validation steps.
-
-      Each solution needs:
-      - `solution_confidence_score` (0.0-1.0): 0.9+ strong evidence, 0.7-0.8 incomplete evidence, 0.3-0.6 speculative, <0.3 insufficient data
-      - `solution_alerts`: Populate ONLY when confidence <0.7. State which signals are missing and impact on reliability.
-
-      If data is insufficient for a confident solution, still include the object with a descriptive title (e.g., "Insufficient Data for Immediate Mitigation"), explain what's missing, and set low confidence.
-
-      ## OUTPUT JSON
-
-      {
-        "issue_title": "<max 100 chars>",
-        "issue_summary": "<1-2 sentences, plain language, no jargon — explain to a non-technical person>",
-        "issue_description": "<2-4 sentences, non-technical. Use: 'ran out of memory', 'stopped working'. Avoid: GC, JVM, heap, OOM, pod, container>",
-        "technical_description": "<6-10 sentences for developers. Include memory values, GC behavior, heap pools, container limits, failure sequence>",
-        "anomaly_type": "OOM_KILLED | POSSIBLE_OOM_KILLED | POSSIBLE_GC_PAUSE | HEALTHY",
-        "root_cause": "<4-6 sentences. Causal chain: trigger → escalation → failure. Connect logs, metrics, JFR, events>",
-        "supporting_logs": ["<verbatim log lines from APPLICATION_LOGS, or 'No direct supporting logs present'>"],
-        "evidences": ["<specific, quantifiable evidence from provided signals>"],
-        "recommendations": [
-          {
-            "solution_type": "Immediate Mitigation",
-            "solution_title": "<short actionable title>",
-            "solution_description": "<what to do and why>",
-            "implementation_notes": "<step-by-step commands with placeholders like <namespace>, <pod-name>>",
-            "solution_confidence_score": 0.0-1.0,
-            "solution_alerts": []
-          },
-          {
-            "solution_type": "Validate & Monitor",
-            "solution_title": "<short title>",
-            "solution_description": "<what to monitor and success criteria>",
-            "implementation_notes": "<monitoring commands and queries>",
-            "solution_confidence_score": 0.0-1.0,
-            "solution_alerts": []
-          },
-          {
-            "solution_type": "Root Cause Fix",
-            "solution_title": "<short title>",
-            "solution_description": "<permanent fix details>",
-            "implementation_notes": "<code changes, file paths, validation steps>",
-            "solution_confidence_score": 0.0-1.0,
-            "solution_alerts": []
-          }
-        ],
-        "confidence_summary": {
-          "rca_confidence_score": 0.0-1.0,
-          "summary_text": "<2-4 sentences: why this confidence level, which signals helped, which were missing>"
-        },
-        "llm_notes": "<3-7 sentences: analysis narrative, decision points, alternative theories, what was ambiguous>"
-      }
-
-      IMPORTANT REMINDER: Your entire response must be a single JSON object. Do not include any text before or after the JSON. Start your response with { and end with }.
+    '
+  user_prompt: "# ROOT CAUSE ANALYSIS PROMPT FOR KUBERNETES POD MEMORY ISSUES\n\n## OUTPUT REQUIREMENT\n\n**Return ONLY valid JSON. Start with `{` and end with `}`. No markdown, no code blocks, no explanatory text outside the JSON structure.**\n\n## INPUT SIGNALS\n\nYou will receive the following signals (some may be missing):\n\n### 1. POD_STATUS\n- Contains: Pod phase, restart count, ready status, container statuses\n- **Note**: A \"Running\" pod can still have memory issues, GC problems, or be approaching OOM\n\n### 2. PROMETHEUS_METRICS\n- Format: CPU Usage: X/Y cores, MEMORY Usage: X/Y MiB\n- Use for: Memory pressure detection, resource utilization analysis\n\n### 3. APPLICATION_LOGS\n- Contains: Application events, error messages, stack traces, OOM errors\n- Look for: OutOfMemoryError, heap space issues, fatal errors, abort messages\n\n### 4. POD_EVENTS\n- Contains: Pod state changes, container restarts, image pulls, warnings\n- Look for: OOMKilled, BackOff, CrashLoopBackOff, exit\
+    \ codes (especially 137)\n\n### 5. JFR_ANALYSIS (Java Flight Recorder from Cryostat)\nStructured profiling data with multiple analysis files:\n- **5a. GC_ANALYSIS_CRYOSTAT**: GC events, heap summaries, pauses, configuration (DefNew, SerialOld, G1GC, ParallelGC)\n- **5b. MEMORY_ANALYSIS_CRYOSTAT**: Heap usage, memory pools (Eden, Survivor, Tenured Gen)\n- **5c. THREAD_ANALYSIS**: Thread parking, statistics, thread dumps\n- **5d. EXCEPTION_ANALYSIS**: Exception statistics, thrown exceptions\n- **5e. CONTAINER_ANALYSIS**: Container configuration, CPU throttling, memory limits\n- **Note**: JFR data is JSON-formatted with event types, columns, and rows. If missing or empty (row_count: 0), note in llm_notes.\n\n### 6. KRUIZE_PERFORMANCE_RECOMMENDATIONS\n- Contains: Resource request/limit recommendations for CPU and memory\n- Shows: Current vs recommended values with deltas\n\n## AVAILABLE CONTEXT DATA\n\n{{context}}\n\n## ANOMALY CATEGORIES\n\nCategorize into EXACTLY ONE:\n- **OOM_KILLED**:\
+    \ Pod terminated by Kubernetes due to OOM (exit code 137, OOMKilled event)\n- **POSSIBLE_OOM_KILLED**: Strong OOM indicators without explicit OOMKilled event (high memory + crashes + OOM errors)\n- **POSSIBLE_GC_PAUSE**: Memory issues from GC behavior (frequent GC, long pauses, GC overhead)\n- **HEALTHY**: No anomalies detected, pod operating normally\n\n## ANALYSIS WORKFLOW\n\n### STEP 1: ANOMALY DETECTION\n\n**CRITICAL**: Do NOT categorize as HEALTHY if there are ANY memory issues, high memory pressure, or GC problems, even if pod is Running.\n\n**Categorization Logic** (apply in order, stop at first match):\n\n1. **OOM_KILLED** if ANY of:\n   - OOMKilled event in POD_EVENTS\n   - Exit code 137 in POD_EVENTS\n   - OutOfMemoryError in APPLICATION_LOGS + pod restart/crash evidence\n\n2. **POSSIBLE_OOM_KILLED** if ANY of:\n   - OutOfMemoryError in APPLICATION_LOGS but no OOMKilled event\n   - Memory usage ≥ 90% in PROMETHEUS_METRICS\n   - Heap pools near max (>90%) in JFR MEMORY_ANALYSIS\n\
+    \   - Application logs show memory allocation failures\n\n3. **POSSIBLE_GC_PAUSE** if ANY of:\n   - Long GC pauses (>100ms) in JFR GC_ANALYSIS\n   - Frequent GC events (>10 per minute) in JFR\n   - High GC overhead (GC time > 10% of total time)\n   - Memory usage 75-90% + GC pressure indicators\n\n4. **HEALTHY** ONLY if ALL of:\n   - No OOM events or errors\n   - Memory usage < 75%\n   - No GC pressure (pauses <50ms, infrequent GC)\n   - No memory-related warnings in logs\n   - Pod running normally without restarts\n\n### STEP 2: ROOT CAUSE IDENTIFICATION\n\n**For OOM_KILLED / POSSIBLE_OOM_KILLED:**\n- Identify what caused memory exhaustion (from logs and JFR)\n- Check for memory leaks, unbounded data structures, large object allocations\n- Analyze memory limits vs actual usage\n- Review application behavior (e.g., loading large datasets, registry growth)\n\n**For POSSIBLE_GC_PAUSE:**\n- Identify GC configuration issues (e.g., Serial GC on multi-core systems)\n- Check for excessive GC\
+    \ activity or long pause times\n- Analyze heap size vs workload requirements\n- Determine if GC pauses are impacting application performance\n\n**For HEALTHY:**\n- Confirm all signals are within normal ranges\n- Note any minor observations\n\n### STEP 3: EVIDENCE COLLECTION\n\nCollect concrete evidence from signals:\n- **Metrics**: Exact CPU/memory values from PROMETHEUS_METRICS\n- **Events**: Specific Kubernetes events with timestamps from POD_EVENTS\n- **Logs**: Actual log lines (verbatim) from APPLICATION_LOGS\n- **JFR**: Specific data from JFR analysis files\n- **Recommendations**: Resource adjustments from KRUIZE_RECOMMENDATIONS\n\n**Rules**:\n- Use ONLY information present in provided signals\n- Quote log lines EXACTLY as they appear (verbatim)\n- Do NOT invent, assume, or construct evidence\n- If no supporting logs exist, state \"No direct supporting logs present\"\n\n### STEP 4: SOLUTION FORMULATION\n\nProvide EXACTLY THREE solutions with specific types:\n\n**1. Immediate Mitigation**\
+    \ (Quick stabilization fix):\n- Focus on immediate adjustments which can resolve the issue\n- Example: Increase memory limits from 512Mi to 1024Mi as suggested by KRUIZE_RECOMMENDATIONS\n- Provide step-by-step commands or steps to apply patches\n- Include exact command examples: `kubectl get deployment -n <namespace>`, `kubectl patch deployment <name> --patch '{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"<container>\",\"resources\":{\"limits\":{\"memory\":\"1024Mi\"}}}]}}}}'`\n\n**2. Validate & Monitor** (Verification and observation):\n- Treat this as second step for immediate fix, after applying immediate fix what to monitor and validate\n- Specify which metrics to watch (memory usage %, GC pause times, restart count)\n- Provide commands to monitor: `kubectl top pod`, `kubectl logs -f`, Prometheus queries\n- Define success criteria (e.g., memory usage stays below 80%, no restarts for 24h)\n\n**3. Root Cause Fix** (Permanent code/configuration change):\n- Focus on\
+    \ detailed code changes or architectural improvements\n- Example: Implement connection pooling, fix memory leaks, optimize data structures\n- Provide specific file locations and code patterns to change\n- Include validation steps after code changes\n\n**Solution Confidence Score (0.0-1.0)** for EACH solution:\n- 0.9-1.0: High confidence - strong evidence supports this solution\n- 0.7-0.8: Medium confidence - reasonable solution but evidence is incomplete\n- 0.3-0.6: Low confidence - speculative solution due to missing data\n- 0.0-0.2: Very low confidence - insufficient evidence, best-effort guess\n\n**Solution Alerts**: Add alerts ONLY when confidence is LOW (<0.7) or critical data is missing:\n- \"APPLICATION_LOGS not available - cannot identify specific code causing memory leak\"\n- \"JFR_ANALYSIS missing - unable to pinpoint exact memory pool exhaustion\"\n- \"KRUIZE_RECOMMENDATIONS unavailable - resource suggestions are based on current metrics only\"\n- \"Limited evidence - this\
+    \ solution is speculative and may not address the root cause\"\n- \"Insufficient data to provide confident recommendation for this solution type\"\n- \"Missing signals: [list] - collect these to enable better recommendations\"\n\n**CRITICAL - JSON Structure Requirement**:\nALWAYS return EXACTLY THREE recommendation objects in the array. NEVER omit a solution or return fewer than three.\n\nIf you cannot determine a confident solution due to missing data:\n- Still include the complete solution object with all required fields\n- Use a descriptive title indicating uncertainty, such as:\n  * \"Unable to Recommend Immediate Fix\" or \"Insufficient Data for Immediate Mitigation\"\n  * \"Limited Monitoring Guidance Available\" or \"Unable to Define Validation Steps\"\n  * \"Unable to Determine Root Cause Fix\" or \"Insufficient Data for Permanent Solution\"\n- In solution_description: Explain which signals are missing and why you cannot provide a confident recommendation\n- In implementation_notes:\
+    \ State \"Cannot provide detailed steps due to insufficient data. Recommend collecting: [list missing signals]\"\n- Set solution_confidence_score to a low value (0.0-0.3)\n- In solution_alerts: Add detailed explanations of missing signals and their impact on the recommendation\n\n### STEP 5: CONFIDENCE SCORING\n\n**RCA Confidence (0.0-1.0)**: How confident in the identified root cause?\n- 1.0: Definitive evidence (OOMKilled event + OOM logs + JFR data)\n- 0.7-0.9: Strong evidence (multiple corroborating signals)\n- 0.4-0.6: Moderate evidence (some signals missing or ambiguous)\n- 0.0-0.3: Weak evidence (limited signals, high uncertainty)\n\n**IMPORTANT**: If evidence is insufficient to determine a definitive root cause:\n- Select the most likely anomaly category based on available signals\n- Lower confidence scores accordingly (typically 0.3-0.6 range)\n- Explicitly state the uncertainty in confidence_summary.summary_text and llm_notes\n- Mention which missing signals would have helped\
+    \ confirm the diagnosis\n- Add solution_alerts for each recommendation explaining what data is missing\n- Still provide best-effort solutions based on the most probable cause\n\n## OUTPUT FORMAT\n\n{\n  \"issue_title\": \"<Concise one-line summary (max 100 chars)>\",\n  \"issue_summary\": \"<1-2 sentence AI summary in very simple language of what happened and why. Example: 'The app ran out of memory and crashed because it was handling more data than it was configured to handle.' No technical jargon — write as if explaining to a non-technical person.>\",\n  \"issue_description\": \"<NON-TECHNICAL description for general users (2-4 sentences). Use plain English: 'ran out of memory', 'stopped working', 'memory usage too high'. Avoid: GC, JVM, heap, OOM, pod, container, Kubernetes terms.>\",\n  \"technical_description\": \"<DETAILED technical analysis for developers (6-10 sentences). Include: memory values, GC behavior, allocation patterns, heap pools, container limits. Reference all available\
+    \ signals (logs, metrics, JFR, events). Provide complete technical narrative of failure sequence.>\",\n  \"anomaly_type\": \"<EXACTLY ONE OF: OOM_KILLED | POSSIBLE_OOM_KILLED | POSSIBLE_GC_PAUSE | HEALTHY>\",\n  \"root_cause\": \"<Detailed explanation (4-6 sentences). Explain causal chain: what triggered the problem, why it escalated, what made it critical. Connect findings from logs, metrics, JFR, and events.>\",\n  \"supporting_logs\": [\n    \"<Verbatim log line 1 from APPLICATION_LOGS>\",\n    \"<Verbatim log line 2 from APPLICATION_LOGS>\",\n    \"<If no logs: 'No direct supporting logs present'>\"\n  ],\n  \"evidences\": [\n    \"<Evidence 1: Specific metric with exact values and percentage>\",\n    \"<Evidence 2: Kubernetes event with timestamp and type>\",\n    \"<Evidence 3: JFR GC data showing pause times or heap usage>\",\n    \"<Evidence 4: JFR memory pool data showing exhaustion>\",\n    \"<Evidence 5: JFR container configuration showing limits>\",\n    \"<Evidence 6: Kruize\
+    \ recommendations showing resource gaps>\",\n    \"<All relevant evidences from available signals. Each must be specific and quantifiable.>\"\n  ],\n  \"recommendations\": [\n    {\n      \"solution_type\": \"Immediate Mitigation\",\n      \"solution_title\": \"<Short actionable title, e.g., 'Increase Memory Limit to 1024Mi'>\",\n      \"solution_description\": \"<Brief description of immediate resource adjustment. Example: Increase memory limit from 512Mi to 1024Mi based on Kruize recommendations to prevent immediate OOMKilled events.>\",\n      \"implementation_notes\": \"<Step-by-step commands OR steps>\",\n      \"solution_confidence_score\": <0.0 to 1.0>,\n      \"solution_alerts\": [\"<Alert 1: Only include if confidence < 0.7. Example: 'KRUIZE_RECOMMENDATIONS not available - memory values are estimated from current usage patterns'>\", \"<Alert 2: Example: 'Without APPLICATION_LOGS, cannot confirm if resource increase alone will solve the issue'>\"]\n    },\n    {\n      \"solution_type\"\
+    : \"Validate & Monitor\",\n      \"solution_title\": \"<Short title, e.g., 'Monitor Memory Usage Post-Increase'>\",\n      \"solution_description\": \"<Description of validation steps. Example: Monitor memory consumption, GC behavior, and pod stability after resource increase to validate the fix and gather data for permanent solution.>\",\n      \"implementation_notes\": \"<Step-by-step commands OR steps>\",\n      \"solution_confidence_score\": <0.0 to 1.0>,\n      \"solution_alerts\": [\"<Only include if confidence < 0.7. Example: 'PROMETHEUS_METRICS unavailable - manual observation required'>\"]\n    },\n    {\n      \"solution_type\": \"Root Cause Fix\",\n      \"solution_title\": \"<Short title, e.g., 'Implement Connection Pooling in DatabaseService'>\",\n      \"solution_description\": \"<Detailed permanent fix description. Example: Modify DatabaseService.java to implement HikariCP connection pooling with max pool size of 20 connections. This prevents unbounded connection creation\
+    \ that leads to memory exhaustion. Add periodic cleanup of idle connections after 10 minutes.>\",\n      \"implementation_notes\": \"<Step-by-step commands OR steps>\",\n      \"solution_confidence_score\": <0.0 to 1.0>,\n      \"solution_alerts\": [\"<Only include if confidence < 0.7. Example: 'APPLICATION_LOGS missing - cannot identify exact code location causing memory leak, solution is based on common patterns'>\", \"<Example: 'JFR_ANALYSIS unavailable - specific memory pool exhaustion point unknown, recommendation is generalized'>\"]\n    }\n  ],\n  \"confidence_summary\": {\n    \"rca_confidence_score\": <0.0 to 1.0>,\n    \"summary_text\": \"<2-4 sentences explaining the RCA confidence score. Justify WHY you have high or low confidence. Mention: which signals provided strong evidence, which were missing, any ambiguities, how complete the evidence chain is. If score is low, mention what additional data would increase confidence.>\"\n  },\n  \"llm_notes\": \"<3-7 sentences narrating\
+    \ the analysis process. Include: (1) What signals were available and first impressions, (2) How you analyzed the data step-by-step, (3) How different signals corroborated findings, (4) Key decision points for anomaly type and root cause, (5) What was difficult or ambiguous, (6) How JFR data influenced analysis (if available), (7) Why you assigned the confidence scores, (8) Alternative theories considered and ruled out. Be conversational and transparent.>\"\n}\n\n## CRITICAL CONSTRAINTS\n\n1. **Output Format**: Return ONLY valid JSON. No markdown, no code blocks, no text outside JSON.\n2. **Anomaly Categorization**: Use EXACTLY ONE of the allowed types. Do NOT use HEALTHY if there are memory issues, high memory pressure (>75%), or GC problems.\n3. **Evidence Requirements**: All evidences MUST be directly observable in provided signals. Supporting logs MUST be verbatim quotes from APPLICATION_LOGS. Do NOT construct, assume, or infer evidence.\n4. **Signal Handling**: Work with whatever\
+    \ signals are provided. Note missing signals in llm_notes and adjust confidence scores. Do not assume data that wasn't provided.\n5. **Language**: issue_summary: 1-2 sentences, plain everyday language, no jargon — the simplest possible explanation of what happened and why. issue_description: Plain, non-technical language for general users. technical_description: Full technical detail for developers.\n6. **Recommendations Structure**: Provide EXACTLY 3 recommendations with solution_type: \"Immediate Mitigation\", \"Validate & Monitor\", \"Root Cause Fix\". Each must have solution_confidence_score (0.0-1.0) and solution_alerts array (populate only when confidence < 0.7 or critical data missing).\n7. **Implementation Notes**: Must be detailed step-by-step instructions with actual commands, file paths, code locations, and monitoring queries. Include placeholders like <deployment-name>, <namespace>, <pod-name> that users can replace.\n8. **Solution Alerts**: Add alerts ONLY when solution\
+    \ confidence is low (<0.7). Explicitly state which signals are missing and how it impacts the solution reliability. Example: \"APPLICATION_LOGS not available - cannot pinpoint exact memory leak location\"\n9. **Confidence Scoring**: Scores MUST reflect quality and completeness of evidence. Lower confidence when signals are missing or ambiguous. Explain reasoning in confidence_summary.summary_text.\n10. **Accuracy**: Base conclusions ONLY on provided signals. If uncertain, state it in confidence_summary.summary_text, llm_notes, and solution_alerts.\n\n---\n\nNow analyze the above context and provide your RCA in JSON format.\n"
+  version: '1.0'
