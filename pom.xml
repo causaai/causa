@@ -112,13 +112,11 @@
         </dependency>
 
         <!-- LangChain4J Skills - DISABLED (not used in this deployment) -->
-        <!--
         <dependency>
             <groupId>io.quarkiverse.langchain4j</groupId>
             <artifactId>quarkus-langchain4j-skills</artifactId>
             <version>1.11.0</version>
         </dependency>
-        -->
 
         <!-- LangChain4J Core -->
         <dependency>
