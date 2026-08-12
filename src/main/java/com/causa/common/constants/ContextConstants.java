@@ -41,6 +41,14 @@ public final class ContextConstants {
     public static final String SECTION_CONTAINER_ANALYSIS = "CONTAINER RESOURCE ANALYSIS (Cryostat JFR)";
     public static final String SECTION_LIBERTY_LOGS = "LIBERTY APPLICATION LOGS (Filesystem MCP)";
 
+    // Async Profiler MCP section headers
+    public static final String SECTION_JFR_REPORT    = "JFR REPORT (Async Profiler MCP)";
+    public static final String SECTION_FLAME_GRAPH   = "FLAME GRAPH (Async Profiler MCP)";
+
+    // Quarkus MCP section headers
+    public static final String SECTION_QUARKUS_METRICS = "QUARKUS METRICS SNAPSHOT (Quarkus MCP)";
+    public static final String SECTION_QUARKUS_HEALTH  = "QUARKUS HEALTH STATUS (Quarkus MCP)";
+
     // Identity field labels
     public static final String LABEL_POD = "Pod";
     public static final String LABEL_CONTAINER = "Container";

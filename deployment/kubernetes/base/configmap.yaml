@@ -67,3 +67,15 @@ data:
   CAUSA_MCP_CRYOSTAT_TIMEOUT: "15000"
   CAUSA_MCP_CRYOSTAT_RETRY_DELAY: "5000"
   CAUSA_MCP_CRYOSTAT_MAX_RETRIES: "3"
+
+  # MCP Async Profiler Configuration (JFR report + flame graph)
+  # Placeholder URL — update to Kind service URL when real server is deployed
+  CAUSA_MCP_ASYNC_PROFILER_ENDPOINT: "http://localhost:8091"
+  CAUSA_MCP_ASYNC_PROFILER_HEALTH_PATH: "/healthz"
+  CAUSA_MCP_ASYNC_PROFILER_TIMEOUT: "10000"
+
+  # MCP Quarkus Configuration (metrics snapshot + health status)
+  # Placeholder URL — update to Kind service URL when real server is deployed
+  CAUSA_MCP_QUARKUS_ENDPOINT: "http://localhost:8092"
+  CAUSA_MCP_QUARKUS_HEALTH_PATH: "/healthz"
+  CAUSA_MCP_QUARKUS_TIMEOUT: "10000"

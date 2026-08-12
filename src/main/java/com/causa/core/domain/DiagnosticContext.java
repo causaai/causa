@@ -44,6 +44,14 @@ public final class DiagnosticContext {
     private final String exceptionAnalysis;
     private final String containerAnalysis;
 
+    // Async Profiler MCP context (cluster)
+    private final String jfrReport;
+    private final String flameGraph;
+
+    // Quarkus MCP context (cluster)
+    private final String quarkusMetrics;
+    private final String quarkusHealth;
+
     // VM — Filesystem MCP
     private final String libertyLogs;
 
@@ -73,6 +81,10 @@ public final class DiagnosticContext {
         this.threadAnalysis = builder.threadAnalysis;
         this.exceptionAnalysis = builder.exceptionAnalysis;
         this.containerAnalysis = builder.containerAnalysis;
+        this.jfrReport = builder.jfrReport;
+        this.flameGraph = builder.flameGraph;
+        this.quarkusMetrics = builder.quarkusMetrics;
+        this.quarkusHealth = builder.quarkusHealth;
         this.libertyLogs = builder.libertyLogs;
         this.heapStatus = builder.heapStatus;
         this.gcActivity = builder.gcActivity;
@@ -149,6 +161,22 @@ public final class DiagnosticContext {
         return containerAnalysis;
     }
 
+    public String getJfrReport() {
+        return jfrReport;
+    }
+
+    public String getFlameGraph() {
+        return flameGraph;
+    }
+
+    public String getQuarkusMetrics() {
+        return quarkusMetrics;
+    }
+
+    public String getQuarkusHealth() {
+        return quarkusHealth;
+    }
+
     public String getHeapStatus() {
         return heapStatus;
     }
@@ -213,6 +241,24 @@ public final class DiagnosticContext {
     }
 
     /**
+     * Checks if any Async Profiler context was collected.
+     *
+     * @return true if JFR report or flame graph are present
+     */
+    public boolean hasAsyncProfilerContext() {
+        return isNotBlank(jfrReport) || isNotBlank(flameGraph);
+    }
+
+    /**
+     * Checks if any Quarkus MCP context was collected.
+     *
+     * @return true if metrics snapshot or health status are present
+     */
+    public boolean hasQuarkusContext() {
+        return isNotBlank(quarkusMetrics) || isNotBlank(quarkusHealth);
+    }
+
+    /**
      * Checks if any Filesystem MCP context was collected.
      *
      *  @return true if liberty logs are present
@@ -243,6 +289,7 @@ public final class DiagnosticContext {
      */
     public boolean hasAnyContext() {
         return hasKubernetesContext() || hasKruizeContext() || hasCryostatContext()
+            || hasAsyncProfilerContext() || hasQuarkusContext()
             || hasFilesystemContext() || hasJmxContext();
     }
 
@@ -300,6 +347,14 @@ public final class DiagnosticContext {
         appendSection(sb, ContextConstants.SECTION_THREAD_ANALYSIS, threadAnalysis);
         appendSection(sb, ContextConstants.SECTION_EXCEPTION_ANALYSIS, exceptionAnalysis);
         appendSection(sb, ContextConstants.SECTION_CONTAINER_ANALYSIS, containerAnalysis);
+
+        // Async Profiler context
+        appendSection(sb, ContextConstants.SECTION_JFR_REPORT, jfrReport);
+        appendSection(sb, ContextConstants.SECTION_FLAME_GRAPH, flameGraph);
+
+        // Quarkus context
+        appendSection(sb, ContextConstants.SECTION_QUARKUS_METRICS, quarkusMetrics);
+        appendSection(sb, ContextConstants.SECTION_QUARKUS_HEALTH, quarkusHealth);
     }
 
     private void appendVmSections(StringBuilder sb) {
@@ -371,6 +426,10 @@ public final class DiagnosticContext {
         private String threadAnalysis;
         private String exceptionAnalysis;
         private String containerAnalysis;
+        private String jfrReport;
+        private String flameGraph;
+        private String quarkusMetrics;
+        private String quarkusHealth;
         private String libertyLogs;
         private String heapStatus;
         private String gcActivity;
@@ -459,6 +518,30 @@ public final class DiagnosticContext {
 
         public Builder containerAnalysis(String containerAnalysis) {
             this.containerAnalysis = containerAnalysis;
+            return this;
+        }
+
+        // Cluster — Async Profiler MCP
+
+        public Builder jfrReport(String jfrReport) {
+            this.jfrReport = jfrReport;
+            return this;
+        }
+
+        public Builder flameGraph(String flameGraph) {
+            this.flameGraph = flameGraph;
+            return this;
+        }
+
+        // Cluster — Quarkus MCP
+
+        public Builder quarkusMetrics(String quarkusMetrics) {
+            this.quarkusMetrics = quarkusMetrics;
+            return this;
+        }
+
+        public Builder quarkusHealth(String quarkusHealth) {
+            this.quarkusHealth = quarkusHealth;
             return this;
         }
 

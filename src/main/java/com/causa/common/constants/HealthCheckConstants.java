@@ -25,6 +25,8 @@ public final class HealthCheckConstants {
         public static final String MCP_CRYOSTAT = "mcp_cryostat";
         public static final String MCP_KRUIZE = "mcp_kruize";
         public static final String MCP_FILESYSTEM = "mcp_filesystem";
+        public static final String MCP_ASYNC_PROFILER = "mcp_async_profiler";
+        public static final String MCP_QUARKUS = "mcp_quarkus";
     }
 
     /**

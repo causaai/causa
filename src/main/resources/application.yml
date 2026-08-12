@@ -157,6 +157,14 @@ causa:
       timeout-ms: ${CAUSA_MCP_FILESYSTEM_TIMEOUT:10000}
       liberty-logs-dir: ${CAUSA_MCP_FILESYSTEM_LIBERTY_LOGS_DIR:/logs}
       alert-window-minutes: ${CAUSA_MCP_FILESYSTEM_ALERT_WINDOW_MINUTES:5}
+    async-profiler:
+      endpoint: ${CAUSA_MCP_ASYNC_PROFILER_ENDPOINT:http://localhost:8091}
+      health-path: ${CAUSA_MCP_ASYNC_PROFILER_HEALTH_PATH:/healthz}
+      timeout-ms: ${CAUSA_MCP_ASYNC_PROFILER_TIMEOUT:10000}
+    quarkus:
+      endpoint: ${CAUSA_MCP_QUARKUS_ENDPOINT:http://localhost:8092}
+      health-path: ${CAUSA_MCP_QUARKUS_HEALTH_PATH:/healthz}
+      timeout-ms: ${CAUSA_MCP_QUARKUS_TIMEOUT:10000}
     jmx:
       endpoint: ${CAUSA_MCP_JMX_ENDPOINT:http://jmx-mcp-server:8080}
       health-path: ${CAUSA_MCP_JMX_HEALTH_PATH:/healthz}

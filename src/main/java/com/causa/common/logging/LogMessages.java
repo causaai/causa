@@ -109,6 +109,12 @@ public final class LogMessages {
         public static final String MCP_FILESYSTEM_CHECK_STARTED = "MCP Filesystem health check started";
         public static final String MCP_FILESYSTEM_CHECK_PASSED = "MCP Filesystem health check passed";
         public static final String MCP_FILESYSTEM_CHECK_FAILED = "MCP Filesystem health check failed";
+        public static final String MCP_ASYNC_PROFILER_CHECK_STARTED = "MCP Async Profiler health check started";
+        public static final String MCP_ASYNC_PROFILER_CHECK_PASSED = "MCP Async Profiler health check passed";
+        public static final String MCP_ASYNC_PROFILER_CHECK_FAILED = "MCP Async Profiler health check failed";
+        public static final String MCP_QUARKUS_CHECK_STARTED = "MCP Quarkus health check started";
+        public static final String MCP_QUARKUS_CHECK_PASSED = "MCP Quarkus health check passed";
+        public static final String MCP_QUARKUS_CHECK_FAILED = "MCP Quarkus health check failed";
         public static final String LLM_CHECK_STARTED = "LLM health check started";
         public static final String LLM_CHECK_PASSED = "LLM health check passed";
         public static final String LLM_CHECK_FAILED = "LLM health check failed";
@@ -198,6 +204,14 @@ public final class LogMessages {
         public static final String MCP_KRUIZE_COST_RECOMMENDATIONS = "Kruize cost recommendations retrieved";
         public static final String MCP_KRUIZE_PERF_RECOMMENDATIONS = "Kruize performance recommendations retrieved";
         public static final String MCP_KRUIZE_SKIPPED_NO_CONTAINER = "Skipping Kruize MCP calls - no container name available";
+
+        // Async Profiler MCP
+        public static final String MCP_ASYNC_PROFILER_JFR_REPORT  = "Async Profiler JFR report retrieved";
+        public static final String MCP_ASYNC_PROFILER_FLAME_GRAPH  = "Async Profiler flame graph retrieved";
+
+        // Quarkus MCP
+        public static final String MCP_QUARKUS_METRICS_SNAPSHOT = "Quarkus metrics snapshot retrieved";
+        public static final String MCP_QUARKUS_HEALTH_STATUS    = "Quarkus health status retrieved";
 
         // Cryostat MCP
         public static final String MCP_CRYOSTAT_GC_ANALYSIS = "Cryostat GC analysis retrieved";
