@@ -1,117 +1,165 @@
-# Health and Readiness Checks
+# Health Checks
 
-This document describes the health and readiness check endpoints available in Causa Backend, their purpose, and how to use them.
+This document covers the Quarkus health endpoints exposed by the app.
 
-## Overview
+**Base URLs:** `{{BASE_URL}}` or `http://localhost:8080`
 
-Causa Backend implements Kubernetes-compatible health checks using the MicroProfile Health specification. These endpoints help orchestration platforms like Kubernetes determine the application's state and manage its lifecycle effectively.
+## Endpoints
 
-## Health Check Endpoints
+| Endpoint | Purpose | Success response code | Error response codes |
+|---|---|---|---|
+| `GET /q/health` | Return overall Quarkus health including liveness and readiness contributors | `200 OK` | `503 Service Unavailable` |
+| `GET /q/health/live` | Return liveness status only | `200 OK` | `503 Service Unavailable` |
+| `GET /q/health/ready` | Return readiness status only | `200 OK` | `503 Service Unavailable` |
 
-### Base Health Endpoint
+---
 
-**Endpoint:** `GET /q/health`
+## GET `/q/health`
 
-Returns the overall health status of the application, combining both liveness and readiness checks.
+Returns the overall Quarkus health response including liveness and readiness contributors.
 
-**Response Example:**
+### Request Example (cURL)
+
+**Using `{{BASE_URL}}`:**
+
+```bash
+curl {{BASE_URL}}/q/health
+```
+
+**Using `localhost:8080`:**
+
+```bash
+curl http://localhost:8080/q/health
+```
+
+### Response Example
+
 ```json
 {
   "status": "UP",
-  "checks": [{
-    "name": "causa-liveness",
-    "status": "UP",
-    "data": {
-      "status": "ALIVE",
-      "message": "Causa is alive and running"
-    }
-  },
-  {
-    "name": "causa-readiness",
-    "status": "UP",
-    "data": {
-      "status": "READY",
-      "message": "Causa is ready to accept requests"
-    }
-  }]
-}
-```
-
-### Liveness Check
-
-**Endpoint:** `GET /q/health/live`
-
-**Purpose:** Indicates whether the application is running and should continue to run.
-
-**When to Use:**
-- Kubernetes uses this to determine if a pod should be restarted
-- Should only fail if the application is in a broken state requiring a restart
-- Examples: deadlock, unrecoverable error, corrupted state
-
-**Response (Healthy):**
-```json
-{
-   "status":"UP",
-   "checks":[
-      {
-         "name":"causa-liveness",
-         "status":"UP",
-         "data":{
-            "status":"ALIVE",
-            "message":"Causa is alive and running"
-         }
+  "checks": [
+    {
+      "name": "causa-liveness",
+      "status": "UP",
+      "data": {
+        "status": "UP",
+        "message": "Causa is alive and running"
       }
-   ]
-}
-```
-
-**HTTP Status Codes:**
-- `200 OK` - Application is alive
-- `503 Service Unavailable` - Application is in a broken state (requires restart)
-
-### Readiness Check 
-
-**Endpoint:** `GET /q/health/ready`
-
-**Purpose:** Indicates whether the application is ready to accept traffic.
-
-**When to Use:**
-- Kubernetes uses this to determine if a pod should receive traffic
-- Should fail if the application is temporarily unable to serve requests
-- Examples: warming up, loading data, waiting for dependencies
-
-**Response (Ready):**
-```json
-{
-   "status":"UP",
-   "checks":[
-      {
-         "name":"causa-readiness",
-         "status":"UP",
-         "data":{
-            "status":"READY",
-            "message":"Causa is ready to accept requests"
-         }
+    },
+    {
+      "name": "Database connections health check",
+      "status": "UP",
+      "data": {
+        "<default>": "UP"
       }
-   ]
+    },
+    {
+      "name": "causa-readiness",
+      "status": "UP",
+      "data": {
+        "status": "READY",
+        "message": "Causa is ready to accept requests"
+      }
+    },
+    {
+      "name": "database",
+      "status": "UP",
+      "data": {
+        "status": "READY",
+        "message": "Database is ready"
+      }
+    }
+  ]
 }
 ```
 
-**HTTP Status Codes:**
-- `200 OK` - Application is ready to serve requests
-- `503 Service Unavailable` - Application is not ready (temporarily)
+---
 
-## Testing Health Checks
+## GET `/q/health/live`
 
-### Using curl
+Returns the liveness check only.
+
+### Request Example (cURL)
+
+**Using `{{BASE_URL}}`:**
 
 ```bash
-# Check overall health
-curl http://localhost:8080/q/health | jq
+curl {{BASE_URL}}/q/health/live
+```
 
-# Check liveness
-curl http://localhost:8080/q/health/live | jq
+**Using `localhost:8080`:**
 
-# Check readiness
-curl http://localhost:8080/q/health/ready | jq
+```bash
+curl http://localhost:8080/q/health/live
+```
+
+### Response Example
+
+```json
+{
+  "status": "UP",
+  "checks": [
+    {
+      "name": "causa-liveness",
+      "status": "UP",
+      "data": {
+        "status": "UP",
+        "message": "Causa is alive and running"
+      }
+    }
+  ]
+}
+```
+
+---
+
+## GET `/q/health/ready`
+
+Returns readiness checks only.
+
+### Request Example (cURL)
+
+**Using `{{BASE_URL}}`:**
+
+```bash
+curl {{BASE_URL}}/q/health/ready
+```
+
+**Using `localhost:8080`:**
+
+```bash
+curl http://localhost:8080/q/health/ready
+```
+
+### Response Example
+
+```json
+{
+  "status": "UP",
+  "checks": [
+    {
+      "name": "Database connections health check",
+      "status": "UP",
+      "data": {
+        "<default>": "UP"
+      }
+    },
+    {
+      "name": "causa-readiness",
+      "status": "UP",
+      "data": {
+        "status": "READY",
+        "message": "Causa is ready to accept requests"
+      }
+    },
+    {
+      "name": "database",
+      "status": "UP",
+      "data": {
+        "status": "READY",
+        "message": "Database is ready"
+      }
+    }
+  ]
+}
 ```

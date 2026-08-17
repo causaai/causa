@@ -1,0 +1,228 @@
+---
+openapi: 3.1.0
+paths:
+  /api/v1/alerts:
+    get:
+      parameters:
+      - name: namespace
+        in: query
+        schema:
+          type: string
+      - name: workload_name
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {}
+      summary: Get Alerts
+      tags:
+      - Alerts Controller
+  /api/v1/alerts/{id}:
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: namespace
+        in: query
+        schema:
+          type: string
+      - name: workload_name
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {}
+      summary: Get Alert By Id
+      tags:
+      - Alerts Controller
+  /api/v1/configs:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfigUpdateRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {}
+        "400":
+          description: Bad Request
+      summary: Update Configs
+      tags:
+      - Config Controller
+    get:
+      parameters:
+      - name: category
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {}
+      summary: List Configs
+      tags:
+      - Config Controller
+  /api/v1/configs/{key}:
+    get:
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {}
+      summary: Get Config
+      tags:
+      - Config Controller
+  /api/v1/diagnostics:
+    get:
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {}
+      summary: List Diagnostics
+      tags:
+      - Diagnostics Controller
+  /api/v1/diagnostics/{id}:
+    get:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {}
+      summary: Get Diagnostic
+      tags:
+      - Diagnostics Controller
+  /api/v1/healthz:
+    get:
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {}
+      summary: Get Health
+      tags:
+      - Health Check Controller
+  /api/v1/webhooks/alerts:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlertWebhookRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {}
+        "400":
+          description: Bad Request
+      summary: Receive Alerts
+      tags:
+      - Webhook Controller
+components:
+  schemas:
+    AlertItem:
+      type: object
+      properties:
+        status:
+          type: string
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+        annotations:
+          type: object
+          additionalProperties:
+            type: string
+        startsAt:
+          type: string
+        endsAt:
+          type: string
+        generatorURL:
+          type: string
+        fingerprint:
+          type: string
+    AlertWebhookRequest:
+      type: object
+      properties:
+        version:
+          type: string
+        status:
+          type: string
+        receiver:
+          type: string
+        groupKey:
+          type: string
+        truncatedAlerts:
+          type: integer
+          format: int32
+        groupLabels:
+          type: object
+          additionalProperties:
+            type: string
+        commonLabels:
+          type: object
+          additionalProperties:
+            type: string
+        commonAnnotations:
+          type: object
+          additionalProperties:
+            type: string
+        externalURL:
+          type: string
+        alerts:
+          type: array
+          items:
+            $ref: "#/components/schemas/AlertItem"
+    ConfigUpdateRequest:
+      type: object
+      properties:
+        configs:
+          type: object
+          additionalProperties:
+            type: string
+info:
+  title: Causa Backend API
+  version: 0.0.1
+  description: "AI-powered Kubernetes root-cause analysis backend. Receives Prometheus\
+    \ Alertmanager webhooks, runs LLM diagnostics, and exposes REST endpoints for\
+    \ alerts, diagnostics, and runtime configuration."
+servers:
+- url: http://localhost:8080
+  description: Local development
