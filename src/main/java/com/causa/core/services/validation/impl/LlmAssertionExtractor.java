@@ -42,7 +42,7 @@ public class LlmAssertionExtractor implements AssertionExtractor {
     private final PromptSender promptSender;
     private final ObjectMapper objectMapper;
     private final PromptTemplateLoader promptTemplateLoader;
-    private final String modelType;
+    private final String provider;
 
     @Inject
     public LlmAssertionExtractor(
@@ -53,13 +53,13 @@ public class LlmAssertionExtractor implements AssertionExtractor {
         this.promptSender = promptSender;
         this.objectMapper = objectMapper;
         this.promptTemplateLoader = new PromptTemplateLoader(PromptConstants.TEMPLATE_PATH_ASSERTION_EXTRACTION);
-        this.modelType = determineModelType(appConfig.getLlmConfig());
+        this.provider = determineProvider(appConfig.getLlmConfig());
     }
 
     /**
      * Determines the model type for template selection based on LLM configuration.
      */
-    private String determineModelType(com.causa.config.LlmConfigSnapshot config) {
+    private String determineProvider(com.causa.config.LlmConfigSnapshot config) {
         String provider = config.getProvider();
         String modelName = config.getModelName();
 
@@ -151,7 +151,7 @@ public class LlmAssertionExtractor implements AssertionExtractor {
 
         try {
             // Load template for the current model type
-            PromptTemplateLoader.PromptTemplate template = promptTemplateLoader.loadTemplate(modelType);
+            PromptTemplateLoader.PromptTemplate template = promptTemplateLoader.loadTemplate(provider, "");
 
             // Build prompt using template
             String userPrompt = buildExtractionPrompt(text, source, template);

@@ -113,16 +113,16 @@ public class PromptTemplateLoader {
             validateModelName(matchedEntry, provider, modelName);
 
             return new PromptTemplate(
-                (String) modelTemplate.get(PromptConstants.KEY_NAME),
-                (String) modelTemplate.get(PromptConstants.KEY_VERSION),
-                (String) modelTemplate.get(PromptConstants.KEY_DESCRIPTION),
-                (String) modelTemplate.get(PromptConstants.KEY_SYSTEM_PROMPT),
-                (String) modelTemplate.get(PromptConstants.KEY_USER_PROMPT),
-                (String) modelTemplate.get(PromptConstants.KEY_VERIFICATION_OBSERVATION),
-                (String) modelTemplate.get(PromptConstants.KEY_VERIFICATION_TREND),
-                (String) modelTemplate.get(PromptConstants.KEY_VERIFICATION_CAUSALITY),
-                (String) modelTemplate.get(PromptConstants.KEY_VERIFICATION_CONFIGURATION),
-                (String) modelTemplate.get(PromptConstants.KEY_VERIFICATION_RECOMMENDATION)
+                (String) matchedEntry.get(PromptConstants.KEY_NAME),
+                (String) matchedEntry.get(PromptConstants.KEY_VERSION),
+                (String) matchedEntry.get(PromptConstants.KEY_DESCRIPTION),
+                (String) matchedEntry.get(PromptConstants.KEY_SYSTEM_PROMPT),
+                (String) matchedEntry.get(PromptConstants.KEY_USER_PROMPT),
+                (String) matchedEntry.get(PromptConstants.KEY_VERIFICATION_OBSERVATION),
+                (String) matchedEntry.get(PromptConstants.KEY_VERIFICATION_TREND),
+                (String) matchedEntry.get(PromptConstants.KEY_VERIFICATION_CAUSALITY),
+                (String) matchedEntry.get(PromptConstants.KEY_VERIFICATION_CONFIGURATION),
+                (String) matchedEntry.get(PromptConstants.KEY_VERIFICATION_RECOMMENDATION)
             );
 
         } catch (IllegalStateException e) {

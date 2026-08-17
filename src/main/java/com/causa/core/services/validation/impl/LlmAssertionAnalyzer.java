@@ -46,7 +46,7 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
     private final PromptSender promptSender;
     private final ObjectMapper objectMapper;
     private final PromptTemplateLoader promptTemplateLoader;
-    private final String modelType;
+    private final String provider;
 
     @Inject
     public LlmAssertionAnalyzer(
@@ -57,13 +57,13 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
         this.promptSender = promptSender;
         this.objectMapper = objectMapper;
         this.promptTemplateLoader = new PromptTemplateLoader(PromptConstants.TEMPLATE_PATH_ASSERTION_ANALYSIS);
-        this.modelType = determineModelType(appConfig.getLlmConfig());
+        this.provider = determineProvider(appConfig.getLlmConfig());
     }
 
     /**
      * Determines the model type for template selection based on LLM configuration.
      */
-    private String determineModelType(com.causa.config.LlmConfigSnapshot config) {
+    private String determineProvider(com.causa.config.LlmConfigSnapshot config) {
         String provider = config.getProvider();
         String modelName = config.getModelName();
 
@@ -106,7 +106,7 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
 
         try {
             // Load template for the current model type
-            PromptTemplateLoader.PromptTemplate template = promptTemplateLoader.loadTemplate(modelType);
+            PromptTemplateLoader.PromptTemplate template = promptTemplateLoader.loadTemplate(provider, "");
 
             // Build analysis prompt using template
             String userPrompt = buildAnalysisPrompt(assertion, diagnosticContext, template);
