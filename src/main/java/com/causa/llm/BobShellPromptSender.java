@@ -28,9 +28,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * <p>BOB Shell is a Node.js CLI tool bundled with the application image.
  *
- * <p>Requires BOB_API_KEY environment variable for authentication (Bob v2+).
- *
- * <p>Invocation: {@code bob run --format json} (prompt written to stdin)
+ * <p>Requires BOB_API_KEY environment variable for authentication.
  *
  * <p>This is a plain class (not a CDI bean) instantiated by {@link UnifiedPromptSender}.
  *
@@ -75,14 +73,14 @@ public class BobShellPromptSender implements PromptSender {
         try {
             // Build complete prompt from request
             String prompt = buildPrompt(request);
-
+            
             // Execute BOB Shell
             String bobOutput = executeBobShell(prompt);
-
+            
             // Parse response
             String responseText = extractContent(bobOutput);
             TokenUsage tokenUsage = extractTokenUsage(bobOutput);
-
+            
             long latencyMs = (System.nanoTime() - startNanos) / 1_000_000;
 
             LLMResponse llmResponse = new LLMResponse(
@@ -125,7 +123,7 @@ public class BobShellPromptSender implements PromptSender {
         if (ready.get()) {
             return true;
         }
-
+        
         // Otherwise, check availability and cache the result
         boolean available = checkAvailability();
         if (available) {
@@ -141,10 +139,7 @@ public class BobShellPromptSender implements PromptSender {
      */
     private boolean checkAvailability() {
         try {
-            ProcessBuilder pb = new ProcessBuilder(
-                appConfig.getLlmConfig().getBobShellPath(),
-                LLMConstants.BobShell.VERSION_FLAG
-            );
+            ProcessBuilder pb = new ProcessBuilder(appConfig.getLlmConfig().getBobShellPath(), LLMConstants.BobShell.VERSION_FLAG);
 
             String apiKey = appConfig.getLlmConfig().getApiKey().trim();
             if (!apiKey.isBlank()) {
@@ -156,13 +151,13 @@ public class BobShellPromptSender implements PromptSender {
                 LLMConstants.BobShell.VERSION_CHECK_TIMEOUT_SECONDS,
                 TimeUnit.SECONDS
             );
-
+            
             if (!completed) {
                 process.destroyForcibly();
                 log.warn(LogMessages.LLM.BOB_VERSION_CHECK_TIMEOUT).log();
                 return false;
             }
-
+            
             int exitCode = process.exitValue();
             if (exitCode == 0) {
                 log.info(LogMessages.LLM.BOB_SHELL_AVAILABLE)
@@ -188,23 +183,30 @@ public class BobShellPromptSender implements PromptSender {
      */
     private String buildPrompt(LLMRequest request) {
         StringBuilder prompt = new StringBuilder();
-
+        
         // Add system prompt and context if present
         if (request.systemPrompt().isPresent() || request.context().isPresent()) {
             request.systemPrompt().ifPresent(sys -> prompt.append(sys).append(System.lineSeparator()).append(System.lineSeparator()));
             request.context().ifPresent(ctx -> prompt.append(ctx).append(System.lineSeparator()).append(System.lineSeparator()));
         }
-
+        
         // Add user prompt
         prompt.append(request.prompt());
-
+        
         return prompt.toString();
     }
 
     /**
-     * Executes BOB Shell CLI using {@code bob run --format json}.
+     * Executes BOB Shell CLI with the given prompt via stdin.
      *
-     * <p>Prompt is written to stdin to avoid OS ARG_MAX limits on large prompts.
+     * <p>Always uses stdin mode for maximum reliability and to avoid ARG_MAX limitations.
+     * This approach:
+     * <ul>
+     *   <li>Eliminates OS-specific command-line argument size limits (ARG_MAX)</li>
+     *   <li>Provides consistent behavior regardless of prompt size</li>
+     *   <li>Simplifies code by removing conditional logic</li>
+     *   <li>Ensures production safety across all environments</li>
+     * </ul>
      */
     private String executeBobShell(String prompt) throws LLMException, InterruptedException {
         try {
@@ -217,6 +219,7 @@ public class BobShellPromptSender implements PromptSender {
                 );
             }
 
+            // Always use stdin mode for reliability and consistency
             ProcessBuilder pb = new ProcessBuilder(
                 appConfig.getLlmConfig().getBobShellPath(),
                 LLMConstants.BobShell.FLAG_ACCEPT_LICENSE,
@@ -226,21 +229,22 @@ public class BobShellPromptSender implements PromptSender {
             );
 
             pb.environment().put(LLMConstants.BobShell.ENV_API_KEY_NAME, apiKey);
-
+            
             pb.redirectErrorStream(true);
-
+            
             Process process = pb.start();
-
+            
             // Write prompt to stdin
             try (OutputStreamWriter writer = new OutputStreamWriter(
                     process.getOutputStream(), StandardCharsets.UTF_8)) {
                 writer.write(prompt);
+                writer.flush();
             }
-
+            
             // Wait for completion with timeout
             int timeoutSeconds = appConfig.getLlmConfig().getTimeoutSeconds();
             boolean completed = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
-
+            
             if (!completed) {
                 process.destroyForcibly();
                 throw new LLMException(
@@ -248,7 +252,7 @@ public class BobShellPromptSender implements PromptSender {
                     LLMConstants.ErrorTypes.LLM_REQUEST_FAILED
                 );
             }
-
+            
             // Read output
             StringBuilder output = new StringBuilder();
             try (BufferedReader reader = new BufferedReader(
@@ -258,10 +262,10 @@ public class BobShellPromptSender implements PromptSender {
                     output.append(line).append(System.lineSeparator());
                 }
             }
-
+            
             int exitCode = process.exitValue();
             String responseText = output.toString().trim();
-
+            
             if (exitCode != 0) {
                 log.error(LogMessages.LLM.BOB_SHELL_FAILED)
                     .field(LLMConstants.BobShell.LOG_FIELD_EXIT_CODE, exitCode)
@@ -273,7 +277,7 @@ public class BobShellPromptSender implements PromptSender {
                     LLMConstants.ErrorTypes.LLM_REQUEST_FAILED
                 );
             }
-
+            
             if (responseText.isEmpty()) {
                 throw new LLMException(
                     LogMessages.LLM.BOB_EMPTY_RESPONSE,
@@ -292,15 +296,15 @@ public class BobShellPromptSender implements PromptSender {
     }
 
     /**
-     * Extracts the response text from {@code bob run --format json} output.
+     * Extracts the actual content from BOB Shell output.
      *
-     * <p>Bob v2 JSON shape:
+     * <p>Bob v2 {@code bob run -f json} output shape:
      * <pre>
      * {
      *   "type": "result",
      *   "status": "success",
      *   "last_message": "actual response text here",
-     *   "stats": { "task_id": "...", "duration_ms": N, "session_costs": N, "tool_calls": N }
+     *   "stats": { "input_tokens": N, "output_tokens": N, "total_tokens": N, ... }
      * }
      * </pre>
      */
@@ -314,28 +318,42 @@ public class BobShellPromptSender implements PromptSender {
         } catch (Exception e) {
             log.warn(LogMessages.LLM.BOB_OUTPUT_MARKERS_NOT_FOUND).log();
         }
-        // Fallback: return raw output if JSON parsing fails
+
+        // Fallback: return full output if JSON parsing fails
+        log.warn(LogMessages.LLM.BOB_OUTPUT_MARKERS_NOT_FOUND).log();
         return bobOutput;
     }
 
     /**
-     * Extracts token usage from {@code bob run --format json} output.
+     * Extracts token usage from BOB Shell statistics block.
      *
-     * <p>Bob v2 does not expose per-token counts in the {@code --format json} output;
-     * only {@code session_costs} and {@code duration_ms} are available under {@code stats}.
-     * Token counts are returned as zero — cost tracking is not affected.
+     * <p>Token counts are read from {@code stats.input_tokens},
+     * {@code stats.output_tokens}, and {@code stats.total_tokens}.
      */
     private TokenUsage extractTokenUsage(String bobOutput) {
         try {
             JsonNode root = objectMapper.readTree(bobOutput.trim());
             JsonNode stats = root.path(LLMConstants.BobShell.JSON_FIELD_STATS);
+
             if (!stats.isMissingNode()) {
-                // Bob v2 does not expose per-token counts; return zeros
-                return new TokenUsage(0, 0, 0);
+                long promptTokens     = stats.path(LLMConstants.BobShell.JSON_FIELD_INPUT_TOKENS).asLong(0);
+                long completionTokens = stats.path(LLMConstants.BobShell.JSON_FIELD_OUTPUT_TOKENS).asLong(0);
+                long totalTokens      = stats.path(LLMConstants.BobShell.JSON_FIELD_TOTAL_TOKENS).asLong(0);
+
+                log.debug(LogMessages.LLM.BOB_EXTRACTED_TOKEN_USAGE)
+                    .field(LLMConstants.BobShell.LOG_FIELD_PROMPT_TOKENS, promptTokens)
+                    .field(LLMConstants.BobShell.LOG_FIELD_COMPLETION_TOKENS, completionTokens)
+                    .field(LLMConstants.BobShell.LOG_FIELD_TOTAL_TOKENS, totalTokens)
+                    .log();
+
+                return new TokenUsage(promptTokens, completionTokens, totalTokens);
+            } else {
+                log.warn(LogMessages.LLM.BOB_STATS_FIELD_NOT_FOUND).log();
             }
         } catch (Exception e) {
             log.warn(LogMessages.LLM.BOB_TOKEN_PARSE_FAILED).exception(e).log();
         }
+
         return new TokenUsage(0, 0, 0);
     }
 

@@ -79,42 +79,44 @@ public final class LLMConstants {
      */
     public static final class BobShell {
         private BobShell() {}
-
+        
         // BOB Shell configuration
         public static final int DEFAULT_TIMEOUT_SECONDS = 180;
-
+        
         // BOB Shell CLI flags
         public static final String FLAG_ACCEPT_LICENSE = "--accept-license";
         public static final String SUBCMD_RUN = "run";
         public static final String FLAG_FORMAT = "--format";
-        public static final String OUTPUT_FORMAT_JSON = "json";
-
-        // Legacy flags — not used in v2
         public static final String FLAG_YOLO = "--yolo";
         public static final String FLAG_OUTPUT_JSON = "-o";
         public static final String FLAG_PROMPT = "-p";
-
+        public static final String OUTPUT_FORMAT_JSON = "json";
+        
         // BOB Shell output markers
         public static final String OUTPUT_MARKER = "---output---";
-
+        
         // Environment variables
         public static final String ENV_API_KEY_NAME = "BOB_API_KEY";
-
+        
         // Health check
         public static final String VERSION_FLAG = "--version";
         public static final int VERSION_CHECK_TIMEOUT_SECONDS = 30;
-
-        // JSON field names
-        public static final String JSON_FIELD_RESPONSE = "response";
+        
+        // JSON field names — bob run -f json top-level fields
         public static final String JSON_FIELD_LAST_MESSAGE = "last_message";
         public static final String JSON_FIELD_STATS = "stats";
+        // v2 stats token fields: stats.{input_tokens, output_tokens, total_tokens}
+        public static final String JSON_FIELD_INPUT_TOKENS = "input_tokens";
+        public static final String JSON_FIELD_OUTPUT_TOKENS = "output_tokens";
+        public static final String JSON_FIELD_TOTAL_TOKENS = "total_tokens";
+        // Legacy v1 nested path: stats.models.premium.tokens.{prompt, candidates, total}
         public static final String JSON_FIELD_MODELS = "models";
         public static final String JSON_FIELD_PREMIUM = "premium";
         public static final String JSON_FIELD_TOKENS = "tokens";
         public static final String JSON_FIELD_PROMPT_TOKENS = "prompt";
         public static final String JSON_FIELD_COMPLETION_TOKENS = "candidates";
         public static final String JSON_FIELD_TOKENS_USED = "total";
-
+        
         // Log field names
         public static final String LOG_FIELD_SHELL_PATH = "shell_path";
         public static final String LOG_FIELD_EXIT_CODE = "exit_code";
@@ -123,7 +125,7 @@ public final class LLMConstants {
         public static final String LOG_FIELD_PROMPT_TOKENS = "promptTokens";
         public static final String LOG_FIELD_COMPLETION_TOKENS = "completionTokens";
         public static final String LOG_FIELD_TOTAL_TOKENS = "totalTokens";
-
+        
         // Output truncation
         public static final int OUTPUT_TRUNCATE_LENGTH = 500;
     }
