@@ -45,5 +45,5 @@ public final class JsonParsingConstants {
      * Returns no match if no {@code {}} pair is present.
      */
     public static final Pattern JSON_OBJECT_PATTERN =
-            Pattern.compile("(?:```[^\\n]*\\n)?[^{]*(\\{.*\\})", Pattern.DOTALL);
+            Pattern.compile("(?:```[^\\n]*\\n)?[^{]*(\\{.*})", Pattern.DOTALL);
 }
