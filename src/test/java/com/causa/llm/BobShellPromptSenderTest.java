@@ -605,7 +605,7 @@ class BobShellPromptSenderTest {
         @Test
         @DisplayName("API key env-var name used when injecting credentials into the process")
         void apiKeyEnvVarName() {
-            assertEquals("BOBSHELL_API_KEY", LLMConstants.BobShell.ENV_API_KEY_NAME);
+            assertEquals("BOB_API_KEY", LLMConstants.BobShell.ENV_API_KEY_NAME);
         }
 
         @Test

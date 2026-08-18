@@ -83,28 +83,28 @@ public final class LLMConstants {
         // BOB Shell configuration
         public static final int DEFAULT_TIMEOUT_SECONDS = 180;
 
-        // BOB Shell CLI flags (bob v2: `bob run --format json`)
+        // BOB Shell CLI flags
         public static final String FLAG_ACCEPT_LICENSE = "--accept-license";
         public static final String SUBCMD_RUN = "run";
         public static final String FLAG_FORMAT = "--format";
         public static final String OUTPUT_FORMAT_JSON = "json";
 
-        // Legacy flags kept for reference — not used in v2
+        // Legacy flags — not used in v2
         public static final String FLAG_YOLO = "--yolo";
         public static final String FLAG_OUTPUT_JSON = "-o";
         public static final String FLAG_PROMPT = "-p";
 
-        // BOB Shell output markers (bob run --format json returns a single JSON object)
+        // BOB Shell output markers
         public static final String OUTPUT_MARKER = "---output---";
 
-        // Environment variables — Bob v2 reads BOB_API_KEY
+        // Environment variables
         public static final String ENV_API_KEY_NAME = "BOB_API_KEY";
 
-        // Health check — raised to 30s to tolerate QEMU/slow environments
+        // Health check
         public static final String VERSION_FLAG = "--version";
         public static final int VERSION_CHECK_TIMEOUT_SECONDS = 30;
 
-        // JSON field names — bob run --format json top-level fields
+        // JSON field names
         public static final String JSON_FIELD_RESPONSE = "response";
         public static final String JSON_FIELD_LAST_MESSAGE = "last_message";
         public static final String JSON_FIELD_STATS = "stats";

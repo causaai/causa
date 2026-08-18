@@ -137,11 +137,6 @@ public class BobShellPromptSender implements PromptSender {
     /**
      * Checks if BOB Shell is available by running 'bob --version'.
      *
-     * <p>BOB_API_KEY is injected into the subprocess environment so that
-     * Bob Shell does not block waiting for auth during the version check.
-     * The timeout is intentionally generous (30s) to tolerate slow startup
-     * in emulated (QEMU x86 on ARM) or resource-constrained environments.
-     *
      * @return true if BOB Shell is available and executable
      */
     private boolean checkAvailability() {
@@ -151,7 +146,6 @@ public class BobShellPromptSender implements PromptSender {
                 LLMConstants.BobShell.VERSION_FLAG
             );
 
-            // Inject BOB_API_KEY so the version check does not hang on auth
             String apiKey = appConfig.getLlmConfig().getApiKey().trim();
             if (!apiKey.isBlank()) {
                 pb.environment().put(LLMConstants.BobShell.ENV_API_KEY_NAME, apiKey);
@@ -208,16 +202,9 @@ public class BobShellPromptSender implements PromptSender {
     }
 
     /**
-     * Executes BOB Shell CLI using {@code bob run --format json <prompt>}.
+     * Executes BOB Shell CLI using {@code bob run --format json}.
      *
-     * <p>Bob v2 invocation:
-     * <ul>
-     *   <li>Uses {@code bob run} subcommand </li>
-     *   <li>{@code --format json} produces a single JSON object on stdout</li>
-     *   <li>{@code --disable-mcp} prevents MCP server initialisation overhead</li>
-     *   <li>Prompt is written to stdin — avoids OS ARG_MAX limits on large (50K+) prompts</li>
-     *   <li>{@code BOB_API_KEY} is explicitly set in the subprocess environment</li>
-     * </ul>
+     * <p>Prompt is written to stdin to avoid OS ARG_MAX limits on large prompts.
      */
     private String executeBobShell(String prompt) throws LLMException, InterruptedException {
         try {
@@ -230,9 +217,6 @@ public class BobShellPromptSender implements PromptSender {
                 );
             }
 
-            // bob run --format json (prompt written to stdin)
-            // Prompt is passed via stdin rather than as a positional argument to avoid
-            // OS ARG_MAX limits when the RCA prompt exceeds 50K characters.
             ProcessBuilder pb = new ProcessBuilder(
                 appConfig.getLlmConfig().getBobShellPath(),
                 LLMConstants.BobShell.FLAG_ACCEPT_LICENSE,
@@ -241,17 +225,13 @@ public class BobShellPromptSender implements PromptSender {
                 LLMConstants.BobShell.OUTPUT_FORMAT_JSON
             );
 
-            // Explicitly set BOB_API_KEY in the subprocess environment.
-            // The JVM process env may not carry it (e.g. when config is supplied
-            // via POST /api/v1/configs rather than pod env vars), so we inject it
-            // directly into the ProcessBuilder environment here.
             pb.environment().put(LLMConstants.BobShell.ENV_API_KEY_NAME, apiKey);
 
             pb.redirectErrorStream(true);
 
             Process process = pb.start();
 
-            // Write prompt to stdin and close the stream so bob knows input is complete
+            // Write prompt to stdin
             try (OutputStreamWriter writer = new OutputStreamWriter(
                     process.getOutputStream(), StandardCharsets.UTF_8)) {
                 writer.write(prompt);
