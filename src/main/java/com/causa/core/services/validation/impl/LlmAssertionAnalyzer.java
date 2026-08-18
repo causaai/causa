@@ -114,10 +114,14 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
             String userPrompt = buildAnalysisPrompt(assertion, diagnosticContext, template);
 
             // Call LLM
+            // Skills disabled — the assertion analyzer has all context it needs in
+            // diagnosticContext; activating skills adds unnecessary tool round-trips
+            // (3 per assertion × N assertions) with no benefit for validation.
             LLMRequest request = LLMRequest.builder(userPrompt)
                 .systemPrompt(template.systemPrompt())
                 .temperature(0.2) // Low temperature for consistent analysis
                 .maxTokens(3000)  // Allow detailed analysis
+                .enableSkills(false)
                 .build();
 
             LLMResponse response = promptSender.send(request);
