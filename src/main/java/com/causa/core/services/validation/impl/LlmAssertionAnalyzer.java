@@ -204,12 +204,11 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
      * Parses the LLM analysis response.
      */
     private AnalysisResult parseAnalysisResponse(String responseText) throws Exception {
-        // Extract the first JSON object from the response.
-        // The pattern skips:
-        //   - an optional opening code fence (```<anything>\n)
-        //   - any leading prose before the first '{'
-        //   - an optional closing code fence (```) after the last '}'
-        // Jackson's streaming parser handles '}' inside string values correctly.
+        // Extract the outermost JSON object from the response.
+        // The pattern handles in order:
+        //   1. an optional opening code fence (```<lang>\n) — skipped as a unit
+        //   2. any leading prose before the first '{' — consumed by [^{]*
+        //   3. trailing text after the last '}' (closing fence, prose) — excluded by greedy .*}
         Matcher jsonMatcher = JsonParsingConstants.JSON_OBJECT_PATTERN.matcher(responseText);
         if (!jsonMatcher.find()) {
             throw new IllegalArgumentException("No JSON object found in LLM response");
