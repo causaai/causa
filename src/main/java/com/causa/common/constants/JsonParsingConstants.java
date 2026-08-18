@@ -36,10 +36,14 @@ public final class JsonParsingConstants {
     public static final int CODE_BLOCK_PREFIX_LENGTH = CODE_BLOCK_PREFIX.length();
 
     /**
-     * Skips an optional opening code fence ({@code ```<lang>\n}) and any prose preamble,
-     * then captures from the first {@code {}} to end-of-string (group 1) for Jackson to parse.
-     * Returns no match if no {@code {}} is present.
+     * Extracts the outermost JSON object from an LLM response. Handles three cases in order:
+     * <ol>
+     *   <li>Optional opening code fence ({@code ```<lang>\n}) — skipped as a unit</li>
+     *   <li>Any leading prose preamble before the first {@code {} — skipped by {@code [^{]*}</li>
+     *   <li>Trailing text after the last {@code }} (closing fence, prose) — excluded by greedy {@code .*\}}</li>
+     * </ol>
+     * Returns no match if no {@code {}} pair is present.
      */
     public static final Pattern JSON_OBJECT_PATTERN =
-            Pattern.compile("(?:```[^\\n]*\\n)?[^{]*(\\{.*)", Pattern.DOTALL);
+            Pattern.compile("(?:```[^\\n]*\\n)?[^{]*(\\{.*\\})", Pattern.DOTALL);
 }
