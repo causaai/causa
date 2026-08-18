@@ -1,5 +1,7 @@
 package com.causa.common.constants;
 
+import java.util.regex.Pattern;
+
 /**
  * JSON Parsing Constants
  *
@@ -32,4 +34,12 @@ public final class JsonParsingConstants {
      * Length of generic code block prefix
      */
     public static final int CODE_BLOCK_PREFIX_LENGTH = CODE_BLOCK_PREFIX.length();
+
+    /**
+     * Skips an optional opening code fence ({@code ```<lang>\n}) and any prose preamble,
+     * then captures from the first {@code {}} to end-of-string (group 1) for Jackson to parse.
+     * Returns no match if no {@code {}} is present.
+     */
+    public static final Pattern JSON_OBJECT_PATTERN =
+            Pattern.compile("(?:```[^\\n]*\\n)?[^{]*(\\{.*)", Pattern.DOTALL);
 }

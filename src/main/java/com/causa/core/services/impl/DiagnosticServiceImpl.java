@@ -41,6 +41,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.regex.Matcher;
 
 /**
  * Diagnostic Service Implementation
@@ -374,27 +375,17 @@ public class DiagnosticServiceImpl implements DiagnosticService {
      * @return the parsed RCA
      */
     private RootCauseAnalysis parseRcaResponse(String responseText) throws Exception {
-        String jsonText = responseText.trim();
-
-        // Strip opening code fence — handles ```json, ```JSON, ```json5, ``` etc.
-        // Checking only the ``` prefix means the language tag is irrelevant.
-        if (jsonText.startsWith(JsonParsingConstants.CODE_BLOCK_PREFIX)) {
-            int nl = jsonText.indexOf('\n');
-            if (nl > 0) jsonText = jsonText.substring(nl + 1).trim();
+        // Extract the first JSON object from the response.
+        // The pattern skips:
+        //   - an optional opening code fence (```<anything>\n)
+        //   - any leading prose before the first '{'
+        //   - an optional closing code fence (```) after the last '}'
+        // Jackson's streaming parser handles '}' inside string values correctly.
+        Matcher jsonMatcher = JsonParsingConstants.JSON_OBJECT_PATTERN.matcher(responseText);
+        if (!jsonMatcher.find()) {
+            throw new IllegalArgumentException("No JSON object found in LLM response");
         }
-
-        // Strip closing code fence
-        if (jsonText.endsWith(JsonParsingConstants.CODE_BLOCK_PREFIX)) {
-            jsonText = jsonText.substring(0, jsonText.length() - JsonParsingConstants.CODE_BLOCK_PREFIX_LENGTH).trim();
-        }
-
-        // Skip any leading prose and let Jackson parse from the first '{'.
-        // Using the streaming parser correctly handles '}' inside string values,
-        // unlike a hand-rolled brace counter.
-        int firstBrace = jsonText.indexOf('{');
-        if (firstBrace > 0) {
-            jsonText = jsonText.substring(firstBrace);
-        }
+        String jsonText = jsonMatcher.group(1);
 
         // Parse JSON to RootCauseAnalysis
         RootCauseAnalysis rca = objectMapper.readValue(jsonText, RootCauseAnalysis.class);

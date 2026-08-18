@@ -1,5 +1,6 @@
 package com.causa.core.services.validation.impl;
 
+import com.causa.common.constants.JsonParsingConstants;
 import com.causa.common.constants.LLMConstants;
 import com.causa.common.constants.PromptConstants;
 import com.causa.common.logging.CausaLogger;
@@ -21,6 +22,7 @@ import io.quarkus.arc.properties.IfBuildProperty;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Matcher;
 
 /**
  * LLM-based assertion analyzer.
@@ -198,20 +200,17 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
      * Parses the LLM analysis response.
      */
     private AnalysisResult parseAnalysisResponse(String responseText) throws Exception {
-        // Clean response
-        String jsonText = responseText.trim();
-        if (jsonText.startsWith("```json")) {
-            jsonText = jsonText.substring(7);
-        } else if (jsonText.startsWith("```")) {
-            jsonText = jsonText.substring(3);
+        // Extract the first JSON object from the response.
+        // The pattern skips:
+        //   - an optional opening code fence (```<anything>\n)
+        //   - any leading prose before the first '{'
+        //   - an optional closing code fence (```) after the last '}'
+        // Jackson's streaming parser handles '}' inside string values correctly.
+        Matcher jsonMatcher = JsonParsingConstants.JSON_OBJECT_PATTERN.matcher(responseText);
+        if (!jsonMatcher.find()) {
+            throw new IllegalArgumentException("No JSON object found in LLM response");
         }
-        if (jsonText.endsWith("```")) {
-            jsonText = jsonText.substring(0, jsonText.length() - 3);
-        }
-        jsonText = jsonText.trim();
-
-        // Parse JSON
-        return objectMapper.readValue(jsonText, AnalysisResult.class);
+        return objectMapper.readValue(jsonMatcher.group(1), AnalysisResult.class);
     }
 
     /**
