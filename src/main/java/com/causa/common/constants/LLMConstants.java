@@ -162,6 +162,7 @@ public final class LLMConstants {
 
         public static final String UNSUPPORTED_PROVIDER = "UnsupportedProvider";
         public static final String MISSING_CONFIGURATION = "MissingConfiguration";
+        public static final String INVALID_CONFIGURATION = "InvalidConfiguration";
         public static final String MODEL_NOT_READY = "ModelNotReady";
         public static final String LLM_REQUEST_FAILED = "LLMRequestFailed";
         public static final String INVALID_REQUEST_PARAMETERS = "InvalidRequestParameters";
@@ -206,6 +207,7 @@ public final class LLMConstants {
 
         public static final String API_KEY = "API_KEY";
         public static final String ADC = "ADC";
+        public static final String ADC_JSON = "ADC_JSON";
     }
 
     /**

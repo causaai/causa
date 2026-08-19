@@ -1,0 +1,80 @@
+# High Memory Pressure Rule Set
+#
+# Example of how easy it is to add a new rule set!
+# No code changes needed - just create this YAML file.
+
+hypothesis: HIGH_MEMORY_PRESSURE
+name: "High Memory Pressure Rules"
+description: "Validates high memory pressure conditions without OOM kills"
+
+thresholds:
+  minSupportedScore: 8
+  minPartiallySupportedScore: 4
+
+required:
+  - id: memory_pressure.required.high_usage
+    description: "Memory usage above 80%"
+    weight: 1
+    match:
+      signalType: METRIC
+      signalName: memory.usage.percent
+      condition: GREATER_THAN
+      threshold: 0.80
+    messages:
+      success: "Memory usage above 80%"
+      failure: "Memory usage below threshold"
+
+  - id: memory_pressure.required.sustained
+    description: "High memory sustained for period"
+    weight: 1
+    match:
+      signalType: METRIC
+      signalName: memory.pressure.duration
+      condition: GREATER_THAN
+      threshold: 300  # 5 minutes in seconds
+    messages:
+      success: "Sustained high memory pressure"
+      failure: "Memory pressure not sustained"
+
+supporting:
+  - id: memory_pressure.supporting.swap_usage
+    description: "Swap memory being used"
+    weight: 3
+    match:
+      signalType: METRIC
+      signalName: swap.usage
+      condition: GREATER_THAN
+      threshold: 0
+    messages:
+      success: "Swap memory in use"
+      failure: "No swap usage detected"
+
+  - id: memory_pressure.supporting.page_faults
+    description: "High page fault rate"
+    weight: 2
+    match:
+      signalType: METRIC
+      signalName: page.faults.rate
+      condition: GREATER_THAN
+      threshold: 1000
+    messages:
+      success: "High page fault rate detected"
+      failure: "Normal page fault rate"
+
+exclusion:
+  - id: memory_pressure.exclusion.oom_killed
+    description: "Pod was OOM killed (different hypothesis)"
+    weight: -10
+    match:
+      signalType: CONTAINER_STATUS
+      signalName: terminationReason
+      signalValue: OOMKilled
+      condition: EQUALS
+    messages:
+      success: "Pod was OOM killed"
+      failure: "No OOM kill"
+
+metadata:
+  version: "1.0.0"
+  author: "Causa Team"
+  tags: [memory, pressure, performance]

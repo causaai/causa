@@ -167,6 +167,9 @@ public final class LogMessages {
         public static final String LLM_RESPONSE_RECEIVED        = "LLM response received";
         public static final String RCA_GENERATED_SUCCESS        = "RCA generated successfully";
         public static final String RCA_GENERATION_FAILED        = "RCA generation failed";
+        public static final String RCA_VALIDATION_STARTED       = "RCA validation started";
+
+        public static final String LLM_CONTEXT_BUILT = "LLM context built";
 
         // Exception messages
         public static final String DIAGNOSTIC_PERSIST_FAILED = "Failed to persist diagnostic";
@@ -255,5 +258,77 @@ public final class LogMessages {
         public static final String FS_SKILLS_LOADED        = "External filesystem skills loaded";
         public static final String FS_SKILLS_FAILED        = "Failed to load external skills from filesystem";
         public static final String SKILLS_MERGED           = "Skills merged";
+    }
+
+    /**
+     * Validation pipeline log messages.
+     */
+    public static final class Validation {
+        private Validation() {}
+
+        // YAML Rule Engine
+        public static final String YAML_RULES_INITIALIZING = "Initializing YAML-based rule sets";
+        public static final String YAML_RULES_LOADING = "Loading YAML rule sets";
+        public static final String YAML_RULES_LOADED = "YAML rule sets loaded";
+        public static final String YAML_RULES_INITIALIZED = "YAML rule sets initialized";
+        public static final String YAML_RULE_RELOADING = "Reloading modified rule set";
+        public static final String YAML_RULES_HOT_RELOADED = "Hot-reloaded rule sets";
+        public static final String YAML_RULE_LOAD_FAILED = "Failed to check for rule set modifications";
+
+        // Hypothesis Validation
+        public static final String HYPOTHESIS_VALIDATION_STARTED = "Validating RCA hypothesis with rule-based approach";
+        public static final String HYPOTHESIS_VALIDATION_COMPLETED = "Rule-based hypothesis validation completed";
+        public static final String HYPOTHESIS_VALIDATION_FAILED = "Rule-based hypothesis validation failed";
+        public static final String HYPOTHESIS_IDENTIFIED = "Hypothesis identified";
+        public static final String SIGNALS_EXTRACTED = "Signals extracted from diagnostic context";
+        public static final String NO_RULESET_AVAILABLE = "No rule set available for hypothesis";
+        public static final String YAML_RULESET_LOADED = "Loaded YAML-based rule set";
+        public static final String NO_RULESET_FOUND = "No rule set found for hypothesis - check YAML configuration";
+
+        // Validation API
+        public static final String VALIDATION_DETAIL_REQUESTED = "Validation detail request received";
+        public static final String VALIDATION_DETAIL_RETRIEVED = "Validation detail retrieved";
+        public static final String VALIDATION_REQUEST_MISSING_ID = "Validation request missing diagnosticId parameter";
+        public static final String VALIDATION_DATA_UNAVAILABLE = "Validation data not available for diagnostic";
+        public static final String VALIDATION_DATA_PARSE_FAILED = "Failed to parse validation data";
+        public static final String DIAGNOSTIC_NOT_FOUND = "Diagnostic not found";
+    }
+
+    /**
+     * Common log field names.
+     */
+    public static final class Fields {
+        private Fields() {}
+
+        // Common
+        public static final String DIAGNOSTIC_ID = "diagnosticId";
+        public static final String ALERT_ID = "alertId";
+        public static final String STATUS = "status";
+        public static final String EXCEPTION = "exception";
+
+        // Validation
+        public static final String HYPOTHESIS = "hypothesis";
+        public static final String ANOMALY_TYPE = "anomalyType";
+        public static final String ISSUE_TITLE = "issueTitle";
+        public static final String SIGNAL_COUNT = "signalCount";
+        public static final String CONFIDENCE = "confidence";
+        public static final String SCORE = "score";
+        public static final String REQUIRED_PASSED = "requiredPassed";
+        public static final String REQUIRED_TOTAL = "requiredTotal";
+        public static final String SUPPORTING_MATCHED = "supportingMatched";
+        public static final String EXCLUSION_MATCHED = "exclusionMatched";
+        public static final String FINAL_STATUS = "finalStatus";
+
+        // YAML Rules
+        public static final String HOT_RELOAD_ENABLED = "hotReloadEnabled";
+        public static final String TOTAL_RULE_SETS = "totalRuleSets";
+        public static final String LOADED_RULE_SETS = "loadedRuleSets";
+        public static final String HYPOTHESES = "hypotheses";
+        public static final String FILE = "file";
+        public static final String COUNT = "count";
+        public static final String SOURCE = "source";
+        public static final String CLASSPATH_DIR = "classpathDir";
+        public static final String EXTERNAL_DIR = "externalDir";
+        public static final String EXPECTED_LOCATION = "expectedLocation";
     }
 }

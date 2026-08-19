@@ -18,6 +18,9 @@ public final class PromptConstants {
      */
     public static final String TEMPLATE_PATH_RCA = "/prompts/rca-prompt-template.yml";
 
+    public static final String TEMPLATE_PATH_ASSERTION_EXTRACTION = "/prompts/assertion-extraction-prompt-template.yml";
+    public static final String TEMPLATE_PATH_ASSERTION_ANALYSIS = "/prompts/assertion-analysis-prompt-template.yml";
+
     /**
      * YAML template keys
      */
@@ -27,7 +30,15 @@ public final class PromptConstants {
     public static final String KEY_VERSION = "version";
     public static final String KEY_DESCRIPTION = "description";
     public static final String KEY_PROMPTS = "prompts";
+    public static final String KEY_PROVIDERS = "providers";
     public static final String KEY_MODELS = "models";
+
+    // Verification guidance keys
+    public static final String KEY_VERIFICATION_OBSERVATION = "verification_observation";
+    public static final String KEY_VERIFICATION_TREND = "verification_trend";
+    public static final String KEY_VERIFICATION_CAUSALITY = "verification_causality";
+    public static final String KEY_VERIFICATION_CONFIGURATION = "verification_configuration";
+    public static final String KEY_VERIFICATION_RECOMMENDATION = "verification_recommendation";
 
     /**
      * Default model type fallback - uses the same value as LLMConstants.Provider.VERTEX_AI_ANTHROPIC
@@ -42,4 +53,14 @@ public final class PromptConstants {
      * Template placeholder strings
      */
     public static final String PLACEHOLDER_CONTEXT = "{{context}}";
+
+    public static final String PLACEHOLDER_SOURCE = "{{source}}";
+    public static final String PLACEHOLDER_RCA_TEXT = "{{rca_text}}";
+
+    // Assertion analysis placeholders
+    public static final String PLACEHOLDER_ASSERTION_TEXT = "{{assertion_text}}";
+    public static final String PLACEHOLDER_ASSERTION_TYPE = "{{assertion_type}}";
+    public static final String PLACEHOLDER_ASSERTION_SOURCE = "{{assertion_source}}";
+    public static final String PLACEHOLDER_VERIFICATION_GUIDANCE = "{{verification_guidance}}";
+    public static final String PLACEHOLDER_DIAGNOSTIC_CONTEXT = "{{diagnostic_context}}";
 }
