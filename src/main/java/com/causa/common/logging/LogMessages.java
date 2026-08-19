@@ -52,7 +52,7 @@ public final class LogMessages {
         public static final String BOB_SHELL_AVAILABLE = "BOB Shell is available and ready";
         public static final String BOB_SHELL_NOT_AVAILABLE = "BOB Shell is not available";
         public static final String BOB_SHELL_FAILED = "BOB Shell failed";
-        public static final String BOB_OUTPUT_MARKERS_NOT_FOUND = "Could not find ---output--- markers in BOB Shell response";
+        public static final String BOB_JSON_PARSE_FAILED = "Failed to parse JSON response from BOB Shell";
         public static final String BOB_EXTRACTED_TOKEN_USAGE = "Extracted token usage from BOB Shell";
         public static final String BOB_STATS_FIELD_NOT_FOUND = "Stats field not found in BOB Shell output";
         public static final String BOB_STATS_BLOCK_NOT_FOUND = "Could not find statistics block in BOB Shell output";

@@ -16,6 +16,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -44,7 +46,7 @@ public class BobShellPromptSender implements PromptSender {
 
     public BobShellPromptSender(AppConfig appConfig) {
         this.appConfig = appConfig;
-        if (appConfig.getLlmConfig().getApiKey().isBlank()) {
+        if (resolveApiKey().isBlank()) {
             log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
                 .field(LLMConstants.ConfigKeys.MISSING_CONFIG, LLMConstants.ConfigKeys.LLM_API_KEY)
                 .log();
@@ -140,12 +142,7 @@ public class BobShellPromptSender implements PromptSender {
     private boolean checkAvailability() {
         try {
             ProcessBuilder pb = new ProcessBuilder(appConfig.getLlmConfig().getBobShellPath(), LLMConstants.BobShell.VERSION_FLAG);
-
-            String apiKey = appConfig.getLlmConfig().getApiKey().trim();
-            if (!apiKey.isBlank()) {
-                pb.environment().put(LLMConstants.BobShell.ENV_API_KEY_NAME, apiKey);
-            }
-
+            pb.environment().putAll(buildSubprocessEnv(resolveApiKey()));
             Process process = pb.start();
             boolean completed = process.waitFor(
                 LLMConstants.BobShell.VERSION_CHECK_TIMEOUT_SECONDS,
@@ -211,7 +208,7 @@ public class BobShellPromptSender implements PromptSender {
     private String executeBobShell(String prompt) throws LLMException, InterruptedException {
         try {
             // Fail fast — there is no point spawning a process without a valid API key
-            String apiKey = appConfig.getLlmConfig().getApiKey().trim();
+            String apiKey = resolveApiKey();
             if (apiKey.isBlank()) {
                 throw new LLMException(
                     LLMConstants.ErrorMessages.API_KEY_REQUIRED + LLMConstants.Provider.IBM_BOB,
@@ -228,7 +225,7 @@ public class BobShellPromptSender implements PromptSender {
                 LLMConstants.BobShell.OUTPUT_FORMAT_JSON
             );
 
-            pb.environment().put(LLMConstants.BobShell.ENV_API_KEY_NAME, apiKey);
+            pb.environment().putAll(buildSubprocessEnv(apiKey));
             
             pb.redirectErrorStream(true);
             
@@ -308,7 +305,7 @@ public class BobShellPromptSender implements PromptSender {
      * }
      * </pre>
      */
-    private String extractContent(String bobOutput) {
+    String extractContent(String bobOutput) {
         try {
             JsonNode root = objectMapper.readTree(bobOutput.trim());
             JsonNode lastMessage = root.path(LLMConstants.BobShell.JSON_FIELD_LAST_MESSAGE);
@@ -316,11 +313,11 @@ public class BobShellPromptSender implements PromptSender {
                 return lastMessage.asText().trim();
             }
         } catch (Exception e) {
-            log.warn(LogMessages.LLM.BOB_OUTPUT_MARKERS_NOT_FOUND).log();
+            log.warn(LogMessages.LLM.BOB_JSON_PARSE_FAILED).log();
         }
 
-        // Fallback: return full output if JSON parsing fails
-        log.warn(LogMessages.LLM.BOB_OUTPUT_MARKERS_NOT_FOUND).log();
+        // Fallback: return full output if last_message field is absent or JSON is invalid
+        log.warn(LogMessages.LLM.BOB_JSON_PARSE_FAILED).log();
         return bobOutput;
     }
 
@@ -330,7 +327,7 @@ public class BobShellPromptSender implements PromptSender {
      * <p>Token counts are read from {@code stats.input_tokens},
      * {@code stats.output_tokens}, and {@code stats.total_tokens}.
      */
-    private TokenUsage extractTokenUsage(String bobOutput) {
+    TokenUsage extractTokenUsage(String bobOutput) {
         try {
             JsonNode root = objectMapper.readTree(bobOutput.trim());
             JsonNode stats = root.path(LLMConstants.BobShell.JSON_FIELD_STATS);
@@ -358,9 +355,30 @@ public class BobShellPromptSender implements PromptSender {
     }
 
     /**
+     * Returns the API key, trimmed, never null.
+     * Treats a null key (misconfigured provider) the same as blank.
+     */
+    private String resolveApiKey() {
+        String key = appConfig.getLlmConfig().getApiKey();
+        return key != null ? key.trim() : "";
+    }
+
+    /**
+     * Builds the subprocess environment map with BOB_API_KEY injected when non-blank.
+     * Kept package-private so tests can verify injection behaviour directly.
+     */
+    static Map<String, String> buildSubprocessEnv(String apiKey) {
+        Map<String, String> env = new HashMap<>();
+        if (apiKey != null && !apiKey.isBlank()) {
+            env.put(LLMConstants.BobShell.ENV_API_KEY_NAME, apiKey);
+        }
+        return env;
+    }
+
+    /**
      * Token usage data class.
      */
-    private static class TokenUsage {
+    static class TokenUsage {
         final long promptTokens;
         final long completionTokens;
         final long totalTokens;

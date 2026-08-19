@@ -10,8 +10,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -305,10 +309,18 @@ class BobShellPromptSenderTest {
     @DisplayName("Response Parsing Tests")
     class ResponseParsingTests {
 
+        private BobShellPromptSender sender;
+
+        @BeforeEach
+        void setUp() {
+            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
+            when(llmConfigSnapshot.getApiKey()).thenReturn("test-key");
+            sender = new BobShellPromptSender(appConfig);
+        }
+
         @Test
-        @DisplayName("Should parse valid BOB Shell v2 JSON output")
-        void shouldParseValidBobShellOutput() {
-            // Given — mirrors bob run -f json output
+        @DisplayName("Should extract last_message from valid v2 JSON output")
+        void shouldExtractLastMessageFromV2Json() {
             String bobOutput = """
                 {
                   "type": "result",
@@ -318,33 +330,31 @@ class BobShellPromptSenderTest {
                 }
                 """;
 
-            assertTrue(bobOutput.contains(LLMConstants.BobShell.JSON_FIELD_LAST_MESSAGE));
-            assertTrue(bobOutput.contains(LLMConstants.BobShell.JSON_FIELD_STATS));
+            assertEquals("The answer is 4", sender.extractContent(bobOutput));
         }
 
         @Test
-        @DisplayName("Should handle output without statistics")
-        void shouldHandleOutputWithoutStatistics() {
-            // Given — minimal valid v2 JSON
-            String bobOutput = """
-                {
-                  "type": "result",
-                  "status": "success",
-                  "last_message": "The answer is 4"
-                }
-                """;
+        @DisplayName("Should trim whitespace around last_message value")
+        void shouldTrimWhitespaceAroundLastMessage() {
+            String bobOutput = "{\"last_message\": \"  answer with spaces  \"}";
 
-            assertTrue(bobOutput.contains(LLMConstants.BobShell.JSON_FIELD_LAST_MESSAGE));
-            assertFalse(bobOutput.contains(LLMConstants.BobShell.JSON_FIELD_STATS));
+            assertEquals("answer with spaces", sender.extractContent(bobOutput));
         }
 
         @Test
-        @DisplayName("Should extract content from last_message field")
-        void shouldExtractContentFromLastMessage() {
-            String expectedContent = "The answer is 4";
-            String bobOutput = "{\"last_message\": \"" + expectedContent + "\"}";
+        @DisplayName("Should fall back to raw output when last_message is missing")
+        void shouldFallbackToRawOutputWhenLastMessageMissing() {
+            String bobOutput = "{\"type\": \"result\", \"stats\": {\"input_tokens\": 5}}";
 
-            assertTrue(bobOutput.contains(expectedContent));
+            assertEquals(bobOutput, sender.extractContent(bobOutput));
+        }
+
+        @Test
+        @DisplayName("Should return raw output for malformed JSON")
+        void shouldReturnRawOutputForMalformedJson() {
+            String malformedOutput = "this is not valid JSON";
+
+            assertEquals(malformedOutput, sender.extractContent(malformedOutput));
         }
     }
 
@@ -352,14 +362,21 @@ class BobShellPromptSenderTest {
     @DisplayName("Token Extraction Tests")
     class TokenExtractionTests {
 
+        private BobShellPromptSender sender;
+
+        @BeforeEach
+        void setUp() {
+            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
+            when(llmConfigSnapshot.getApiKey()).thenReturn("test-key");
+            sender = new BobShellPromptSender(appConfig);
+        }
+
         @Test
-        @DisplayName("Should extract token usage from v2 stats block")
+        @DisplayName("Should extract token counts from v2 stats block")
         void shouldExtractTokenUsageFromValidStats() {
-            // Given — mirrors bob run -f json stats structure
-            String statsJson = """
+            String bobOutput = """
                 {
                   "type": "result",
-                  "status": "success",
                   "last_message": "OK",
                   "stats": {
                     "input_tokens": 15,
@@ -369,26 +386,79 @@ class BobShellPromptSenderTest {
                 }
                 """;
 
-            assertTrue(statsJson.contains(LLMConstants.BobShell.JSON_FIELD_STATS));
-            assertTrue(statsJson.contains(LLMConstants.BobShell.JSON_FIELD_INPUT_TOKENS));
-            assertTrue(statsJson.contains(LLMConstants.BobShell.JSON_FIELD_OUTPUT_TOKENS));
-            assertTrue(statsJson.contains(LLMConstants.BobShell.JSON_FIELD_TOTAL_TOKENS));
+            BobShellPromptSender.TokenUsage usage = sender.extractTokenUsage(bobOutput);
+
+            assertEquals(15, usage.promptTokens);
+            assertEquals(8,  usage.completionTokens);
+            assertEquals(23, usage.totalTokens);
         }
 
         @Test
-        @DisplayName("Should handle missing stats field")
-        void shouldHandleMissingStatsField() {
-            String statsJson = "{\"last_message\": \"OK\"}";
+        @DisplayName("Should return zero token usage when stats block is missing")
+        void shouldReturnZeroUsageWhenStatsMissing() {
+            String bobOutput = "{\"last_message\": \"OK\"}";
 
-            assertFalse(statsJson.contains(LLMConstants.BobShell.JSON_FIELD_STATS));
+            BobShellPromptSender.TokenUsage usage = sender.extractTokenUsage(bobOutput);
+
+            assertEquals(0, usage.promptTokens);
+            assertEquals(0, usage.completionTokens);
+            assertEquals(0, usage.totalTokens);
         }
 
         @Test
-        @DisplayName("Should handle malformed JSON gracefully")
-        void shouldHandleMalformedJsonGracefully() {
-            String malformedJson = "{ invalid json }";
+        @DisplayName("Should default missing stats fields to zero")
+        void shouldDefaultMissingStatsFieldsToZero() {
+            String bobOutput = "{\"stats\": {\"input_tokens\": 5}}";
 
-            assertNotNull(malformedJson);
+            BobShellPromptSender.TokenUsage usage = sender.extractTokenUsage(bobOutput);
+
+            assertEquals(5, usage.promptTokens);
+            assertEquals(0, usage.completionTokens);
+            assertEquals(0, usage.totalTokens);
+        }
+
+        @Test
+        @DisplayName("Should return zero token usage for malformed JSON")
+        void shouldReturnZeroUsageForMalformedJson() {
+            String malformedJson = "{ \"stats\": { \"input_tokens\": 10, ";
+
+            BobShellPromptSender.TokenUsage usage = sender.extractTokenUsage(malformedJson);
+
+            assertEquals(0, usage.promptTokens);
+            assertEquals(0, usage.completionTokens);
+            assertEquals(0, usage.totalTokens);
+        }
+    }
+
+    @Nested
+    @DisplayName("API Key Injection Tests")
+    class ApiKeyInjectionTests {
+
+        @ParameterizedTest
+        @ValueSource(strings = {"my-api-key", "  key-with-spaces  "})
+        @DisplayName("Should inject BOB_API_KEY when apiKey is non-blank")
+        void shouldInjectApiKeyWhenNonBlank(String apiKey) {
+            Map<String, String> env = BobShellPromptSender.buildSubprocessEnv(apiKey);
+
+            assertTrue(env.containsKey(LLMConstants.BobShell.ENV_API_KEY_NAME));
+            assertEquals(apiKey, env.get(LLMConstants.BobShell.ENV_API_KEY_NAME));
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"", " ", "   "})
+        @DisplayName("Should omit BOB_API_KEY when apiKey is blank")
+        void shouldOmitApiKeyWhenBlank(String apiKey) {
+            Map<String, String> env = BobShellPromptSender.buildSubprocessEnv(apiKey);
+
+            assertFalse(env.containsKey(LLMConstants.BobShell.ENV_API_KEY_NAME));
+        }
+
+        @Test
+        @DisplayName("Should omit BOB_API_KEY when apiKey is null")
+        void shouldOmitApiKeyWhenNull() {
+            Map<String, String> env = BobShellPromptSender.buildSubprocessEnv(null);
+
+            assertFalse(env.containsKey(LLMConstants.BobShell.ENV_API_KEY_NAME));
         }
     }
 
