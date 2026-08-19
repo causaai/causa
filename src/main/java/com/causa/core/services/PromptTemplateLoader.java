@@ -1,19 +1,17 @@
 package com.causa.core.services;
 
-import java.io.InputStream;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
-import org.yaml.snakeyaml.Yaml;
-
 import com.causa.common.constants.LLMConstants;
 import com.causa.common.constants.PromptConstants;
 import com.causa.common.logging.CausaLogger;
 import com.causa.config.RcaConfig;
-
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.yaml.snakeyaml.Yaml;
+
+import java.io.InputStream;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @ApplicationScoped
 public class PromptTemplateLoader {

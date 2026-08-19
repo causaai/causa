@@ -17,7 +17,6 @@ public final class PromptConstants {
      * Template file paths
      */
     public static final String TEMPLATE_PATH_RCA = "/prompts/rca-prompt-template.yml";
-
     public static final String TEMPLATE_PATH_ASSERTION_EXTRACTION = "/prompts/assertion-extraction-prompt-template.yml";
     public static final String TEMPLATE_PATH_ASSERTION_ANALYSIS = "/prompts/assertion-analysis-prompt-template.yml";
 
