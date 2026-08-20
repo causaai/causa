@@ -21,6 +21,9 @@ import io.quarkus.arc.properties.IfBuildProperty;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * LLM-based assertion analyzer.
@@ -43,10 +46,13 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
 
     private static final CausaLogger log = CausaLogger.getLogger(LlmAssertionAnalyzer.class);
 
+    private static final int PARALLEL_THREADS = 5;
+
     private final PromptSender promptSender;
     private final ObjectMapper objectMapper;
     private final PromptTemplateLoader promptTemplateLoader;
     private final String provider;
+    private final ExecutorService executorService;
 
     @Inject
     public LlmAssertionAnalyzer(
@@ -58,6 +64,7 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
         this.objectMapper = objectMapper;
         this.promptTemplateLoader = new PromptTemplateLoader(PromptConstants.TEMPLATE_PATH_ASSERTION_ANALYSIS);
         this.provider = determineProvider(appConfig.getLlmConfig());
+        this.executorService = Executors.newFixedThreadPool(PARALLEL_THREADS);
     }
 
     /**
@@ -154,16 +161,19 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
         List<Assertion> assertions,
         String diagnosticContext
     ) {
-        log.info("Analyzing all assertions with LLM")
+        log.info("Analyzing all assertions with LLM in parallel")
             .field("totalAssertions", assertions.size())
+            .field("parallelThreads", PARALLEL_THREADS)
             .log();
 
-        List<ValidationResult> results = new ArrayList<>();
+        List<CompletableFuture<ValidationResult>> futures = assertions.stream()
+            .map(assertion -> CompletableFuture.supplyAsync(
+                () -> analyze(assertion, diagnosticContext), executorService))
+            .toList();
 
-        for (Assertion assertion : assertions) {
-            ValidationResult result = analyze(assertion, diagnosticContext);
-            results.add(result);
-        }
+        List<ValidationResult> results = futures.stream()
+            .map(CompletableFuture::join)
+            .toList();
 
         log.info("Batch analysis completed")
             .field("totalAssertions", assertions.size())
@@ -195,11 +205,12 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
     }
 
     /**
-     * Parses the LLM analysis response.
+     * Parses the LLM analysis response, extracting JSON even if surrounded by text.
      */
     private AnalysisResult parseAnalysisResponse(String responseText) throws Exception {
-        // Clean response
         String jsonText = responseText.trim();
+
+        // Strip markdown code fences
         if (jsonText.startsWith("```json")) {
             jsonText = jsonText.substring(7);
         } else if (jsonText.startsWith("```")) {
@@ -210,7 +221,15 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
         }
         jsonText = jsonText.trim();
 
-        // Parse JSON
+        // If it doesn't start with '{', try to extract JSON object from the text
+        if (!jsonText.startsWith("{")) {
+            int start = jsonText.indexOf('{');
+            int end = jsonText.lastIndexOf('}');
+            if (start >= 0 && end > start) {
+                jsonText = jsonText.substring(start, end + 1);
+            }
+        }
+
         return objectMapper.readValue(jsonText, AnalysisResult.class);
     }
 

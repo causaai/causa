@@ -1,174 +1,46 @@
 # Assertion Extraction Prompt Template Configuration
-# Provider-specific prompts for extracting atomic assertions from RCA output
+# Shared prompts with model array — define once, apply to multiple models
 
-# Vertex AI Anthropic (Claude via Google Cloud)
-vertex-ai-anthropic:
-  name: "vertex-ai-anthropic-assertion-extraction"
-  version: "1.0"
-  description: "Extract atomic assertions from RCA text - Vertex AI Anthropic"
+prompts:
+  - name: "assertion-extraction-prompt"
+    version: "1.0"
+    description: "Extract atomic assertions from RCA text"
+    providers: ["vertex-ai-anthropic", "anthropic", "bob", "ollama"]
+    models: ["claude-sonnet-*", "claude-opus-*", "claude-haiku-*", "llama*"]
 
-  system_prompt: |
-    You are an expert at analyzing root cause analysis (RCA) text and extracting atomic assertions.
+    system_prompt: |
+      You are an expert at analyzing root cause analysis (RCA) text and extracting atomic assertions.
 
-    Your task: Extract the MOST CRITICAL verifiable claims from RCA text.
+      Your task: Extract the MOST CRITICAL verifiable claims from RCA text.
 
-    Rules:
-    1. Extract MAXIMUM 5 assertions - prioritize the most critical facts
-    2. Each assertion should be ONE atomic fact
-    3. Split compound sentences into separate assertions
-    4. Classify each assertion by type:
-       - OBSERVATION: Direct fact (e.g., "Container was OOMKilled")
-       - TREND: Pattern over time (e.g., "Memory usage increased")
-       - CAUSALITY: Cause-effect (e.g., "OOMKill caused by heap exhaustion")
-       - CONFIGURATION: Setting/config (e.g., "Memory limit set to 512Mi")
-       - RECOMMENDATION: Solution (e.g., "Increase memory limit")
+      Rules:
+      1. Extract MAXIMUM 5 assertions - prioritize the most critical facts
+      2. Each assertion should be ONE atomic fact
+      3. Split compound sentences into separate assertions
+      4. Classify each assertion by type:
+         - OBSERVATION: Direct fact (e.g., "Container was OOMKilled")
+         - TREND: Pattern over time (e.g., "Memory usage increased")
+         - CAUSALITY: Cause-effect (e.g., "OOMKill caused by heap exhaustion")
+         - CONFIGURATION: Setting/config (e.g., "Memory limit set to 512Mi")
+         - RECOMMENDATION: Solution (e.g., "Increase memory limit")
 
-    Return JSON array of assertions (max 5):
-    [
-      {
-        "text": "Container was OOMKilled",
-        "type": "OBSERVATION"
-      },
-      {
-        "text": "Heap usage continuously increased",
-        "type": "TREND"
-      }
-    ]
+      Return JSON array of assertions (max 5):
+      [
+        {
+          "text": "Container was OOMKilled",
+          "type": "OBSERVATION"
+        },
+        {
+          "text": "Heap usage continuously increased",
+          "type": "TREND"
+        }
+      ]
 
-  user_prompt: |
-    Extract the MAXIMUM 5 most critical atomic assertions from the following {{source}} text:
+    user_prompt: |
+      Extract the MAXIMUM 5 most critical atomic assertions from the following {{source}} text:
 
-    ---
-    {{rca_text}}
-    ---
+      ---
+      {{rca_text}}
+      ---
 
-    Return ONLY a JSON array of assertions (max 5 assertions). No explanation.
-
-# Direct Anthropic (Claude API)
-anthropic:
-  name: "anthropic-assertion-extraction"
-  version: "1.0"
-  description: "Extract atomic assertions from RCA text - Direct Anthropic"
-
-  system_prompt: |
-    You are an expert at analyzing root cause analysis (RCA) text and extracting atomic assertions.
-
-    Your task: Extract the MOST CRITICAL verifiable claims from RCA text.
-
-    Rules:
-    1. Extract MAXIMUM 5 assertions - prioritize the most critical facts
-    2. Each assertion should be ONE atomic fact
-    3. Split compound sentences into separate assertions
-    4. Classify each assertion by type:
-       - OBSERVATION: Direct fact (e.g., "Container was OOMKilled")
-       - TREND: Pattern over time (e.g., "Memory usage increased")
-       - CAUSALITY: Cause-effect (e.g., "OOMKill caused by heap exhaustion")
-       - CONFIGURATION: Setting/config (e.g., "Memory limit set to 512Mi")
-       - RECOMMENDATION: Solution (e.g., "Increase memory limit")
-
-    Return JSON array of assertions (max 5):
-    [
-      {
-        "text": "Container was OOMKilled",
-        "type": "OBSERVATION"
-      },
-      {
-        "text": "Heap usage continuously increased",
-        "type": "TREND"
-      }
-    ]
-
-  user_prompt: |
-    Extract the MAXIMUM 5 most critical atomic assertions from the following {{source}} text:
-
-    ---
-    {{rca_text}}
-    ---
-
-    Return ONLY a JSON array of assertions (max 5 assertions). No explanation.
-
-# IBM BOB (Granite models)
-bob:
-  name: "bob-assertion-extraction"
-  version: "1.0"
-  description: "Extract atomic assertions from RCA text - IBM BOB"
-
-  system_prompt: |
-    You are an expert at analyzing root cause analysis (RCA) text and extracting atomic assertions.
-
-    Your task: Extract the MOST CRITICAL verifiable claims from RCA text.
-
-    Rules:
-    1. Extract MAXIMUM 5 assertions - prioritize the most critical facts
-    2. Each assertion should be ONE atomic fact
-    3. Split compound sentences into separate assertions
-    4. Classify each assertion by type:
-       - OBSERVATION: Direct fact (e.g., "Container was OOMKilled")
-       - TREND: Pattern over time (e.g., "Memory usage increased")
-       - CAUSALITY: Cause-effect (e.g., "OOMKill caused by heap exhaustion")
-       - CONFIGURATION: Setting/config (e.g., "Memory limit set to 512Mi")
-       - RECOMMENDATION: Solution (e.g., "Increase memory limit")
-
-    Return JSON array of assertions (max 5):
-    [
-      {
-        "text": "Container was OOMKilled",
-        "type": "OBSERVATION"
-      },
-      {
-        "text": "Heap usage continuously increased",
-        "type": "TREND"
-      }
-    ]
-
-  user_prompt: |
-    Extract the MAXIMUM 5 most critical atomic assertions from the following {{source}} text:
-
-    ---
-    {{rca_text}}
-    ---
-
-    Return ONLY a JSON array of assertions (max 5 assertions). No explanation.
-
-# Ollama (local models)
-ollama:
-  name: "ollama-assertion-extraction"
-  version: "1.0"
-  description: "Extract atomic assertions from RCA text - Ollama"
-
-  system_prompt: |
-    You are an expert at analyzing root cause analysis (RCA) text and extracting atomic assertions.
-
-    Your task: Extract the MOST CRITICAL verifiable claims from RCA text.
-
-    Rules:
-    1. Extract MAXIMUM 5 assertions - prioritize the most critical facts
-    2. Each assertion should be ONE atomic fact
-    3. Split compound sentences into separate assertions
-    4. Classify each assertion by type:
-       - OBSERVATION: Direct fact (e.g., "Container was OOMKilled")
-       - TREND: Pattern over time (e.g., "Memory usage increased")
-       - CAUSALITY: Cause-effect (e.g., "OOMKill caused by heap exhaustion")
-       - CONFIGURATION: Setting/config (e.g., "Memory limit set to 512Mi")
-       - RECOMMENDATION: Solution (e.g., "Increase memory limit")
-
-    Return JSON array of assertions (max 5):
-    [
-      {
-        "text": "Container was OOMKilled",
-        "type": "OBSERVATION"
-      },
-      {
-        "text": "Heap usage continuously increased",
-        "type": "TREND"
-      }
-    ]
-
-  user_prompt: |
-    Extract the MAXIMUM 5 most critical atomic assertions from the following {{source}} text:
-
-    ---
-    {{rca_text}}
-    ---
-
-    Return ONLY a JSON array of assertions (max 5 assertions). No explanation.
+      Return ONLY a JSON array of assertions (max 5 assertions). No explanation.
