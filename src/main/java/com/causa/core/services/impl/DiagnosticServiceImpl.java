@@ -41,6 +41,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.regex.Matcher;
 
 /**
  * Diagnostic Service Implementation
@@ -364,31 +365,26 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     /**
      * Parses the LLM JSON response into a RootCauseAnalysis object.
      *
-     * <p>Handles markdown code blocks case-insensitively (```json, ```JSON, ```json5, etc.)
-     * by removing entire first line if it starts with backticks.
+     * <p>Strips any opening code fence (```json, ```JSON, ```json5, ``` etc.) by
+     * skipping the entire first line if it starts with triple backticks — the language
+     * tag is ignored, so all variants are handled uniformly.
+     * Also tolerates prose preamble emitted by the LLM after tool calls by
+     * extracting only the outermost { ... } block.
      *
      * @param responseText the LLM response text (should be JSON)
      * @return the parsed RCA
      */
     private RootCauseAnalysis parseRcaResponse(String responseText) throws Exception {
-        // Clean the response - remove markdown code blocks if present
-        String jsonText = responseText.trim();
-
-        // Handle opening code block case-insensitively
-        if (jsonText.startsWith(JsonParsingConstants.CODE_BLOCK_PREFIX)) {
-            // Remove entire first line (handles ```json, ```JSON, ```json5, etc.)
-            int firstNewline = jsonText.indexOf('\n');
-            if (firstNewline > 0) {
-                jsonText = jsonText.substring(firstNewline + 1);
-            }
+        // Extract the outermost JSON object from the response.
+        // The pattern handles in order:
+        //   1. an optional opening code fence (```<lang>\n) — skipped as a unit
+        //   2. any leading prose before the first '{' — consumed by [^{]*
+        //   3. trailing text after the last '}' (closing fence, prose) — excluded by greedy .*}
+        Matcher jsonMatcher = JsonParsingConstants.JSON_OBJECT_PATTERN.matcher(responseText);
+        if (!jsonMatcher.find()) {
+            throw new IllegalArgumentException("No JSON object found in LLM response");
         }
-
-        // Handle closing code block
-        if (jsonText.endsWith(JsonParsingConstants.CODE_BLOCK_PREFIX)) {
-            jsonText = jsonText.substring(0, jsonText.length() - JsonParsingConstants.CODE_BLOCK_PREFIX_LENGTH);
-        }
-
-        jsonText = jsonText.trim();
+        String jsonText = jsonMatcher.group(1);
 
         // Parse JSON to RootCauseAnalysis
         RootCauseAnalysis rca = objectMapper.readValue(jsonText, RootCauseAnalysis.class);

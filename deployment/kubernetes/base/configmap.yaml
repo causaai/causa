@@ -31,7 +31,7 @@ data:
   LLM_TEMPERATURE: "0.1"
   LLM_MAX_TOKENS: "8192"
   # Set to "false" to disable skills globally
-  LLM_SKILLS_ENABLED: "false"
+  LLM_SKILLS_ENABLED: "true"
   # Optional: path to a directory of user-provided skills (each subdirectory must contain a SKILL.md).
   # External skills are merged on top of bundled ones; external wins on name collision.
   # Mount user skill ConfigMaps under this path, one subdirectory per skill.

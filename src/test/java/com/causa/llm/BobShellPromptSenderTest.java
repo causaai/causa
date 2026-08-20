@@ -10,8 +10,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -305,52 +309,52 @@ class BobShellPromptSenderTest {
     @DisplayName("Response Parsing Tests")
     class ResponseParsingTests {
 
-        @Test
-        @DisplayName("Should parse valid BOB Shell output")
-        void shouldParseValidBobShellOutput() {
-            // Given
-            String bobOutput = """
-                ---output---
-                {"response": "The answer is 4"}
-                ---output---
-                {"stats": {"promptTokens": 10, "completionTokens": 5, "tokensUsed": 15}}
-                """;
+        private BobShellPromptSender sender;
 
-            // This test verifies the output format BOB Shell is expected to produce
-            assertTrue(bobOutput.contains(LLMConstants.BobShell.OUTPUT_MARKER));
-            assertTrue(bobOutput.contains("promptTokens"));
-            assertTrue(bobOutput.contains("completionTokens"));
-            assertTrue(bobOutput.contains("tokensUsed"));
+        @BeforeEach
+        void setUp() {
+            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
+            when(llmConfigSnapshot.getApiKey()).thenReturn("test-key");
+            sender = new BobShellPromptSender(appConfig);
         }
 
         @Test
-        @DisplayName("Should handle output without statistics")
-        void shouldHandleOutputWithoutStatistics() {
-            // Given
+        @DisplayName("Should extract last_message from valid v2 JSON output")
+        void shouldExtractLastMessageFromV2Json() {
             String bobOutput = """
-                ---output---
-                {"response": "The answer is 4"}
-                ---output---
+                {
+                  "type": "result",
+                  "status": "success",
+                  "last_message": "The answer is 4",
+                  "stats": { "input_tokens": 10, "output_tokens": 5, "total_tokens": 15 }
+                }
                 """;
 
-            // This test verifies graceful handling when stats are missing
-            assertTrue(bobOutput.contains(LLMConstants.BobShell.OUTPUT_MARKER));
+            assertEquals("The answer is 4", sender.extractContent(bobOutput));
         }
 
         @Test
-        @DisplayName("Should extract content between markers")
-        void shouldExtractContentBetweenMarkers() {
-            // Given
-            String expectedContent = "{\"response\": \"The answer is 4\"}";
-            String bobOutput = String.format("""
-                ---output---
-                %s
-                ---output---
-                {"stats": {"promptTokens": 10, "completionTokens": 5, "tokensUsed": 15}}
-                """, expectedContent);
+        @DisplayName("Should trim whitespace around last_message value")
+        void shouldTrimWhitespaceAroundLastMessage() {
+            String bobOutput = "{\"last_message\": \"  answer with spaces  \"}";
 
-            // Then
-            assertTrue(bobOutput.contains(expectedContent));
+            assertEquals("answer with spaces", sender.extractContent(bobOutput));
+        }
+
+        @Test
+        @DisplayName("Should fall back to raw output when last_message is missing")
+        void shouldFallbackToRawOutputWhenLastMessageMissing() {
+            String bobOutput = "{\"type\": \"result\", \"stats\": {\"input_tokens\": 5}}";
+
+            assertEquals(bobOutput, sender.extractContent(bobOutput));
+        }
+
+        @Test
+        @DisplayName("Should return raw output for malformed JSON")
+        void shouldReturnRawOutputForMalformedJson() {
+            String malformedOutput = "this is not valid JSON";
+
+            assertEquals(malformedOutput, sender.extractContent(malformedOutput));
         }
     }
 
@@ -358,59 +362,103 @@ class BobShellPromptSenderTest {
     @DisplayName("Token Extraction Tests")
     class TokenExtractionTests {
 
+        private BobShellPromptSender sender;
+
+        @BeforeEach
+        void setUp() {
+            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
+            when(llmConfigSnapshot.getApiKey()).thenReturn("test-key");
+            sender = new BobShellPromptSender(appConfig);
+        }
+
         @Test
-        @DisplayName("Should extract token usage from valid stats")
+        @DisplayName("Should extract token counts from v2 stats block")
         void shouldExtractTokenUsageFromValidStats() {
-            // Given — mirrors the real BOB Shell stats block: stats.models.premium.tokens
-            String statsJson = """
+            String bobOutput = """
                 {
-                  "response": "OK",
+                  "type": "result",
+                  "last_message": "OK",
                   "stats": {
-                    "models": {
-                      "premium": {
-                        "tokens": {
-                          "prompt": 15,
-                          "candidates": 8,
-                          "total": 23
-                        }
-                      }
-                    }
+                    "input_tokens": 15,
+                    "output_tokens": 8,
+                    "total_tokens": 23
                   }
                 }
                 """;
 
-            // Verify JSON structure matches the constants used by extractTokenUsage()
-            assertTrue(statsJson.contains(LLMConstants.BobShell.JSON_FIELD_STATS));
-            assertTrue(statsJson.contains(LLMConstants.BobShell.JSON_FIELD_MODELS));
-            assertTrue(statsJson.contains(LLMConstants.BobShell.JSON_FIELD_PREMIUM));
-            assertTrue(statsJson.contains(LLMConstants.BobShell.JSON_FIELD_TOKENS));
-            assertTrue(statsJson.contains(LLMConstants.BobShell.JSON_FIELD_PROMPT_TOKENS));
-            assertTrue(statsJson.contains(LLMConstants.BobShell.JSON_FIELD_COMPLETION_TOKENS));
-            assertTrue(statsJson.contains(LLMConstants.BobShell.JSON_FIELD_TOKENS_USED));
+            BobShellPromptSender.TokenUsage usage = sender.extractTokenUsage(bobOutput);
+
+            assertEquals(15, usage.promptTokens);
+            assertEquals(8,  usage.completionTokens);
+            assertEquals(23, usage.totalTokens);
         }
 
         @Test
-        @DisplayName("Should handle missing stats field")
-        void shouldHandleMissingStatsField() {
-            // Given
-            String statsJson = """
-                {
-                  "response": "OK"
-                }
-                """;
+        @DisplayName("Should return zero token usage when stats block is missing")
+        void shouldReturnZeroUsageWhenStatsMissing() {
+            String bobOutput = "{\"last_message\": \"OK\"}";
 
-            // Verify it doesn't contain stats
-            assertFalse(statsJson.contains(LLMConstants.BobShell.JSON_FIELD_STATS));
+            BobShellPromptSender.TokenUsage usage = sender.extractTokenUsage(bobOutput);
+
+            assertEquals(0, usage.promptTokens);
+            assertEquals(0, usage.completionTokens);
+            assertEquals(0, usage.totalTokens);
         }
 
         @Test
-        @DisplayName("Should handle malformed JSON gracefully")
-        void shouldHandleMalformedJsonGracefully() {
-            // Given
-            String malformedJson = "{ invalid json }";
+        @DisplayName("Should default missing stats fields to zero")
+        void shouldDefaultMissingStatsFieldsToZero() {
+            String bobOutput = "{\"stats\": {\"input_tokens\": 5}}";
 
-            // This should not throw an exception
-            assertNotNull(malformedJson);
+            BobShellPromptSender.TokenUsage usage = sender.extractTokenUsage(bobOutput);
+
+            assertEquals(5, usage.promptTokens);
+            assertEquals(0, usage.completionTokens);
+            assertEquals(0, usage.totalTokens);
+        }
+
+        @Test
+        @DisplayName("Should return zero token usage for malformed JSON")
+        void shouldReturnZeroUsageForMalformedJson() {
+            String malformedJson = "{ \"stats\": { \"input_tokens\": 10, ";
+
+            BobShellPromptSender.TokenUsage usage = sender.extractTokenUsage(malformedJson);
+
+            assertEquals(0, usage.promptTokens);
+            assertEquals(0, usage.completionTokens);
+            assertEquals(0, usage.totalTokens);
+        }
+    }
+
+    @Nested
+    @DisplayName("API Key Injection Tests")
+    class ApiKeyInjectionTests {
+
+        @ParameterizedTest
+        @ValueSource(strings = {"my-api-key", "  key-with-spaces  "})
+        @DisplayName("Should inject BOB_API_KEY when apiKey is non-blank")
+        void shouldInjectApiKeyWhenNonBlank(String apiKey) {
+            Map<String, String> env = BobShellPromptSender.buildSubprocessEnv(apiKey);
+
+            assertTrue(env.containsKey(LLMConstants.BobShell.ENV_API_KEY_NAME));
+            assertEquals(apiKey, env.get(LLMConstants.BobShell.ENV_API_KEY_NAME));
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"", " ", "   "})
+        @DisplayName("Should omit BOB_API_KEY when apiKey is blank")
+        void shouldOmitApiKeyWhenBlank(String apiKey) {
+            Map<String, String> env = BobShellPromptSender.buildSubprocessEnv(apiKey);
+
+            assertFalse(env.containsKey(LLMConstants.BobShell.ENV_API_KEY_NAME));
+        }
+
+        @Test
+        @DisplayName("Should omit BOB_API_KEY when apiKey is null")
+        void shouldOmitApiKeyWhenNull() {
+            Map<String, String> env = BobShellPromptSender.buildSubprocessEnv(null);
+
+            assertFalse(env.containsKey(LLMConstants.BobShell.ENV_API_KEY_NAME));
         }
     }
 
@@ -475,85 +523,57 @@ class BobShellPromptSenderTest {
     class OutputFormatConstantsTests {
 
         @Test
-        @DisplayName("OUTPUT_MARKER must be the literal '---output---' sentinel")
-        void outputMarkerValue() {
-            assertEquals("---output---", LLMConstants.BobShell.OUTPUT_MARKER);
+        @DisplayName("JSON field: top-level response text is 'last_message'")
+        void lastMessageFieldName() {
+            assertEquals("last_message", LLMConstants.BobShell.JSON_FIELD_LAST_MESSAGE);
         }
 
         @Test
-        @DisplayName("JSON field path: top-level stats wrapper is 'stats'")
+        @DisplayName("JSON field: top-level stats wrapper is 'stats'")
         void statsFieldName() {
             assertEquals("stats", LLMConstants.BobShell.JSON_FIELD_STATS);
         }
 
         @Test
-        @DisplayName("JSON field path: stats → models")
-        void modelsFieldName() {
-            assertEquals("models", LLMConstants.BobShell.JSON_FIELD_MODELS);
+        @DisplayName("JSON field: stats.input_tokens")
+        void inputTokensFieldName() {
+            assertEquals("input_tokens", LLMConstants.BobShell.JSON_FIELD_INPUT_TOKENS);
         }
 
         @Test
-        @DisplayName("JSON field path: stats.models → premium")
-        void premiumFieldName() {
-            assertEquals("premium", LLMConstants.BobShell.JSON_FIELD_PREMIUM);
+        @DisplayName("JSON field: stats.output_tokens")
+        void outputTokensFieldName() {
+            assertEquals("output_tokens", LLMConstants.BobShell.JSON_FIELD_OUTPUT_TOKENS);
         }
 
         @Test
-        @DisplayName("JSON field path: stats.models.premium → tokens")
-        void tokensFieldName() {
-            assertEquals("tokens", LLMConstants.BobShell.JSON_FIELD_TOKENS);
-        }
-
-        @Test
-        @DisplayName("JSON field path: tokens.prompt (input token count)")
-        void promptTokensFieldName() {
-            // The CLI emits 'prompt' not 'promptTokens'
-            assertEquals("prompt", LLMConstants.BobShell.JSON_FIELD_PROMPT_TOKENS);
-        }
-
-        @Test
-        @DisplayName("JSON field path: tokens.candidates (output token count)")
-        void completionTokensFieldName() {
-            // The CLI emits 'candidates' not 'completionTokens'
-            assertEquals("candidates", LLMConstants.BobShell.JSON_FIELD_COMPLETION_TOKENS);
-        }
-
-        @Test
-        @DisplayName("JSON field path: tokens.total (combined token count)")
+        @DisplayName("JSON field: stats.total_tokens")
         void totalTokensFieldName() {
-            // The CLI emits 'total' not 'tokensUsed'
-            assertEquals("total", LLMConstants.BobShell.JSON_FIELD_TOKENS_USED);
+            assertEquals("total_tokens", LLMConstants.BobShell.JSON_FIELD_TOTAL_TOKENS);
         }
 
         @Test
-        @DisplayName("A well-formed stats JSON block contains all expected field names")
+        @DisplayName("A well-formed v2 stats JSON block contains all expected field names")
         void wellFormedStatsJsonContainsAllFields() {
-            // Build a sample JSON string that mirrors actual BOB Shell output
             String statsJson = "{"
+                    + "\"" + LLMConstants.BobShell.JSON_FIELD_LAST_MESSAGE + "\": \"OK\","
                     + "\"" + LLMConstants.BobShell.JSON_FIELD_STATS + "\": {"
-                    + "  \"" + LLMConstants.BobShell.JSON_FIELD_MODELS + "\": {"
-                    + "    \"" + LLMConstants.BobShell.JSON_FIELD_PREMIUM + "\": {"
-                    + "      \"" + LLMConstants.BobShell.JSON_FIELD_TOKENS + "\": {"
-                    + "        \"" + LLMConstants.BobShell.JSON_FIELD_PROMPT_TOKENS + "\": 15,"
-                    + "        \"" + LLMConstants.BobShell.JSON_FIELD_COMPLETION_TOKENS + "\": 8,"
-                    + "        \"" + LLMConstants.BobShell.JSON_FIELD_TOKENS_USED + "\": 23"
-                    + "      }}}}}"
-                    ;
+                    + "  \"" + LLMConstants.BobShell.JSON_FIELD_INPUT_TOKENS + "\": 15,"
+                    + "  \"" + LLMConstants.BobShell.JSON_FIELD_OUTPUT_TOKENS + "\": 8,"
+                    + "  \"" + LLMConstants.BobShell.JSON_FIELD_TOTAL_TOKENS + "\": 23"
+                    + "}}";
 
-            // Every field name constant appears in the constructed JSON
+            assertTrue(statsJson.contains("\"last_message\""));
             assertTrue(statsJson.contains("\"stats\""));
-            assertTrue(statsJson.contains("\"models\""));
-            assertTrue(statsJson.contains("\"premium\""));
-            assertTrue(statsJson.contains("\"tokens\""));
-            assertTrue(statsJson.contains("\"prompt\""));
-            assertTrue(statsJson.contains("\"candidates\""));
-            assertTrue(statsJson.contains("\"total\""));
+            assertTrue(statsJson.contains("\"input_tokens\""));
+            assertTrue(statsJson.contains("\"output_tokens\""));
+            assertTrue(statsJson.contains("\"total_tokens\""));
         }
 
         @Test
         @DisplayName("Output without stats block must NOT match stats field constant")
         void noStatsFieldInPlainOutput() {
-            String plainOutput = "---output---\nHello, I am Bob!\n---output---\n";
+            String plainOutput = "{\"last_message\": \"Hello, I am Bob!\"}";
             assertFalse(plainOutput.contains(LLMConstants.BobShell.JSON_FIELD_STATS));
         }
     }
@@ -579,15 +599,15 @@ class BobShellPromptSenderTest {
         }
 
         @Test
-        @DisplayName("--yolo flag value")
-        void yoloFlag() {
-            assertEquals("--yolo", LLMConstants.BobShell.FLAG_YOLO);
+        @DisplayName("bob run subcommand value")
+        void runSubcommand() {
+            assertEquals("run", LLMConstants.BobShell.SUBCMD_RUN);
         }
 
         @Test
-        @DisplayName("-o flag enables JSON output mode")
-        void outputJsonFlag() {
-            assertEquals("-o", LLMConstants.BobShell.FLAG_OUTPUT_JSON);
+        @DisplayName("--format flag value")
+        void formatFlag() {
+            assertEquals("--format", LLMConstants.BobShell.FLAG_FORMAT);
         }
 
         @Test
@@ -597,15 +617,9 @@ class BobShellPromptSenderTest {
         }
 
         @Test
-        @DisplayName("-p flag for inline prompt")
-        void promptFlag() {
-            assertEquals("-p", LLMConstants.BobShell.FLAG_PROMPT);
-        }
-
-        @Test
         @DisplayName("API key env-var name used when injecting credentials into the process")
         void apiKeyEnvVarName() {
-            assertEquals("BOBSHELL_API_KEY", LLMConstants.BobShell.ENV_API_KEY_NAME);
+            assertEquals("BOB_API_KEY", LLMConstants.BobShell.ENV_API_KEY_NAME);
         }
 
         @Test
@@ -615,16 +629,13 @@ class BobShellPromptSenderTest {
         }
 
         @Test
-        @DisplayName("Should use correct JSON field names")
+        @DisplayName("Should use correct v2 JSON field names")
         void shouldUseCorrectJsonFieldNames() {
-            // Nested path: stats → models → premium → tokens → {prompt, candidates, total}
-            assertEquals("stats",      LLMConstants.BobShell.JSON_FIELD_STATS);
-            assertEquals("models",     LLMConstants.BobShell.JSON_FIELD_MODELS);
-            assertEquals("premium",    LLMConstants.BobShell.JSON_FIELD_PREMIUM);
-            assertEquals("tokens",     LLMConstants.BobShell.JSON_FIELD_TOKENS);
-            assertEquals("prompt",     LLMConstants.BobShell.JSON_FIELD_PROMPT_TOKENS);
-            assertEquals("candidates", LLMConstants.BobShell.JSON_FIELD_COMPLETION_TOKENS);
-            assertEquals("total",      LLMConstants.BobShell.JSON_FIELD_TOKENS_USED);
+            assertEquals("last_message", LLMConstants.BobShell.JSON_FIELD_LAST_MESSAGE);
+            assertEquals("stats",        LLMConstants.BobShell.JSON_FIELD_STATS);
+            assertEquals("input_tokens", LLMConstants.BobShell.JSON_FIELD_INPUT_TOKENS);
+            assertEquals("output_tokens",LLMConstants.BobShell.JSON_FIELD_OUTPUT_TOKENS);
+            assertEquals("total_tokens", LLMConstants.BobShell.JSON_FIELD_TOTAL_TOKENS);
         }
     }
 }
