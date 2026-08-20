@@ -1,430 +1,134 @@
 # Assertion Analysis Prompt Template Configuration
-# Provider-specific prompts for validating RCA assertions against diagnostic context
-
-# Vertex AI Anthropic (Claude via Google Cloud)
-vertex-ai-anthropic:
-  name: "vertex-ai-anthropic-assertion-analysis"
-  version: "1.0"
-  description: "Validate RCA assertions against diagnostic evidence - Vertex AI Anthropic"
-
-  # Verification guidance for each assertion type
-  verification_observation: |
-    For OBSERVATION assertions, verify:
-    - Is this fact directly stated in the context?
-    - Are there specific events, logs, or metrics confirming this?
-    - Look for: pod status, events, exit codes, error messages
-
-    Example questions:
-    - "Does the context show the container was OOMKilled?"
-    - "Is there an event with Reason: OOMKilled?"
-    - "What is the exit code?"
-
-  verification_trend: |
-    For TREND assertions, verify:
-    - Are there multiple data points showing this pattern?
-    - Is the trend consistent across measurements?
-    - Look for: metric time series, repeated observations, progression
-
-    Example questions:
-    - "Does memory usage show an increasing pattern?"
-    - "Are there multiple measurements confirming the trend?"
-    - "What are the values at different timestamps?"
-
-  verification_causality: |
-    For CAUSALITY assertions, verify:
-    - Is the cause-effect relationship supported by evidence?
-    - Did the cause occur before the effect?
-    - Are there alternative explanations?
-    - Look for: temporal ordering, mechanism explanation, supporting data
-
-    Example questions:
-    - "Is there evidence of the claimed cause?"
-    - "Is there evidence of the claimed effect?"
-    - "Did the cause precede the effect?"
-    - "Does the context explain the mechanism?"
-
-  verification_configuration: |
-    For CONFIGURATION assertions, verify:
-    - Is this configuration setting explicitly stated?
-    - Are there logs or manifests confirming this?
-    - Look for: resource limits, environment variables, container config
-
-    Example questions:
-    - "What is the configured memory limit?"
-    - "Are there manifest details showing this setting?"
-    - "Does the configuration match the claimed value?"
-
-  verification_recommendation: |
-    For RECOMMENDATION assertions:
-    - Recommendations are not validated against evidence
-    - They are suggestions for future action
-    - Mark as UNKNOWN with appropriate explanation
-
-  system_prompt: |
-    You are an expert validator for Kubernetes root cause analysis.
-
-    Your task: Verify an assertion against diagnostic context.
-
-    Process:
-    1. Understand the assertion - what claim is being made?
-    2. Ask targeted questions to verify the claim:
-       - For OBSERVATION: "Does the context show this fact?"
-       - For TREND: "Does the context show this pattern over time?"
-       - For CAUSALITY: "Does the context support this cause-effect relationship?"
-       - For CONFIGURATION: "Does the context confirm this setting?"
-    3. Search the diagnostic context for evidence
-    4. Evaluate evidence strength and relevance
-    5. Determine validation status and confidence
-
-    Evidence Quality:
-    - DIRECT: Explicit statement in context (e.g., "Reason: OOMKilled")
-    - STRONG: Multiple corroborating data points
-    - MODERATE: Indirect evidence or single data point
-    - WEAK: Circumstantial or partial evidence
-    - NONE: No supporting evidence found
-
-    Validation Status:
-    - SUPPORTED: Strong direct evidence supports the claim
-    - PARTIALLY_SUPPORTED: Some evidence but not conclusive
-    - UNSUPPORTED: Evidence contradicts the claim
-    - UNKNOWN: Insufficient evidence to validate
-
-    Return JSON:
-    {
-      "status": "SUPPORTED|PARTIALLY_SUPPORTED|UNSUPPORTED|UNKNOWN",
-      "confidence": 0.0-1.0,
-      "evidence": [
-        {
-          "snippet": "exact text from context",
-          "source": "section name",
-          "relevance": 0.0-1.0,
-          "type": "KUBERNETES_EVENT|METRIC|POD_LOG|etc"
-        }
-      ],
-      "reasoning": "Explain why this status and confidence",
-      "questions_asked": [
-        "What questions did you ask to verify?"
-      ]
-    }
-
-  user_prompt: |
-    # ASSERTION TO VERIFY
-
-    **Text:** {{assertion_text}}
-    **Type:** {{assertion_type}}
-    **Source:** {{assertion_source}}
-
-    # VERIFICATION APPROACH
-
-    {{verification_guidance}}
-
-    # DIAGNOSTIC CONTEXT
-
-    Search the following diagnostic context for evidence:
-
-    ```
-    {{diagnostic_context}}
-    ```
-
-    # YOUR TASK
-
-    1. Ask targeted questions about this {{assertion_type}} assertion
-    2. Search the context for evidence
-    3. Evaluate evidence quality and relevance
-    4. Return JSON with status, confidence, evidence, and reasoning
-
-# Direct Anthropic (Claude API)
-anthropic:
-  name: "anthropic-assertion-analysis"
-  version: "1.0"
-  description: "Validate RCA assertions against diagnostic evidence - Direct Anthropic"
-
-  # Verification guidance for each assertion type (same as vertex-ai-anthropic)
-  verification_observation: |
-    For OBSERVATION assertions, verify:
-    - Is this fact directly stated in the context?
-    - Are there specific events, logs, or metrics confirming this?
-    - Look for: pod status, events, exit codes, error messages
-
-    Example questions:
-    - "Does the context show the container was OOMKilled?"
-    - "Is there an event with Reason: OOMKilled?"
-    - "What is the exit code?"
-
-  verification_trend: |
-    For TREND assertions, verify:
-    - Are there multiple data points showing this pattern?
-    - Is the trend consistent across measurements?
-    - Look for: metric time series, repeated observations, progression
-
-    Example questions:
-    - "Does memory usage show an increasing pattern?"
-    - "Are there multiple measurements confirming the trend?"
-    - "What are the values at different timestamps?"
-
-  verification_causality: |
-    For CAUSALITY assertions, verify:
-    - Is the cause-effect relationship supported by evidence?
-    - Did the cause occur before the effect?
-    - Are there alternative explanations?
-    - Look for: temporal ordering, mechanism explanation, supporting data
-
-    Example questions:
-    - "Is there evidence of the claimed cause?"
-    - "Is there evidence of the claimed effect?"
-    - "Did the cause precede the effect?"
-    - "Does the context explain the mechanism?"
-
-  verification_configuration: |
-    For CONFIGURATION assertions, verify:
-    - Is this configuration setting explicitly stated?
-    - Are there logs or manifests confirming this?
-    - Look for: resource limits, environment variables, container config
-
-    Example questions:
-    - "What is the configured memory limit?"
-    - "Are there manifest details showing this setting?"
-    - "Does the configuration match the claimed value?"
-
-  verification_recommendation: |
-    For RECOMMENDATION assertions:
-    - Recommendations are not validated against evidence
-    - They are suggestions for future action
-    - Mark as UNKNOWN with appropriate explanation
-
-  system_prompt: |
-    You are an expert validator for Kubernetes root cause analysis.
-
-    Your task: Verify an assertion against diagnostic context.
-
-    Process:
-    1. Understand the assertion - what claim is being made?
-    2. Ask targeted questions to verify the claim:
-       - For OBSERVATION: "Does the context show this fact?"
-       - For TREND: "Does the context show this pattern over time?"
-       - For CAUSALITY: "Does the context support this cause-effect relationship?"
-       - For CONFIGURATION: "Does the context confirm this setting?"
-    3. Search the diagnostic context for evidence
-    4. Evaluate evidence strength and relevance
-    5. Determine validation status and confidence
-
-    Evidence Quality:
-    - DIRECT: Explicit statement in context (e.g., "Reason: OOMKilled")
-    - STRONG: Multiple corroborating data points
-    - MODERATE: Indirect evidence or single data point
-    - WEAK: Circumstantial or partial evidence
-    - NONE: No supporting evidence found
-
-    Validation Status:
-    - SUPPORTED: Strong direct evidence supports the claim
-    - PARTIALLY_SUPPORTED: Some evidence but not conclusive
-    - UNSUPPORTED: Evidence contradicts the claim
-    - UNKNOWN: Insufficient evidence to validate
-
-    Return JSON:
-    {
-      "status": "SUPPORTED|PARTIALLY_SUPPORTED|UNSUPPORTED|UNKNOWN",
-      "confidence": 0.0-1.0,
-      "evidence": [
-        {
-          "snippet": "exact text from context",
-          "source": "section name",
-          "relevance": 0.0-1.0,
-          "type": "KUBERNETES_EVENT|METRIC|POD_LOG|etc"
-        }
-      ],
-      "reasoning": "Explain why this status and confidence",
-      "questions_asked": [
-        "What questions did you ask to verify?"
-      ]
-    }
-
-  user_prompt: |
-    # ASSERTION TO VERIFY
-
-    **Text:** {{assertion_text}}
-    **Type:** {{assertion_type}}
-    **Source:** {{assertion_source}}
-
-    # VERIFICATION APPROACH
-
-    {{verification_guidance}}
-
-    # DIAGNOSTIC CONTEXT
-
-    Search the following diagnostic context for evidence:
-
-    ```
-    {{diagnostic_context}}
-    ```
-
-    # YOUR TASK
-
-    1. Ask targeted questions about this {{assertion_type}} assertion
-    2. Search the context for evidence
-    3. Evaluate evidence quality and relevance
-    4. Return JSON with status, confidence, evidence, and reasoning
-
-# IBM BOB (Granite models)
-bob:
-  name: "bob-assertion-analysis"
-  version: "1.0"
-  description: "Validate RCA assertions against diagnostic evidence - IBM BOB"
-
-  # Verification guidance for each assertion type
-  verification_observation: |
-    For OBSERVATION assertions, verify:
-    - Is this fact directly stated in the context?
-    - Are there specific events, logs, or metrics confirming this?
-    - Look for: pod status, events, exit codes, error messages
-
-  verification_trend: |
-    For TREND assertions, verify:
-    - Are there multiple data points showing this pattern?
-    - Is the trend consistent across measurements?
-    - Look for: metric time series, repeated observations, progression
-
-  verification_causality: |
-    For CAUSALITY assertions, verify:
-    - Is the cause-effect relationship supported by evidence?
-    - Did the cause occur before the effect?
-    - Are there alternative explanations?
-    - Look for: temporal ordering, mechanism explanation, supporting data
-
-  verification_configuration: |
-    For CONFIGURATION assertions, verify:
-    - Is this configuration setting explicitly stated?
-    - Are there logs or manifests confirming this?
-    - Look for: resource limits, environment variables, container config
-
-  verification_recommendation: |
-    For RECOMMENDATION assertions:
-    - Recommendations are not validated against evidence
-    - They are suggestions for future action
-    - Mark as UNKNOWN with appropriate explanation
-
-  system_prompt: |
-    You are an expert validator for Kubernetes root cause analysis.
-
-    Your task: Verify an assertion against diagnostic context.
-
-    Process:
-    1. Understand the assertion - what claim is being made?
-    2. Ask targeted questions to verify the claim
-    3. Search the diagnostic context for evidence
-    4. Evaluate evidence strength and relevance
-    5. Determine validation status and confidence
-
-    Validation Status:
-    - SUPPORTED: Strong direct evidence supports the claim
-    - PARTIALLY_SUPPORTED: Some evidence but not conclusive
-    - UNSUPPORTED: Evidence contradicts the claim
-    - UNKNOWN: Insufficient evidence to validate
-
-    Return JSON with status, confidence, evidence, and reasoning.
-
-  user_prompt: |
-    # ASSERTION TO VERIFY
-
-    **Text:** {{assertion_text}}
-    **Type:** {{assertion_type}}
-    **Source:** {{assertion_source}}
-
-    # VERIFICATION APPROACH
-
-    {{verification_guidance}}
-
-    # DIAGNOSTIC CONTEXT
-
-    ```
-    {{diagnostic_context}}
-    ```
-
-    # YOUR TASK
-
-    1. Ask targeted questions about this {{assertion_type}} assertion
-    2. Search the context for evidence
-    3. Evaluate evidence quality and relevance
-    4. Return JSON with status, confidence, evidence, and reasoning
-
-# Ollama (local models)
-ollama:
-  name: "ollama-assertion-analysis"
-  version: "1.0"
-  description: "Validate RCA assertions against diagnostic evidence - Ollama"
-
-  # Verification guidance for each assertion type
-  verification_observation: |
-    For OBSERVATION assertions, verify:
-    - Is this fact directly stated in the context?
-    - Are there specific events, logs, or metrics confirming this?
-    - Look for: pod status, events, exit codes, error messages
-
-  verification_trend: |
-    For TREND assertions, verify:
-    - Are there multiple data points showing this pattern?
-    - Is the trend consistent across measurements?
-    - Look for: metric time series, repeated observations, progression
-
-  verification_causality: |
-    For CAUSALITY assertions, verify:
-    - Is the cause-effect relationship supported by evidence?
-    - Did the cause occur before the effect?
-    - Are there alternative explanations?
-    - Look for: temporal ordering, mechanism explanation, supporting data
-
-  verification_configuration: |
-    For CONFIGURATION assertions, verify:
-    - Is this configuration setting explicitly stated?
-    - Are there logs or manifests confirming this?
-    - Look for: resource limits, environment variables, container config
-
-  verification_recommendation: |
-    For RECOMMENDATION assertions:
-    - Recommendations are not validated against evidence
-    - They are suggestions for future action
-    - Mark as UNKNOWN with appropriate explanation
-
-  system_prompt: |
-    You are an expert validator for Kubernetes root cause analysis.
-
-    Your task: Verify an assertion against diagnostic context.
-
-    Process:
-    1. Understand the assertion - what claim is being made?
-    2. Ask targeted questions to verify the claim
-    3. Search the diagnostic context for evidence
-    4. Evaluate evidence strength and relevance
-    5. Determine validation status and confidence
-
-    Validation Status:
-    - SUPPORTED: Strong direct evidence supports the claim
-    - PARTIALLY_SUPPORTED: Some evidence but not conclusive
-    - UNSUPPORTED: Evidence contradicts the claim
-    - UNKNOWN: Insufficient evidence to validate
-
-    Return JSON with status, confidence, evidence, and reasoning.
-
-  user_prompt: |
-    # ASSERTION TO VERIFY
-
-    **Text:** {{assertion_text}}
-    **Type:** {{assertion_type}}
-    **Source:** {{assertion_source}}
-
-    # VERIFICATION APPROACH
-
-    {{verification_guidance}}
-
-    # DIAGNOSTIC CONTEXT
-
-    ```
-    {{diagnostic_context}}
-    ```
-
-    # YOUR TASK
-
-    1. Ask targeted questions about this {{assertion_type}} assertion
-    2. Search the context for evidence
-    3. Evaluate evidence quality and relevance
-    4. Return JSON with status, confidence, evidence, and reasoning
+# Shared prompts with model array — define once, apply to multiple models
+
+prompts:
+  - name: "assertion-analysis-prompt"
+    version: "1.0"
+    description: "Validate RCA assertions against diagnostic evidence"
+    providers: ["vertex-ai-anthropic", "anthropic", "bob", "ollama"]
+    models: ["claude-sonnet-*", "claude-opus-*", "claude-haiku-*", "llama*"]
+
+    verification_observation: |
+      For OBSERVATION assertions, verify:
+      - Is this fact directly stated in the context?
+      - Are there specific events, logs, or metrics confirming this?
+      - Look for: pod status, events, exit codes, error messages
+
+      Example questions:
+      - "Does the context show the container was OOMKilled?"
+      - "Is there an event with Reason: OOMKilled?"
+      - "What is the exit code?"
+
+    verification_trend: |
+      For TREND assertions, verify:
+      - Are there multiple data points showing this pattern?
+      - Is the trend consistent across measurements?
+      - Look for: metric time series, repeated observations, progression
+
+      Example questions:
+      - "Does memory usage show an increasing pattern?"
+      - "Are there multiple measurements confirming the trend?"
+      - "What are the values at different timestamps?"
+
+    verification_causality: |
+      For CAUSALITY assertions, verify:
+      - Is the cause-effect relationship supported by evidence?
+      - Did the cause occur before the effect?
+      - Are there alternative explanations?
+      - Look for: temporal ordering, mechanism explanation, supporting data
+
+      Example questions:
+      - "Is there evidence of the claimed cause?"
+      - "Is there evidence of the claimed effect?"
+      - "Did the cause precede the effect?"
+      - "Does the context explain the mechanism?"
+
+    verification_configuration: |
+      For CONFIGURATION assertions, verify:
+      - Is this configuration setting explicitly stated?
+      - Are there logs or manifests confirming this?
+      - Look for: resource limits, environment variables, container config
+
+      Example questions:
+      - "What is the configured memory limit?"
+      - "Are there manifest details showing this setting?"
+      - "Does the configuration match the claimed value?"
+
+    verification_recommendation: |
+      For RECOMMENDATION assertions:
+      - Recommendations are not validated against evidence
+      - They are suggestions for future action
+      - Mark as UNKNOWN with appropriate explanation
+
+    system_prompt: |
+      You are an expert validator for Kubernetes root cause analysis.
+
+      Your task: Verify an assertion against diagnostic context.
+
+      Process:
+      1. Understand the assertion - what claim is being made?
+      2. Ask targeted questions to verify the claim:
+         - For OBSERVATION: "Does the context show this fact?"
+         - For TREND: "Does the context show this pattern over time?"
+         - For CAUSALITY: "Does the context support this cause-effect relationship?"
+         - For CONFIGURATION: "Does the context confirm this setting?"
+      3. Search the diagnostic context for evidence
+      4. Evaluate evidence strength and relevance
+      5. Determine validation status and confidence
+
+      Evidence Quality:
+      - DIRECT: Explicit statement in context (e.g., "Reason: OOMKilled")
+      - STRONG: Multiple corroborating data points
+      - MODERATE: Indirect evidence or single data point
+      - WEAK: Circumstantial or partial evidence
+      - NONE: No supporting evidence found
+
+      Validation Status:
+      - SUPPORTED: Strong direct evidence supports the claim
+      - PARTIALLY_SUPPORTED: Some evidence but not conclusive
+      - UNSUPPORTED: Evidence contradicts the claim
+      - UNKNOWN: Insufficient evidence to validate
+
+      Return JSON:
+      {
+        "status": "SUPPORTED|PARTIALLY_SUPPORTED|UNSUPPORTED|UNKNOWN",
+        "confidence": 0.0-1.0,
+        "evidence": [
+          {
+            "snippet": "exact text from context",
+            "source": "section name",
+            "relevance": 0.0-1.0,
+            "type": "KUBERNETES_EVENT|METRIC|POD_LOG|etc"
+          }
+        ],
+        "reasoning": "Explain why this status and confidence",
+        "questions_asked": [
+          "What questions did you ask to verify?"
+        ]
+      }
+
+    user_prompt: |
+      # ASSERTION TO VERIFY
+
+      **Text:** {{assertion_text}}
+      **Type:** {{assertion_type}}
+      **Source:** {{assertion_source}}
+
+      # VERIFICATION APPROACH
+
+      {{verification_guidance}}
+
+      # DIAGNOSTIC CONTEXT
+
+      Search the following diagnostic context for evidence:
+
+      ```
+      {{diagnostic_context}}
+      ```
+
+      # YOUR TASK
+
+      1. Ask targeted questions about this {{assertion_type}} assertion
+      2. Search the context for evidence
+      3. Evaluate evidence quality and relevance
+      4. Return JSON with status, confidence, evidence, and reasoning

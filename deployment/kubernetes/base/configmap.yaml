@@ -14,13 +14,13 @@ data:
   # LLM Configuration (Public settings - non-sensitive)
   # Provider: anthropic (direct API) | vertex-ai-anthropic (Google Cloud) | bob (BOB Shell CLI) | ibm-bob (future REST API) | ollama (future)
   # DO NOT set required string properties to "" 
-  # LLM_PROVIDER: ""
-  # LLM_MODEL_NAME: ""
+  # LLM_PROVIDER: "vertex-ai-anthropic"
+  # LLM_MODEL_NAME: "claude-sonnet-4-6"
 
   # Vertex AI Configuration (Public settings)
   # Valid regions: us-east5, us-central1, europe-west1, asia-southeast1
   # Note: 'global' is NOT valid for Claude on Vertex AI
-  # VERTEX_LOCATION: ""
+  # VERTEX_LOCATION: "us-east5"
 
 
   # Optional overrides (leave empty to use defaults)
