@@ -15,6 +15,7 @@ import com.causa.core.ports.llm.PromptSender;
 import com.causa.core.services.PromptTemplateLoader;
 import com.causa.core.services.validation.AssertionAnalyzer;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import io.quarkus.arc.properties.IfBuildProperty;
@@ -25,6 +26,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 
 /**
@@ -67,6 +69,19 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
         this.promptTemplateLoader = new PromptTemplateLoader(PromptConstants.TEMPLATE_PATH_ASSERTION_ANALYSIS);
         this.provider = determineProvider(appConfig.getLlmConfig());
         this.executorService = Executors.newFixedThreadPool(PARALLEL_THREADS);
+    }
+
+    @PreDestroy
+    void shutdown() {
+        executorService.shutdown();
+        try {
+            if (!executorService.awaitTermination(30, TimeUnit.SECONDS)) {
+                executorService.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            executorService.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 
     /**
