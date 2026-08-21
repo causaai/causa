@@ -9,7 +9,7 @@ data:
   CAUSA_LOG_LEVEL: "INFO"
 
   # Database Configuration
-  CAUSA_DB_URL: "jdbc:postgresql://iri-db-rw:5432/iri-db"
+  CAUSA_DB_URL: "jdbc:postgresql://diagnostics-tool-db-rw:5432/diagnostics-tool-db"
 
   # LLM Configuration (Public settings - non-sensitive)
   # Provider: anthropic (direct API) | vertex-ai-anthropic (Google Cloud) | bob (BOB Shell CLI) | ibm-bob (future REST API) | ollama (future)
@@ -67,3 +67,10 @@ data:
   CAUSA_MCP_CRYOSTAT_TIMEOUT: "15000"
   CAUSA_MCP_CRYOSTAT_RETRY_DELAY: "5000"
   CAUSA_MCP_CRYOSTAT_MAX_RETRIES: "3"
+
+  # MCP Quarkus Configuration (metrics snapshot + health status)
+  # Set CAUSA_MCP_QUARKUS_ENDPOINT to enable — leave blank to disable Quarkus MCP health check and metrics collection
+  CAUSA_MCP_QUARKUS_ENDPOINT: ""
+  CAUSA_MCP_QUARKUS_HEALTH_PATH: "/healthz"
+  CAUSA_MCP_QUARKUS_TIMEOUT: "10000"
+  CAUSA_MCP_QUARKUS_METRICS_BASE_URL: ""
