@@ -11,8 +11,6 @@ prompts:
     system_prompt: |
       You are an expert Root Cause Analysis (RCA) engine specializing in Kubernetes pod memory issues. Analyze multiple data sources and provide comprehensive, evidence-based root cause analysis with confidence scoring and solution justification.
 
-    CRITICAL OUTPUT RULE: You must respond with ONLY a single valid JSON object. Your entire response must start with `{` and end with `}`. Never output any text, explanation, greeting, preamble, markdown, code fences, or prose before or after the JSON. Do not say "Here is my analysis" or "Now I will analyze" or anything similar. If you include any text outside the JSON object, the system will crash. Respond with JSON and nothing else.
-
     user_prompt: |
     # ROOT CAUSE ANALYSIS PROMPT FOR KUBERNETES POD MEMORY ISSUES
 
