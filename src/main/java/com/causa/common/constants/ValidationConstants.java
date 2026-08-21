@@ -68,6 +68,15 @@ public final class ValidationConstants {
     }
 
     /**
+     * Assertion analysis configuration
+     */
+    public static final class AssertionAnalysis {
+        private AssertionAnalysis() {}
+
+        public static final int DEFAULT_PARALLEL_THREADS = 5;
+    }
+
+    /**
      * Validation log field names
      */
     public static final class LogFields {

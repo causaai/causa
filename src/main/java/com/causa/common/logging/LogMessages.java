@@ -292,6 +292,15 @@ public final class LogMessages {
         public static final String VALIDATION_DATA_UNAVAILABLE = "Validation data not available for diagnostic";
         public static final String VALIDATION_DATA_PARSE_FAILED = "Failed to parse validation data";
         public static final String DIAGNOSTIC_NOT_FOUND = "Diagnostic not found";
+
+        // LLM Assertion Analyzer
+        public static final String ASSERTION_ANALYZING = "Analyzing assertion with LLM";
+        public static final String ASSERTION_ANALYSIS_COMPLETED = "LLM assertion analysis completed";
+        public static final String ASSERTION_ANALYSIS_FAILED = "LLM assertion analysis failed";
+        public static final String ASSERTION_BATCH_START = "Analyzing all assertions with LLM in parallel";
+        public static final String ASSERTION_BATCH_COMPLETED = "Batch analysis completed";
+        public static final String ASSERTION_SKIP_RECOMMENDATION = "Recommendations are not validated against evidence";
+        public static final String ASSERTION_NO_JSON = "No JSON object found in LLM response";
     }
 
     /**
