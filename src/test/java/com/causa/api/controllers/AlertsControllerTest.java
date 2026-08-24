@@ -1,5 +1,7 @@
 package com.causa.api.controllers;
 
+import com.causa.api.dto.request.AlertTriggerRequest;
+import com.causa.api.dto.request.AlertWebhookRequest;
 import com.causa.api.dto.response.AlertResponse;
 import com.causa.common.constants.AlertConstants.AlertSeverity;
 import com.causa.common.constants.AlertConstants.AlertStatus;
@@ -34,6 +36,9 @@ class AlertsControllerTest {
     @Mock
     private AlertService alertService;
 
+    @Mock
+    private WebhookController webhookController;
+
     private AlertsController controller;
 
     private static Alert buildAlert(String id) {
@@ -49,7 +54,7 @@ class AlertsControllerTest {
 
     @BeforeEach
     void setUp() {
-        controller = new AlertsController(alertService);
+        controller = new AlertsController(alertService, webhookController);
     }
 
     // -------------------------------------------------------------------------
@@ -225,6 +230,30 @@ class AlertsControllerTest {
             assertEquals("ns-x", body.workloadInfo().namespace());
             assertEquals("cluster-x", body.workloadInfo().clusterName());
             assertEquals("prometheus", body.alertSource());
+        }
+    }
+
+    @Nested
+    @DisplayName("POST /api/v1/alerts")
+    class CreateManualAlertTests {
+
+        @Test
+        @DisplayName("Should map request and delegate to webhook controller")
+        void shouldMapRequestAndDelegateToWebhookController() {
+            AlertTriggerRequest request = new AlertTriggerRequest();
+            request.setNamespace("default");
+            request.setContainer("app");
+            request.setPodName("pod-1");
+            request.setWorkloadName("workload-1");
+
+            Response webhookResponse = Response.ok().build();
+
+            when(webhookController.receiveAlerts(any(AlertWebhookRequest.class))).thenReturn(webhookResponse);
+
+            Response response = controller.createManualAlert(request);
+
+            assertSame(webhookResponse, response);
+            verify(webhookController).receiveAlerts(any(AlertWebhookRequest.class));
         }
     }
 }

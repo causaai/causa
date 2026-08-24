@@ -73,16 +73,15 @@ public class AlertMapper {
         String alertName   = labels.get(AlertConstants.Labels.ALERT_NAME);
         String severityStr = labels.getOrDefault(AlertConstants.Labels.SEVERITY, appConfig.getAlertConfig().getFilterSeverity());
 
-        // Workload fields — annotations first (PrometheusRule uses container_name / pod_name as annotation
-        // keys), label keys (container / pod) used as fallback for older or custom alert sources.
-        String containerName = getAnnotationOrLabel(annotations, labels,
-            AlertConstants.Labels.CONTAINER_NAME, AlertConstants.Labels.CONTAINER);
-        String podName       = getAnnotationOrLabel(annotations, labels,
-            AlertConstants.Labels.POD_NAME, AlertConstants.Labels.POD);
-        String namespace     = getAnnotationOrLabel(annotations, labels, AlertConstants.Labels.NAMESPACE,    AlertConstants.Labels.NAMESPACE);
-        String clusterName   = getAnnotationOrLabel(annotations, labels, AlertConstants.Labels.CLUSTER_NAME, AlertConstants.Labels.CLUSTER_NAME);
-        String workloadType  = getAnnotationOrLabel(annotations, labels, AlertConstants.Labels.WORKLOAD_TYPE, AlertConstants.Labels.WORKLOAD_TYPE);
-        String workloadName  = getAnnotationOrLabel(annotations, labels, AlertConstants.Labels.WORKLOAD_NAME, AlertConstants.Labels.WORKLOAD_NAME);
+        // Workload fields — standard Prometheus labels, direct label lookup
+        String containerName = labels.get(AlertConstants.Labels.CONTAINER);
+        String podName       = labels.get(AlertConstants.Labels.POD);
+        String namespace     = labels.get(AlertConstants.Labels.NAMESPACE);
+        String clusterName   = labels.get(AlertConstants.Labels.CLUSTER_NAME);
+        String workloadType  = labels.get(AlertConstants.Labels.WORKLOAD_TYPE);
+
+        // workload_name — always set as annotation by PrometheusRule
+        String workloadName  = annotations.get(AlertConstants.Labels.WORKLOAD_NAME);
 
         // alert_source — from annotations, default to "prometheus"
         String alertSource = annotations.getOrDefault(
@@ -108,16 +107,6 @@ public class AlertMapper {
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
-
-    /**
-     * Looks up {@code annotationKey} in annotations first, then {@code labelKey} in labels.
-     * Pass the same key for both params when the key is identical in both maps.
-     */
-    private String getAnnotationOrLabel(Map<String, String> annotations, Map<String, String> labels,
-                                        String annotationKey, String labelKey) {
-        String value = annotations.get(annotationKey);
-        return value != null ? value : labels.get(labelKey);
-    }
 
     private Instant parseTimestamp(String iso) {
         if (iso == null || iso.isBlank()) return Instant.now();

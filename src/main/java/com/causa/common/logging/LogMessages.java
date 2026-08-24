@@ -109,6 +109,9 @@ public final class LogMessages {
         public static final String MCP_FILESYSTEM_CHECK_STARTED = "MCP Filesystem health check started";
         public static final String MCP_FILESYSTEM_CHECK_PASSED = "MCP Filesystem health check passed";
         public static final String MCP_FILESYSTEM_CHECK_FAILED = "MCP Filesystem health check failed";
+        public static final String MCP_QUARKUS_CHECK_STARTED = "MCP Quarkus health check started";
+        public static final String MCP_QUARKUS_CHECK_PASSED = "MCP Quarkus health check passed";
+        public static final String MCP_QUARKUS_CHECK_FAILED = "MCP Quarkus health check failed";
         public static final String LLM_CHECK_STARTED = "LLM health check started";
         public static final String LLM_CHECK_PASSED = "LLM health check passed";
         public static final String LLM_CHECK_FAILED = "LLM health check failed";
@@ -132,9 +135,11 @@ public final class LogMessages {
         public static final String ALERT_PERSISTED = "Alert persisted to database";
 
         // Alerts API
-        public static final String ALERTS_GET_REQUEST   = "GET /api/v1/alerts request received";
-        public static final String ALERTS_GET_FOUND     = "Alert(s) retrieved successfully";
-        public static final String ALERTS_GET_NOT_FOUND = "Alert not found";
+        public static final String ALERTS_GET_REQUEST      = "GET /api/v1/alerts request received";
+        public static final String ALERTS_GET_FOUND        = "Alert(s) retrieved successfully";
+        public static final String ALERTS_GET_NOT_FOUND    = "Alert not found";
+        public static final String ALERTS_TRIGGER_REQUEST  = "POST /api/v1/alerts manual trigger request received";
+        public static final String ALERTS_TRIGGER_ACCEPTED = "Manual alert trigger accepted";
 
         // Exception messages
         public static final String ALERT_PERSIST_FAILED = "Failed to persist alert";
@@ -181,6 +186,7 @@ public final class LogMessages {
         public static final String DIAGNOSTIC_GET_REQUEST    = "GET /api/v1/diagnostics/{id} request received";
         public static final String DIAGNOSTIC_GET_FOUND      = "Diagnostic retrieved successfully";
         public static final String DIAGNOSTIC_GET_NOT_FOUND  = "Diagnostic not found";
+
     }
 
     /**
@@ -201,6 +207,9 @@ public final class LogMessages {
         public static final String MCP_KRUIZE_COST_RECOMMENDATIONS = "Kruize cost recommendations retrieved";
         public static final String MCP_KRUIZE_PERF_RECOMMENDATIONS = "Kruize performance recommendations retrieved";
         public static final String MCP_KRUIZE_SKIPPED_NO_CONTAINER = "Skipping Kruize MCP calls - no container name available";
+
+        // Quarkus MCP
+        public static final String MCP_QUARKUS_RAW_METRICS = "Quarkus raw metrics retrieved";
 
         // Cryostat MCP
         public static final String MCP_CRYOSTAT_GC_ANALYSIS = "Cryostat GC analysis retrieved";

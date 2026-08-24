@@ -68,6 +68,7 @@ class WebhookControllerTest {
             AlertWebhookRequest.AlertItem item = new AlertWebhookRequest.AlertItem();
             item.setStatus("firing");
             item.setLabels(Map.of("alertname", "TestAlert_" + i, "container", "c-" + i, "namespace", "default"));
+            item.setAnnotations(Map.of("pod_name", "pod-" + i));
             item.setFingerprint("fp-" + i);
             items.add(item);
         }
@@ -127,6 +128,130 @@ class WebhookControllerTest {
             assertEquals(400, response.getStatus());
             ErrorResponse error = (ErrorResponse) response.getEntity();
             assertTrue(error.message().contains("alerts[0]"));
+        }
+
+        @Test
+        @DisplayName("Should return 400 when pod_name is missing")
+        void shouldReturn400WhenPodNameMissing() {
+            AlertWebhookRequest req = buildRequest(1);
+            when(validator.validate(req)).thenReturn(
+                    List.of("alerts[0] must contain non-blank 'pod_name' in annotations or labels"));
+
+            Response response = controller.receiveAlerts(req);
+
+            assertEquals(400, response.getStatus());
+            ErrorResponse error = (ErrorResponse) response.getEntity();
+            assertTrue(error.message().contains("pod_name"));
+            verifyNoInteractions(alertMapper, alertService, diagnosticService);
+        }
+
+        @Test
+        @DisplayName("Should return 400 when pod_name is blank")
+        void shouldReturn400WhenPodNameBlank() {
+            AlertWebhookRequest req = buildRequest(1);
+            req.getAlerts().get(0).setAnnotations(Map.of("pod_name", "  "));
+            when(validator.validate(req)).thenReturn(
+                    List.of("alerts[0] must contain non-blank 'pod_name' in annotations or labels"));
+
+            Response response = controller.receiveAlerts(req);
+
+            assertEquals(400, response.getStatus());
+            ErrorResponse error = (ErrorResponse) response.getEntity();
+            assertTrue(error.message().contains("pod_name"));
+            verifyNoInteractions(alertMapper, alertService, diagnosticService);
+        }
+
+        @Test
+        @DisplayName("Should return 400 when container is missing")
+        void shouldReturn400WhenContainerMissing() {
+            AlertWebhookRequest req = buildRequest(1);
+            when(validator.validate(req)).thenReturn(
+                    List.of("alerts[0] must contain non-blank 'container' in annotations or labels"));
+
+            Response response = controller.receiveAlerts(req);
+
+            assertEquals(400, response.getStatus());
+            ErrorResponse error = (ErrorResponse) response.getEntity();
+            assertTrue(error.message().contains("container"));
+            verifyNoInteractions(alertMapper, alertService, diagnosticService);
+        }
+
+        @Test
+        @DisplayName("Should return 400 when container is blank")
+        void shouldReturn400WhenContainerBlank() {
+            AlertWebhookRequest req = buildRequest(1);
+            req.getAlerts().get(0).setAnnotations(Map.of("container_name", "  ", "pod_name", "pod-0"));
+            when(validator.validate(req)).thenReturn(
+                    List.of("alerts[0] must contain non-blank 'container' in annotations or labels"));
+
+            Response response = controller.receiveAlerts(req);
+
+            assertEquals(400, response.getStatus());
+            ErrorResponse error = (ErrorResponse) response.getEntity();
+            assertTrue(error.message().contains("container"));
+            verifyNoInteractions(alertMapper, alertService, diagnosticService);
+        }
+
+        @Test
+        @DisplayName("Should return 400 when namespace is missing")
+        void shouldReturn400WhenNamespaceMissing() {
+            AlertWebhookRequest req = buildRequest(1);
+            when(validator.validate(req)).thenReturn(
+                    List.of("alerts[0] must contain non-blank 'namespace' in annotations or labels"));
+
+            Response response = controller.receiveAlerts(req);
+
+            assertEquals(400, response.getStatus());
+            ErrorResponse error = (ErrorResponse) response.getEntity();
+            assertTrue(error.message().contains("namespace"));
+            verifyNoInteractions(alertMapper, alertService, diagnosticService);
+        }
+
+        @Test
+        @DisplayName("Should return 400 when namespace is blank")
+        void shouldReturn400WhenNamespaceBlank() {
+            AlertWebhookRequest req = buildRequest(1);
+            req.getAlerts().get(0).setLabels(Map.of("alertname", "TestAlert_0", "container", "c-0", "namespace", "  "));
+            when(validator.validate(req)).thenReturn(
+                    List.of("alerts[0] must contain non-blank 'namespace' in annotations or labels"));
+
+            Response response = controller.receiveAlerts(req);
+
+            assertEquals(400, response.getStatus());
+            ErrorResponse error = (ErrorResponse) response.getEntity();
+            assertTrue(error.message().contains("namespace"));
+            verifyNoInteractions(alertMapper, alertService, diagnosticService);
+        }
+
+        @Test
+        @DisplayName("Should return 400 when workload_name is missing (vm platform)")
+        void shouldReturn400WhenWorkloadNameMissing() {
+            AlertWebhookRequest req = buildRequest(1);
+            when(validator.validate(req)).thenReturn(
+                    List.of("alerts[0] must contain non-blank 'workload_name' in annotations or labels"));
+
+            Response response = controller.receiveAlerts(req);
+
+            assertEquals(400, response.getStatus());
+            ErrorResponse error = (ErrorResponse) response.getEntity();
+            assertTrue(error.message().contains("workload_name"));
+            verifyNoInteractions(alertMapper, alertService, diagnosticService);
+        }
+
+        @Test
+        @DisplayName("Should return 400 when workload_name is blank (vm platform)")
+        void shouldReturn400WhenWorkloadNameBlank() {
+            AlertWebhookRequest req = buildRequest(1);
+            req.getAlerts().get(0).setAnnotations(Map.of("workload_name", "  "));
+            when(validator.validate(req)).thenReturn(
+                    List.of("alerts[0] must contain non-blank 'workload_name' in annotations or labels"));
+
+            Response response = controller.receiveAlerts(req);
+
+            assertEquals(400, response.getStatus());
+            ErrorResponse error = (ErrorResponse) response.getEntity();
+            assertTrue(error.message().contains("workload_name"));
+            verifyNoInteractions(alertMapper, alertService, diagnosticService);
         }
     }
 

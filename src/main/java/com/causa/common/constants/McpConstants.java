@@ -80,6 +80,9 @@ public final class McpConstants {
         public static final String KRUIZE_GET_COST_RECOMMENDATIONS = "getCostOptimizedRecommendations";
         public static final String KRUIZE_GET_PERF_RECOMMENDATIONS = "getPerformanceOptimizedRecommendations";
 
+        // Quarkus MCP tools
+        public static final String QUARKUS_FETCH_RAW_METRICS = "fetch_raw_metrics_from_endpoint";
+
         // Cryostat MCP tools
         public static final String CRYOSTAT_GET_GC_ANALYSIS = "get_gc_analysis";
         public static final String CRYOSTAT_GET_MEMORY_ANALYSIS = "get_memory_analysis";
@@ -137,6 +140,9 @@ public final class McpConstants {
 
         // Cryostat arguments
         public static final String POD_NAME = "pod_name";
+
+        // Quarkus MCP arguments
+        public static final String BASE_URL = "baseUrl";
 
         // Filesystem arguments
         public static final String PATH = "path";
@@ -287,6 +293,7 @@ public final class McpConstants {
         public static final String HAS_K8S_CONTEXT = "hasK8sContext";
         public static final String HAS_KRUIZE_CONTEXT = "hasKruizeContext";
         public static final String HAS_CRYOSTAT_CONTEXT = "hasCryostatContext";
+        public static final String HAS_QUARKUS_CONTEXT = "hasQuarkusContext";
         public static final String HAS_FILESYSTEM_CONTEXT = "hasFilesystemContext";
         public static final String HAS_JMX_CONTEXT = "hasJmxContext";
         public static final String PLATFORM = "platform";
