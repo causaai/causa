@@ -73,7 +73,6 @@ public final class ValidationConstants {
     public static final class AssertionAnalysis {
         private AssertionAnalysis() {}
 
-        public static final int DEFAULT_PARALLEL_THREADS = 5;
         public static final int MAX_ASSERTIONS_PER_VALIDATION = 15;
     }
 

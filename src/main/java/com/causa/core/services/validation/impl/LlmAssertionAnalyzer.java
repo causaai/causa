@@ -64,8 +64,7 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
         PromptSender promptSender,
         AppConfig appConfig,
         ObjectMapper objectMapper,
-        @ConfigProperty(name = "causa.validation.assertion-analyzer.parallel-threads",
-                        defaultValue = "" + ValidationConstants.AssertionAnalysis.DEFAULT_PARALLEL_THREADS)
+        @ConfigProperty(name = "causa.validation.assertion-analyzer.parallel-threads")
         int parallelThreads
     ) {
         this.promptSender = promptSender;
