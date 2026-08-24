@@ -128,6 +128,11 @@ causa:
       skills-dir: ${LLM_SKILLS_DIR:}
     google-application-credentials: ${GOOGLE_APPLICATION_CREDENTIALS:}
 
+  # Validation Configuration
+  validation:
+    assertion-analyzer:
+      parallel-threads: ${CAUSA_VALIDATION_PARALLEL_THREADS:5}
+
   # Alert Configuration
   alerts:
     filter-severity: ${CAUSA_ALERT_SEVERITY:critical}
