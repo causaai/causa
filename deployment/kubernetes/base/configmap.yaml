@@ -9,7 +9,7 @@ data:
   CAUSA_LOG_LEVEL: "INFO"
 
   # Database Configuration
-  CAUSA_DB_URL: "jdbc:postgresql://diagnostics-tool-db-rw:5432/diagnostics-tool-db"
+  CAUSA_DB_URL: "jdbc:postgresql://iri-db-rw:5432/iri-db"
 
   # LLM Configuration (Public settings - non-sensitive)
   # Provider: anthropic (direct API) | vertex-ai-anthropic (Google Cloud) | bob (BOB Shell CLI) | ibm-bob (future REST API) | ollama (future)
