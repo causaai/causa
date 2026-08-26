@@ -1,6 +1,7 @@
 package com.causa.core.services.rules.impl;
 
 import com.causa.common.logging.CausaLogger;
+import com.causa.common.logging.LogMessages;
 import com.causa.core.services.rules.Signal;
 import com.causa.core.services.rules.SignalExtractor;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -82,7 +83,7 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
     @Override
     public List<Signal> extractSignals(String diagnosticContext) {
         if (diagnosticContext == null || diagnosticContext.isBlank()) {
-            log.warn("Empty diagnostic context, no signals to extract").log();
+            log.warn(LogMessages.Validation.EMPTY_DIAGNOSTIC_CONTEXT).log();
             return List.of();
         }
 
@@ -94,7 +95,7 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
         signals.addAll(extractLogPatternSignals(diagnosticContext));
         signals.addAll(extractKruizeSignals(diagnosticContext));
 
-        log.info("Extracted signals from diagnostic context")
+        log.info(LogMessages.Validation.SIGNALS_EXTRACTED)
             .field("signalCount", signals.size())
             .log();
 

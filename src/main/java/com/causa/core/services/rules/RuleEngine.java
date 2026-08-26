@@ -1,6 +1,7 @@
 package com.causa.core.services.rules;
 
 import com.causa.common.logging.CausaLogger;
+import com.causa.common.logging.LogMessages;
 import com.causa.core.domain.RootCauseAnalysis;
 import com.causa.core.services.validation.HypothesisValidator;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -52,7 +53,7 @@ public class RuleEngine implements HypothesisValidator {
         String rulesetPath = ANOMALY_TO_RULESET.get(anomaly);
 
         if (rulesetPath == null) {
-            log.info("No ruleset configured for anomaly type")
+            log.info(LogMessages.Validation.NO_RULESET_AVAILABLE)
                 .field("anomalyType", anomaly)
                 .log();
             return HypothesisValidationResult.builder(anomaly)
@@ -65,21 +66,21 @@ public class RuleEngine implements HypothesisValidator {
                 .requiredResults(List.of())
                 .supportingResults(List.of())
                 .exclusionResults(List.of())
-                .explanation("No ruleset available for anomaly type: " + anomaly)
+                .explanation(LogMessages.Validation.NO_RULESET_EXPLANATION_PREFIX + anomaly)
                 .build();
         }
 
         RuleSet ruleSet = ruleSetCache.computeIfAbsent(rulesetPath, this::loadRuleSetFromYaml);
         List<Signal> signals = signalExtractor.extractSignals(diagnosticContext);
 
-        log.info("PATH B: Running rule-based hypothesis validation")
+        log.info(LogMessages.Validation.PATH_B_RUNNING)
             .field("anomalyType", anomaly)
             .field("ruleset", rulesetPath)
             .field("signalCount", signals.size())
             .log();
 
         for (Signal signal : signals) {
-            log.info("PATH B Signal extracted")
+            log.info(LogMessages.Validation.PATH_B_SIGNAL_EXTRACTED)
                 .field("type", signal.getType())
                 .field("name", signal.getName())
                 .field("value", signal.getValueAsString())
@@ -102,7 +103,7 @@ public class RuleEngine implements HypothesisValidator {
         RuleSet ruleSet,
         List<Signal> signals
     ) {
-        log.debug("Validating hypothesis with rule engine")
+        log.debug(LogMessages.Validation.HYPOTHESIS_VALIDATION_STARTED)
             .field("hypothesis", hypothesis)
             .field("ruleSetName", ruleSet.getHypothesisName())
             .field("signalCount", signals.size())
@@ -174,7 +175,7 @@ public class RuleEngine implements HypothesisValidator {
             .explanation(explanation)
             .build();
 
-        log.info("Rule-based validation completed")
+        log.info(LogMessages.Validation.VALIDATION_COMPLETED)
             .field("hypothesis", hypothesis)
             .field("status", status)
             .field("confidence", confidence)
@@ -196,7 +197,7 @@ public class RuleEngine implements HypothesisValidator {
             .map(rule -> {
                 try {
                     RuleEvaluationResult result = rule.evaluate(signals);
-                    log.info("Rule evaluated")
+                    log.info(LogMessages.Validation.RULE_EVALUATED)
                         .field("ruleId", rule.getId())
                         .field("type", rule.getType())
                         .field("weight", rule.getWeight())
@@ -205,7 +206,7 @@ public class RuleEngine implements HypothesisValidator {
                         .log();
                     return result;
                 } catch (Exception e) {
-                    log.error("Rule evaluation failed")
+                    log.error(LogMessages.Validation.RULE_EVALUATION_ERROR)
                         .field("ruleId", rule.getId())
                         .exception(e)
                         .log();
@@ -398,7 +399,7 @@ public class RuleEngine implements HypothesisValidator {
     private RuleSet loadRuleSetFromYaml(String path) {
         try (InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream(path)) {
             if (is == null) {
-                log.error("Ruleset file not found").field("path", path).log();
+                log.error(LogMessages.Validation.RULESET_FILE_NOT_FOUND).field("path", path).log();
                 return emptyRuleSet("UNKNOWN");
             }
             Yaml yaml = new Yaml();
@@ -413,7 +414,7 @@ public class RuleEngine implements HypothesisValidator {
             List<Rule> supporting = parseRules((List<Map<String, Object>>) data.getOrDefault("supporting", List.of()), RuleType.SUPPORTING);
             List<Rule> exclusion = parseRules((List<Map<String, Object>>) data.getOrDefault("exclusion", List.of()), RuleType.EXCLUSION);
 
-            log.info("Loaded ruleset from YAML")
+            log.info(LogMessages.Validation.RULESET_LOADED)
                 .field("path", path)
                 .field("hypothesis", hypothesis)
                 .field("required", required.size())
@@ -423,7 +424,7 @@ public class RuleEngine implements HypothesisValidator {
 
             return new LoadedRuleSet(hypothesis, required, supporting, exclusion, minSupported, minPartial);
         } catch (Exception e) {
-            log.error("Failed to load ruleset").field("path", path).exception(e).log();
+            log.error(LogMessages.Validation.RULESET_LOAD_FAILED).field("path", path).exception(e).log();
             return emptyRuleSet("UNKNOWN");
         }
     }
