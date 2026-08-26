@@ -68,6 +68,11 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
         Pattern.CASE_INSENSITIVE
     );
 
+    // GC log detail pattern: "303M->220M(365M) 53.562ms"
+    private static final Pattern GC_PAUSE_DETAIL_PATTERN = Pattern.compile(
+        "(\\d+)M->(\\d+)M\\((\\d+)M\\)\\s+(\\d+\\.?\\d*)ms"
+    );
+
     // Kruize patterns
     private static final Pattern KRUIZE_MEMORY_REC_PATTERN = Pattern.compile(
         "kruize.*recommends?.*memory.*limit.*to\\s*(\\d+)",
@@ -235,6 +240,22 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
                 .build());
         }
 
+        // Derive memory trend from OOMKilled + restart count
+        // If the pod was OOM killed with restarts, memory repeatedly grew to exhaustion — that's an increasing trend
+        if (context.contains("OOMKilled")) {
+            Matcher restartCheck = RESTART_COUNT_PATTERN.matcher(context);
+            if (restartCheck.find() && Integer.parseInt(restartCheck.group(1)) > 0) {
+                signals.add(Signal.builder(Signal.SignalType.METRIC, "memory.utilization.trend")
+                    .value("INCREASING")
+                    .metadata("source", "derived_from_oomkilled_with_restarts")
+                    .build());
+                signals.add(Signal.builder(Signal.SignalType.METRIC, "heap.usage.trend")
+                    .value("INCREASING")
+                    .metadata("source", "derived_from_oomkilled_with_restarts")
+                    .build());
+            }
+        }
+
         // Derive memory pressure duration from restart count
         Matcher restartMatcher = RESTART_COUNT_PATTERN.matcher(context);
         if (restartMatcher.find()) {
@@ -291,6 +312,68 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
                 .value(fullGcCount)
                 .metadata("frequent", fullGcCount > 10)
                 .build());
+        }
+
+        // Extract GC pause durations, heap-after-GC ratios, and memory trend from verbose:gc logs
+        Matcher gcDetailMatcher = GC_PAUSE_DETAIL_PATTERN.matcher(context);
+        double maxPause = 0;
+        double totalPause = 0;
+        double maxHeapAfterGcRatio = 0;
+        int gcDetailCount = 0;
+        List<Double> beforeGcValues = new ArrayList<>();
+        while (gcDetailMatcher.find()) {
+            gcDetailCount++;
+            double beforeGc = Double.parseDouble(gcDetailMatcher.group(1));
+            double afterGc = Double.parseDouble(gcDetailMatcher.group(2));
+            double maxHeap = Double.parseDouble(gcDetailMatcher.group(3));
+            double pauseMs = Double.parseDouble(gcDetailMatcher.group(4));
+            beforeGcValues.add(beforeGc);
+            totalPause += pauseMs;
+            if (pauseMs > maxPause) {
+                maxPause = pauseMs;
+            }
+            if (maxHeap > 0) {
+                double ratio = afterGc / maxHeap;
+                if (ratio > maxHeapAfterGcRatio) {
+                    maxHeapAfterGcRatio = ratio;
+                }
+            }
+        }
+        if (gcDetailCount > 0) {
+            signals.add(Signal.builder(Signal.SignalType.METRIC, "gc.pause.max")
+                .value(maxPause)
+                .metadata("source", "verbose_gc_logs")
+                .build());
+            signals.add(Signal.builder(Signal.SignalType.METRIC, "gc.pause.total")
+                .value(totalPause)
+                .metadata("source", "verbose_gc_logs")
+                .build());
+            signals.add(Signal.builder(Signal.SignalType.METRIC, "heap.after.gc.ratio")
+                .value(maxHeapAfterGcRatio)
+                .metadata("source", "verbose_gc_logs")
+                .build());
+        }
+
+        // Derive memory trend from GC log before-GC heap values
+        // e.g. 163M -> 184M -> 237M -> 305M -> 441M = INCREASING
+        if (beforeGcValues.size() >= 3) {
+            int rises = 0;
+            for (int i = 1; i < beforeGcValues.size(); i++) {
+                if (beforeGcValues.get(i) > beforeGcValues.get(i - 1)) {
+                    rises++;
+                }
+            }
+            double riseRatio = (double) rises / (beforeGcValues.size() - 1);
+            if (riseRatio >= 0.5) {
+                signals.add(Signal.builder(Signal.SignalType.METRIC, "memory.utilization.trend")
+                    .value("INCREASING")
+                    .metadata("source", "derived_from_gc_logs")
+                    .build());
+                signals.add(Signal.builder(Signal.SignalType.METRIC, "heap.usage.trend")
+                    .value("INCREASING")
+                    .metadata("source", "derived_from_gc_logs")
+                    .build());
+            }
         }
 
         return signals;

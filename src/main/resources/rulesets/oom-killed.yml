@@ -9,6 +9,7 @@ hypothesis: OOM_KILLED
 name: "OOMKilled Validation Rules"
 description: "Deterministic validation rules for OOMKilled hypothesis based on Kubernetes container termination patterns"
 
+
 # Score thresholds for validation verdict
 thresholds:
   minSupportedScore: 10

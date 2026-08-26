@@ -38,7 +38,7 @@ public class RuleEngine implements HypothesisValidator {
     private static final Map<String, String> ANOMALY_TO_RULESET = Map.of(
         "OOM_KILLED", "rulesets/oom-killed.yml",
         "POSSIBLE_OOM_KILLED", "rulesets/oom-killed.yml",
-        "POSSIBLE_GC_PAUSE", "rulesets/high-memory-pressure.yml"
+        "POSSIBLE_GC_PAUSE", "rulesets/gc-pause.yml"
     );
 
     private final Map<String, RuleSet> ruleSetCache = new ConcurrentHashMap<>();
@@ -77,6 +77,14 @@ public class RuleEngine implements HypothesisValidator {
             .field("ruleset", rulesetPath)
             .field("signalCount", signals.size())
             .log();
+
+        for (Signal signal : signals) {
+            log.info("PATH B Signal extracted")
+                .field("type", signal.getType())
+                .field("name", signal.getName())
+                .field("value", signal.getValueAsString())
+                .log();
+        }
 
         return validate(anomaly, ruleSet, signals);
     }
@@ -187,7 +195,15 @@ public class RuleEngine implements HypothesisValidator {
         return rules.stream()
             .map(rule -> {
                 try {
-                    return rule.evaluate(signals);
+                    RuleEvaluationResult result = rule.evaluate(signals);
+                    log.info("Rule evaluated")
+                        .field("ruleId", rule.getId())
+                        .field("type", rule.getType())
+                        .field("weight", rule.getWeight())
+                        .field("passed", result.isPassed())
+                        .field("reasoning", result.getReasoning())
+                        .log();
+                    return result;
                 } catch (Exception e) {
                     log.error("Rule evaluation failed")
                         .field("ruleId", rule.getId())
