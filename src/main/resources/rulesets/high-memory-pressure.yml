@@ -7,7 +7,6 @@ hypothesis: HIGH_MEMORY_PRESSURE
 name: "High Memory Pressure Rules"
 description: "Validates high memory pressure conditions without OOM kills"
 
-
 thresholds:
   minSupportedScore: 8
   minPartiallySupportedScore: 4
