@@ -1,9 +1,17 @@
 package com.causa.core.services.rules;
 
 import com.causa.common.logging.CausaLogger;
+import com.causa.core.domain.RootCauseAnalysis;
+import com.causa.core.services.validation.HypothesisValidator;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.yaml.snakeyaml.Yaml;
 
+import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -23,9 +31,55 @@ import java.util.stream.Collectors;
  * @since 0.0.1
  */
 @ApplicationScoped
-public class RuleEngine {
+public class RuleEngine implements HypothesisValidator {
 
     private static final CausaLogger log = CausaLogger.getLogger(RuleEngine.class);
+
+    private static final Map<String, String> ANOMALY_TO_RULESET = Map.of(
+        "OOM_KILLED", "rulesets/oom-killed.yml",
+        "POSSIBLE_OOM_KILLED", "rulesets/oom-killed.yml",
+        "POSSIBLE_GC_PAUSE", "rulesets/high-memory-pressure.yml"
+    );
+
+    private final Map<String, RuleSet> ruleSetCache = new ConcurrentHashMap<>();
+
+    @Inject
+    SignalExtractor signalExtractor;
+
+    @Override
+    public HypothesisValidationResult validateHypothesis(RootCauseAnalysis rca, String diagnosticContext) {
+        String anomaly = rca.anomalyType() != null ? rca.anomalyType().name() : "UNKNOWN";
+        String rulesetPath = ANOMALY_TO_RULESET.get(anomaly);
+
+        if (rulesetPath == null) {
+            log.info("No ruleset configured for anomaly type")
+                .field("anomalyType", anomaly)
+                .log();
+            return HypothesisValidationResult.builder(anomaly)
+                .status(HypothesisValidationResult.ValidationStatus.UNSUPPORTED)
+                .confidence(0.0)
+                .totalScore(0)
+                .maxPossibleScore(0)
+                .normalizedScore(0.0)
+                .scoreBreakdown(new HypothesisValidationResult.ScoreBreakdown(0, 0, 0))
+                .requiredResults(List.of())
+                .supportingResults(List.of())
+                .exclusionResults(List.of())
+                .explanation("No ruleset available for anomaly type: " + anomaly)
+                .build();
+        }
+
+        RuleSet ruleSet = ruleSetCache.computeIfAbsent(rulesetPath, this::loadRuleSetFromYaml);
+        List<Signal> signals = signalExtractor.extractSignals(diagnosticContext);
+
+        log.info("PATH B: Running rule-based hypothesis validation")
+            .field("anomalyType", anomaly)
+            .field("ruleset", rulesetPath)
+            .field("signalCount", signals.size())
+            .log();
+
+        return validate(anomaly, ruleSet, signals);
+    }
 
     /**
      * Validate a hypothesis using the provided rule set and signals.
@@ -322,5 +376,163 @@ public class RuleEngine {
         explanation.append(String.format("Total score: %d. Verdict: %s.", score, status));
 
         return explanation.toString();
+    }
+
+    @SuppressWarnings("unchecked")
+    private RuleSet loadRuleSetFromYaml(String path) {
+        try (InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream(path)) {
+            if (is == null) {
+                log.error("Ruleset file not found").field("path", path).log();
+                return emptyRuleSet("UNKNOWN");
+            }
+            Yaml yaml = new Yaml();
+            Map<String, Object> data = yaml.load(is);
+
+            String hypothesis = (String) data.getOrDefault("hypothesis", "UNKNOWN");
+            Map<String, Object> thresholds = (Map<String, Object>) data.getOrDefault("thresholds", Map.of());
+            int minSupported = ((Number) thresholds.getOrDefault("minSupportedScore", 10)).intValue();
+            int minPartial = ((Number) thresholds.getOrDefault("minPartiallySupportedScore", 5)).intValue();
+
+            List<Rule> required = parseRules((List<Map<String, Object>>) data.getOrDefault("required", List.of()), RuleType.REQUIRED);
+            List<Rule> supporting = parseRules((List<Map<String, Object>>) data.getOrDefault("supporting", List.of()), RuleType.SUPPORTING);
+            List<Rule> exclusion = parseRules((List<Map<String, Object>>) data.getOrDefault("exclusion", List.of()), RuleType.EXCLUSION);
+
+            log.info("Loaded ruleset from YAML")
+                .field("path", path)
+                .field("hypothesis", hypothesis)
+                .field("required", required.size())
+                .field("supporting", supporting.size())
+                .field("exclusion", exclusion.size())
+                .log();
+
+            return new LoadedRuleSet(hypothesis, required, supporting, exclusion, minSupported, minPartial);
+        } catch (Exception e) {
+            log.error("Failed to load ruleset").field("path", path).exception(e).log();
+            return emptyRuleSet("UNKNOWN");
+        }
+    }
+
+    private RuleSet emptyRuleSet(String hypothesis) {
+        return new LoadedRuleSet(hypothesis, List.of(), List.of(), List.of(), 10, 5);
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Rule> parseRules(List<Map<String, Object>> rulesData, RuleType type) {
+        List<Rule> rules = new ArrayList<>();
+        for (Map<String, Object> rd : rulesData) {
+            String id = (String) rd.get("id");
+            String desc = (String) rd.get("description");
+            int weight = ((Number) rd.getOrDefault("weight", 1)).intValue();
+            if (type == RuleType.EXCLUSION) {
+                weight = -Math.abs(weight);
+            }
+            Map<String, Object> match = (Map<String, Object>) rd.getOrDefault("match", Map.of());
+            Map<String, String> messages = (Map<String, String>) rd.getOrDefault("messages", Map.of());
+            rules.add(new YamlRule(id, desc, type, weight, match, messages));
+        }
+        return rules;
+    }
+
+    private record LoadedRuleSet(
+        String hypothesis,
+        List<Rule> required,
+        List<Rule> supporting,
+        List<Rule> exclusion,
+        int minSupported,
+        int minPartial
+    ) implements RuleSet {
+        @Override public String getHypothesisName() { return hypothesis; }
+        @Override public List<Rule> getRequiredRules() { return required; }
+        @Override public List<Rule> getSupportingRules() { return supporting; }
+        @Override public List<Rule> getExclusionRules() { return exclusion; }
+        @Override public int getMinSupportedScore() { return minSupported; }
+        @Override public int getMinPartiallySupportedScore() { return minPartial; }
+    }
+
+    private static class YamlRule extends Rule.BaseRule {
+        private final Map<String, Object> match;
+        private final Map<String, String> messages;
+
+        YamlRule(String id, String description, RuleType type, int weight,
+                 Map<String, Object> match, Map<String, String> messages) {
+            super(id, description, type, weight);
+            this.match = match;
+            this.messages = messages;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public RuleEvaluationResult evaluate(List<Signal> signals) {
+            Object signalTypeRaw = match.get("signalType");
+            Object signalNameRaw = match.get("signalName");
+            Object signalValueRaw = match.get("signalValue");
+            String condition = (String) match.getOrDefault("condition", "EQUALS");
+            boolean caseInsensitive = "CASE_INSENSITIVE".equalsIgnoreCase(
+                (String) match.getOrDefault("matchType", ""));
+
+            List<String> signalTypes = toStringList(signalTypeRaw);
+            List<String> signalNames = toStringList(signalNameRaw);
+
+            List<Signal> matched = new ArrayList<>();
+            for (Signal signal : signals) {
+                boolean typeMatch = signalTypes.isEmpty() ||
+                    signalTypes.stream().anyMatch(t -> t.equalsIgnoreCase(signal.getType().name()));
+                boolean nameMatch = signalNames.isEmpty() ||
+                    signalNames.stream().anyMatch(n -> caseInsensitive ?
+                        n.equalsIgnoreCase(signal.getName()) : n.equals(signal.getName()));
+
+                if (!typeMatch || !nameMatch) continue;
+
+                boolean valueMatch = evaluateCondition(signal, condition, signalValueRaw,
+                    (Number) match.get("threshold"), caseInsensitive);
+
+                if (valueMatch) {
+                    matched.add(signal);
+                }
+            }
+
+            if (!matched.isEmpty()) {
+                return RuleEvaluationResult.passed(this, matched,
+                    messages.getOrDefault("success", "Rule matched"));
+            }
+            return RuleEvaluationResult.failed(this,
+                messages.getOrDefault("failure", "Rule did not match"));
+        }
+
+        private boolean evaluateCondition(Signal signal, String condition,
+                                          Object expectedValue, Number threshold,
+                                          boolean caseInsensitive) {
+            switch (condition.toUpperCase()) {
+                case "EQUALS":
+                    if (expectedValue == null) return true;
+                    List<String> expectedValues = toStringList(expectedValue);
+                    String actual = signal.getValueAsString();
+                    return expectedValues.stream().anyMatch(ev ->
+                        caseInsensitive ? ev.equalsIgnoreCase(actual) : ev.equals(actual));
+                case "CONTAINS":
+                    if (expectedValue == null) return true;
+                    String actualStr = signal.getValueAsString();
+                    if (actualStr == null) return false;
+                    String expected = expectedValue.toString();
+                    return caseInsensitive ?
+                        actualStr.toLowerCase().contains(expected.toLowerCase()) :
+                        actualStr.contains(expected);
+                case "GREATER_THAN":
+                    if (threshold == null) return false;
+                    return signal.getValueAsDouble()
+                        .map(v -> v > threshold.doubleValue())
+                        .orElse(false);
+                default:
+                    return false;
+            }
+        }
+
+        @SuppressWarnings("unchecked")
+        private static List<String> toStringList(Object value) {
+            if (value == null) return List.of();
+            if (value instanceof List) return ((List<Object>) value).stream()
+                .map(Object::toString).collect(Collectors.toList());
+            return List.of(value.toString());
+        }
     }
 }

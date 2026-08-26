@@ -264,10 +264,11 @@ public class ValidationAggregator {
         double ruleWeight = 0.6;       // 60% - Rule-based (more deterministic)
 
         double combinedScore = (assertionScore * assertionWeight) + (ruleScore * ruleWeight);
-        ValidationResult.ValidationStatus finalStatus = scoreToStatus(combinedScore);
 
         double avgConfidence = (assertionVerdict.confidence() * assertionWeight) +
                                (ruleBasedVerdict.getConfidence() * ruleWeight);
+
+        ValidationResult.ValidationStatus finalStatus = scoreToStatus(avgConfidence);
 
         return new DualValidationResult.FinalVerdict(
             finalStatus,

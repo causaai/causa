@@ -47,13 +47,24 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
         Pattern.CASE_INSENSITIVE
     );
 
+    // Quarkus metrics patterns
+    private static final Pattern HEAP_AFTER_GC_PATTERN = Pattern.compile(
+        "jvm_memory_usage_after_gc\\{[^}]*pool=long-lived[^}]*}[\":]*(\\d+\\.\\d+)"
+    );
+    private static final Pattern RESTART_COUNT_PATTERN = Pattern.compile(
+        "Restart Count:\\s*(\\d+)", Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern REMAINING_PATTERN = Pattern.compile(
+        "remaining=(\\d+)B.*max=(\\d+)B"
+    );
+
     // Log patterns
     private static final Pattern OOM_ERROR_PATTERN = Pattern.compile(
         "OutOfMemoryError|OOM Error|java\\.lang\\.OutOfMemoryError",
         Pattern.CASE_INSENSITIVE
     );
     private static final Pattern FULL_GC_PATTERN = Pattern.compile(
-        "Full GC|\\[Full GC",
+        "Pause Full|Full GC|\\[Full GC",
         Pattern.CASE_INSENSITIVE
     );
 
@@ -65,49 +76,24 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
 
     @Override
     public List<Signal> extractSignals(String diagnosticContext) {
-        // ==============================================
-        // HARDCODED FOR TESTING - REMOVE IN PRODUCTION
-        // ==============================================
-        // Always inject test signals for testing PATH B validation when MCP is not connected
-        log.warn("TESTING: Injecting hardcoded test signals for PATH B validation")
-            .field("hasRealContext", diagnosticContext != null && !diagnosticContext.isBlank())
+        if (diagnosticContext == null || diagnosticContext.isBlank()) {
+            log.warn("Empty diagnostic context, no signals to extract").log();
+            return List.of();
+        }
+
+        List<Signal> signals = new ArrayList<>();
+        signals.addAll(extractKubernetesEventSignals(diagnosticContext));
+        signals.addAll(extractContainerStatusSignals(diagnosticContext));
+        signals.addAll(extractPodStatusSignals(diagnosticContext));
+        signals.addAll(extractMetricSignals(diagnosticContext));
+        signals.addAll(extractLogPatternSignals(diagnosticContext));
+        signals.addAll(extractKruizeSignals(diagnosticContext));
+
+        log.info("Extracted signals from diagnostic context")
+            .field("signalCount", signals.size())
             .log();
 
-        return List.of(
-            // Kubernetes Event: OOMKilled termination
-            Signal.builder(Signal.SignalType.KUBERNETES_EVENT, "reason")
-                .value("OOMKilled")
-                .build(),
-            Signal.builder(Signal.SignalType.KUBERNETES_EVENT, "terminationReason")
-                .value("OOMKilled")
-                .build(),
-
-            // Container Status: Exit code 137 (OOM)
-            Signal.builder(Signal.SignalType.CONTAINER_STATUS, "exitCode")
-                .value(137)
-                .build(),
-            Signal.builder(Signal.SignalType.CONTAINER_STATUS, "terminationReason")
-                .value("OOMKilled")
-                .build(),
-
-            // Pod Status: CrashLoopBackOff
-            Signal.builder(Signal.SignalType.POD_STATUS, "podState")
-                .value("CrashLoopBackOff")
-                .build(),
-
-            // Memory metrics
-            Signal.builder(Signal.SignalType.METRIC, "memory.utilization.trend")
-                .value("INCREASING")
-                .build(),
-            Signal.builder(Signal.SignalType.METRIC, "heap.usage")
-                .value(0.98)
-                .build(),
-
-            // Log pattern: OutOfMemoryError
-            Signal.builder(Signal.SignalType.LOG_PATTERN, "error.oom")
-                .value("java.lang.OutOfMemoryError: Java heap space")
-                .build()
-        );
+        return signals;
     }
 
     private List<Signal> extractKubernetesEventSignals(String context) {
@@ -193,26 +179,91 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
     private List<Signal> extractMetricSignals(String context) {
         List<Signal> signals = new ArrayList<>();
 
-        // Extract Memory Trend
+        // Extract Memory Trend from explicit text
         Matcher memoryTrendMatcher = MEMORY_TREND_PATTERN.matcher(context);
         while (memoryTrendMatcher.find()) {
             String trend = memoryTrendMatcher.group(1).toUpperCase();
             signals.add(Signal.builder(Signal.SignalType.METRIC, "memory.utilization.trend")
                 .value(trend)
                 .build());
+            signals.add(Signal.builder(Signal.SignalType.METRIC, "heap.usage.trend")
+                .value(trend)
+                .build());
         }
 
-        // Extract Heap Usage
+        // Extract Heap Usage from explicit text
         Matcher heapUsageMatcher = HEAP_USAGE_PATTERN.matcher(context);
         while (heapUsageMatcher.find()) {
             double heapUsage = Double.parseDouble(heapUsageMatcher.group(1));
-            // Normalize to 0.0-1.0 if it looks like a percentage
             if (heapUsage > 1.0) {
                 heapUsage = heapUsage / 100.0;
             }
             signals.add(Signal.builder(Signal.SignalType.METRIC, "heap.usage")
                 .value(heapUsage)
                 .build());
+        }
+
+        // Derive heap usage from Quarkus jvm_memory_usage_after_gc metric
+        Matcher afterGcMatcher = HEAP_AFTER_GC_PATTERN.matcher(context);
+        if (afterGcMatcher.find()) {
+            double afterGc = Double.parseDouble(afterGcMatcher.group(1));
+            signals.add(Signal.builder(Signal.SignalType.METRIC, "heap.usage")
+                .value(afterGc)
+                .metadata("source", "quarkus_jvm_memory_usage_after_gc")
+                .build());
+        }
+
+        // Derive memory trend from 'remaining' values in allocation logs
+        Matcher remainingMatcher = REMAINING_PATTERN.matcher(context);
+        long prevRemaining = -1;
+        boolean increasing = false;
+        while (remainingMatcher.find()) {
+            long remaining = Long.parseLong(remainingMatcher.group(1));
+            if (prevRemaining > 0 && remaining < prevRemaining) {
+                increasing = true;
+            }
+            prevRemaining = remaining;
+        }
+        if (increasing) {
+            signals.add(Signal.builder(Signal.SignalType.METRIC, "memory.utilization.trend")
+                .value("INCREASING")
+                .metadata("source", "derived_from_remaining_logs")
+                .build());
+            signals.add(Signal.builder(Signal.SignalType.METRIC, "heap.usage.trend")
+                .value("INCREASING")
+                .metadata("source", "derived_from_remaining_logs")
+                .build());
+        }
+
+        // Derive memory pressure duration from restart count
+        Matcher restartMatcher = RESTART_COUNT_PATTERN.matcher(context);
+        if (restartMatcher.find()) {
+            int restartCount = Integer.parseInt(restartMatcher.group(1));
+            if (restartCount > 0) {
+                signals.add(Signal.builder(Signal.SignalType.METRIC, "memory.pressure.duration")
+                    .value(restartCount * 300)
+                    .metadata("source", "derived_from_restart_count")
+                    .build());
+            }
+        }
+
+        // Derive memory usage percent from Quarkus metrics
+        Matcher usedMatcher = Pattern.compile(
+            "jvm_memory_used_bytes\\{area=heap,id=Tenured Gen}[\":]*(\\d+\\.?\\d*E?\\d*)"
+        ).matcher(context);
+        Matcher maxMatcher = Pattern.compile(
+            "jvm_memory_max_bytes\\{area=heap,id=Tenured Gen}[\":]*(\\d+\\.?\\d*E?\\d*)"
+        ).matcher(context);
+        if (usedMatcher.find() && maxMatcher.find()) {
+            double used = Double.parseDouble(usedMatcher.group(1));
+            double max = Double.parseDouble(maxMatcher.group(1));
+            if (max > 0) {
+                double usagePercent = used / max;
+                signals.add(Signal.builder(Signal.SignalType.METRIC, "memory.usage.percent")
+                    .value(usagePercent)
+                    .metadata("source", "quarkus_jvm_memory")
+                    .build());
+            }
         }
 
         return signals;
@@ -236,7 +287,7 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
             fullGcCount++;
         }
         if (fullGcCount > 0) {
-            signals.add(Signal.builder(Signal.SignalType.LOG_PATTERN, "gc.full.count")
+            signals.add(Signal.builder(Signal.SignalType.LOG_PATTERN, "full.gc.count")
                 .value(fullGcCount)
                 .metadata("frequent", fullGcCount > 10)
                 .build());

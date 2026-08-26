@@ -1,4 +1,4 @@
-# Assertion Extraction Prompt Template Configuration
+git # Assertion Extraction Prompt Template Configuration
 # Shared prompts with model array — define once, apply to multiple models
 
 prompts:
