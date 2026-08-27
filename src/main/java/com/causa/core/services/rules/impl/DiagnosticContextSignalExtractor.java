@@ -33,6 +33,13 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
 
     private static final CausaLogger log = CausaLogger.getLogger(DiagnosticContextSignalExtractor.class);
 
+    // Signal extraction thresholds
+    private static final double HEAP_USAGE_MAX_RATIO = 1.0;
+    private static final double PERCENTAGE_DIVISOR = 100.0;
+    private static final int RESTART_TO_SECONDS_MULTIPLIER = 300;
+    private static final int MIN_GC_VALUES_FOR_TREND = 3;
+    private static final double GC_RISE_RATIO_THRESHOLD = 0.5;
+
     // Kubernetes Event patterns
     private static final Pattern REASON_PATTERN = Pattern.compile("Reason:\\s*(\\w+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern EXIT_CODE_PATTERN = Pattern.compile("Exit Code:\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
@@ -207,8 +214,8 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
         Matcher heapUsageMatcher = HEAP_USAGE_PATTERN.matcher(context);
         while (heapUsageMatcher.find()) {
             double heapUsage = Double.parseDouble(heapUsageMatcher.group(1));
-            if (heapUsage > 1.0) {
-                heapUsage = heapUsage / 100.0;
+            if (heapUsage > HEAP_USAGE_MAX_RATIO) {
+                heapUsage = heapUsage / PERCENTAGE_DIVISOR;
             }
             signals.add(Signal.builder(Signal.SignalType.METRIC, "heap.usage")
                 .value(heapUsage)
@@ -269,7 +276,7 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
             int restartCount = Integer.parseInt(restartMatcher.group(1));
             if (restartCount > 0) {
                 signals.add(Signal.builder(Signal.SignalType.METRIC, "memory.pressure.duration")
-                    .value(restartCount * 300)
+                    .value(restartCount * RESTART_TO_SECONDS_MULTIPLIER)
                     .metadata("source", "derived_from_restart_count")
                     .build());
             }
@@ -359,7 +366,7 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
 
         // Derive memory trend from GC log before-GC heap values
         // e.g. 163M -> 184M -> 237M -> 305M -> 441M = INCREASING
-        if (beforeGcValues.size() >= 3) {
+        if (beforeGcValues.size() >= MIN_GC_VALUES_FOR_TREND) {
             int rises = 0;
             for (int i = 1; i < beforeGcValues.size(); i++) {
                 if (beforeGcValues.get(i) > beforeGcValues.get(i - 1)) {
@@ -367,7 +374,7 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
                 }
             }
             double riseRatio = (double) rises / (beforeGcValues.size() - 1);
-            if (riseRatio >= 0.5) {
+            if (riseRatio >= GC_RISE_RATIO_THRESHOLD) {
                 signals.add(Signal.builder(Signal.SignalType.METRIC, "memory.utilization.trend")
                     .value("INCREASING")
                     .metadata("source", "derived_from_gc_logs")
