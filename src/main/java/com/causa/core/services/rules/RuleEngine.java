@@ -1,5 +1,6 @@
 package com.causa.core.services.rules;
 
+import com.causa.common.constants.ValidationConstants.RulesetPaths;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
 import com.causa.core.domain.RootCauseAnalysis;
@@ -37,9 +38,9 @@ public class RuleEngine implements HypothesisValidator {
     private static final CausaLogger log = CausaLogger.getLogger(RuleEngine.class);
 
     private static final Map<String, String> ANOMALY_TO_RULESET = Map.of(
-        "OOM_KILLED", "rulesets/oom-killed.yml",
-        "POSSIBLE_OOM_KILLED", "rulesets/oom-killed.yml",
-        "POSSIBLE_GC_PAUSE", "rulesets/gc-pause.yml"
+        "OOM_KILLED", RulesetPaths.OOM_KILLED,
+        "POSSIBLE_OOM_KILLED", RulesetPaths.OOM_KILLED,
+        "POSSIBLE_GC_PAUSE", RulesetPaths.GC_PAUSE
     );
 
     private final Map<String, RuleSet> ruleSetCache = new ConcurrentHashMap<>();

@@ -1,6 +1,8 @@
 package com.causa.core.services.validation;
 
+import com.causa.common.constants.ValidationConstants.Aggregation;
 import com.causa.common.logging.CausaLogger;
+import com.causa.common.logging.LogMessages;
 import com.causa.core.domain.validation.DualValidationResult;
 import com.causa.core.domain.validation.ValidationResult;
 import com.causa.core.services.rules.HypothesisValidationResult;
@@ -38,7 +40,7 @@ public class ValidationAggregator {
         HypothesisValidationResult ruleBasedResult,
         DualValidationResult.FinalVerdict.AggregationStrategy strategy
     ) {
-        log.info("Aggregating dual validation results")
+        log.info(LogMessages.Validation.HYPOTHESIS_VALIDATION_STARTED)
             .field("assertionCount", assertionResults.size())
             .field("ruleBasedStatus", ruleBasedResult.getStatus())
             .field("strategy", strategy)
@@ -58,7 +60,7 @@ public class ValidationAggregator {
             finalVerdict
         );
 
-        log.info("Dual validation aggregation completed")
+        log.info(LogMessages.Validation.HYPOTHESIS_VALIDATION_COMPLETED)
             .field("finalStatus", finalVerdict.status())
             .field("finalConfidence", finalVerdict.confidence())
             .field("summary", result.toSummaryString())
@@ -78,11 +80,10 @@ public class ValidationAggregator {
                 ValidationResult.ValidationStatus.UNKNOWN,
                 0.0,
                 0, 0, 0, 0, 0,
-                "No assertions to validate"
+                Aggregation.NO_ASSERTIONS
             );
         }
 
-        // Count assertions by status
         int total = results.size();
         int supported = (int) results.stream()
             .filter(r -> r.status() == ValidationResult.ValidationStatus.SUPPORTED)
@@ -97,18 +98,15 @@ public class ValidationAggregator {
             .filter(r -> r.status() == ValidationResult.ValidationStatus.UNKNOWN)
             .count();
 
-        // Calculate average confidence
         double avgConfidence = results.stream()
             .mapToDouble(ValidationResult::confidence)
             .average()
             .orElse(0.0);
 
-        // Determine overall status
         ValidationResult.ValidationStatus status = determineAssertionStatus(
             total, supported, partiallySupported, unsupported, unknown
         );
 
-        // Build explanation
         String explanation = String.format(
             "Assertions: %d supported, %d partial, %d unsupported, %d unknown out of %d total",
             supported, partiallySupported, unsupported, unknown, total
@@ -135,22 +133,19 @@ public class ValidationAggregator {
         double supportedRatio = (double) supported / total;
         double unsupportedRatio = (double) unsupported / total;
 
-        // If majority (>70%) are supported
-        if (supportedRatio >= 0.7) {
+        if (supportedRatio >= Aggregation.SUPPORTED_RATIO_THRESHOLD) {
             return ValidationResult.ValidationStatus.SUPPORTED;
         }
 
-        // If majority (>70%) are unsupported
-        if (unsupportedRatio >= 0.7) {
+        if (unsupportedRatio >= Aggregation.UNSUPPORTED_RATIO_THRESHOLD) {
             return ValidationResult.ValidationStatus.UNSUPPORTED;
         }
 
-        // If significant support (>40%) exists
-        if (supportedRatio + (partiallySupported * 0.5 / total) >= 0.4) {
+        if (supportedRatio + (partiallySupported * Aggregation.PARTIAL_SUPPORT_WEIGHT_FACTOR / total)
+                >= Aggregation.PARTIAL_SUPPORT_RATIO_THRESHOLD) {
             return ValidationResult.ValidationStatus.PARTIALLY_SUPPORTED;
         }
 
-        // Default: unsupported
         return ValidationResult.ValidationStatus.UNSUPPORTED;
     }
 
@@ -180,7 +175,6 @@ public class ValidationAggregator {
         ValidationResult.ValidationStatus assertionStatus = assertionVerdict.status();
         ValidationResult.ValidationStatus ruleStatus = mapRuleStatus(ruleBasedVerdict.getStatus());
 
-        // Both must be SUPPORTED
         if (assertionStatus == ValidationResult.ValidationStatus.SUPPORTED &&
             ruleStatus == ValidationResult.ValidationStatus.SUPPORTED) {
 
@@ -189,11 +183,10 @@ public class ValidationAggregator {
                 ValidationResult.ValidationStatus.SUPPORTED,
                 confidence,
                 DualValidationResult.FinalVerdict.AggregationStrategy.STRICT_CONSENSUS,
-                "Both paths support the RCA hypothesis"
+                Aggregation.BOTH_SUPPORT
             );
         }
 
-        // Both must be UNSUPPORTED
         if (assertionStatus == ValidationResult.ValidationStatus.UNSUPPORTED &&
             ruleStatus == ValidationResult.ValidationStatus.UNSUPPORTED) {
 
@@ -202,11 +195,10 @@ public class ValidationAggregator {
                 ValidationResult.ValidationStatus.UNSUPPORTED,
                 confidence,
                 DualValidationResult.FinalVerdict.AggregationStrategy.STRICT_CONSENSUS,
-                "Both paths reject the RCA hypothesis"
+                Aggregation.BOTH_REJECT
             );
         }
 
-        // Disagreement or partial support → PARTIALLY_SUPPORTED
         double avgConfidence = (assertionVerdict.confidence() + ruleBasedVerdict.getConfidence()) / 2.0;
         return new DualValidationResult.FinalVerdict(
             ValidationResult.ValidationStatus.PARTIALLY_SUPPORTED,
@@ -230,14 +222,14 @@ public class ValidationAggregator {
                 assertionVerdict.status(),
                 assertionVerdict.confidence(),
                 DualValidationResult.FinalVerdict.AggregationStrategy.HIGHEST_CONFIDENCE,
-                "Assertion-based validation has higher confidence"
+                Aggregation.ASSERTION_HIGHER_CONFIDENCE
             );
         } else {
             return new DualValidationResult.FinalVerdict(
                 mapRuleStatus(ruleBasedVerdict.getStatus()),
                 ruleBasedVerdict.getConfidence(),
                 DualValidationResult.FinalVerdict.AggregationStrategy.HIGHEST_CONFIDENCE,
-                "Rule-based validation has higher confidence"
+                Aggregation.RULE_HIGHER_CONFIDENCE
             );
         }
     }
@@ -255,18 +247,14 @@ public class ValidationAggregator {
         DualValidationResult.AssertionBasedVerdict assertionVerdict,
         HypothesisValidationResult ruleBasedVerdict
     ) {
-        // Convert statuses to numeric scores
         double assertionScore = statusToScore(assertionVerdict.status());
         double ruleScore = statusToScore(mapRuleStatus(ruleBasedVerdict.getStatus()));
 
-        // Weighted average: PATH A = 40%, PATH B = 60%
-        double assertionWeight = 0.4;  // 40% - LLM-based (more exploratory)
-        double ruleWeight = 0.6;       // 60% - Rule-based (more deterministic)
+        double combinedScore = (assertionScore * Aggregation.ASSERTION_WEIGHT) +
+                               (ruleScore * Aggregation.RULE_WEIGHT);
 
-        double combinedScore = (assertionScore * assertionWeight) + (ruleScore * ruleWeight);
-
-        double avgConfidence = (assertionVerdict.confidence() * assertionWeight) +
-                               (ruleBasedVerdict.getConfidence() * ruleWeight);
+        double avgConfidence = (assertionVerdict.confidence() * Aggregation.ASSERTION_WEIGHT) +
+                               (ruleBasedVerdict.getConfidence() * Aggregation.RULE_WEIGHT);
 
         ValidationResult.ValidationStatus finalStatus = scoreToStatus(combinedScore);
 
@@ -275,7 +263,7 @@ public class ValidationAggregator {
             avgConfidence,
             DualValidationResult.FinalVerdict.AggregationStrategy.WEIGHTED_AVERAGE,
             String.format("Weighted average: assertion=%.2f (weight=%.1f), rule=%.2f (weight=%.1f), final=%.2f",
-                assertionScore, assertionWeight, ruleScore, ruleWeight, combinedScore)
+                assertionScore, Aggregation.ASSERTION_WEIGHT, ruleScore, Aggregation.RULE_WEIGHT, combinedScore)
         );
     }
 
@@ -286,7 +274,6 @@ public class ValidationAggregator {
         DualValidationResult.AssertionBasedVerdict assertionVerdict,
         HypothesisValidationResult ruleBasedVerdict
     ) {
-        // If rule-based is SUPPORTED or UNSUPPORTED (strong signal), use it
         if (ruleBasedVerdict.getStatus() == HypothesisValidationResult.ValidationStatus.SUPPORTED ||
             ruleBasedVerdict.getStatus() == HypothesisValidationResult.ValidationStatus.UNSUPPORTED) {
 
@@ -294,16 +281,15 @@ public class ValidationAggregator {
                 mapRuleStatus(ruleBasedVerdict.getStatus()),
                 ruleBasedVerdict.getConfidence(),
                 DualValidationResult.FinalVerdict.AggregationStrategy.RULE_BASED_PRIORITY,
-                "Rule-based validation provides deterministic verdict"
+                Aggregation.RULE_DETERMINISTIC
             );
         }
 
-        // Otherwise fall back to assertion-based
         return new DualValidationResult.FinalVerdict(
             assertionVerdict.status(),
             assertionVerdict.confidence(),
             DualValidationResult.FinalVerdict.AggregationStrategy.RULE_BASED_PRIORITY,
-            "Rule-based inconclusive, using assertion-based verdict"
+            Aggregation.RULE_INCONCLUSIVE
         );
     }
 
@@ -325,10 +311,10 @@ public class ValidationAggregator {
      */
     private double statusToScore(ValidationResult.ValidationStatus status) {
         return switch (status) {
-            case SUPPORTED -> 1.0;
-            case PARTIALLY_SUPPORTED -> 0.5;
-            case UNSUPPORTED -> 0.0;
-            case UNKNOWN -> 0.25;
+            case SUPPORTED -> Aggregation.SCORE_SUPPORTED;
+            case PARTIALLY_SUPPORTED -> Aggregation.SCORE_PARTIALLY_SUPPORTED;
+            case UNSUPPORTED -> Aggregation.SCORE_UNSUPPORTED;
+            case UNKNOWN -> Aggregation.SCORE_UNKNOWN;
         };
     }
 
@@ -336,9 +322,9 @@ public class ValidationAggregator {
      * Convert numeric score back to status.
      */
     private ValidationResult.ValidationStatus scoreToStatus(double score) {
-        if (score >= 0.75) {
+        if (score >= Aggregation.SUPPORTED_SCORE_THRESHOLD) {
             return ValidationResult.ValidationStatus.SUPPORTED;
-        } else if (score >= 0.4) {
+        } else if (score >= Aggregation.PARTIALLY_SUPPORTED_SCORE_THRESHOLD) {
             return ValidationResult.ValidationStatus.PARTIALLY_SUPPORTED;
         } else {
             return ValidationResult.ValidationStatus.UNSUPPORTED;

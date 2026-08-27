@@ -1,5 +1,10 @@
 package com.causa.core.services.rules.impl;
 
+import com.causa.common.constants.ValidationConstants.ContextKeywords;
+import com.causa.common.constants.ValidationConstants.SignalMetadata;
+import com.causa.common.constants.ValidationConstants.SignalNames;
+import com.causa.common.constants.ValidationConstants.SignalThresholds;
+import com.causa.common.constants.ValidationConstants.SignalValues;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
 import com.causa.core.services.rules.Signal;
@@ -32,13 +37,6 @@ import java.util.regex.Pattern;
 public class DiagnosticContextSignalExtractor implements SignalExtractor {
 
     private static final CausaLogger log = CausaLogger.getLogger(DiagnosticContextSignalExtractor.class);
-
-    // Signal extraction thresholds
-    private static final double HEAP_USAGE_MAX_RATIO = 1.0;
-    private static final double PERCENTAGE_DIVISOR = 100.0;
-    private static final int RESTART_TO_SECONDS_MULTIPLIER = 300;
-    private static final int MIN_GC_VALUES_FOR_TREND = 3;
-    private static final double GC_RISE_RATIO_THRESHOLD = 0.5;
 
     // Kubernetes Event patterns
     private static final Pattern REASON_PATTERN = Pattern.compile("Reason:\\s*(\\w+)", Pattern.CASE_INSENSITIVE);
@@ -118,33 +116,32 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
     private List<Signal> extractKubernetesEventSignals(String context) {
         List<Signal> signals = new ArrayList<>();
 
-        // Extract Reason field
         Matcher reasonMatcher = REASON_PATTERN.matcher(context);
         while (reasonMatcher.find()) {
             String reason = reasonMatcher.group(1);
-            signals.add(Signal.builder(Signal.SignalType.KUBERNETES_EVENT, "reason")
+            signals.add(Signal.builder(Signal.SignalType.KUBERNETES_EVENT, SignalNames.REASON)
                 .value(reason)
                 .build());
 
-            if ("OOMKilled".equalsIgnoreCase(reason)) {
-                signals.add(Signal.builder(Signal.SignalType.KUBERNETES_EVENT, "terminationReason")
-                    .value("OOMKilled")
+            if (SignalValues.OOM_KILLED.equalsIgnoreCase(reason)) {
+                signals.add(Signal.builder(Signal.SignalType.KUBERNETES_EVENT, SignalNames.TERMINATION_REASON)
+                    .value(SignalValues.OOM_KILLED)
                     .build());
             }
         }
 
-        // Check for deployment/rollout mentions
-        if (context.toLowerCase().contains("rollout") || context.toLowerCase().contains("deployment")) {
-            signals.add(Signal.builder(Signal.SignalType.KUBERNETES_EVENT, "deployment")
-                .value("deployment rollout detected")
+        if (context.toLowerCase().contains(ContextKeywords.ROLLOUT) ||
+            context.toLowerCase().contains(ContextKeywords.DEPLOYMENT)) {
+            signals.add(Signal.builder(Signal.SignalType.KUBERNETES_EVENT, SignalNames.DEPLOYMENT)
+                .value(SignalValues.DEPLOYMENT_ROLLOUT_DETECTED)
                 .build());
         }
 
-        // Check for eviction
-        if (context.toLowerCase().contains("evict")) {
-            String evictionType = context.toLowerCase().contains("disk") ? "disk pressure" : "memory pressure";
-            signals.add(Signal.builder(Signal.SignalType.KUBERNETES_EVENT, "eviction")
-                .value("eviction due to " + evictionType)
+        if (context.toLowerCase().contains(ContextKeywords.EVICT)) {
+            String evictionType = context.toLowerCase().contains(ContextKeywords.DISK)
+                ? SignalValues.DISK_PRESSURE : SignalValues.MEMORY_PRESSURE;
+            signals.add(Signal.builder(Signal.SignalType.KUBERNETES_EVENT, SignalNames.EVICTION)
+                .value(SignalValues.EVICTION_PREFIX + evictionType)
                 .build());
         }
 
@@ -154,19 +151,17 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
     private List<Signal> extractContainerStatusSignals(String context) {
         List<Signal> signals = new ArrayList<>();
 
-        // Extract Exit Code
         Matcher exitCodeMatcher = EXIT_CODE_PATTERN.matcher(context);
         while (exitCodeMatcher.find()) {
             int exitCode = Integer.parseInt(exitCodeMatcher.group(1));
-            signals.add(Signal.builder(Signal.SignalType.CONTAINER_STATUS, "exitCode")
+            signals.add(Signal.builder(Signal.SignalType.CONTAINER_STATUS, SignalNames.EXIT_CODE)
                 .value(exitCode)
                 .build());
         }
 
-        // Check for termination reason in container status
-        if (context.contains("OOMKilled")) {
-            signals.add(Signal.builder(Signal.SignalType.CONTAINER_STATUS, "terminationReason")
-                .value("OOMKilled")
+        if (context.contains(ContextKeywords.OOM_KILLED)) {
+            signals.add(Signal.builder(Signal.SignalType.CONTAINER_STATUS, SignalNames.TERMINATION_REASON)
+                .value(SignalValues.OOM_KILLED)
                 .build());
         }
 
@@ -176,19 +171,17 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
     private List<Signal> extractPodStatusSignals(String context) {
         List<Signal> signals = new ArrayList<>();
 
-        // Extract Pod Status
         Matcher statusMatcher = POD_STATUS_PATTERN.matcher(context);
         while (statusMatcher.find()) {
             String status = statusMatcher.group(1);
-            signals.add(Signal.builder(Signal.SignalType.POD_STATUS, "status")
+            signals.add(Signal.builder(Signal.SignalType.POD_STATUS, SignalNames.STATUS)
                 .value(status)
                 .build());
         }
 
-        // Check for CrashLoopBackOff
-        if (context.contains("CrashLoopBackOff")) {
-            signals.add(Signal.builder(Signal.SignalType.POD_STATUS, "podState")
-                .value("CrashLoopBackOff")
+        if (context.contains(SignalValues.CRASH_LOOP_BACK_OFF)) {
+            signals.add(Signal.builder(Signal.SignalType.POD_STATUS, SignalNames.POD_STATE)
+                .value(SignalValues.CRASH_LOOP_BACK_OFF)
                 .build());
         }
 
@@ -198,41 +191,37 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
     private List<Signal> extractMetricSignals(String context) {
         List<Signal> signals = new ArrayList<>();
 
-        // Extract Memory Trend from explicit text
         Matcher memoryTrendMatcher = MEMORY_TREND_PATTERN.matcher(context);
         while (memoryTrendMatcher.find()) {
             String trend = memoryTrendMatcher.group(1).toUpperCase();
-            signals.add(Signal.builder(Signal.SignalType.METRIC, "memory.utilization.trend")
+            signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.MEMORY_UTILIZATION_TREND)
                 .value(trend)
                 .build());
-            signals.add(Signal.builder(Signal.SignalType.METRIC, "heap.usage.trend")
+            signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.HEAP_USAGE_TREND)
                 .value(trend)
                 .build());
         }
 
-        // Extract Heap Usage from explicit text
         Matcher heapUsageMatcher = HEAP_USAGE_PATTERN.matcher(context);
         while (heapUsageMatcher.find()) {
             double heapUsage = Double.parseDouble(heapUsageMatcher.group(1));
-            if (heapUsage > HEAP_USAGE_MAX_RATIO) {
-                heapUsage = heapUsage / PERCENTAGE_DIVISOR;
+            if (heapUsage > SignalThresholds.HEAP_USAGE_MAX_RATIO) {
+                heapUsage = heapUsage / SignalThresholds.PERCENTAGE_DIVISOR;
             }
-            signals.add(Signal.builder(Signal.SignalType.METRIC, "heap.usage")
+            signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.HEAP_USAGE)
                 .value(heapUsage)
                 .build());
         }
 
-        // Derive heap usage from Quarkus jvm_memory_usage_after_gc metric
         Matcher afterGcMatcher = HEAP_AFTER_GC_PATTERN.matcher(context);
         if (afterGcMatcher.find()) {
             double afterGc = Double.parseDouble(afterGcMatcher.group(1));
-            signals.add(Signal.builder(Signal.SignalType.METRIC, "heap.usage")
+            signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.HEAP_USAGE)
                 .value(afterGc)
-                .metadata("source", "quarkus_jvm_memory_usage_after_gc")
+                .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_QUARKUS_AFTER_GC)
                 .build());
         }
 
-        // Derive memory trend from 'remaining' values in allocation logs
         Matcher remainingMatcher = REMAINING_PATTERN.matcher(context);
         long prevRemaining = -1;
         boolean increasing = false;
@@ -244,45 +233,41 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
             prevRemaining = remaining;
         }
         if (increasing) {
-            signals.add(Signal.builder(Signal.SignalType.METRIC, "memory.utilization.trend")
-                .value("INCREASING")
-                .metadata("source", "derived_from_remaining_logs")
+            signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.MEMORY_UTILIZATION_TREND)
+                .value(SignalValues.INCREASING)
+                .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_REMAINING_LOGS)
                 .build());
-            signals.add(Signal.builder(Signal.SignalType.METRIC, "heap.usage.trend")
-                .value("INCREASING")
-                .metadata("source", "derived_from_remaining_logs")
+            signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.HEAP_USAGE_TREND)
+                .value(SignalValues.INCREASING)
+                .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_REMAINING_LOGS)
                 .build());
         }
 
-        // Derive memory trend from OOMKilled + restart count
-        // If the pod was OOM killed with restarts, memory repeatedly grew to exhaustion — that's an increasing trend
-        if (context.contains("OOMKilled")) {
+        if (context.contains(ContextKeywords.OOM_KILLED)) {
             Matcher restartCheck = RESTART_COUNT_PATTERN.matcher(context);
             if (restartCheck.find() && Integer.parseInt(restartCheck.group(1)) > 0) {
-                signals.add(Signal.builder(Signal.SignalType.METRIC, "memory.utilization.trend")
-                    .value("INCREASING")
-                    .metadata("source", "derived_from_oomkilled_with_restarts")
+                signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.MEMORY_UTILIZATION_TREND)
+                    .value(SignalValues.INCREASING)
+                    .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_OOMKILLED_RESTARTS)
                     .build());
-                signals.add(Signal.builder(Signal.SignalType.METRIC, "heap.usage.trend")
-                    .value("INCREASING")
-                    .metadata("source", "derived_from_oomkilled_with_restarts")
+                signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.HEAP_USAGE_TREND)
+                    .value(SignalValues.INCREASING)
+                    .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_OOMKILLED_RESTARTS)
                     .build());
             }
         }
 
-        // Derive memory pressure duration from restart count
         Matcher restartMatcher = RESTART_COUNT_PATTERN.matcher(context);
         if (restartMatcher.find()) {
             int restartCount = Integer.parseInt(restartMatcher.group(1));
             if (restartCount > 0) {
-                signals.add(Signal.builder(Signal.SignalType.METRIC, "memory.pressure.duration")
-                    .value(restartCount * RESTART_TO_SECONDS_MULTIPLIER)
-                    .metadata("source", "derived_from_restart_count")
+                signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.MEMORY_PRESSURE_DURATION)
+                    .value(restartCount * SignalThresholds.RESTART_TO_SECONDS_MULTIPLIER)
+                    .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_RESTART_COUNT)
                     .build());
             }
         }
 
-        // Derive memory usage percent from Quarkus metrics (Tenured Gen or G1 Old Gen)
         Matcher usedMatcher = HEAP_USED_BYTES_PATTERN.matcher(context);
         Matcher maxMatcher = HEAP_MAX_BYTES_PATTERN.matcher(context);
         if (usedMatcher.find() && maxMatcher.find()) {
@@ -290,9 +275,9 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
             double max = Double.parseDouble(maxMatcher.group(1));
             if (max > 0) {
                 double usagePercent = used / max;
-                signals.add(Signal.builder(Signal.SignalType.METRIC, "memory.usage.percent")
+                signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.MEMORY_USAGE_PERCENT)
                     .value(usagePercent)
-                    .metadata("source", "quarkus_jvm_memory")
+                    .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_QUARKUS_MEMORY)
                     .build());
             }
         }
@@ -303,28 +288,25 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
     private List<Signal> extractLogPatternSignals(String context) {
         List<Signal> signals = new ArrayList<>();
 
-        // Check for OutOfMemoryError
         Matcher oomErrorMatcher = OOM_ERROR_PATTERN.matcher(context);
         if (oomErrorMatcher.find()) {
-            signals.add(Signal.builder(Signal.SignalType.LOG_PATTERN, "error.oom")
+            signals.add(Signal.builder(Signal.SignalType.LOG_PATTERN, SignalNames.ERROR_OOM)
                 .value(oomErrorMatcher.group(0))
                 .build());
         }
 
-        // Check for Full GC
         Matcher fullGcMatcher = FULL_GC_PATTERN.matcher(context);
         int fullGcCount = 0;
         while (fullGcMatcher.find()) {
             fullGcCount++;
         }
         if (fullGcCount > 0) {
-            signals.add(Signal.builder(Signal.SignalType.LOG_PATTERN, "full.gc.count")
+            signals.add(Signal.builder(Signal.SignalType.LOG_PATTERN, SignalNames.FULL_GC_COUNT)
                 .value(fullGcCount)
-                .metadata("frequent", fullGcCount > 10)
+                .metadata(SignalMetadata.FREQUENT, fullGcCount > SignalThresholds.FULL_GC_FREQUENT_THRESHOLD)
                 .build());
         }
 
-        // Extract GC pause durations, heap-after-GC ratios, and memory trend from verbose:gc logs
         Matcher gcDetailMatcher = GC_PAUSE_DETAIL_PATTERN.matcher(context);
         double maxPause = 0;
         double totalPause = 0;
@@ -350,23 +332,21 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
             }
         }
         if (gcDetailCount > 0) {
-            signals.add(Signal.builder(Signal.SignalType.METRIC, "gc.pause.max")
+            signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.GC_PAUSE_MAX)
                 .value(maxPause)
-                .metadata("source", "verbose_gc_logs")
+                .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_VERBOSE_GC)
                 .build());
-            signals.add(Signal.builder(Signal.SignalType.METRIC, "gc.pause.total")
+            signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.GC_PAUSE_TOTAL)
                 .value(totalPause)
-                .metadata("source", "verbose_gc_logs")
+                .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_VERBOSE_GC)
                 .build());
-            signals.add(Signal.builder(Signal.SignalType.METRIC, "heap.after.gc.ratio")
+            signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.HEAP_AFTER_GC_RATIO)
                 .value(maxHeapAfterGcRatio)
-                .metadata("source", "verbose_gc_logs")
+                .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_VERBOSE_GC)
                 .build());
         }
 
-        // Derive memory trend from GC log before-GC heap values
-        // e.g. 163M -> 184M -> 237M -> 305M -> 441M = INCREASING
-        if (beforeGcValues.size() >= MIN_GC_VALUES_FOR_TREND) {
+        if (beforeGcValues.size() >= SignalThresholds.MIN_GC_VALUES_FOR_TREND) {
             int rises = 0;
             for (int i = 1; i < beforeGcValues.size(); i++) {
                 if (beforeGcValues.get(i) > beforeGcValues.get(i - 1)) {
@@ -374,14 +354,14 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
                 }
             }
             double riseRatio = (double) rises / (beforeGcValues.size() - 1);
-            if (riseRatio >= GC_RISE_RATIO_THRESHOLD) {
-                signals.add(Signal.builder(Signal.SignalType.METRIC, "memory.utilization.trend")
-                    .value("INCREASING")
-                    .metadata("source", "derived_from_gc_logs")
+            if (riseRatio >= SignalThresholds.GC_RISE_RATIO_THRESHOLD) {
+                signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.MEMORY_UTILIZATION_TREND)
+                    .value(SignalValues.INCREASING)
+                    .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_GC_LOGS)
                     .build());
-                signals.add(Signal.builder(Signal.SignalType.METRIC, "heap.usage.trend")
-                    .value("INCREASING")
-                    .metadata("source", "derived_from_gc_logs")
+                signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.HEAP_USAGE_TREND)
+                    .value(SignalValues.INCREASING)
+                    .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_GC_LOGS)
                     .build());
             }
         }
@@ -392,13 +372,12 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
     private List<Signal> extractKruizeSignals(String context) {
         List<Signal> signals = new ArrayList<>();
 
-        // Check for Kruize memory recommendation
         Matcher kruizeMatcher = KRUIZE_MEMORY_REC_PATTERN.matcher(context);
         if (kruizeMatcher.find()) {
             String recommendation = kruizeMatcher.group(0);
-            signals.add(Signal.builder(Signal.SignalType.KRUIZE_RECOMMENDATION, "memory.limit.recommendation")
-                .value("increase memory limit")
-                .metadata("recommendation", recommendation)
+            signals.add(Signal.builder(Signal.SignalType.KRUIZE_RECOMMENDATION, SignalNames.MEMORY_LIMIT_RECOMMENDATION)
+                .value(SignalValues.INCREASE_MEMORY_LIMIT)
+                .metadata(SignalMetadata.RECOMMENDATION, recommendation)
                 .build());
         }
 
