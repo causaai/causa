@@ -313,12 +313,14 @@ public final class McpConstants {
         public static final String HAS_KRUIZE_CONTEXT = "hasKruizeContext";
         public static final String HAS_CRYOSTAT_CONTEXT = "hasCryostatContext";
         public static final String HAS_QUARKUS_CONTEXT = "hasQuarkusContext";
+        public static final String HAS_ASYNC_PROFILER_CONTEXT = "hasAsyncProfilerContext";
         public static final String HAS_FILESYSTEM_CONTEXT = "hasFilesystemContext";
         public static final String HAS_JMX_CONTEXT = "hasJmxContext";
         public static final String PLATFORM = "platform";
         public static final String RETRY_ATTEMPT = "retryAttempt";
         public static final String DELAY_MS = "delayMs";
         public static final String ANALYSIS_TYPE = "analysisType";
+        public static final String SESSION_ID = "sessionId";
     }
 
     /**

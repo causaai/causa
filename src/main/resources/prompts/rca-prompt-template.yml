@@ -30,7 +30,69 @@ prompts:
          - 5e. CONTAINER_ANALYSIS: Container configuration, CPU throttling, memory limits
       6. **KRUIZE_PERFORMANCE_RECOMMENDATIONS**: Current vs recommended resource values with deltas.
 
-      ## CONTEXT DATA
+      You will receive the following signals (some may be missing):
+
+      ### 1. POD_STATUS
+      - Contains: Pod phase, restart count, ready status, container statuses
+      - **Note**: A "Running" pod can still have memory issues, GC problems, or be approaching OOM
+
+      ### 2. PROMETHEUS_METRICS
+      - Format: CPU Usage: X/Y cores, MEMORY Usage: X/Y MiB
+      - Use for: Memory pressure detection, resource utilization analysis
+
+      ### 3. APPLICATION_LOGS
+      - Contains: Application events, error messages, stack traces, OOM errors
+      - Look for: OutOfMemoryError, heap space issues, fatal errors, abort messages
+
+      ### 4. POD_EVENTS
+      - Contains: Pod state changes, container restarts, image pulls, warnings
+      - Look for: OOMKilled, BackOff, CrashLoopBackOff, exit codes (especially 137)
+
+      ### 5. JFR_ANALYSIS (Java Flight Recorder from Cryostat)
+      Structured profiling data with multiple analysis files:
+      - **5a. GC_ANALYSIS_CRYOSTAT**: GC events, heap summaries, pauses, configuration (DefNew, SerialOld, G1GC, ParallelGC)
+      - **5b. MEMORY_ANALYSIS_CRYOSTAT**: Heap usage, memory pools (Eden, Survivor, Tenured Gen)
+      - **5c. THREAD_ANALYSIS**: Thread parking, statistics, thread dumps
+      - **5d. EXCEPTION_ANALYSIS**: Exception statistics, thrown exceptions
+      - **5e. CONTAINER_ANALYSIS**: Container configuration, CPU throttling, memory limits
+      - **Note**: JFR data is JSON-formatted with event types, columns, and rows. If missing or empty (row_count: 0), note in llm_notes.
+
+      ### 6. KRUIZE_PERFORMANCE_RECOMMENDATIONS
+      - Contains: Resource request/limit recommendations for CPU and memory
+      - Shows: Current vs recommended values with deltas
+
+      ### 7. QUARKUS_RAW_METRICS (Quarkus MCP)
+      - Source: `fetch_raw_metrics_from_endpoint` tool — live Micrometer/Prometheus metrics scraped from the Quarkus pod
+      - Top-level fields: `source`, `base_url`, `timestamp`, `metric_count`, `metrics` (flat map of metric-name → value)
+      - Key metric families to reason about:
+        - `jvm_memory_used_bytes{area="heap",id="G1 Old Gen"}` — live old-gen heap consumption in bytes
+        - `jvm_memory_max_bytes{area="heap",id="G1 Old Gen"}` — maximum heap ceiling; compare with used to compute utilisation %
+        - `jvm_gc_overhead` — fraction of time spent in GC (0.0 = no GC pressure, >0.1 = significant pressure)
+        - `jvm_gc_live_data_size_bytes` — bytes of live data after last full GC
+        - `jvm_threads_live_threads` / `jvm_threads_states_threads{state=...}` — thread counts by state (blocked, runnable, waiting, timed-waiting)
+        - `process_cpu_usage` — process-level CPU utilisation (0.0–1.0)
+        - `system_cpu_usage` — host CPU utilisation; compare with process to assess contention
+        - `worker_pool_active` / `worker_pool_idle{pool_name="vert.x-worker-thread"}` — Vert.x worker thread pool saturation
+      - **Note**: If section is missing or `"No Data Available"`, note in `llm_notes` and omit Quarkus evidence from scoring.
+
+      ### 8. ASYNC_PROFILER_DATA (Async Profiler MCP — Jafra backend)
+      Up to seven sections collected from the Async Profiler MCP server. All are optional; each is absent when the endpoint is not configured or the pod has no Jafra sidecar.
+      - **8a. PROFILED PODS** (`list_profiled_pods`): JSON array confirming the pod is registered; contains `latestRecordingId` (null if no recording exists yet)
+      - **8b. JVM STATUS** (`get_pod_jvm_status`): `profilerAttached`, `heapUsedBytes`, `heapMaxBytes`, `gcCollectionCount`, `threadCount`
+      - **8c. JVM STATISTICS** (`get_jvm_statistics`): `heapUsedMb`, `heapMaxMb`, `heapUtilisationPct`, `gcPauseTimeMs`, `gcCollections`, `liveThreads`
+      - **8d. LATEST RECORDING** (`get_recording`): recording `state` (`RUNNING`/`STOPPED`), `startTime`, `duration`, `sizeBytes`
+      - **8e. RECORDING REPORT** (`get_recording_report`): JMC rule-based structured findings — memory leaks, GC pause violations, CPU bottlenecks, thread stalls
+      - **8f. JFR SUMMARY** (`get_jfr_summary`): LLM-ready narrative of CPU hotspots, allocation hot paths, GC activity, and lock contention
+      - **8g. FLAME GRAPH** (`get_flame_graph`): JSON call-stack frame tree; each node has `name`, `value` (self-sample count), `children`
+      - Key values to reason about:
+        - `heapUtilisationPct ≥ 85 %` — heap nearly exhausted; corroborate with POD EVENTS `OOMKilling`
+        - `heapMaxMb > container memory limit × 0.75` — JVM heap ceiling exceeds safe cgroup headroom; container will OOMKill before JVM OOM handler fires
+        - `gcPauseTimeMs > 100` — GC pauses causing latency; corroborate with Cryostat GC ANALYSIS
+        - Flame graph frame dominating ≥ 30 % of samples — CPU hotspot; distinguish app code from JVM GC/lock internals
+        - RECORDING REPORT `MemoryLeakRule` or `ObjectCountAfterGCRule` violations — high-confidence leak evidence
+      - **Note**: If sections 8d–8g are absent, `latestRecordingId` was null (no JFR recording yet) — state in `llm_notes`. If all sections are `"No Data Available"`, Async Profiler MCP was not configured — omit from `evidences`.
+
+      ## AVAILABLE CONTEXT DATA
 
       {{context}}
 

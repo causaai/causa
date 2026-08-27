@@ -35,6 +35,7 @@ class McpContextCollectorTest {
     @Mock McpConfig.KruizeConfig kruizeConfig;
     @Mock McpConfig.CryostatConfig cryostatConfig;
     @Mock McpConfig.QuarkusConfig quarkusConfig;
+    @Mock McpConfig.AsyncProfilerConfig asyncProfilerConfig;
     @Mock McpConfig.JmxConfig jmxConfig;
     @Mock McpConfig.FilesystemConfig filesystemMcpConfig;
     @Mock LibertyLogsContextCollector libertyLogsContextCollector;
@@ -81,6 +82,10 @@ class McpContextCollectorTest {
             when(quarkusConfig.endpoint()).thenReturn(Optional.of("http://192.0.2.1"));
             when(quarkusConfig.timeoutMs()).thenReturn(1);
 
+            when(mcpConfig.asyncProfiler()).thenReturn(asyncProfilerConfig);
+            when(asyncProfilerConfig.endpoint()).thenReturn(Optional.of("http://192.0.2.1"));
+            when(asyncProfilerConfig.timeoutMs()).thenReturn(1);
+
             collector = new McpContextCollector(mcpConfig, libertyLogsContextCollector, "cluster");
         }
 
@@ -106,7 +111,119 @@ class McpContextCollectorTest {
             assertThat(ctx.hasKruizeContext()).isFalse();
             assertThat(ctx.hasCryostatContext()).isFalse();
             assertThat(ctx.hasQuarkusContext()).isFalse();
+            assertThat(ctx.hasAsyncProfilerContext()).isFalse();
         }
+
+        @Test
+        @DisplayName("hasAsyncProfilerContext is true when Async Profiler MCP tool returns pod list")
+        void shouldCollectAsyncProfilerContextWhenMcpToolSucceeds() throws Exception {
+            // given
+            ObjectMapper mapper = new ObjectMapper();
+            ObjectNode textEntry = mapper.createObjectNode();
+            textEntry.put("text", "[{\"podName\":\"pod-1\",\"latestRecordingId\":null}]");
+            ArrayNode contentArray = mapper.createArrayNode();
+            contentArray.add(textEntry);
+            ObjectNode podListResult = mapper.createObjectNode();
+            podListResult.set("content", contentArray);
+
+            McpContextCollector testCollector =
+                    new McpContextCollector(mcpConfig, libertyLogsContextCollector, "cluster") {
+                        @Override
+                        protected String initializeMcpSession(String endpoint, int timeoutMs) {
+                            return "test-session";
+                        }
+
+                        @Override
+                        protected JsonNode callMcpTool(String endpoint, String sessionId,
+                                String toolName, ObjectNode arguments, int timeoutMs) {
+                            return podListResult;
+                        }
+                    };
+
+            // when
+            DiagnosticContext ctx = testCollector.collectContext(buildAlert());
+
+            // then
+            assertThat(ctx.hasAsyncProfilerContext()).isTrue();
+            assertThat(ctx.getAsyncProfilerPodList()).contains("pod-1");
+        }
+
+        @Test
+        @DisplayName("terminateMcpSession is called after successful callAsyncProfilerTool")
+        void shouldTerminateSessionAfterSuccessfulAsyncProfilerCall() throws Exception {
+            // given
+            ObjectMapper mapper = new ObjectMapper();
+            ObjectNode textEntry = mapper.createObjectNode();
+            textEntry.put("text", "[{\"podName\":\"pod-1\",\"latestRecordingId\":null}]");
+            ArrayNode contentArray = mapper.createArrayNode();
+            contentArray.add(textEntry);
+            ObjectNode podListResult = mapper.createObjectNode();
+            podListResult.set("content", contentArray);
+
+            java.util.List<String> terminatedSessions = new java.util.ArrayList<>();
+
+            McpContextCollector testCollector =
+                    new McpContextCollector(mcpConfig, libertyLogsContextCollector, "cluster") {
+                        @Override
+                        protected String initializeMcpSession(String endpoint, int timeoutMs) {
+                            return "test-session";
+                        }
+
+                        @Override
+                        protected JsonNode callMcpTool(String endpoint, String sessionId,
+                                String toolName, ObjectNode arguments, int timeoutMs) {
+                            return podListResult;
+                        }
+
+                        @Override
+                        protected void terminateMcpSession(String endpoint, String sessionId, int timeoutMs) {
+                            terminatedSessions.add(sessionId);
+                        }
+                    };
+
+            // when
+            testCollector.collectContext(buildAlert());
+
+            // then — session was terminated at least once (called per callAsyncProfilerTool invocation)
+            assertThat(terminatedSessions).isNotEmpty();
+            assertThat(terminatedSessions).allMatch(s -> s.equals("test-session"));
+        }
+
+        @Test
+        @DisplayName("terminateMcpSession is called even when callMcpTool throws")
+        void shouldTerminateSessionEvenWhenAsyncProfilerToolThrows() throws Exception {
+            // given
+            java.util.List<String> terminatedSessions = new java.util.ArrayList<>();
+
+            McpContextCollector testCollector =
+                    new McpContextCollector(mcpConfig, libertyLogsContextCollector, "cluster") {
+                        @Override
+                        protected String initializeMcpSession(String endpoint, int timeoutMs) {
+                            return "test-session";
+                        }
+
+                        @Override
+                        protected JsonNode callMcpTool(String endpoint, String sessionId,
+                                String toolName, ObjectNode arguments, int timeoutMs) throws Exception {
+                            throw new RuntimeException("MCP tool failure");
+                        }
+
+                        @Override
+                        protected void terminateMcpSession(String endpoint, String sessionId, int timeoutMs) {
+                            terminatedSessions.add(sessionId);
+                        }
+                    };
+
+            // when — exception is swallowed by callAsyncProfilerTool, context is returned
+            DiagnosticContext ctx = testCollector.collectContext(buildAlert());
+
+            // then — session still terminated despite the exception
+            assertThat(ctx).isNotNull();
+            assertThat(terminatedSessions).isNotEmpty();
+            assertThat(terminatedSessions).allMatch(s -> s.equals("test-session"));
+        }
+
+
 
         @Test
         @DisplayName("hasQuarkusContext is true when Quarkus MCP tool returns metrics")
@@ -249,6 +366,10 @@ class McpContextCollectorTest {
             when(mcpConfig.quarkus()).thenReturn(quarkusConfig);
             when(quarkusConfig.endpoint()).thenReturn(Optional.of("http://192.0.2.1"));
             when(quarkusConfig.timeoutMs()).thenReturn(1);
+
+            when(mcpConfig.asyncProfiler()).thenReturn(asyncProfilerConfig);
+            when(asyncProfilerConfig.endpoint()).thenReturn(Optional.of("http://192.0.2.1"));
+            when(asyncProfilerConfig.timeoutMs()).thenReturn(1);
 
             McpContextCollector c = new McpContextCollector(mcpConfig, libertyLogsContextCollector, null);
             DiagnosticContext ctx = c.collectContext(buildAlert());
