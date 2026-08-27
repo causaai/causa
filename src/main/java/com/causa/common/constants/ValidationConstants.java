@@ -88,5 +88,4 @@ public final class ValidationConstants {
         public static final String UNSUPPORTED_COUNT = "unsupportedCount";
         public static final String UNKNOWN_COUNT = "unknownCount";
     }
-
 }
