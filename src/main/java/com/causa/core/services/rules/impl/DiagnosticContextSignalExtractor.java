@@ -48,9 +48,15 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
         Pattern.CASE_INSENSITIVE
     );
 
-    // Quarkus metrics patterns
+    // Quarkus metrics patterns (handles both quoted and unquoted Prometheus label values)
     private static final Pattern HEAP_AFTER_GC_PATTERN = Pattern.compile(
-        "jvm_memory_usage_after_gc\\{[^}]*pool=long-lived[^}]*}[\":]*(\\d+\\.\\d+)"
+        "jvm_memory_usage_after_gc\\{[^}]*pool=\"?long-lived\"?[^}]*}\\s*[\":]*(\\d+\\.?\\d*E?\\d*)"
+    );
+    private static final Pattern HEAP_USED_BYTES_PATTERN = Pattern.compile(
+        "jvm_memory_used_bytes\\{[^}]*area=\"?heap\"?[^}]*id=\"?(?:Tenured Gen|G1 Old Gen)\"?[^}]*}\\s*[\":]*(\\d+\\.?\\d*E?\\d*)"
+    );
+    private static final Pattern HEAP_MAX_BYTES_PATTERN = Pattern.compile(
+        "jvm_memory_max_bytes\\{[^}]*area=\"?heap\"?[^}]*id=\"?(?:Tenured Gen|G1 Old Gen)\"?[^}]*}\\s*[\":]*(\\d+\\.?\\d*E?\\d*)"
     );
     private static final Pattern RESTART_COUNT_PATTERN = Pattern.compile(
         "Restart Count:\\s*(\\d+)", Pattern.CASE_INSENSITIVE
@@ -269,13 +275,9 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
             }
         }
 
-        // Derive memory usage percent from Quarkus metrics
-        Matcher usedMatcher = Pattern.compile(
-            "jvm_memory_used_bytes\\{area=heap,id=Tenured Gen}[\":]*(\\d+\\.?\\d*E?\\d*)"
-        ).matcher(context);
-        Matcher maxMatcher = Pattern.compile(
-            "jvm_memory_max_bytes\\{area=heap,id=Tenured Gen}[\":]*(\\d+\\.?\\d*E?\\d*)"
-        ).matcher(context);
+        // Derive memory usage percent from Quarkus metrics (Tenured Gen or G1 Old Gen)
+        Matcher usedMatcher = HEAP_USED_BYTES_PATTERN.matcher(context);
+        Matcher maxMatcher = HEAP_MAX_BYTES_PATTERN.matcher(context);
         if (usedMatcher.find() && maxMatcher.find()) {
             double used = Double.parseDouble(usedMatcher.group(1));
             double max = Double.parseDouble(maxMatcher.group(1));
