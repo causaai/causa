@@ -268,7 +268,7 @@ public class ValidationAggregator {
         double avgConfidence = (assertionVerdict.confidence() * assertionWeight) +
                                (ruleBasedVerdict.getConfidence() * ruleWeight);
 
-        ValidationResult.ValidationStatus finalStatus = scoreToStatus(avgConfidence);
+        ValidationResult.ValidationStatus finalStatus = scoreToStatus(combinedScore);
 
         return new DualValidationResult.FinalVerdict(
             finalStatus,
