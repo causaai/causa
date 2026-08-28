@@ -163,6 +163,7 @@ public final class ValidationConstants {
         public static final String SOURCE_QUARKUS_MEMORY = "quarkus_jvm_memory";
         public static final String SOURCE_VERBOSE_GC = "verbose_gc_logs";
         public static final String SOURCE_GC_LOGS = "derived_from_gc_logs";
+        public static final String SOURCE_EXIT_CODE_137 = "inferred_from_exit_code_137";
     }
 
     /**
@@ -176,6 +177,7 @@ public final class ValidationConstants {
         public static final String EVICT = "evict";
         public static final String DISK = "disk";
         public static final String OOM_KILLED = "OOMKilled";
+        public static final String BACK_OFF_RESTARTING = "Back-off restarting failed container";
     }
 
     /**
@@ -190,6 +192,9 @@ public final class ValidationConstants {
         public static final int MIN_GC_VALUES_FOR_TREND = 3;
         public static final double GC_RISE_RATIO_THRESHOLD = 0.5;
         public static final int FULL_GC_FREQUENT_THRESHOLD = 10;
+        public static final int SUSTAINED_PRESSURE_SECONDS = 600;
+        public static final int CHRONIC_OOM_PRESSURE_SECONDS = 3000;
+        public static final int EXIT_CODE_OOM_KILLED = 137;
     }
 
     /**

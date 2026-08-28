@@ -150,6 +150,7 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
 
     private List<Signal> extractContainerStatusSignals(String context) {
         List<Signal> signals = new ArrayList<>();
+        boolean hasExitCode137 = false;
 
         Matcher exitCodeMatcher = EXIT_CODE_PATTERN.matcher(context);
         while (exitCodeMatcher.find()) {
@@ -157,11 +158,22 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
             signals.add(Signal.builder(Signal.SignalType.CONTAINER_STATUS, SignalNames.EXIT_CODE)
                 .value(exitCode)
                 .build());
+            if (exitCode == SignalThresholds.EXIT_CODE_OOM_KILLED) {
+                hasExitCode137 = true;
+            }
         }
 
         if (context.contains(ContextKeywords.OOM_KILLED)) {
             signals.add(Signal.builder(Signal.SignalType.CONTAINER_STATUS, SignalNames.TERMINATION_REASON)
                 .value(SignalValues.OOM_KILLED)
+                .build());
+        } else if (hasExitCode137) {
+            // K8s may report reason as "Error" instead of "OOMKilled" depending on
+            // which crash cycle lastState captured. Exit code 137 = SIGKILL from
+            // kernel OOM killer in container environments.
+            signals.add(Signal.builder(Signal.SignalType.CONTAINER_STATUS, SignalNames.TERMINATION_REASON)
+                .value(SignalValues.OOM_KILLED)
+                .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_EXIT_CODE_137)
                 .build());
         }
 
@@ -179,7 +191,8 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
                 .build());
         }
 
-        if (context.contains(SignalValues.CRASH_LOOP_BACK_OFF)) {
+        if (context.contains(SignalValues.CRASH_LOOP_BACK_OFF) ||
+            context.contains(ContextKeywords.BACK_OFF_RESTARTING)) {
             signals.add(Signal.builder(Signal.SignalType.POD_STATUS, SignalNames.POD_STATE)
                 .value(SignalValues.CRASH_LOOP_BACK_OFF)
                 .build());
@@ -243,7 +256,17 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
                 .build());
         }
 
-        if (context.contains(ContextKeywords.OOM_KILLED)) {
+        boolean hasOomEvidence = context.contains(ContextKeywords.OOM_KILLED);
+        if (!hasOomEvidence) {
+            Matcher exitCheck = EXIT_CODE_PATTERN.matcher(context);
+            while (exitCheck.find()) {
+                if (Integer.parseInt(exitCheck.group(1)) == SignalThresholds.EXIT_CODE_OOM_KILLED) {
+                    hasOomEvidence = true;
+                    break;
+                }
+            }
+        }
+        if (hasOomEvidence) {
             Matcher restartCheck = RESTART_COUNT_PATTERN.matcher(context);
             if (restartCheck.find() && Integer.parseInt(restartCheck.group(1)) > 0) {
                 signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.MEMORY_UTILIZATION_TREND)
