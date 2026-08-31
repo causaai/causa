@@ -3,7 +3,7 @@
 <div align="center">
   <h2 align="center">Causa AI Agent</h2>
   <p align="center">
-    Automated, intelligent root-cause analysis for Java Memory Anomalies in Kubernetes.
+    Automated, intelligent root-cause analysis for Java Anomalies in Kubernetes.
     <br /><br />
     <a href="https://github.com/causaai/causa-backend/tree/main/docs">Explore The Docs</a>
     &middot;
@@ -45,7 +45,7 @@
 ---
 
 ## About The Project
-[Causa](https://github.com/causaai/causa-backend) is an AI-powered root cause analysis agent that helps engineering teams reduce Mean Time to Resolution (MTTR) for Java memory issues on Kubernetes and virtual machines.
+[Causa](https://github.com/causaai/causa-backend) is an AI-powered root cause analysis agent that helps engineering teams reduce Mean Time to Resolution (MTTR) for Java issues on Kubernetes and virtual machines.
 
 When a Prometheus [Alertmanager](https://prometheus.io/docs/alerting/latest/alertmanager/) alert is triggered, Causa automatically collects production context—including application logs, pod health, Kubernetes events, and infrastructure insights via MCP servers—and uses AI to identify the root cause. Within minutes, it delivers prioritized remediation steps, covering both immediate mitigation and long-term fixes, so engineers can resolve incidents faster with less manual investigation.
 
@@ -65,7 +65,7 @@ Instead of engineers manually collecting data from multiple tools, Causa deliver
 
 - 🧠 **Context-Aware Diagnostics** – Automatically gathers production context from Kubernetes, JVM, [Kruize Recommendations](https://github.com/kruize/autotune/) and infrastructure through MCP servers.
 
-- ☸️ **Kubernetes & VM Support (Planned)** – Diagnoses Java memory issues across both Kubernetes clusters and traditional virtual machine deployments (VM Support is planned for next release).
+- ☸️ **Kubernetes & VM Support (Planned)** – Diagnoses Java issues across both Kubernetes clusters and traditional virtual machine deployments (VM Support is planned for next release).
 
 - 🤖 **Flexible LLM Providers** – Supports multiple AI backends including Anthropic Claude, Vertex AI Claude, with extensible support for IBM Bob (Planned) and Ollama (Planned).
 
