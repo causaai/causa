@@ -220,17 +220,18 @@ public class RuleEngine implements HypothesisValidator {
     /**
      * Calculate total weighted score.
      *
-     * <p>Score = (Required passed) + Sum(Supporting weights) - Sum(Exclusion weights)
+     * <p>Score = Sum(Required weights) + Sum(Supporting weights) - Sum(Exclusion weights)
      */
     private int calculateScore(
         List<RuleEvaluationResult> requiredResults,
         List<RuleEvaluationResult> supportingResults,
         List<RuleEvaluationResult> exclusionResults
     ) {
-        // Required rules contribute their weight if passed (or can be treated as binary gate)
-        int requiredScore = (int) requiredResults.stream()
+        // Required rules contribute their full weight if passed (highest importance)
+        int requiredScore = requiredResults.stream()
             .filter(RuleEvaluationResult::isPassed)
-            .count();
+            .mapToInt(RuleEvaluationResult::getWeightContribution)
+            .sum();
 
         // Supporting rules add positive weight
         int supportingScore = supportingResults.stream()
@@ -255,9 +256,10 @@ public class RuleEngine implements HypothesisValidator {
         List<RuleEvaluationResult> supportingResults,
         List<RuleEvaluationResult> exclusionResults
     ) {
-        int requiredScore = (int) requiredResults.stream()
+        int requiredScore = requiredResults.stream()
             .filter(RuleEvaluationResult::isPassed)
-            .count();
+            .mapToInt(RuleEvaluationResult::getWeightContribution)
+            .sum();
 
         int supportingScore = supportingResults.stream()
             .filter(RuleEvaluationResult::isPassed)
@@ -279,11 +281,13 @@ public class RuleEngine implements HypothesisValidator {
     /**
      * Calculate maximum possible score for normalization.
      *
-     * <p>Max score = (all required passed) + sum(all supporting weights) + 0 (exclusions don't add to max)
+     * <p>Max score = sum(all required weights) + sum(all supporting weights) + 0 (exclusions don't add to max)
      */
     private int calculateMaxPossibleScore(RuleSet ruleSet) {
-        // All required rules passed
-        int maxRequired = ruleSet.getRequiredRules().size();
+        // All required rules passed with their weights
+        int maxRequired = ruleSet.getRequiredRules().stream()
+            .mapToInt(Rule::getWeight)
+            .sum();
 
         // All supporting rules matched
         int maxSupporting = ruleSet.getSupportingRules().stream()

@@ -14,7 +14,7 @@ thresholds:
 required:
   - id: memory_pressure.required.high_usage
     description: "Memory usage above 80%"
-    weight: 1
+    weight: 10
     match:
       signalType: METRIC
       signalName: memory.usage.percent
@@ -26,7 +26,7 @@ required:
 
   - id: memory_pressure.required.sustained
     description: "High memory sustained for period"
-    weight: 1
+    weight: 10
     match:
       signalType: METRIC
       signalName: memory.pressure.duration
@@ -39,7 +39,7 @@ required:
 supporting:
   - id: memory_pressure.supporting.swap_usage
     description: "Swap memory being used"
-    weight: 3
+    weight: 2
     match:
       signalType: METRIC
       signalName: swap.usage
@@ -51,7 +51,7 @@ supporting:
 
   - id: memory_pressure.supporting.page_faults
     description: "High page fault rate"
-    weight: 2
+    weight: 1
     match:
       signalType: METRIC
       signalName: page.faults.rate

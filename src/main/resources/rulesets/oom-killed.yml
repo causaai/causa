@@ -18,7 +18,7 @@ thresholds:
 required:
   - id: oom.required.exit_code_137
     description: "Container terminated with exit code 137 (SIGKILL)"
-    weight: 1
+    weight: 10
     match:
       signalType: CONTAINER_STATUS
       signalName: exitCode
@@ -30,7 +30,7 @@ required:
 
   - id: oom.required.reason_oomkilled
     description: "Container termination reason is OOMKilled"
-    weight: 1
+    weight: 10
     match:
       signalType: [KUBERNETES_EVENT, CONTAINER_STATUS]
       signalName: [terminationReason, reason]
@@ -43,7 +43,7 @@ required:
 
   - id: oom.required.memory_increasing
     description: "Memory utilization continuously increased"
-    weight: 1
+    weight: 10
     match:
       signalType: METRIC
       signalName: memory.utilization.trend
@@ -58,7 +58,7 @@ required:
 supporting:
   - id: oom.supporting.heap_exceeded
     description: "Heap usage exceeded 90% threshold"
-    weight: 5
+    weight: 3
     match:
       signalType: [METRIC, JVM_ANALYSIS]
       signalName: heap.usage
@@ -70,7 +70,7 @@ supporting:
 
   - id: oom.supporting.heap_trend_increasing
     description: "Heap usage trending upward"
-    weight: 2
+    weight: 1
     match:
       signalType: METRIC
       signalName: heap.usage.trend
@@ -83,7 +83,7 @@ supporting:
 
   - id: oom.supporting.oom_error_in_logs
     description: "OutOfMemoryError found in logs"
-    weight: 4
+    weight: 3
     match:
       signalType: LOG_PATTERN
       signalName: error.oom
@@ -95,7 +95,7 @@ supporting:
 
   - id: oom.supporting.crash_loop
     description: "Pod in CrashLoopBackOff state due to repeated OOM kills"
-    weight: 3
+    weight: 2
     match:
       signalType: POD_STATUS
       signalName: podState
@@ -107,7 +107,7 @@ supporting:
 
   - id: oom.supporting.sustained_memory_pressure
     description: "Sustained memory pressure indicated by repeated OOM restarts"
-    weight: 4
+    weight: 2
     match:
       signalType: METRIC
       signalName: memory.pressure.duration
@@ -119,7 +119,7 @@ supporting:
 
   - id: oom.supporting.high_restart_count
     description: "High restart count indicates repeated OOM kill cycles"
-    weight: 3
+    weight: 2
     match:
       signalType: METRIC
       signalName: memory.pressure.duration

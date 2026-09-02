@@ -15,7 +15,7 @@ thresholds:
 required:
   - id: gc.required.full_gc_detected
     description: "Full GC events detected in logs"
-    weight: 1
+    weight: 10
     match:
       signalType: LOG_PATTERN
       signalName: full.gc.count
@@ -27,7 +27,7 @@ required:
 
   - id: gc.required.long_gc_pause
     description: "GC pause duration exceeds 30ms"
-    weight: 1
+    weight: 10
     match:
       signalType: METRIC
       signalName: gc.pause.max
@@ -39,7 +39,7 @@ required:
 
   - id: gc.required.heap_after_gc_high
     description: "Heap usage remains high after GC (poor reclamation)"
-    weight: 1
+    weight: 10
     match:
       signalType: METRIC
       signalName: heap.after.gc.ratio
@@ -52,7 +52,7 @@ required:
 supporting:
   - id: gc.supporting.frequent_full_gc
     description: "Frequent Full GC events (more than 5)"
-    weight: 5
+    weight: 3
     match:
       signalType: LOG_PATTERN
       signalName: full.gc.count
@@ -64,7 +64,7 @@ supporting:
 
   - id: gc.supporting.heap_high
     description: "Heap usage exceeded 80%"
-    weight: 3
+    weight: 2
     match:
       signalType: METRIC
       signalName: heap.usage
@@ -76,7 +76,7 @@ supporting:
 
   - id: gc.supporting.memory_trend_increasing
     description: "Memory utilization trending upward"
-    weight: 2
+    weight: 1
     match:
       signalType: METRIC
       signalName: [memory.utilization.trend, heap.usage.trend]
@@ -89,7 +89,7 @@ supporting:
 
   - id: gc.supporting.total_gc_pause_time
     description: "Total GC pause time exceeds 10% of elapsed time"
-    weight: 4
+    weight: 2
     match:
       signalType: METRIC
       signalName: gc.pause.percent
