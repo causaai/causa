@@ -52,7 +52,7 @@ required:
 supporting:
   - id: gc.supporting.frequent_full_gc
     description: "Frequent Full GC events (more than 5)"
-    weight: 4
+    weight: 5
     match:
       signalType: LOG_PATTERN
       signalName: full.gc.count
@@ -64,7 +64,7 @@ supporting:
 
   - id: gc.supporting.heap_high
     description: "Heap usage exceeded 80%"
-    weight: 4
+    weight: 3
     match:
       signalType: METRIC
       signalName: heap.usage
@@ -89,7 +89,7 @@ supporting:
 
   - id: gc.supporting.total_gc_pause_time
     description: "Total GC pause time exceeds 10% of elapsed time"
-    weight: 3
+    weight: 4
     match:
       signalType: METRIC
       signalName: gc.pause.percent
