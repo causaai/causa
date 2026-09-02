@@ -26,7 +26,7 @@ required:
       condition: EQUALS
     messages:
       success: "Found container exit code 137"
-      failure: "No exit code 137 found in container status"
+      failure: "Exit code 137 not found in container status"
 
   - id: oom.required.reason_oomkilled
     description: "Container termination reason is OOMKilled"
@@ -68,18 +68,6 @@ supporting:
       success: "Heap usage exceeded 90%"
       failure: "Heap usage did not exceed threshold"
 
-  - id: oom.supporting.full_gc_frequent
-    description: "Frequent Full GC events detected"
-    weight: 3
-    match:
-      signalType: [LOG_PATTERN, JVM_ANALYSIS]
-      signalName: full.gc.count
-      condition: GREATER_THAN
-      threshold: 5
-    messages:
-      success: "Detected frequent Full GC events"
-      failure: "No frequent Full GC detected"
-
   - id: oom.supporting.heap_trend_increasing
     description: "Heap usage trending upward"
     weight: 2
@@ -105,17 +93,41 @@ supporting:
       success: "Found OutOfMemoryError in logs"
       failure: "No OOM errors in logs"
 
-  - id: oom.supporting.kruize_memory_recommendation
-    description: "Kruize recommends increasing memory limit"
+  - id: oom.supporting.crash_loop
+    description: "Pod in CrashLoopBackOff state due to repeated OOM kills"
     weight: 3
     match:
-      signalType: KRUIZE_RECOMMENDATION
-      signalName: memory.limit.recommendation
-      condition: GREATER_THAN
-      threshold: 0
+      signalType: POD_STATUS
+      signalName: podState
+      signalValue: CrashLoopBackOff
+      condition: EQUALS
     messages:
-      success: "Kruize recommends memory increase"
-      failure: "No Kruize memory recommendations"
+      success: "Pod is in CrashLoopBackOff — repeated crash cycle"
+      failure: "Pod is not in CrashLoopBackOff"
+
+  - id: oom.supporting.sustained_memory_pressure
+    description: "Sustained memory pressure indicated by repeated OOM restarts"
+    weight: 4
+    match:
+      signalType: METRIC
+      signalName: memory.pressure.duration
+      condition: GREATER_THAN
+      threshold: 600
+    messages:
+      success: "Sustained memory pressure detected from repeated OOM restarts"
+      failure: "No sustained memory pressure"
+
+  - id: oom.supporting.high_restart_count
+    description: "High restart count indicates repeated OOM kill cycles"
+    weight: 3
+    match:
+      signalType: METRIC
+      signalName: memory.pressure.duration
+      condition: GREATER_THAN
+      threshold: 3000
+    messages:
+      success: "Very high restart count — chronic OOM condition"
+      failure: "Restart count not high enough for chronic OOM"
 
 # EXCLUSION RULES - Subtract weight if matched (negative indicators)
 exclusion:

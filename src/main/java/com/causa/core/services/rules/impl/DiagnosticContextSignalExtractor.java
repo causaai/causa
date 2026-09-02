@@ -85,6 +85,14 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
         "(\\d+)M->(\\d+)M\\((\\d+)M\\)\\s+(\\d+\\.?\\d*)ms"
     );
 
+    // Quarkus GC pause metrics patterns (JSON format from MCP metrics endpoint)
+    private static final Pattern QUARKUS_GC_PAUSE_SUM_PATTERN = Pattern.compile(
+        "\"jvm_gc_pause_seconds_sum\\{[^}]*}\"\\s*:\\s*(\\d+\\.?\\d*(?:E-?\\d+)?)"
+    );
+    private static final Pattern QUARKUS_PROCESS_UPTIME_PATTERN = Pattern.compile(
+        "\"process_uptime_seconds\"\\s*:\\s*(\\d+\\.?\\d*)"
+    );
+
     // Kruize patterns
     private static final Pattern KRUIZE_MEMORY_REC_PATTERN = Pattern.compile(
         "kruize.*recommends?.*memory.*limit.*to\\s*(\\d+)",
@@ -104,6 +112,7 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
         signals.addAll(extractPodStatusSignals(diagnosticContext));
         signals.addAll(extractMetricSignals(diagnosticContext));
         signals.addAll(extractLogPatternSignals(diagnosticContext));
+        signals.addAll(extractQuarkusGcPauseSignals(diagnosticContext));
         signals.addAll(extractKruizeSignals(diagnosticContext));
 
         log.info(LogMessages.Validation.SIGNALS_EXTRACTED)
@@ -387,6 +396,35 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
                     .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_GC_LOGS)
                     .build());
             }
+        }
+
+        return signals;
+    }
+
+    private List<Signal> extractQuarkusGcPauseSignals(String context) {
+        List<Signal> signals = new ArrayList<>();
+
+        Matcher uptimeMatcher = QUARKUS_PROCESS_UPTIME_PATTERN.matcher(context);
+        if (!uptimeMatcher.find()) {
+            return signals;
+        }
+        double uptimeSeconds = Double.parseDouble(uptimeMatcher.group(1));
+        if (uptimeSeconds <= 0) {
+            return signals;
+        }
+
+        Matcher pauseSumMatcher = QUARKUS_GC_PAUSE_SUM_PATTERN.matcher(context);
+        double totalPauseSeconds = 0;
+        while (pauseSumMatcher.find()) {
+            totalPauseSeconds += Double.parseDouble(pauseSumMatcher.group(1));
+        }
+
+        if (totalPauseSeconds > 0) {
+            double pausePercent = totalPauseSeconds / uptimeSeconds;
+            signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.GC_PAUSE_PERCENT)
+                .value(pausePercent)
+                .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_QUARKUS_GC_PAUSE)
+                .build());
         }
 
         return signals;

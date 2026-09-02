@@ -88,15 +88,15 @@ supporting:
       failure: "No increasing memory trend"
 
   - id: gc.supporting.total_gc_pause_time
-    description: "Total GC pause time exceeds 200ms"
+    description: "Total GC pause time exceeds 10% of elapsed time"
     weight: 3
     match:
       signalType: METRIC
-      signalName: gc.pause.total
+      signalName: gc.pause.percent
       condition: GREATER_THAN
-      threshold: 200
+      threshold: 0.10
     messages:
-      success: "Total GC pause time exceeds 200ms"
+      success: "Total GC pause time exceeds 10% of elapsed time"
       failure: "Total GC pause time under threshold"
 
 exclusion:

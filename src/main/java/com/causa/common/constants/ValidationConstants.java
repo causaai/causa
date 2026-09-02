@@ -118,6 +118,7 @@ public final class ValidationConstants {
         // GC metric signals
         public static final String GC_PAUSE_MAX = "gc.pause.max";
         public static final String GC_PAUSE_TOTAL = "gc.pause.total";
+        public static final String GC_PAUSE_PERCENT = "gc.pause.percent";
         public static final String HEAP_AFTER_GC_RATIO = "heap.after.gc.ratio";
 
         // Log pattern signals
@@ -157,6 +158,7 @@ public final class ValidationConstants {
 
         // Source values
         public static final String SOURCE_QUARKUS_AFTER_GC = "quarkus_jvm_memory_usage_after_gc";
+        public static final String SOURCE_QUARKUS_GC_PAUSE = "quarkus_jvm_gc_pause_seconds";
         public static final String SOURCE_REMAINING_LOGS = "derived_from_remaining_logs";
         public static final String SOURCE_OOMKILLED_RESTARTS = "derived_from_oomkilled_with_restarts";
         public static final String SOURCE_RESTART_COUNT = "derived_from_restart_count";

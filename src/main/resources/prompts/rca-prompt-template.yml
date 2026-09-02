@@ -40,9 +40,16 @@ prompts:
 
       Apply in order, stop at first match. Do NOT classify as HEALTHY if ANY memory issues, high pressure, or GC problems exist.
 
-      1. **OOM_KILLED** — ANY of: OOMKilled event, exit code 137, OutOfMemoryError + restart/crash evidence
-      2. **POSSIBLE_OOM_KILLED** — ANY of: OutOfMemoryError without OOMKilled event, memory ≥90%, heap pools >90% in JFR, allocation failures in logs
-      3. **POSSIBLE_GC_PAUSE** — ANY of: GC pauses >100ms, GC events >10/min, GC overhead >10%, memory 75-90% + GC pressure
+      **CRITICAL CLASSIFICATION RULES:**
+      - "Allocation Failure" in GC logs is a NORMAL GC trigger reason (young gen full → triggers collection). It is NOT an OOM signal. Do NOT use GC "Allocation Failure" to classify as OOM.
+      - High heap usage (even 90-100%) in a RUNNING pod with NO exit code 137 and NO OOMKilled event indicates GC pressure, NOT OOM.
+      - OOM_KILLED requires HARD evidence: exit code 137 + OOMKilled termination reason.
+      - POSSIBLE_OOM_KILLED requires java.lang.OutOfMemoryError exception in logs OR container memory hitting cgroup limit — NOT just high JVM heap or GC allocation failures.
+      - If the pod is Running with no OOM kill history and has Full GC / major GC events, classify as POSSIBLE_GC_PAUSE even if heap is at 100%.
+
+      1. **OOM_KILLED** — REQUIRES ALL of: OOMKilled termination reason, exit code 137, restart/crash evidence.
+      2. **POSSIBLE_OOM_KILLED** — ANY of: java.lang.OutOfMemoryError in application logs (without OOMKilled event), container memory usage hitting cgroup limit with evidence of pressure, OutOfMemoryError + high memory without crash. NOT just high heap usage, NOT GC "Allocation Failure" logs.
+      3. **POSSIBLE_GC_PAUSE** — ANY of: Full GC / major GC events detected, GC pauses >30ms, GC "Allocation Failure" triggers in logs, heap usage >80% in a running pod, high GC frequency, poor heap reclamation after GC, memory 75-90% + GC pressure, GC overhead >10%.
       4. **HEALTHY** — ALL of: no OOM events/errors, memory <75%, GC pauses <50ms, no memory warnings, no restarts
 
       ### STEP 2: ROOT CAUSE IDENTIFICATION
