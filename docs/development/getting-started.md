@@ -1,6 +1,6 @@
 # Getting Started - Development Guide
 
-This guide will help you set up your development environment, build, compile, and run the Causa Backend application.
+This guide will help you set up your development environment, build, compile, and run the Causa application.
 
 ## Table of Contents
 
