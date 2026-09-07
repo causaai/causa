@@ -45,7 +45,7 @@
 ---
 
 ## About The Project
-[Causa](https://github.com/causaai/causa) is an AI-powered root cause analysis agent that helps engineering teams reduce Mean Time to Resolution (MTTR) for Java memory issues on Kubernetes and virtual machines.
+[Causa](https://github.com/causaai/causa) is an AI-powered root cause analysis agent that helps engineering teams reduce Mean Time to Resolution (MTTR) for Java issues on Kubernetes and virtual machines.
 
 When a Prometheus [Alertmanager](https://prometheus.io/docs/alerting/latest/alertmanager/) alert is triggered, Causa automatically collects production context—including application logs, pod health, Kubernetes events, and infrastructure insights via MCP servers—and uses AI to identify the root cause. Within minutes, it delivers prioritized remediation steps, covering both immediate mitigation and long-term fixes, so engineers can resolve incidents faster with less manual investigation.
 
