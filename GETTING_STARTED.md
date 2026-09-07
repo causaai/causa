@@ -57,10 +57,10 @@ jafra-agent (DaemonSet) ──gRPC──→  jafra-analyzer  ──HTTP──→
 Prometheus + Alertmanager
     │  memory alert fires
     ▼
-causa-backend  ←── gathers context from:
+causa  ←── gathers context from:
     │                - Kubernetes MCP Server (pod, logs, events)
     │                - Quarkus MCP Server (JVM metrics)
-    │                - Jafra MCP Server (JFR analysis)
+    │                - Jafra (Experimental) MCP Server (JFR analysis)
     │  runs AI analysis via LLM provider
     ▼
 causa-mcp-server  ←──  Bob IDE / Claude Code / any MCP client
@@ -73,11 +73,11 @@ Developer sees root cause + prioritised remediation steps
 
 | Component | Repo | What it does |
 |---|---|---|
-| `causa-backend` | [causaai/causa-backend](https://github.com/causaai/causa-backend) | Quarkus-based AI RCA agent; receives Prometheus alerts and produces diagnoses |
+| `causa` | [causaai/causa](https://github.com/causaai/causa) | Quarkus-based AI RCA agent; receives Prometheus alerts and produces diagnoses |
 | `causa-mcp` | [causaai/causa-mcp](https://github.com/causaai/causa-mcp) | MCP server bridging your IDE/agent to the Causa engine |
-| `jafra-controller` | [bharathappali/jafra-controller](https://github.com/bharathappali/jafra-controller) | Go mutating webhook; injects async-profiler into opted-in Java pods |
-| `jafra-agent` | [bharathappali/jafra-agent](https://github.com/bharathappali/jafra-agent) | Rust DaemonSet; streams JFR chunks from nodes to the analyzer |
-| `jafra-analyzer` | [bharathappali/jafra-analyzer](https://github.com/bharathappali/jafra-analyzer) | Quarkus service; stores recordings and serves automated JFR analysis |
+| `jafra-controller - Experimental` | [bharathappali/jafra-controller](https://github.com/bharathappali/jafra-controller) | Go mutating webhook; injects async-profiler into opted-in Java pods |
+| `jafra-agent - Experimental` | [bharathappali/jafra-agent](https://github.com/bharathappali/jafra-agent) | Rust DaemonSet; streams JFR chunks from nodes to the analyzer |
+| `jafra-analyzer - Experimental` | [bharathappali/jafra-analyzer](https://github.com/bharathappali/jafra-analyzer) | Quarkus service; stores recordings and serves automated JFR analysis |
 | `installer` | [causaai/installer](https://github.com/causaai/installer) | Shell installer; deploys the full stack in one command |
 | `causa-demos` | [causaai/causa-demos](https://github.com/causaai/causa-demos) | End-to-end demos with a pre-built chaos workload |
 
@@ -168,11 +168,11 @@ When the installer completes, all components are running in the `causa-rca` name
 - Prometheus stack (kube-prometheus-stack) — for alerting
 - cert-manager — required by the Jafra Controller webhook
 - Kubernetes MCP Server
-- Jafra Ecosystem (Controller, Agent, Analyzer)
+- Jafra Ecosystem - Experimental (Controller, Agent, Analyzer)
 - Jafra MCP Server
 - Quarkus MCP Server
 - PostgreSQL with pgvector
-- Causa Backend
+- Causa
 - Causa MCP Server
 
 #### Set the target Quarkus app URL (optional at install time)
@@ -214,7 +214,7 @@ oc login <api-url>
 - Kubernetes MCP Server + Route
 - Quarkus MCP Server
 - PostgreSQL via CloudNativePG operator
-- Causa Backend + Route
+- Causa + Route
 - Causa MCP Server + Route
 
 #### Custom namespace (both targets)
@@ -340,7 +340,7 @@ curl -X POST http://<causa-route>/api/v1/configs \
 <details>
 <summary><strong>Option C — IBM Bob</strong></summary>
 
-IBM Bob must already be installed and configured on the host where `causa-backend` runs. See the [Bob Shell Integration Guide](causa-backend/docs/llm/bob-shell-integration.md) for full prerequisites.
+IBM Bob must already be installed and configured on the host where `causa` runs. See the [Bob Shell Integration Guide](causa/docs/llm/bob-shell-integration.md) for full prerequisites.
 
 ```bash
 curl -X POST http://<causa-route>/api/v1/configs \
@@ -557,7 +557,7 @@ kubectl get pods -n causa-rca
 
 All pods should be in `Running` state. A newly created cluster may take 2–3 minutes for all images to pull.
 
-**Check the Causa Backend is healthy:**
+**Check Causa is healthy:**
 
 ```bash
 # Kind
@@ -661,7 +661,7 @@ LLM_API_KEY=sk-ant-api03-...
 The demo script:
 1. Runs the Causa installer (provisions Kind + deploys the full stack)
 2. Deploys `quarkus-perf` with chaos scenarios (`large-response`, `idle-timeout`, `memory-cache`) and a load-gen job
-3. Pushes your LLM credentials to Causa Backend
+3. Pushes your LLM credentials to Causa
 4. Writes the Causa MCP config to `~/.bob/settings/mcp.json` and `~/.claude.json`
 5. Optionally copies the `causa-rca` skill to the path you specified
 6. Prints ready-to-paste RCA prompts
