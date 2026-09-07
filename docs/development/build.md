@@ -1,6 +1,6 @@
 # Building and Pushing Docker Images
 
-This guide explains how to build and push multi-architecture Docker images for causa-backend.
+This guide explains how to build and push multi-architecture Docker images for causa.
 
 ## Overview
 
