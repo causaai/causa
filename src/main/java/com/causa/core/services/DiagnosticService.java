@@ -2,8 +2,9 @@ package com.causa.core.services;
 
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
+import com.causa.core.domain.PageRequest;
+import com.causa.core.domain.PageResult;
 
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -24,9 +25,12 @@ public interface DiagnosticService {
     Diagnostic triggerDiagnostics(Alert alert);
 
     /**
-     * Returns all diagnostics ordered by creation time descending.
+     * Returns a paginated list of diagnostics ordered by creation time descending.
+     *
+     * @param pageRequest page and size
+     * @return paginated result of diagnostics
      */
-    List<Diagnostic> listDiagnostics();
+    PageResult<Diagnostic> listDiagnostics(PageRequest pageRequest);
 
     /**
      * Returns a single diagnostic by its ID.

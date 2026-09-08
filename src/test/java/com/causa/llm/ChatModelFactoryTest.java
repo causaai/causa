@@ -1,5 +1,6 @@
 package com.causa.llm;
 
+import com.causa.common.constants.LLMConstants;
 import com.causa.common.exceptions.LLMException;
 import com.causa.config.AppConfig;
 import com.causa.config.LlmConfigSnapshot;
@@ -109,6 +110,53 @@ class ChatModelFactoryTest {
             when(llmConfig.getVertexProjectId()).thenReturn("  ");
             assertThatThrownBy(() -> factory().chatModel())
                     .isInstanceOf(LLMException.class);
+        }
+    }
+
+    @Nested
+    @DisplayName("chatModel() — vertex-ai-anthropic (missing/invalid credentials)")
+    class VertexMissingCredentialsTests {
+
+        @Test
+        @DisplayName("throws LLMException when GOOGLE_APPLICATION_CREDENTIALS is null")
+        void throws_whenAdcNull() {
+            when(appConfig.getLlmConfig()).thenReturn(llmConfig);
+            when(llmConfig.getProvider()).thenReturn("vertex-ai-anthropic");
+            when(llmConfig.getVertexProjectId()).thenReturn("my-project");
+            when(llmConfig.getGoogleApplicationCredentials()).thenReturn(null);
+            assertThatThrownBy(() -> factory().chatModel())
+                    .isInstanceOf(LLMException.class)
+                    .hasMessageContaining("GOOGLE_APPLICATION_CREDENTIALS")
+                    .satisfies(ex -> assertThat(((LLMException) ex).getErrorType())
+                            .isEqualTo(LLMConstants.ErrorTypes.MISSING_CONFIGURATION));
+        }
+
+        @Test
+        @DisplayName("throws LLMException when GOOGLE_APPLICATION_CREDENTIALS is empty")
+        void throws_whenAdcEmpty() {
+            when(appConfig.getLlmConfig()).thenReturn(llmConfig);
+            when(llmConfig.getProvider()).thenReturn("vertex-ai-anthropic");
+            when(llmConfig.getVertexProjectId()).thenReturn("my-project");
+            when(llmConfig.getGoogleApplicationCredentials()).thenReturn("");
+            assertThatThrownBy(() -> factory().chatModel())
+                    .isInstanceOf(LLMException.class)
+                    .hasMessageContaining("GOOGLE_APPLICATION_CREDENTIALS")
+                    .satisfies(ex -> assertThat(((LLMException) ex).getErrorType())
+                            .isEqualTo(LLMConstants.ErrorTypes.MISSING_CONFIGURATION));
+        }
+
+        @Test
+        @DisplayName("throws LLMException when GOOGLE_APPLICATION_CREDENTIALS is not valid Base64")
+        void throws_whenAdcNotBase64() {
+            when(appConfig.getLlmConfig()).thenReturn(llmConfig);
+            when(llmConfig.getProvider()).thenReturn("vertex-ai-anthropic");
+            when(llmConfig.getVertexProjectId()).thenReturn("my-project");
+            when(llmConfig.getGoogleApplicationCredentials()).thenReturn("!!!not-base64!!!");
+            assertThatThrownBy(() -> factory().chatModel())
+                    .isInstanceOf(LLMException.class)
+                    .hasMessageContaining("Base64")
+                    .satisfies(ex -> assertThat(((LLMException) ex).getErrorType())
+                            .isEqualTo(LLMConstants.ErrorTypes.INVALID_CONFIGURATION));
         }
     }
 }

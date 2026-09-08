@@ -36,7 +36,7 @@ class AlertWebhookValidatorTest {
 
         AlertWebhookRequest.AlertItem item = new AlertWebhookRequest.AlertItem();
         item.setStatus("firing");
-        item.setLabels(Map.of("alertname", "CPUHigh", "container", "my-container", "namespace", "default"));
+        item.setLabels(Map.of("alertname", "CPUHigh", "container", "my-container", "namespace", "default", "pod", "my-pod-abc"));
         item.setAnnotations(Map.of());
         req.setAlerts(List.of(item));
         return req;
@@ -224,10 +224,11 @@ class AlertWebhookValidatorTest {
         }
 
         @Test
-        @DisplayName("Should return error when container label is missing (cluster platform)")
+        @DisplayName("Should return error when container label is missing and not in annotations (cluster platform)")
         void shouldReturnErrorWhenContainerMissing() {
             AlertWebhookRequest req = buildValidClusterRequest();
             req.getAlerts().get(0).setLabels(Map.of("alertname", "Test", "namespace", "ns"));
+            req.getAlerts().get(0).setAnnotations(Map.of("pod_name", "my-pod"));
 
             List<String> errors = clusterValidator.validate(req);
 
@@ -235,14 +236,38 @@ class AlertWebhookValidatorTest {
         }
 
         @Test
-        @DisplayName("Should return error when namespace label is missing (cluster platform)")
+        @DisplayName("Should return error when namespace is missing from both labels and annotations (cluster platform)")
         void shouldReturnErrorWhenNamespaceMissing() {
             AlertWebhookRequest req = buildValidClusterRequest();
             req.getAlerts().get(0).setLabels(Map.of("alertname", "Test", "container", "c"));
+            req.getAlerts().get(0).setAnnotations(Map.of("pod_name", "my-pod"));
 
             List<String> errors = clusterValidator.validate(req);
 
             assertTrue(errors.stream().anyMatch(e -> e.contains("namespace")));
+        }
+
+        @Test
+        @DisplayName("Should return error when pod missing from labels (cluster platform)")
+        void shouldReturnErrorWhenPodNameMissing() {
+            AlertWebhookRequest req = buildValidClusterRequest();
+            req.getAlerts().get(0).setLabels(Map.of("alertname", "Test", "container", "c", "namespace", "ns"));
+
+            List<String> errors = clusterValidator.validate(req);
+
+            assertTrue(errors.stream().anyMatch(e -> e.contains("pod")));
+        }
+
+        @Test
+        @DisplayName("Should return error when container is only in annotations, not labels (cluster platform)")
+        void shouldPassWhenContainerInAnnotations() {
+            AlertWebhookRequest req = buildValidClusterRequest();
+            req.getAlerts().get(0).setLabels(Map.of("alertname", "Test", "namespace", "default", "pod", "my-pod"));
+            req.getAlerts().get(0).setAnnotations(Map.of("container_name", "my-container"));
+
+            List<String> errors = clusterValidator.validate(req);
+
+            assertTrue(errors.stream().anyMatch(e -> e.contains("container")));
         }
     }
 
@@ -293,6 +318,58 @@ class AlertWebhookValidatorTest {
 
             assertTrue(errors.stream().noneMatch(e -> e.contains("container")));
         }
+
+        @Test
+        @DisplayName("Should pass when workload_name exists only in annotations (vm platform)")
+        void shouldPassWhenWorkloadNameFromAnnotations() {
+            AlertWebhookRequest req = buildValidVmRequest();
+            req.getAlerts().get(0).setLabels(Map.of("alertname", "Test"));
+            req.getAlerts().get(0).setAnnotations(Map.of("workload_name", "my-workload"));
+
+            List<String> errors = vmValidator.validate(req);
+
+            assertTrue(errors.isEmpty());
+        }
+
+        @Test
+        @DisplayName("Should return error when workload_name absent from annotations but present as label only (vm platform)")
+        void shouldPassWhenWorkloadNameFromLabel() {
+            AlertWebhookRequest req = buildValidVmRequest();
+            req.getAlerts().get(0).setLabels(Map.of("alertname", "Test", "workload_name", "my-workload"));
+            req.getAlerts().get(0).setAnnotations(Map.of("other_key", "value"));
+
+            List<String> errors = vmValidator.validate(req);
+
+            // workload_name must be in annotations; label-only is not accepted
+            assertTrue(errors.stream().anyMatch(e -> e.contains("workload_name")));
+        }
+
+        @Test
+        @DisplayName("Should return error when workload_name missing from both annotations and labels (vm platform)")
+        void shouldReturnErrorWhenWorkloadNameMissingFromBoth() {
+            AlertWebhookRequest req = buildValidVmRequest();
+            req.getAlerts().get(0).setLabels(Map.of("alertname", "Test"));
+            req.getAlerts().get(0).setAnnotations(Map.of("other_key", "value"));
+
+            List<String> errors = vmValidator.validate(req);
+
+            assertTrue(errors.stream().anyMatch(e -> e.contains("workload_name")));
+        }
+
+        @Test
+        @DisplayName("Should return error when workload_name is blank in annotations (vm platform)")
+        void shouldReturnErrorWhenWorkloadNameIsBlank() {
+            AlertWebhookRequest req = buildValidVmRequest();
+            req.getAlerts().get(0).setLabels(Map.of("alertname", "Test"));
+            // Note: Map.of() does not allow blank values; use HashMap
+            java.util.Map<String, String> annotations = new java.util.HashMap<>();
+            annotations.put("workload_name", "  ");
+            req.getAlerts().get(0).setAnnotations(annotations);
+
+            List<String> errors = vmValidator.validate(req);
+
+            assertTrue(errors.stream().anyMatch(e -> e.contains("workload_name")));
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -340,11 +417,13 @@ class AlertWebhookValidatorTest {
             req.setVersion("4");
             AlertWebhookRequest.AlertItem item1 = new AlertWebhookRequest.AlertItem();
             item1.setStatus("firing");
-            item1.setLabels(Map.of("alertname", "A1", "container", "c", "namespace", "ns"));
+            item1.setLabels(Map.of("alertname", "A1", "container", "c", "namespace", "ns", "pod", "pod-1"));
+            item1.setAnnotations(Map.of());
 
             AlertWebhookRequest.AlertItem item2 = new AlertWebhookRequest.AlertItem();
             item2.setStatus(null);  // missing status
-            item2.setLabels(Map.of("alertname", "A2", "container", "c", "namespace", "ns"));
+            item2.setLabels(Map.of("alertname", "A2", "container", "c", "namespace", "ns", "pod", "pod-2"));
+            item2.setAnnotations(Map.of());
 
             req.setAlerts(List.of(item1, item2));
 

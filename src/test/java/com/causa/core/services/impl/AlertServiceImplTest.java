@@ -5,6 +5,8 @@ import com.causa.common.constants.AlertConstants.AlertStatus;
 import com.causa.config.AlertConfigSnapshot;
 import com.causa.config.AppConfig;
 import com.causa.core.domain.Alert;
+import com.causa.core.domain.PageRequest;
+import com.causa.core.domain.PageResult;
 import com.causa.core.ports.AlertRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -337,23 +339,26 @@ class AlertServiceImplTest {
         }
 
         @Test
-        @DisplayName("Should delegate getAlerts with filters to repository")
+        @DisplayName("Should delegate listAlerts with filters to repository")
         void shouldDelegateGetAlertsToRepository() {
-            when(alertRepository.findByFilters("my-app", "production")).thenReturn(List.of());
+            PageResult<Alert> page = PageResult.of(List.of(), 0L, PageRequest.of(1, 0));
+            when(alertRepository.search(any(), any())).thenReturn(page);
 
-            alertService.getAlerts("my-app", "production");
+            alertService.listAlerts(new Alert.Filter("my-app", "production", null),
+                PageRequest.of(1, 0));
 
-            verify(alertRepository).findByFilters("my-app", "production");
+            verify(alertRepository).search(any(), any());
         }
 
         @Test
-        @DisplayName("Should delegate getAlerts with null filters to repository")
+        @DisplayName("Should delegate listAlerts with empty filter to repository")
         void shouldDelegateGetAlertsWithNullFilters() {
-            when(alertRepository.findByFilters(null, null)).thenReturn(List.of());
+            PageResult<Alert> page = PageResult.of(List.of(), 0L, PageRequest.of(1, 0));
+            when(alertRepository.search(any(), any())).thenReturn(page);
 
-            alertService.getAlerts(null, null);
+            alertService.listAlerts(Alert.Filter.empty(), PageRequest.of(1, 0));
 
-            verify(alertRepository).findByFilters(null, null);
+            verify(alertRepository).search(any(), any());
         }
     }
 

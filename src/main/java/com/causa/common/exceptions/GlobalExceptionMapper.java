@@ -97,6 +97,26 @@ public class GlobalExceptionMapper {
     }
 
     /**
+     * Handles invalid pagination/sort/filter parameter exceptions.
+     *
+     * <p>Produced by the service layer when {@code page}, {@code page_size},
+     * {@code sort}, or {@code sort_dir} values fail validation rules.
+     *
+     * @param exception the invalid pagination exception
+     * @return HTTP 400 response with the validation message
+     */
+    @ServerExceptionMapper
+    public Response handleInvalidPaginationException(InvalidPaginationException exception) {
+        log.debug(LogMessages.Pagination.INVALID_PARAM)
+            .field("message", exception.getMessage())
+            .log();
+
+        return Response.status(Response.Status.BAD_REQUEST)
+            .entity(ErrorResponse.of(400, "Bad Request", exception.getMessage()))
+            .build();
+    }
+
+    /**
      * Handles 400 Bad Request exceptions.
      *
      * @param exception the bad request exception

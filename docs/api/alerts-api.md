@@ -9,6 +9,7 @@ This document covers the webhook ingestion endpoint and alert retrieval endpoint
 | Endpoint | Purpose | Success response code | Error response codes |
 |---|---|---|---|
 | `POST /api/v1/webhooks/alerts` | Ingest Alertmanager webhook payloads and trigger diagnostics for accepted alerts | `200 OK` | `400 Bad Request`, `500 Internal Server Error` |
+| `POST /api/v1/alerts` | Manually create a synthetic alert to trigger diagnosis | `200 OK` | `400 Bad Request`, `500 Internal Server Error` |
 | `GET /api/v1/alerts` | List all alerts or filter by `workload_name` and `namespace` | `200 OK` | `400 Bad Request`, `500 Internal Server Error` |
 | `GET /api/v1/alerts/{id}` | Fetch one alert by id | `200 OK` | `404 Not Found` |
 
@@ -164,6 +165,67 @@ This payload used `severity: info` while the current minimum accepted severity i
 - Rejected alerts are returned as a map of `source identifier -> rejection reason`.
 - The payload above is the provided `causa-high-memory` webhook payload.
 - Re-sending the same alert can trigger cooldown rejection, as shown above.
+
+---
+
+## POST `/api/v1/alerts`
+
+Manually creates a synthetic alert and sends it through the same alert-processing pipeline used by the webhook endpoint. This lets users trigger diagnosis for a pod or workload even when no external alert exists.
+
+### Request Example (cURL)
+
+**Using `{{BASE_URL}}`:**
+
+```bash
+curl -X POST {{BASE_URL}}/api/v1/alerts \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "namespace": "chaos-test",
+    "container": "heap-oom-prom",
+    "pod": "heap-oom-prom-75d49588db-tqhrg"
+  }'
+```
+
+**Using `localhost:8080`:**
+
+```bash
+curl -X POST http://localhost:8080/api/v1/alerts \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "namespace": "chaos-test",
+    "container": "heap-oom-prom",
+    "pod": "heap-oom-prom-75d49588db-tqhrg"
+  }'
+```
+
+### Request Payload
+
+| Field | Required | Location in generated synthetic alert | Description |
+|---|---|---|---|
+| `namespace` | Cluster: Yes | label | Kubernetes namespace |
+| `container` | Cluster: Yes | label | Container name |
+| `pod` | Cluster: Yes | label | Pod name |
+| `workload_name` | VM: Yes / Cluster: No | annotation | Workload name used by alert mapping/filtering |
+| `workload_type` | No | label | Workload type such as `Deployment` or `StatefulSet` |
+| `cluster_name` | No | label | Cluster name |
+| `severity` | No | label | Defaults to `critical` when omitted |
+
+### Response Example
+
+```json
+{
+  "status": "accepted",
+  "message": "All 1 alerts accepted and diagnostics initiated",
+  "totalReceived": 1,
+  "totalAccepted": 1,
+  "totalRejected": 0,
+  "accepted": {
+    "alrt_wXhKJWpfPoJTWMZN": "diag_6YuCDWBMfwzWoMhY"
+  },
+  "rejected": {},
+  "timestamp": "2026-08-06T07:18:22.848519Z"
+}
+```
 
 ---
 

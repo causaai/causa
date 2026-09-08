@@ -44,6 +44,18 @@ public final class DiagnosticContext {
     private final String exceptionAnalysis;
     private final String containerAnalysis;
 
+    // Quarkus MCP context (cluster)
+    private final String quarkusRawMetrics;
+
+    // Async Profiler MCP context (cluster)
+    private final String asyncProfilerPodList;
+    private final String asyncProfilerJvmStatus;
+    private final String asyncProfilerJvmStatistics;
+    private final String asyncProfilerRecording;
+    private final String asyncProfilerReport;
+    private final String asyncProfilerJfrSummary;
+    private final String asyncProfilerFlameGraph;
+
     // VM — Filesystem MCP
     private final String libertyLogs;
 
@@ -73,6 +85,14 @@ public final class DiagnosticContext {
         this.threadAnalysis = builder.threadAnalysis;
         this.exceptionAnalysis = builder.exceptionAnalysis;
         this.containerAnalysis = builder.containerAnalysis;
+        this.quarkusRawMetrics = builder.quarkusRawMetrics;
+        this.asyncProfilerPodList = builder.asyncProfilerPodList;
+        this.asyncProfilerJvmStatus = builder.asyncProfilerJvmStatus;
+        this.asyncProfilerJvmStatistics = builder.asyncProfilerJvmStatistics;
+        this.asyncProfilerRecording = builder.asyncProfilerRecording;
+        this.asyncProfilerReport = builder.asyncProfilerReport;
+        this.asyncProfilerJfrSummary = builder.asyncProfilerJfrSummary;
+        this.asyncProfilerFlameGraph = builder.asyncProfilerFlameGraph;
         this.libertyLogs = builder.libertyLogs;
         this.heapStatus = builder.heapStatus;
         this.gcActivity = builder.gcActivity;
@@ -149,6 +169,38 @@ public final class DiagnosticContext {
         return containerAnalysis;
     }
 
+    public String getQuarkusRawMetrics() {
+        return quarkusRawMetrics;
+    }
+
+    public String getAsyncProfilerPodList() {
+        return asyncProfilerPodList;
+    }
+
+    public String getAsyncProfilerJvmStatus() {
+        return asyncProfilerJvmStatus;
+    }
+
+    public String getAsyncProfilerJvmStatistics() {
+        return asyncProfilerJvmStatistics;
+    }
+
+    public String getAsyncProfilerRecording() {
+        return asyncProfilerRecording;
+    }
+
+    public String getAsyncProfilerReport() {
+        return asyncProfilerReport;
+    }
+
+    public String getAsyncProfilerJfrSummary() {
+        return asyncProfilerJfrSummary;
+    }
+
+    public String getAsyncProfilerFlameGraph() {
+        return asyncProfilerFlameGraph;
+    }
+
     public String getHeapStatus() {
         return heapStatus;
     }
@@ -213,6 +265,36 @@ public final class DiagnosticContext {
     }
 
     /**
+     * Checks if any Quarkus MCP context was collected.
+     *
+     * @return true if a metrics snapshot is present
+     */
+    public boolean hasQuarkusContext() {
+        return isNotBlank(quarkusRawMetrics);
+    }
+
+    /**
+     * Checks if any Async Profiler MCP context was collected.
+     *
+     * <p>The administrative {@code asyncProfilerRecording} field is intentionally
+     * excluded from this signal gate — it contains only recording metadata
+     * (state, startTime, duration, sizeBytes) with no diagnostic signal value.
+     * Including it would allow metadata-only responses to trigger a full LLM call
+     * via {@link #hasAnyContext()}.
+     *
+     * @return true if any profiler field other than the administrative
+     *     {@code asyncProfilerRecording} field is present
+     */
+    public boolean hasAsyncProfilerContext() {
+        return isNotBlank(asyncProfilerPodList)
+            || isNotBlank(asyncProfilerJvmStatus)
+            || isNotBlank(asyncProfilerJvmStatistics)
+            || isNotBlank(asyncProfilerReport)
+            || isNotBlank(asyncProfilerJfrSummary)
+            || isNotBlank(asyncProfilerFlameGraph);
+    }
+
+    /**
      * Checks if any Filesystem MCP context was collected.
      *
      *  @return true if liberty logs are present
@@ -243,6 +325,7 @@ public final class DiagnosticContext {
      */
     public boolean hasAnyContext() {
         return hasKubernetesContext() || hasKruizeContext() || hasCryostatContext()
+            || hasQuarkusContext() || hasAsyncProfilerContext()
             || hasFilesystemContext() || hasJmxContext();
     }
 
@@ -300,6 +383,22 @@ public final class DiagnosticContext {
         appendSection(sb, ContextConstants.SECTION_THREAD_ANALYSIS, threadAnalysis);
         appendSection(sb, ContextConstants.SECTION_EXCEPTION_ANALYSIS, exceptionAnalysis);
         appendSection(sb, ContextConstants.SECTION_CONTAINER_ANALYSIS, containerAnalysis);
+
+        // Quarkus context — only append if data is present
+        if (isNotBlank(quarkusRawMetrics)) {
+            appendSection(sb, ContextConstants.SECTION_QUARKUS_RAW_METRICS, quarkusRawMetrics);
+        }
+
+        // Async Profiler context — only append if data is present
+        if (hasAsyncProfilerContext()) {
+            appendSection(sb, ContextConstants.SECTION_ASYNC_PROFILER_POD_LIST,    asyncProfilerPodList);
+            appendSection(sb, ContextConstants.SECTION_ASYNC_PROFILER_JVM_STATUS,  asyncProfilerJvmStatus);
+            appendSection(sb, ContextConstants.SECTION_ASYNC_PROFILER_JVM_STATS,   asyncProfilerJvmStatistics);
+            appendSection(sb, ContextConstants.SECTION_ASYNC_PROFILER_RECORDING,   asyncProfilerRecording);
+            appendSection(sb, ContextConstants.SECTION_ASYNC_PROFILER_REPORT,      asyncProfilerReport);
+            appendSection(sb, ContextConstants.SECTION_ASYNC_PROFILER_JFR_SUMMARY, asyncProfilerJfrSummary);
+            appendSection(sb, ContextConstants.SECTION_ASYNC_PROFILER_FLAME_GRAPH, asyncProfilerFlameGraph);
+        }
     }
 
     private void appendVmSections(StringBuilder sb) {
@@ -371,6 +470,14 @@ public final class DiagnosticContext {
         private String threadAnalysis;
         private String exceptionAnalysis;
         private String containerAnalysis;
+        private String quarkusRawMetrics;
+        private String asyncProfilerPodList;
+        private String asyncProfilerJvmStatus;
+        private String asyncProfilerJvmStatistics;
+        private String asyncProfilerRecording;
+        private String asyncProfilerReport;
+        private String asyncProfilerJfrSummary;
+        private String asyncProfilerFlameGraph;
         private String libertyLogs;
         private String heapStatus;
         private String gcActivity;
@@ -459,6 +566,50 @@ public final class DiagnosticContext {
 
         public Builder containerAnalysis(String containerAnalysis) {
             this.containerAnalysis = containerAnalysis;
+            return this;
+        }
+
+        // Cluster — Quarkus MCP
+
+        public Builder quarkusRawMetrics(String quarkusRawMetrics) {
+            this.quarkusRawMetrics = quarkusRawMetrics;
+            return this;
+        }
+
+        // Cluster — Async Profiler MCP
+
+        public Builder asyncProfilerPodList(String asyncProfilerPodList) {
+            this.asyncProfilerPodList = asyncProfilerPodList;
+            return this;
+        }
+
+        public Builder asyncProfilerJvmStatus(String asyncProfilerJvmStatus) {
+            this.asyncProfilerJvmStatus = asyncProfilerJvmStatus;
+            return this;
+        }
+
+        public Builder asyncProfilerJvmStatistics(String asyncProfilerJvmStatistics) {
+            this.asyncProfilerJvmStatistics = asyncProfilerJvmStatistics;
+            return this;
+        }
+
+        public Builder asyncProfilerRecording(String asyncProfilerRecording) {
+            this.asyncProfilerRecording = asyncProfilerRecording;
+            return this;
+        }
+
+        public Builder asyncProfilerReport(String asyncProfilerReport) {
+            this.asyncProfilerReport = asyncProfilerReport;
+            return this;
+        }
+
+        public Builder asyncProfilerJfrSummary(String asyncProfilerJfrSummary) {
+            this.asyncProfilerJfrSummary = asyncProfilerJfrSummary;
+            return this;
+        }
+
+        public Builder asyncProfilerFlameGraph(String asyncProfilerFlameGraph) {
+            this.asyncProfilerFlameGraph = asyncProfilerFlameGraph;
             return this;
         }
 

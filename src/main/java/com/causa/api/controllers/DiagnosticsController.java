@@ -8,13 +8,17 @@ import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
+import com.causa.core.domain.PageRequest;
+import com.causa.core.domain.PageResult;
 import com.causa.core.ports.AlertRepository;
 import com.causa.core.services.DiagnosticService;
 import jakarta.inject.Inject;
+import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -25,7 +29,7 @@ import java.util.Optional;
 /**
  * Diagnostics Controller
  *
- * <p>GET /api/v1/diagnostics        — list all diagnostics (summary)
+ * <p>GET /api/v1/diagnostics        — paginated list of diagnostics (summary)
  * <p>GET /api/v1/diagnostics/{id}   — full diagnostic detail
  *
  * @since 0.0.1
@@ -55,23 +59,38 @@ public class DiagnosticsController {
     // -------------------------------------------------------------------------
 
     @GET
-    public Response listDiagnostics() {
-        log.info(LogMessages.Diagnostic.DIAGNOSTICS_LIST_REQUEST).log();
+    public Response listDiagnostics(
+            @QueryParam(ApiConstants.Paths.Pagination.QUERY_PAGE)      @DefaultValue("1")                                              int page,
+            @QueryParam(ApiConstants.Paths.Pagination.QUERY_PAGE_SIZE) @DefaultValue(ApiConstants.Paths.Pagination.DEFAULT_PAGE_SIZE) int pageSize) {
 
-        List<Diagnostic> diagnostics = diagnosticService.listDiagnostics();
+        log.info(LogMessages.Diagnostic.DIAGNOSTICS_LIST_REQUEST)
+            .field("page", page)
+            .field("page_size", pageSize)
+            .log();
 
-        List<DiagnosticListItemResponse> items = diagnostics.stream()
+        PageResult<Diagnostic> result = diagnosticService.listDiagnostics(PageRequest.of(page, pageSize));
+
+        List<DiagnosticListItemResponse> items = result.items().stream()
             .map(d -> {
                 Alert alert = alertRepository.findById(d.getAlertId()).orElse(null);
                 return DiagnosticListItemResponse.from(d, alert, clusterName);
             })
             .toList();
 
+        PageResult<DiagnosticListItemResponse> response = PageResult.of(
+            items,
+            result.page(),
+            result.pageSize(),
+            result.total()
+        );
+
         log.info(LogMessages.Diagnostic.DIAGNOSTICS_LIST_RETURNED)
             .field("count", items.size())
+            .field("total", result.total())
+            .field("page", result.page())
             .log();
 
-        return Response.ok(items).build();
+        return Response.ok(response).build();
     }
 
     // -------------------------------------------------------------------------

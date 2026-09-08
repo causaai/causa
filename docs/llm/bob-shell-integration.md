@@ -2,12 +2,12 @@
 
 ## Overview
 
-This guide explains how to use IBM's BOB Shell CLI directly integrated into causa-backend. The `BobShellPromptSender` provides native BOB integration without requiring a separate wrapper service.
+This guide explains how to use IBM's BOB Shell CLI directly integrated into causa. The `BobShellPromptSender` provides native BOB integration without requiring a separate wrapper service.
 
 ## Architecture
 
 ```
-Causa Backend
+Causa
     ↓
 BobShellPromptSender (implements PromptSender)
     ↓
@@ -24,7 +24,7 @@ IBM BOB AI Service API
 
 ### 1. BOB Shell Installation
 
-BOB Shell must be installed in the environment where causa-backend runs:
+BOB Shell must be installed in the environment where causa runs:
 
 **Local Development (macOS/Linux):**
 ```bash
@@ -280,7 +280,7 @@ bob --version
 export LLM_API_KEY=your-bob-api-key
 ```
 
-4. Run causa-backend:
+4. Run causa:
 ```bash
 ./mvnw quarkus:dev
 ```

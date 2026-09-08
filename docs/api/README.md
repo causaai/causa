@@ -20,6 +20,7 @@ This folder contains the current API documentation for the Causa backend.
 | Method | Path | Description | Details |
 |---|---|---|---|
 | `POST` | `/api/v1/webhooks/alerts` | Ingest Alertmanager webhook payloads and trigger diagnostics | [`alerts-api.md`](docs/api/alerts-api.md) |
+| `POST` | `/api/v1/alerts` | Manually create a synthetic alert to trigger diagnosis | [`alerts-api.md`](docs/api/alerts-api.md) |
 | `GET` | `/api/v1/alerts` | List alerts, optionally filtered by `workload_name` and `namespace` | [`alerts-api.md`](docs/api/alerts-api.md) |
 | `GET` | `/api/v1/alerts/{id}` | Fetch one alert by id | [`alerts-api.md`](docs/api/alerts-api.md) |
 | `GET` | `/api/v1/diagnostics` | List diagnostic summaries | [`diagnostics-api.md`](docs/api/diagnostics-api.md) |

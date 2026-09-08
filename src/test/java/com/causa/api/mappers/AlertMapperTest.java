@@ -165,7 +165,7 @@ class AlertMapperTest {
         }
 
         @Test
-        @DisplayName("Should extract container name from annotation (higher priority)")
+        @DisplayName("Should extract container name from label")
         void shouldExtractContainerNameFromAnnotation() {
             AlertWebhookRequest.AlertItem item = buildItem(
                     Map.of("alertname", "Test", "container", "label-container", "namespace", "ns"),
@@ -173,7 +173,7 @@ class AlertMapperTest {
             );
             Alert alert = alertMapper.toDomain(item);
 
-            assertEquals("annotation-container", alert.getWorkloadInfo().containerName());
+            assertEquals("label-container", alert.getWorkloadInfo().containerName());
         }
 
         @Test
@@ -201,7 +201,7 @@ class AlertMapperTest {
         }
 
         @Test
-        @DisplayName("Should extract pod name from annotation (higher priority)")
+        @DisplayName("Should extract pod name from label")
         void shouldExtractPodNameFromAnnotation() {
             AlertWebhookRequest.AlertItem item = buildItem(
                     Map.of("alertname", "Test", "container", "c", "namespace", "ns", "pod", "label-pod"),
@@ -209,7 +209,7 @@ class AlertMapperTest {
             );
             Alert alert = alertMapper.toDomain(item);
 
-            assertEquals("annotation-pod", alert.getWorkloadInfo().podName());
+            assertEquals("label-pod", alert.getWorkloadInfo().podName());
         }
 
         @Test

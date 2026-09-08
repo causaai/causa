@@ -5,6 +5,8 @@ import com.causa.common.constants.AlertConstants.AlertStatus;
 import com.causa.common.constants.DiagnosticConstants.DiagnosticStatus;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
+import com.causa.core.domain.PageRequest;
+import com.causa.core.domain.PageResult;
 import com.causa.core.ports.AlertRepository;
 import com.causa.core.ports.DiagnosticRepository;
 import com.causa.core.services.RcaPromptBuilder;
@@ -57,7 +59,7 @@ class DiagnosticServiceImplTest {
     private com.causa.core.ports.llm.PromptSender promptSender;
 
     @Mock
-    private com.causa.config.LLMConfig llmConfig;
+    private com.causa.config.AppConfig appConfig;
 
     @Mock
     private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
@@ -66,22 +68,23 @@ class DiagnosticServiceImplTest {
     private jakarta.validation.Validator validator;
 
     @Mock
-    private jakarta.transaction.UserTransaction userTransaction;
+    private jakarta.enterprise.inject.Instance<com.causa.core.services.validation.RcaValidator> rcaValidatorInstance;
 
     private DiagnosticServiceImpl diagnosticService;
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.when(rcaValidatorInstance.isResolvable()).thenReturn(false);
         diagnosticService = new DiagnosticServiceImpl(
                 diagnosticRepository,
                 alertRepository,
                 mcpContextCollector,
                 rcaPromptBuilder,
                 promptSender,
-                llmConfig,
+                appConfig,
                 objectMapper,
                 validator,
-                userTransaction
+                rcaValidatorInstance
         );
     }
 
@@ -202,26 +205,30 @@ class DiagnosticServiceImplTest {
     class ListDiagnosticsTests {
 
         @Test
-        @DisplayName("Should delegate to repository")
+        @DisplayName("Should delegate to repository and return paginated result")
         void shouldDelegateToRepository() {
             Diagnostic d1 = buildDiagnostic("d1", "a1", DiagnosticStatus.COMPLETED);
             Diagnostic d2 = buildDiagnostic("d2", "a2", DiagnosticStatus.PENDING);
-            when(diagnosticRepository.findAll()).thenReturn(List.of(d1, d2));
+            PageResult<Diagnostic> page = PageResult.of(List.of(d1, d2), 2L, PageRequest.of(1, 0));
+            when(diagnosticRepository.search(any())).thenReturn(page);
 
-            List<Diagnostic> result = diagnosticService.listDiagnostics();
+            PageResult<Diagnostic> result = diagnosticService.listDiagnostics(PageRequest.of(1, 0));
 
-            assertEquals(2, result.size());
-            verify(diagnosticRepository).findAll();
+            assertEquals(2, result.items().size());
+            assertEquals(2L, result.total());
+            verify(diagnosticRepository).search(any());
         }
 
         @Test
-        @DisplayName("Should return empty list when no diagnostics")
+        @DisplayName("Should return empty page when no diagnostics")
         void shouldReturnEmptyListWhenNoDiagnostics() {
-            when(diagnosticRepository.findAll()).thenReturn(List.of());
+            PageResult<Diagnostic> page = PageResult.of(List.of(), 0L, PageRequest.of(1, 0));
+            when(diagnosticRepository.search(any())).thenReturn(page);
 
-            List<Diagnostic> result = diagnosticService.listDiagnostics();
+            PageResult<Diagnostic> result = diagnosticService.listDiagnostics(PageRequest.of(1, 0));
 
-            assertTrue(result.isEmpty());
+            assertTrue(result.items().isEmpty());
+            assertEquals(0L, result.total());
         }
     }
 

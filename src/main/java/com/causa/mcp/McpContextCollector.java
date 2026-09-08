@@ -140,6 +140,16 @@ public class McpContextCollector {
             collectCryostatContext(contextBuilder, alert);
         }
 
+        // Quarkus context collection (requires pod name)
+        if (alert.getWorkloadInfo().podName() != null && !alert.getWorkloadInfo().podName().isBlank()) {
+            collectQuarkusContext(contextBuilder, alert);
+        }
+
+        // Async Profiler context collection (requires pod name)
+        if (alert.getWorkloadInfo().podName() != null && !alert.getWorkloadInfo().podName().isBlank()) {
+            collectAsyncProfilerContext(contextBuilder, alert);
+        }
+
         DiagnosticContext context = contextBuilder.build();
 
         log.info(LogMessages.Mcp.MCP_CONTEXT_COLLECTION_COMPLETE)
@@ -147,6 +157,8 @@ public class McpContextCollector {
             .field(McpConstants.LogFields.HAS_K8S_CONTEXT, context.hasKubernetesContext())
             .field(McpConstants.LogFields.HAS_KRUIZE_CONTEXT, context.hasKruizeContext())
             .field(McpConstants.LogFields.HAS_CRYOSTAT_CONTEXT, context.hasCryostatContext())
+            .field(McpConstants.LogFields.HAS_QUARKUS_CONTEXT, context.hasQuarkusContext())
+            .field(McpConstants.LogFields.HAS_ASYNC_PROFILER_CONTEXT, context.hasAsyncProfilerContext())
             .log();
 
         return context;
@@ -438,7 +450,7 @@ public class McpContextCollector {
      * @param timeoutMs HTTP timeout in milliseconds
      * @return the session ID
      */
-    private String initializeMcpSession(String endpoint, int timeoutMs) throws Exception {
+    protected String initializeMcpSession(String endpoint, int timeoutMs) throws Exception {
         ObjectNode initRequest = objectMapper.createObjectNode();
         initRequest.put(McpConstants.JsonRpc.FIELD_JSONRPC, McpConstants.JsonRpc.VERSION);
         initRequest.put(McpConstants.JsonRpc.FIELD_ID, 1);
@@ -513,8 +525,8 @@ public class McpContextCollector {
     /**
      * Calls an MCP tool via JSON-RPC 2.0.
      */
-    private JsonNode callMcpTool(String endpoint, String sessionId, String toolName,
-                                  ObjectNode arguments, int timeoutMs) throws Exception {
+    protected JsonNode callMcpTool(String endpoint, String sessionId, String toolName,
+                                   ObjectNode arguments, int timeoutMs) throws Exception {
         ObjectNode toolRequest = objectMapper.createObjectNode();
         toolRequest.put(McpConstants.JsonRpc.FIELD_JSONRPC, McpConstants.JsonRpc.VERSION);
         toolRequest.put(McpConstants.JsonRpc.FIELD_ID, 2);
@@ -1046,6 +1058,102 @@ public class McpContextCollector {
     }
 
     /**
+     * Collects Quarkus MCP context (raw metrics snapshot).
+     *
+     * <p>Calls {@code fetch_raw_metrics_from_endpoint} with {@code podName} and {@code namespace}
+     * from the alert — the MCP server queries Prometheus using these labels to retrieve metrics
+     * for the alerting pod. No app URL configuration is required.
+     *
+     * <p>If {@code podName} is not present in the alert, the call is skipped with a warning.
+     *
+     * @param builder the context builder to populate
+     * @param alert the alert
+     */
+    private void collectQuarkusContext(DiagnosticContext.Builder builder, Alert alert) {
+        String podName = alert.getWorkloadInfo().podName();
+        if (podName == null || podName.isBlank()) {
+            log.warn(LogMessages.Mcp.MCP_CALL_FAILED)
+                .field(McpConstants.LogFields.TOOL, McpConstants.Tools.QUARKUS_FETCH_RAW_METRICS)
+                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+                .field(McpConstants.LogFields.ERROR, "podName not present in alert — skipping Quarkus metrics collection")
+                .log();
+            return;
+        }
+
+        String quarkusBase = mcpConfig.quarkus().endpoint().orElse("");
+        if (quarkusBase.isBlank()) {
+            log.warn(LogMessages.Mcp.MCP_CALL_FAILED)
+                .field(McpConstants.LogFields.TOOL, McpConstants.Tools.QUARKUS_FETCH_RAW_METRICS)
+                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+                .field(McpConstants.LogFields.ERROR, "CAUSA_MCP_QUARKUS_ENDPOINT not configured — skipping Quarkus metrics collection")
+                .log();
+            return;
+        }
+        String endpoint = quarkusBase + McpConstants.Paths.MCP_ENDPOINT;
+        int timeout = mcpConfig.quarkus().timeoutMs();
+
+        try {
+            String sessionId = initializeMcpSession(endpoint, timeout);
+            ObjectNode arguments = objectMapper.createObjectNode();
+            arguments.put(McpConstants.Arguments.POD_NAME, podName);
+            arguments.put(McpConstants.Arguments.NAMESPACE, alert.getWorkloadInfo().namespace());
+            mcpConfig.quarkus().metricsBaseUrl()
+                .filter(url -> !url.isBlank())
+                .ifPresent(url -> arguments.put(McpConstants.Arguments.BASE_URL, url));
+            JsonNode result = callMcpTool(endpoint, sessionId,
+                    McpConstants.Tools.QUARKUS_FETCH_RAW_METRICS, arguments, timeout);
+            builder.quarkusRawMetrics(extractTextFromContent(result));
+            log.info(LogMessages.Mcp.MCP_QUARKUS_RAW_METRICS)
+                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+                .field(McpConstants.LogFields.POD_NAME, podName)
+                .log();
+        } catch (Exception e) {
+            log.warn(LogMessages.Mcp.MCP_CALL_FAILED)
+                .field(McpConstants.LogFields.TOOL, McpConstants.Tools.QUARKUS_FETCH_RAW_METRICS)
+                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+                .field(McpConstants.LogFields.ERROR, e.getMessage())
+                .log();
+        }
+    }
+
+    /**
+     * Calls a single pod-scoped MCP tool safely, logging success or warning on failure.
+     *
+     * <p>Encapsulates the repetitive session-init → tool-call → extract-text → warn-on-error
+     * pattern shared by Async Profiler and Quarkus collectors. Each call gets its own MCP
+     * session; a failure returns {@code null} without affecting sibling tool calls.
+     *
+     * @param endpoint   full MCP endpoint URL (base + /mcp)
+     * @param timeoutMs  HTTP timeout in milliseconds
+     * @param toolName   MCP tool name to invoke
+     * @param podName    pod_name argument value
+     * @param alert      originating alert (used only for log fields)
+     * @param successMsg info log message to emit on success
+     * @return extracted text result, or {@code null} on any failure
+     */
+    private String callMcpToolSafe(String endpoint, int timeoutMs, String toolName,
+                                    String podName, Alert alert, String successMsg) {
+        try {
+            String sessionId = initializeMcpSession(endpoint, timeoutMs);
+            ObjectNode arguments = objectMapper.createObjectNode();
+            arguments.put(McpConstants.Arguments.POD_NAME, podName);
+            JsonNode result = callMcpTool(endpoint, sessionId, toolName, arguments, timeoutMs);
+            String text = extractTextFromContent(result);
+            log.info(successMsg)
+                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+                .log();
+            return text;
+        } catch (Exception e) {
+            log.warn(LogMessages.Mcp.MCP_CALL_FAILED)
+                .field(McpConstants.LogFields.TOOL, toolName)
+                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+                .field(McpConstants.LogFields.ERROR, e.getMessage())
+                .log();
+            return null;
+        }
+    }
+
+    /**
      * Collects Cryostat MCP context (JFR analysis from 5 tools).
      *
      * @param builder the context builder to populate
@@ -1188,4 +1296,241 @@ public class McpContextCollector {
         }
         return null;
     }
+
+    // =========================================================================
+    // Async Profiler path
+    // =========================================================================
+
+    /**
+     * Collects Async Profiler MCP context (7 read-only tools).
+     *
+     * <p>Tool execution order:
+     * <ol>
+     *   <li>{@code list_profiled_pods} — confirms pod is registered; yields {@code latestRecordingId}</li>
+     *   <li>{@code get_pod_jvm_status} — profiler readiness + JVM health</li>
+     *   <li>{@code get_jvm_statistics} — live heap/thread/GC snapshot</li>
+     *   <li>{@code get_recording} — status of the latest recording (requires recording_id)</li>
+     *   <li>{@code get_recording_report} — JMC rule-based analysis (Live — Jafra /report)</li>
+     *   <li>{@code get_jfr_summary} — compact LLM-ready JFR summary (Live — Jafra /summary)</li>
+     *   <li>{@code get_flame_graph} — call-stack frame tree as JSON</li>
+     * </ol>
+     *
+     * <p>Tools 4-7 require a {@code recording_id} extracted read-only from the
+     * {@code latestRecordingId} field in the {@code list_profiled_pods} response.
+     * If no recording exists, tools 4-7 are skipped gracefully; tools 1-3 still run.
+     *
+     * @param builder the context builder to populate
+     * @param alert   the alert
+     */
+    private void collectAsyncProfilerContext(DiagnosticContext.Builder builder, Alert alert) {
+        String podName = alert.getWorkloadInfo().podName();
+
+        String base = mcpConfig.asyncProfiler().endpoint().orElse("");
+        if (base.isBlank()) {
+            log.warn(LogMessages.Mcp.MCP_CALL_FAILED)
+                .field(McpConstants.LogFields.TOOL, McpConstants.Tools.ASYNC_PROFILER_LIST_PODS)
+                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+                .field(McpConstants.LogFields.ERROR,
+                    "CAUSA_MCP_ASYNC_PROFILER_ENDPOINT not configured — skipping Async Profiler context collection")
+                .log();
+            return;
+        }
+
+        String endpoint = base + McpConstants.Paths.MCP_ENDPOINT;
+        int timeout = mcpConfig.asyncProfiler().timeoutMs();
+
+        // Tool 1 — list_profiled_pods (no arguments)
+        String podListJson = callAsyncProfilerTool(endpoint, timeout,
+            McpConstants.Tools.ASYNC_PROFILER_LIST_PODS,
+            objectMapper.createObjectNode(), alert);
+        builder.asyncProfilerPodList(podListJson);
+        if (podListJson != null) {
+            log.info(LogMessages.Mcp.MCP_ASYNC_PROFILER_POD_LIST)
+                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+                .log();
+        }
+
+        // Tool 2 — get_pod_jvm_status
+        ObjectNode a2 = objectMapper.createObjectNode();
+        a2.put(McpConstants.Arguments.POD_NAME, podName);
+        String jvmStatus = callAsyncProfilerTool(endpoint, timeout,
+            McpConstants.Tools.ASYNC_PROFILER_GET_JVM_STATUS, a2, alert);
+        builder.asyncProfilerJvmStatus(jvmStatus);
+        if (jvmStatus != null) {
+            log.info(LogMessages.Mcp.MCP_ASYNC_PROFILER_JVM_STATUS)
+                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+                .log();
+        }
+
+        // Tool 3 — get_jvm_statistics
+        ObjectNode a3 = objectMapper.createObjectNode();
+        a3.put(McpConstants.Arguments.POD_NAME, podName);
+        String jvmStats = callAsyncProfilerTool(endpoint, timeout,
+            McpConstants.Tools.ASYNC_PROFILER_GET_JVM_STATS, a3, alert);
+        builder.asyncProfilerJvmStatistics(jvmStats);
+        if (jvmStats != null) {
+            log.info(LogMessages.Mcp.MCP_ASYNC_PROFILER_JVM_STATS)
+                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+                .log();
+        }
+
+        // Tools 4 + 7 (stubs) — require a recording_id from list_profiled_pods.
+        // Skip gracefully when none is available; they are not yet wired to Jafra.
+        String recordingId = extractLatestRecordingId(podListJson, podName);
+        if (recordingId != null && !recordingId.isBlank()) {
+            // Tool 4 — get_recording (stub)
+            ObjectNode a4 = objectMapper.createObjectNode();
+            a4.put(McpConstants.Arguments.RECORDING_ID, recordingId);
+            String recording = callAsyncProfilerTool(endpoint, timeout,
+                McpConstants.Tools.ASYNC_PROFILER_GET_RECORDING, a4, alert);
+            builder.asyncProfilerRecording(recording);
+            if (recording != null) {
+                log.info(LogMessages.Mcp.MCP_ASYNC_PROFILER_RECORDING)
+                    .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+                    .log();
+            }
+
+            // Tool 7 — get_flame_graph (stub)
+            ObjectNode a7 = objectMapper.createObjectNode();
+            a7.put(McpConstants.Arguments.RECORDING_ID, recordingId);
+            a7.put(McpConstants.Arguments.FORMAT, McpConstants.Arguments.FORMAT_JSON);
+            String flameGraph = callAsyncProfilerTool(endpoint, timeout,
+                McpConstants.Tools.ASYNC_PROFILER_GET_FLAME_GRAPH, a7, alert);
+            builder.asyncProfilerFlameGraph(flameGraph);
+            if (flameGraph != null) {
+                log.info(LogMessages.Mcp.MCP_ASYNC_PROFILER_FLAME_GRAPH)
+                    .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+                    .log();
+            }
+        } else {
+            log.info(LogMessages.Mcp.MCP_ASYNC_PROFILER_NO_RECORDING)
+                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+                .field(McpConstants.LogFields.POD_NAME, podName)
+                .log();
+        }
+
+        // Tool 5 — get_recording_report (Live — Jafra /report)
+        // Args: pod + container + namespace + last (NO recording_id)
+        String namespace  = alert.getWorkloadInfo().namespace();
+        String container  = alert.getWorkloadInfo().containerName();
+        ObjectNode a5 = objectMapper.createObjectNode();
+        a5.put(McpConstants.Arguments.POD,       podName);
+        a5.put(McpConstants.Arguments.CONTAINER, container != null ? container : "");
+        a5.put(McpConstants.Arguments.NAMESPACE, namespace  != null ? namespace  : "default");
+        a5.put(McpConstants.Arguments.LAST,      McpConstants.Arguments.LAST_5M);
+        String report = callAsyncProfilerTool(endpoint, timeout,
+            McpConstants.Tools.ASYNC_PROFILER_GET_REPORT, a5, alert);
+        builder.asyncProfilerReport(report);
+        if (report != null) {
+            log.info(LogMessages.Mcp.MCP_ASYNC_PROFILER_REPORT)
+                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+                .log();
+        }
+
+        // Tool 6 — get_jfr_summary (Live — Jafra /summary)
+        // Args: pod + container + namespace + last (NO recording_id)
+        ObjectNode a6 = objectMapper.createObjectNode();
+        a6.put(McpConstants.Arguments.POD,       podName);
+        a6.put(McpConstants.Arguments.CONTAINER, container != null ? container : "");
+        a6.put(McpConstants.Arguments.NAMESPACE, namespace  != null ? namespace  : "default");
+        a6.put(McpConstants.Arguments.LAST,      McpConstants.Arguments.LAST_5M);
+        String jfrSummary = callAsyncProfilerTool(endpoint, timeout,
+            McpConstants.Tools.ASYNC_PROFILER_GET_JFR_SUMMARY, a6, alert);
+        builder.asyncProfilerJfrSummary(jfrSummary);
+        if (jfrSummary != null) {
+            log.info(LogMessages.Mcp.MCP_ASYNC_PROFILER_JFR_SUMMARY)
+                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+                .log();
+        }
+    }
+
+    /**
+     * Calls a single Async Profiler MCP tool safely.
+     *
+     * <p>Each call gets its own MCP session. A failure returns {@code null}
+     * without affecting sibling tool calls.
+     *
+     * @param endpoint  full MCP endpoint URL (base + /mcp)
+     * @param timeoutMs HTTP timeout in milliseconds
+     * @param toolName  MCP tool name to invoke
+     * @param arguments JSON arguments node
+     * @param alert     originating alert (used only for log fields)
+     * @return extracted text result, or {@code null} on any failure
+     */
+    private String callAsyncProfilerTool(String endpoint, int timeoutMs,
+            String toolName, ObjectNode arguments, Alert alert) {
+        String sessionId = null;
+        try {
+            sessionId = initializeMcpSession(endpoint, timeoutMs);
+            JsonNode result = callMcpTool(endpoint, sessionId, toolName, arguments, timeoutMs);
+            return extractTextFromContent(result);
+        } catch (Exception e) {
+            log.warn(LogMessages.Mcp.MCP_CALL_FAILED)
+                .field(McpConstants.LogFields.TOOL, toolName)
+                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
+                .field(McpConstants.LogFields.ERROR, e.getMessage())
+                .log();
+            return null;
+        } finally {
+            if (sessionId != null) {
+                terminateMcpSession(endpoint, sessionId, timeoutMs);
+            }
+        }
+    }
+
+    /**
+     * Terminates an MCP session by sending an HTTP DELETE to the endpoint
+     * with the session ID header, as required by the MCP protocol.
+     *
+     * @param endpoint  the MCP server endpoint URL
+     * @param sessionId the session ID to terminate
+     * @param timeoutMs request timeout in milliseconds
+     */
+    protected void terminateMcpSession(String endpoint, String sessionId, int timeoutMs) {
+        try {
+            HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(endpoint))
+                .header(McpConstants.Headers.MCP_SESSION_ID, sessionId)
+                .DELETE()
+                .timeout(Duration.ofMillis(timeoutMs))
+                .build();
+            httpClient.send(request, HttpResponse.BodyHandlers.discarding());
+        } catch (Exception e) {
+            log.warn("Failed to terminate MCP session")
+                .field(McpConstants.LogFields.SESSION_ID, sessionId)
+                .field(McpConstants.LogFields.ERROR, e.getMessage())
+                .log();
+        }
+    }
+
+    /**
+     * Extracts {@code latestRecordingId} from the JSON array returned by
+     * {@code list_profiled_pods}, matching on {@code podName}.
+     *
+     * @param podListJson JSON text from list_profiled_pods response
+     * @param podName     pod name to match
+     * @return the recording ID string, or {@code null} if not found or parse error
+     */
+    private String extractLatestRecordingId(String podListJson, String podName) {
+        if (podListJson == null || podListJson.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode arr = objectMapper.readTree(podListJson);
+            if (arr.isArray()) {
+                for (JsonNode pod : arr) {
+                    if (podName.equals(pod.path("podName").asText(null))) {
+                        String id = pod.path("latestRecordingId").asText(null);
+                        return (id != null && !id.isBlank()) ? id : null;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Could not extract latestRecordingId from async profiler response")
+                .field(McpConstants.LogFields.ERROR, e.getMessage())
+                .log();
+        }
+        return null;
+    }
+
 }

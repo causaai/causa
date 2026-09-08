@@ -126,6 +126,27 @@ public final class ApiConstants {
             public static final String BY_KEY = "/{" + PATH_PARAM_KEY + "}";
             public static final String QUERY_CATEGORY = "category";
         }
+
+        /**
+         * Pagination query parameter names shared across paginated list endpoints.
+         *
+         * <p>Default values and the max page size cap are configured in
+         * {@code application.yml} under {@code causa.api.pagination.*} and injected
+         * via {@code @ConfigProperty} in the service layer.
+         */
+        public static final class Pagination {
+            private Pagination() {}
+
+            public static final String QUERY_PAGE      = "page";
+            public static final String QUERY_PAGE_SIZE = "page_size";
+
+            /** Default number of items returned per page when {@code page_size} is omitted. */
+            public static final String DEFAULT_PAGE_SIZE = "20";
+
+            /** Hard upper cap — requests above this are rejected with HTTP 400. */
+            public static final int MAX_PAGE_SIZE = 100;
+        }
+
     }
 
     /**

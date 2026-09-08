@@ -21,6 +21,24 @@ paths:
       summary: Get Alerts
       tags:
       - Alerts Controller
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlertTriggerRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {}
+        "400":
+          description: Bad Request
+      summary: Create Manual Alert
+      tags:
+      - Alerts Controller
   /api/v1/alerts/{id}:
     get:
       parameters:
@@ -177,6 +195,23 @@ components:
         generatorURL:
           type: string
         fingerprint:
+          type: string
+    AlertTriggerRequest:
+      type: object
+      properties:
+        namespace:
+          type: string
+        container:
+          type: string
+        pod:
+          type: string
+        workload_name:
+          type: string
+        workload_type:
+          type: string
+        cluster_name:
+          type: string
+        severity:
           type: string
     AlertWebhookRequest:
       type: object
