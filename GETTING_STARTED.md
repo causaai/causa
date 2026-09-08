@@ -22,6 +22,7 @@ This guide walks you through everything you need to do **from scratch** to get C
 2. [Prerequisites](#2-prerequisites)
 3. [Install Causa](#3-install-causa)
    - [Option A — Kind (local, recommended for getting started)](#option-a--kind-local-recommended-for-getting-started)
+   - [Port-forwarding on Kind](#port-forwarding-on-kind-causa-backend--causa-mcp)
    - [Option B — OpenShift (existing cluster)](#option-b--openshift-existing-cluster)
 4. [Configure the LLM Provider](#4-configure-the-llm-provider)
    - [Option A — Vertex AI (Claude on Google Cloud)](#option-a--vertex-ai-claude-on-google-cloud)
@@ -154,9 +155,9 @@ cd installer
 ./install.sh
 ```
 
-When the installer completes, all components are running in the `causa-rca` namespace and the following NodePorts are mapped to `localhost`:
+When the installer completes, all components are running in the `causa-rca` namespace. All services are `ClusterIP` — use `kubectl port-forward` to reach them from your local machine (see [Port-forwarding on Kind](#port-forwarding-on-kind-causa-backend--causa-mcp) below).
 
-| Port | Service |
+| Local port | Service |
 |---|---|
 | `30000` | Kubernetes MCP Server |
 | `30001` | Causa Backend |
@@ -207,7 +208,7 @@ oc login <api-url>
 ./install.sh --target openshift
 ```
 
-> **Note:** Jafra (Ecosystem + MCP Server) is not supported on OpenShift. The installer skips it automatically. On OpenShift, Causa uses Cryostat for JVM profiling integration.
+> **Note:** Jafra (Ecosystem + MCP Server) is not supported on OpenShift. The installer skips it automatically.
 
 **What gets installed on OpenShift:**
 - OpenShift User Workload Monitoring (enabled) + Alertmanager webhook configured
@@ -340,7 +341,7 @@ curl -X POST http://<causa-route>/api/v1/configs \
 <details>
 <summary><strong>Option C — IBM Bob</strong></summary>
 
-IBM Bob must already be installed and configured on the host where `causa` runs. See the [Bob Shell Integration Guide](causa/docs/llm/bob-shell-integration.md) for full prerequisites.
+IBM Bob must already be installed and configured on the host where `causa` runs. See the [Bob Shell Integration Guide](https://github.com/causaai/causa/blob/main/docs/llm/bob-shell-integration.md) for full prerequisites.
 
 ```bash
 curl -X POST http://<causa-route>/api/v1/configs \
@@ -364,7 +365,6 @@ curl -X POST http://<causa-route>/api/v1/configs \
 | LLM access | GCP Vertex AI | Anthropic API | IBM Bob shell |
 | Credentials needed | GCP credentials file + project ID | API key | Bob API key |
 | GCP account required | ✅ Yes | ❌ No | ❌ No |
-| Works offline | ❌ No | ❌ No | Depends on Bob setup |
 
 ---
 
@@ -474,6 +474,19 @@ kubectl -n causa-rca port-forward svc/jafra-analyzer 8080:8080
 curl 'http://127.0.0.1:8080/api/v1/recordings'
 curl 'http://127.0.0.1:8080/api/v1/recordings?namespace=<your-namespace>&pod=<pod-name>&container=<container-name>'
 ```
+
+---
+
+### Port-forwarding on Kind (Causa Backend & Causa MCP)
+
+On Kind, `causa-backend` and `causa-mcp` are `ClusterIP` services — run these in a terminal before using them:
+
+```bash
+kubectl port-forward svc/causa-backend 30001:8080 -n causa-rca &
+kubectl port-forward svc/causa-mcp     30005:8081 -n causa-rca &
+```
+
+Keep the sessions running. Replace `causa-rca` with your namespace if you installed with `-n`.
 
 ---
 
@@ -695,6 +708,13 @@ cd installer
 ./install.sh --terminate
 ```
 
+### Terminate port-forwards (Kind only)
+
+```bash
+pkill -f "port-forward svc/causa-backend"
+pkill -f "port-forward svc/causa-mcp"
+```
+
 ### Causa stack + Kind cluster
 
 ```bash
@@ -721,8 +741,8 @@ cd causa-demos/quarkus-rca
 
 ## Next Steps
 
-- **Explore the API** — The Causa Backend exposes a full REST API. See [causa-backend/docs/api](https://github.com/causaai/causa-backend/tree/main/docs/api) for the full OpenAPI specification.
-- **Tune LLM behaviour** — Temperature, max tokens, timeout, and model name are all configurable at runtime. See the [LLM Configuration Options](https://github.com/causaai/causa-backend/blob/main/docs/llm/llm-config-options.md) reference.
+- **Explore the API** — The Causa Backend exposes a full REST API. See [causa/docs/api](https://github.com/causaai/causa/tree/main/docs/api) for the full OpenAPI specification.
+- **Tune LLM behaviour** — Temperature, max tokens, timeout, and model name are all configurable at runtime. See the [LLM Configuration Options](https://github.com/causaai/causa/blob/main/docs/llm/llm-config-options.md) reference.
 - **Add more workloads** — Repeat [Section 5](#5-onboard-a-java-workload) for any additional Java deployment. Each newly labelled workload is automatically covered by the existing alert rule and Jafra injection with no further configuration.
 - **Rotate LLM credentials** — Re-POST to `/api/v1/configs` at any time. Settings take effect immediately without restarting Causa.
 - **Contribute** — All repos live under [github.com/causaai](https://github.com/causaai). Fork, open a feature branch, and raise a PR.
