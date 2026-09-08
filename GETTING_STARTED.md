@@ -98,6 +98,8 @@ Developer sees root cause + prioritised remediation steps
 | `helm` | Installs the Prometheus stack | [helm.sh](https://helm.sh/docs/intro/install/) |
 | `git` | Cloning the installer | pre-installed on most systems |
 | `curl`, `grep`, `sed`, `awk` | Script utilities | pre-installed on macOS and most Linux distributions |
+| `jq` | JSON pretty-printer (used in verify steps) | [jq](https://jqlang.github.io/jq/download/) — `brew install jq` / `apt install jq` |
+| `envsubst` | Variable substitution in YAML templates | pre-installed on Linux; macOS: `brew install gettext && brew link gettext` |
 
 > **Podman users:** Kind requires rootful mode. Run:
 > ```bash
@@ -287,7 +289,8 @@ Replace `<causa-route>` with:
 
 ```bash
 # Read and base64-encode your credentials file
-CREDS_B64=$(base64 -w0 <path-to-credentials-file>)
+# base64 flags differ by OS: -w0 on Linux disables line-wrapping; macOS base64 omits line-wraps by default
+CREDS_B64=$(base64 -w0 <path-to-credentials-file> 2>/dev/null || base64 <path-to-credentials-file>)
 # Sub-option A: ~/.config/gcloud/application_default_credentials.json
 # Sub-option B: ./causa-gcp-key.json
 
@@ -471,8 +474,8 @@ kubectl get pod -l app=<your-app> -o jsonpath='{.items[0].metadata.annotations.j
 
 ```bash
 kubectl -n causa-rca port-forward svc/jafra-analyzer 8080:8080
-curl 'http://127.0.0.1:8080/api/v1/recordings'
-curl 'http://127.0.0.1:8080/api/v1/recordings?namespace=<your-namespace>&pod=<pod-name>&container=<container-name>'
+curl 'http://localhost:8080/api/v1/recordings'
+curl 'http://localhost:8080/api/v1/recordings?namespace=<your-namespace>&pod=<pod-name>&container=<container-name>'
 ```
 
 ---
