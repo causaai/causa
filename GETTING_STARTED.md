@@ -283,9 +283,15 @@ gcloud iam service-accounts keys create causa-gcp-key.json \
 
 #### Step 2 — Push the configuration to Causa
 
-Replace `<causa-route>` with:
-- **Kind:** `localhost:30001`
-- **OpenShift:** `$(kubectl get route causa-backend -n causa-rca -o jsonpath='{.spec.host}')`
+Set `CAUSA_URL` for your environment before running any of the `curl` commands below:
+
+```bash
+# Kind (http — port-forwarded local endpoint)
+CAUSA_URL=http://localhost:30001
+
+# OpenShift (https — Route TLS terminates at the ingress controller)
+CAUSA_URL=https://$(oc get route causa-backend -n causa-rca -o jsonpath='{.spec.host}')
+```
 
 ```bash
 # Read and base64-encode your credentials file
@@ -294,7 +300,7 @@ CREDS_B64=$(base64 -w0 <path-to-credentials-file> 2>/dev/null || base64 <path-to
 # Sub-option A: ~/.config/gcloud/application_default_credentials.json
 # Sub-option B: ./causa-gcp-key.json
 
-curl -X POST http://<causa-route>/api/v1/configs \
+curl -X POST ${CAUSA_URL}/api/v1/configs \
   -H 'Content-Type: application/json' \
   -d "{
     \"configs\": {
@@ -325,8 +331,10 @@ Get your key at [https://console.anthropic.com/settings/keys](https://console.an
 
 #### Step 2 — Push the configuration to Causa
 
+Set `CAUSA_URL` as shown at the top of this section, then:
+
 ```bash
-curl -X POST http://<causa-route>/api/v1/configs \
+curl -X POST ${CAUSA_URL}/api/v1/configs \
   -H 'Content-Type: application/json' \
   -d '{
     "configs": {
@@ -346,8 +354,10 @@ curl -X POST http://<causa-route>/api/v1/configs \
 
 IBM Bob must already be installed and configured on the host where `causa` runs. See the [Bob Shell Integration Guide](https://github.com/causaai/causa/blob/main/docs/llm/bob-shell-integration.md) for full prerequisites.
 
+Set `CAUSA_URL` as shown at the top of this section, then:
+
 ```bash
-curl -X POST http://<causa-route>/api/v1/configs \
+curl -X POST ${CAUSA_URL}/api/v1/configs \
   -H 'Content-Type: application/json' \
   -d '{
     "configs": {
@@ -574,7 +584,13 @@ Use `http://localhost:30005/mcp` as the streamable-HTTP MCP endpoint. On OpenShi
 
 ### Install the causa-rca skill (Bob and Claude Code)
 
-The `causa-rca` skill tells your AI assistant how to use the Causa MCP tools. The skill is bundled with Causa at `causa/docs/skills/SKILL.md`. Copy it to your skills directory:
+The `causa-rca` skill tells your AI assistant how to use the Causa MCP tools. It lives in the `causa` repository at `docs/skills/SKILL.md`. If you have not already cloned that repo, do so first:
+
+```bash
+git clone https://github.com/causaai/causa.git
+```
+
+Then copy the skill to your AI assistant's skills directory:
 
 ```bash
 # Bob
