@@ -14,7 +14,6 @@ This folder contains the current API documentation for the Causa backend.
 | Quarkus health checks | Liveness, readiness, and overall platform checks | [`health-checks.md`](docs/api/health-checks.md) |
 | OpenAPI spec | OpenAPI YAML for the current API surface | [`openapi.yaml`](docs/api/openapi.yaml) |
 | Postman collection | Importable request collection for manual testing | [`postman-collection.json`](docs/api/postman-collection.json) |
-| Causa RCA skill | AI agent skill for triggering and querying RCA via the Causa MCP server | [`causa-mcp-skill.md`](docs/skills/causa-mcp-skill.md) |
 
 ## Endpoint summary
 
