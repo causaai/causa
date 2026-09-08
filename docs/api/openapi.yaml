@@ -254,7 +254,7 @@ components:
             type: string
 info:
   title: Causa Backend API
-  version: 0.0.1
+  version: 0.0.1-SNAPSHOT
   description: "AI-powered Kubernetes root-cause analysis backend. Receives Prometheus\
     \ Alertmanager webhooks, runs LLM diagnostics, and exposes REST endpoints for\
     \ alerts, diagnostics, and runtime configuration."
