@@ -1,8 +1,9 @@
 package com.causa.core.ports;
 
 import com.causa.core.domain.Alert;
+import com.causa.core.domain.PageRequest;
+import com.causa.core.domain.PageResult;
 
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -22,14 +23,13 @@ public interface AlertRepository {
 
     Optional<Alert> findById(String alertId);
 
-    List<Alert> findAll();
-
     /**
-     * Returns all alerts that match ALL non-null/non-blank parameters (AND logic).
-     * A null or blank value for any parameter means that filter is skipped.
+     * Returns alerts matching all non-null/non-blank filter fields (AND logic),
+     * paginated according to {@code pageRequest}.
      *
-     * @param workloadName filter by {@code workload_name} column (exact match); null = skip
-     * @param namespace    filter by {@code workload_info->>'namespace'} (exact match); null = skip
+     * @param filter      filter criteria — use {@link Alert.Filter#empty()} for no filtering
+     * @param pageRequest page and size — use {@link PageRequest#of(int, int)} to construct
+     * @return a paginated result containing matching alerts and total count
      */
-    List<Alert> findByFilters(String workloadName, String namespace);
+    PageResult<Alert> search(Alert.Filter filter, PageRequest pageRequest);
 }

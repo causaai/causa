@@ -105,6 +105,19 @@
             <artifactId>quarkus-scheduler</artifactId>
         </dependency>
 
+        <!-- Jackson YAML support for YAML-based rule definitions -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+        </dependency>
+
+        <!-- LangChain4J Skills - DISABLED (not used in this deployment) -->
+        <dependency>
+            <groupId>io.quarkiverse.langchain4j</groupId>
+            <artifactId>quarkus-langchain4j-skills</artifactId>
+            <version>1.11.0</version>
+        </dependency>
+
         <!-- LangChain4J Core -->
         <dependency>
             <groupId>dev.langchain4j</groupId>
@@ -139,13 +152,7 @@
             <artifactId>langchain4j-vertex-ai-anthropic</artifactId>
             <version>${langchain4j-vertex-anthropic.version}</version>
         </dependency>
-
-        <dependency>
-            <groupId>io.quarkiverse.langchain4j</groupId>
-            <artifactId>quarkus-langchain4j-skills</artifactId>
-            <version>1.11.0</version>
-        </dependency>
-
+        
         <!-- Test Dependencies -->
         <dependency>
             <groupId>org.assertj</groupId>

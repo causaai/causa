@@ -138,6 +138,37 @@ public final class Alert {
     }
 
     // -------------------------------------------------------------------------
+    // Filter — query criteria for list operations
+    // -------------------------------------------------------------------------
+
+    /**
+     * Optional filter criteria for alert list queries.
+     *
+     * <p>All fields are optional — {@code null} or blank means "skip this filter".
+     * All present (non-blank) fields are AND-ed inside the repository.
+     * Add new fields here as the product requires them; no repository interface
+     * changes are needed.
+     */
+    public record Filter(
+            /** Exact match on the {@code workload_name} column. Null/blank → skip. */
+            String workloadName,
+            /** Exact match on {@code workload_info->>'namespace'} (JSONB). Null/blank → skip. */
+            String namespace,
+            /** Exact match on the {@code status} column. Null/blank → skip. */
+            String status
+    ) {
+        /** Returns a filter with no constraints — matches every alert. */
+        public static Filter empty() { return new Filter(null, null, null); }
+
+        /** Returns {@code true} when every field is null or blank. */
+        public boolean isEmpty() {
+            return isBlank(workloadName) && isBlank(namespace) && isBlank(status);
+        }
+
+        private static boolean isBlank(String s) { return s == null || s.isBlank(); }
+    }
+
+    // -------------------------------------------------------------------------
     // Builder
     // -------------------------------------------------------------------------
 

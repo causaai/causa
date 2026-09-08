@@ -31,7 +31,7 @@ data:
   LLM_TEMPERATURE: "0.1"
   LLM_MAX_TOKENS: "8192"
   # Set to "false" to disable skills globally
-  LLM_SKILLS_ENABLED: "false"
+  LLM_SKILLS_ENABLED: "true"
   # Optional: path to a directory of user-provided skills (each subdirectory must contain a SKILL.md).
   # External skills are merged on top of bundled ones; external wins on name collision.
   # Mount user skill ConfigMaps under this path, one subdirectory per skill.
@@ -67,3 +67,16 @@ data:
   CAUSA_MCP_CRYOSTAT_TIMEOUT: "15000"
   CAUSA_MCP_CRYOSTAT_RETRY_DELAY: "5000"
   CAUSA_MCP_CRYOSTAT_MAX_RETRIES: "3"
+
+  # MCP Quarkus Configuration (metrics snapshot + health status)
+  # Set CAUSA_MCP_QUARKUS_ENDPOINT to enable — leave blank to disable Quarkus MCP health check and metrics collection
+  CAUSA_MCP_QUARKUS_ENDPOINT: ""
+  CAUSA_MCP_QUARKUS_HEALTH_PATH: "/healthz"
+  CAUSA_MCP_QUARKUS_TIMEOUT: "10000"
+  CAUSA_MCP_QUARKUS_METRICS_BASE_URL: ""
+
+  # MCP Async Profiler Configuration (JVM profiling — CPU hotspots, flame graphs, JFR analysis)
+  # Set CAUSA_MCP_ASYNC_PROFILER_ENDPOINT to enable — leave blank to disable
+  CAUSA_MCP_ASYNC_PROFILER_ENDPOINT: ""
+  CAUSA_MCP_ASYNC_PROFILER_HEALTH_PATH: "/healthz"
+  CAUSA_MCP_ASYNC_PROFILER_TIMEOUT: "15000"

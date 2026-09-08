@@ -85,31 +85,24 @@ public final class LLMConstants {
         
         // BOB Shell CLI flags
         public static final String FLAG_ACCEPT_LICENSE = "--accept-license";
-        public static final String FLAG_YOLO = "--yolo";
-        public static final String FLAG_OUTPUT_JSON = "-o";
-        public static final String FLAG_PROMPT = "-p";
+        public static final String SUBCMD_RUN = "run";
+        public static final String FLAG_FORMAT = "--format";
         public static final String OUTPUT_FORMAT_JSON = "json";
         
-        // BOB Shell output markers
-        public static final String OUTPUT_MARKER = "---output---";
-        
         // Environment variables
-        public static final String ENV_API_KEY_NAME = "BOBSHELL_API_KEY";  // BOB Shell internally uses this env var
+        public static final String ENV_API_KEY_NAME = "BOB_API_KEY";
         
         // Health check
         public static final String VERSION_FLAG = "--version";
-        public static final int VERSION_CHECK_TIMEOUT_SECONDS = 5;
+        public static final int VERSION_CHECK_TIMEOUT_SECONDS = 30;
         
-        // JSON field names — top-level stats block
-        public static final String JSON_FIELD_RESPONSE = "response";
+        // JSON field names — bob run -f json output
+        public static final String JSON_FIELD_LAST_MESSAGE = "last_message";
         public static final String JSON_FIELD_STATS = "stats";
-        // Nested path: stats.models.premium.tokens
-        public static final String JSON_FIELD_MODELS = "models";
-        public static final String JSON_FIELD_PREMIUM = "premium";
-        public static final String JSON_FIELD_TOKENS = "tokens";
-        public static final String JSON_FIELD_PROMPT_TOKENS = "prompt";
-        public static final String JSON_FIELD_COMPLETION_TOKENS = "candidates";
-        public static final String JSON_FIELD_TOKENS_USED = "total";
+        // stats token fields: stats.{input_tokens, output_tokens, total_tokens}
+        public static final String JSON_FIELD_INPUT_TOKENS = "input_tokens";
+        public static final String JSON_FIELD_OUTPUT_TOKENS = "output_tokens";
+        public static final String JSON_FIELD_TOTAL_TOKENS = "total_tokens";
         
         // Log field names
         public static final String LOG_FIELD_SHELL_PATH = "shell_path";
@@ -162,6 +155,7 @@ public final class LLMConstants {
 
         public static final String UNSUPPORTED_PROVIDER = "UnsupportedProvider";
         public static final String MISSING_CONFIGURATION = "MissingConfiguration";
+        public static final String INVALID_CONFIGURATION = "InvalidConfiguration";
         public static final String MODEL_NOT_READY = "ModelNotReady";
         public static final String LLM_REQUEST_FAILED = "LLMRequestFailed";
         public static final String INVALID_REQUEST_PARAMETERS = "InvalidRequestParameters";
@@ -206,6 +200,7 @@ public final class LLMConstants {
 
         public static final String API_KEY = "API_KEY";
         public static final String ADC = "ADC";
+        public static final String ADC_JSON = "ADC_JSON";
     }
 
     /**
@@ -241,5 +236,13 @@ public final class LLMConstants {
         public static final String LLM_ERROR_FORMAT = "LLM health check failed: %s";
         public static final String LLM_CONFIG_NOT_AVAILABLE = "LLM config not available";
         public static final String LLM_CONNECTION_FAILED = "LLM connection failed";
+
+        /**
+         * Injected after tool results to re-anchor JSON-only output format.
+         * Prevents leading prose when the LLM is in a conversational state post tool loop.
+         */
+        public static final String POST_TOOL_JSON_CONSTRAINT =
+                "All skill context has been loaded. Now respond with ONLY the raw JSON object. "
+                + "Start with `{` and end with `}`. No preamble, no markdown, no explanatory text.";
     }
 }

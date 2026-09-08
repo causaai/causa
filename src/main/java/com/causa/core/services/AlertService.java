@@ -1,6 +1,8 @@
 package com.causa.core.services;
 
 import com.causa.core.domain.Alert;
+import com.causa.core.domain.PageRequest;
+import com.causa.core.domain.PageResult;
 
 import java.util.List;
 import java.util.Map;
@@ -27,9 +29,11 @@ public interface AlertService {
     Optional<Alert> getAlert(String alertId);
 
     /**
-     * Returns alerts filtered by the given parameters using AND logic.
-     * Pass {@code null} / blank for any param to skip that filter.
-     * All non-blank params must match simultaneously.
+     * Returns a paginated, filtered list of alerts.
+     *
+     * @param filter      filter criteria — use {@link Alert.Filter#empty()} for no filtering
+     * @param pageRequest page and size
+     * @return paginated result of matching alerts
      */
-    List<Alert> getAlerts(String workloadName, String namespace);
+    PageResult<Alert> listAlerts(Alert.Filter filter, PageRequest pageRequest);
 }

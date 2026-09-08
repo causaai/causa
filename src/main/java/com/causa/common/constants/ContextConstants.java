@@ -39,6 +39,17 @@ public final class ContextConstants {
     public static final String SECTION_THREAD_ANALYSIS = "THREAD ANALYSIS (Cryostat JFR)";
     public static final String SECTION_EXCEPTION_ANALYSIS = "EXCEPTION ANALYSIS (Cryostat JFR)";
     public static final String SECTION_CONTAINER_ANALYSIS = "CONTAINER RESOURCE ANALYSIS (Cryostat JFR)";
+    public static final String SECTION_QUARKUS_RAW_METRICS = "QUARKUS RAW METRICS (Quarkus MCP)";
+
+    // Async Profiler MCP context section headers
+    public static final String SECTION_ASYNC_PROFILER_POD_LIST    = "ASYNC PROFILER — PROFILED PODS";
+    public static final String SECTION_ASYNC_PROFILER_JVM_STATUS  = "ASYNC PROFILER — JVM STATUS";
+    public static final String SECTION_ASYNC_PROFILER_JVM_STATS   = "ASYNC PROFILER — JVM STATISTICS";
+    public static final String SECTION_ASYNC_PROFILER_RECORDING   = "ASYNC PROFILER — LATEST RECORDING";
+    public static final String SECTION_ASYNC_PROFILER_REPORT      = "ASYNC PROFILER — RECORDING REPORT (CPU/JVM)";
+    public static final String SECTION_ASYNC_PROFILER_JFR_SUMMARY = "ASYNC PROFILER — JFR SUMMARY (LLM-ready)";
+    public static final String SECTION_ASYNC_PROFILER_FLAME_GRAPH = "ASYNC PROFILER — FLAME GRAPH (call stack)";
+
     public static final String SECTION_LIBERTY_LOGS = "LIBERTY APPLICATION LOGS (Filesystem MCP)";
 
     // Identity field labels

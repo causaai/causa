@@ -7,6 +7,8 @@ import com.causa.common.constants.AlertConstants.AlertStatus;
 import com.causa.common.constants.DiagnosticConstants.DiagnosticStatus;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
+import com.causa.core.domain.PageRequest;
+import com.causa.core.domain.PageResult;
 import com.causa.core.ports.AlertRepository;
 import com.causa.core.services.DiagnosticService;
 import jakarta.ws.rs.core.Response;
@@ -23,6 +25,8 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 /**
@@ -78,53 +82,58 @@ class DiagnosticsControllerTest {
     class ListDiagnosticsTests {
 
         @Test
-        @DisplayName("Should return 200 with empty list when no diagnostics")
+        @DisplayName("Should return 200 with empty page when no diagnostics")
         void shouldReturn200WithEmptyList() {
-            when(diagnosticService.listDiagnostics()).thenReturn(List.of());
+            PageResult<Diagnostic> page = PageResult.of(List.of(), 0L, PageRequest.of(1, 20));
+            when(diagnosticService.listDiagnostics(any())).thenReturn(page);
 
-            Response response = controller.listDiagnostics();
+            Response response = controller.listDiagnostics(1, 20);
 
             assertEquals(200, response.getStatus());
             @SuppressWarnings("unchecked")
-            List<DiagnosticListItemResponse> body = (List<DiagnosticListItemResponse>) response.getEntity();
-            assertTrue(body.isEmpty());
+            PageResult<DiagnosticListItemResponse> body = (PageResult<DiagnosticListItemResponse>) response.getEntity();
+            assertTrue(body.items().isEmpty());
+            assertEquals(0L, body.total());
         }
 
         @Test
-        @DisplayName("Should return 200 with list of diagnostics")
+        @DisplayName("Should return 200 with paginated diagnostics")
         void shouldReturn200WithDiagnosticList() {
             Diagnostic d1 = buildDiagnostic("diag-1", "alert-1");
             Diagnostic d2 = buildDiagnostic("diag-2", "alert-2");
-            when(diagnosticService.listDiagnostics()).thenReturn(List.of(d1, d2));
+            PageResult<Diagnostic> page = PageResult.of(List.of(d1, d2), 2L, PageRequest.of(1, 20));
+            when(diagnosticService.listDiagnostics(any())).thenReturn(page);
 
             Alert a1 = buildAlert("alert-1");
             Alert a2 = buildAlert("alert-2");
             when(alertRepository.findById("alert-1")).thenReturn(Optional.of(a1));
             when(alertRepository.findById("alert-2")).thenReturn(Optional.of(a2));
 
-            Response response = controller.listDiagnostics();
+            Response response = controller.listDiagnostics(1, 20);
 
             assertEquals(200, response.getStatus());
             @SuppressWarnings("unchecked")
-            List<DiagnosticListItemResponse> body = (List<DiagnosticListItemResponse>) response.getEntity();
-            assertEquals(2, body.size());
+            PageResult<DiagnosticListItemResponse> body = (PageResult<DiagnosticListItemResponse>) response.getEntity();
+            assertEquals(2, body.items().size());
+            assertEquals(2L, body.total());
         }
 
         @Test
         @DisplayName("Should handle missing alert gracefully (alert deleted)")
         void shouldHandleMissingAlertGracefully() {
             Diagnostic d1 = buildDiagnostic("diag-1", "alert-orphan");
-            when(diagnosticService.listDiagnostics()).thenReturn(List.of(d1));
+            PageResult<Diagnostic> page = PageResult.of(List.of(d1), 1L, PageRequest.of(1, 20));
+            when(diagnosticService.listDiagnostics(any())).thenReturn(page);
             when(alertRepository.findById("alert-orphan")).thenReturn(Optional.empty());
 
-            Response response = controller.listDiagnostics();
+            Response response = controller.listDiagnostics(1, 20);
 
             assertEquals(200, response.getStatus());
             @SuppressWarnings("unchecked")
-            List<DiagnosticListItemResponse> body = (List<DiagnosticListItemResponse>) response.getEntity();
-            assertEquals(1, body.size());
+            PageResult<DiagnosticListItemResponse> body = (PageResult<DiagnosticListItemResponse>) response.getEntity();
+            assertEquals(1, body.items().size());
             // workloadName should be null when alert is missing
-            assertNull(body.get(0).workloadName());
+            assertNull(body.items().get(0).workloadName());
         }
 
         @Test
@@ -132,10 +141,11 @@ class DiagnosticsControllerTest {
         void shouldLookupAlertForEachDiagnostic() {
             Diagnostic d1 = buildDiagnostic("diag-1", "alert-1");
             Diagnostic d2 = buildDiagnostic("diag-2", "alert-2");
-            when(diagnosticService.listDiagnostics()).thenReturn(List.of(d1, d2));
+            PageResult<Diagnostic> page = PageResult.of(List.of(d1, d2), 2L, PageRequest.of(1, 20));
+            when(diagnosticService.listDiagnostics(any())).thenReturn(page);
             when(alertRepository.findById(anyString())).thenReturn(Optional.empty());
 
-            controller.listDiagnostics();
+            controller.listDiagnostics(1, 20);
 
             verify(alertRepository).findById("alert-1");
             verify(alertRepository).findById("alert-2");

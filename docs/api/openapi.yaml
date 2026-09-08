@@ -21,6 +21,24 @@ paths:
       summary: Get Alerts
       tags:
       - Alerts Controller
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlertTriggerRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: {}
+        "400":
+          description: Bad Request
+      summary: Create Manual Alert
+      tags:
+      - Alerts Controller
   /api/v1/alerts/{id}:
     get:
       parameters:
@@ -178,6 +196,23 @@ components:
           type: string
         fingerprint:
           type: string
+    AlertTriggerRequest:
+      type: object
+      properties:
+        namespace:
+          type: string
+        container:
+          type: string
+        pod:
+          type: string
+        workload_name:
+          type: string
+        workload_type:
+          type: string
+        cluster_name:
+          type: string
+        severity:
+          type: string
     AlertWebhookRequest:
       type: object
       properties:
@@ -219,7 +254,7 @@ components:
             type: string
 info:
   title: Causa Backend API
-  version: 0.0.1
+  version: 0.0.1-SNAPSHOT
   description: "AI-powered Kubernetes root-cause analysis backend. Receives Prometheus\
     \ Alertmanager webhooks, runs LLM diagnostics, and exposes REST endpoints for\
     \ alerts, diagnostics, and runtime configuration."

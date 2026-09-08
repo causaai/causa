@@ -2,6 +2,7 @@ package com.causa.api.validators;
 
 import com.causa.api.dto.request.AlertWebhookRequest;
 import com.causa.common.constants.AlertConstants;
+import org.apache.commons.lang3.StringUtils;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -9,6 +10,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Alert Webhook Validator
@@ -92,29 +94,34 @@ public class AlertWebhookValidator {
             return;
         }
 
+        Map<String, String> annotations = item.getAnnotations() != null ? item.getAnnotations() : Map.of();
+        Map<String, String> labels      = item.getLabels();
+
         // alertname is always required
-        if (!item.getLabels().containsKey(AlertConstants.Labels.ALERT_NAME)) {
+        if (StringUtils.isBlank(labels.get(AlertConstants.Labels.ALERT_NAME))) {
             errors.add("alerts[" + index + "].labels must contain '"
                 + AlertConstants.Labels.ALERT_NAME + "'");
         }
 
         if ("vm".equals(platform)) {
-            // VM platform — require workload_name in annotations
-            if (item.getAnnotations() == null
-                    || !item.getAnnotations().containsKey(AlertConstants.Labels.WORKLOAD_NAME)) {
-                errors.add("alerts[" + index + "].annotations must contain '"
-                    + AlertConstants.Labels.WORKLOAD_NAME + "'");
+            // VM platform — workload_name is always set as annotation by PrometheusRule
+            if (StringUtils.isBlank(annotations.get(AlertConstants.Labels.WORKLOAD_NAME))) {
+                errors.add("alerts[" + index + "] must contain non-blank '"
+                    + AlertConstants.Labels.WORKLOAD_NAME + "' in annotations");
             }
         } else {
-            // Cluster platform — require container and namespace in labels
-            if (!item.getLabels().containsKey(AlertConstants.Labels.CONTAINER)) {
-                errors.add("alerts[" + index + "].labels must contain '"
-                    + AlertConstants.Labels.CONTAINER + "'");
+            // Cluster platform — container, namespace, and pod are standard Prometheus labels
+            if (StringUtils.isBlank(labels.get(AlertConstants.Labels.CONTAINER))) {
+                errors.add("alerts[" + index + "] must contain non-blank '"
+                    + AlertConstants.Labels.CONTAINER + "' in labels");
             }
-
-            if (!item.getLabels().containsKey(AlertConstants.Labels.NAMESPACE)) {
-                errors.add("alerts[" + index + "].labels must contain '"
-                    + AlertConstants.Labels.NAMESPACE + "'");
+            if (StringUtils.isBlank(labels.get(AlertConstants.Labels.NAMESPACE))) {
+                errors.add("alerts[" + index + "] must contain non-blank '"
+                    + AlertConstants.Labels.NAMESPACE + "' in labels");
+            }
+            if (StringUtils.isBlank(labels.get(AlertConstants.Labels.POD))) {
+                errors.add("alerts[" + index + "] must contain non-blank '"
+                    + AlertConstants.Labels.POD + "' in labels");
             }
         }
     }

@@ -52,7 +52,7 @@ public final class LogMessages {
         public static final String BOB_SHELL_AVAILABLE = "BOB Shell is available and ready";
         public static final String BOB_SHELL_NOT_AVAILABLE = "BOB Shell is not available";
         public static final String BOB_SHELL_FAILED = "BOB Shell failed";
-        public static final String BOB_OUTPUT_MARKERS_NOT_FOUND = "Could not find ---output--- markers in BOB Shell response";
+        public static final String BOB_JSON_PARSE_FAILED = "Failed to parse JSON response from BOB Shell";
         public static final String BOB_EXTRACTED_TOKEN_USAGE = "Extracted token usage from BOB Shell";
         public static final String BOB_STATS_FIELD_NOT_FOUND = "Stats field not found in BOB Shell output";
         public static final String BOB_STATS_BLOCK_NOT_FOUND = "Could not find statistics block in BOB Shell output";
@@ -109,6 +109,12 @@ public final class LogMessages {
         public static final String MCP_FILESYSTEM_CHECK_STARTED = "MCP Filesystem health check started";
         public static final String MCP_FILESYSTEM_CHECK_PASSED = "MCP Filesystem health check passed";
         public static final String MCP_FILESYSTEM_CHECK_FAILED = "MCP Filesystem health check failed";
+        public static final String MCP_QUARKUS_CHECK_STARTED = "MCP Quarkus health check started";
+        public static final String MCP_QUARKUS_CHECK_PASSED = "MCP Quarkus health check passed";
+        public static final String MCP_QUARKUS_CHECK_FAILED = "MCP Quarkus health check failed";
+        public static final String MCP_ASYNC_PROFILER_CHECK_STARTED = "MCP Async Profiler health check started";
+        public static final String MCP_ASYNC_PROFILER_CHECK_PASSED  = "MCP Async Profiler health check passed";
+        public static final String MCP_ASYNC_PROFILER_CHECK_FAILED  = "MCP Async Profiler health check failed";
         public static final String LLM_CHECK_STARTED = "LLM health check started";
         public static final String LLM_CHECK_PASSED = "LLM health check passed";
         public static final String LLM_CHECK_FAILED = "LLM health check failed";
@@ -132,9 +138,11 @@ public final class LogMessages {
         public static final String ALERT_PERSISTED = "Alert persisted to database";
 
         // Alerts API
-        public static final String ALERTS_GET_REQUEST   = "GET /api/v1/alerts request received";
-        public static final String ALERTS_GET_FOUND     = "Alert(s) retrieved successfully";
-        public static final String ALERTS_GET_NOT_FOUND = "Alert not found";
+        public static final String ALERTS_GET_REQUEST      = "GET /api/v1/alerts request received";
+        public static final String ALERTS_GET_FOUND        = "Alert(s) retrieved successfully";
+        public static final String ALERTS_GET_NOT_FOUND    = "Alert not found";
+        public static final String ALERTS_TRIGGER_REQUEST  = "POST /api/v1/alerts manual trigger request received";
+        public static final String ALERTS_TRIGGER_ACCEPTED = "Manual alert trigger accepted";
 
         // Exception messages
         public static final String ALERT_PERSIST_FAILED = "Failed to persist alert";
@@ -167,6 +175,9 @@ public final class LogMessages {
         public static final String LLM_RESPONSE_RECEIVED        = "LLM response received";
         public static final String RCA_GENERATED_SUCCESS        = "RCA generated successfully";
         public static final String RCA_GENERATION_FAILED        = "RCA generation failed";
+        public static final String RCA_VALIDATION_STARTED       = "RCA validation started";
+
+        public static final String LLM_CONTEXT_BUILT = "LLM context built";
 
         // Exception messages
         public static final String DIAGNOSTIC_PERSIST_FAILED = "Failed to persist diagnostic";
@@ -178,6 +189,7 @@ public final class LogMessages {
         public static final String DIAGNOSTIC_GET_REQUEST    = "GET /api/v1/diagnostics/{id} request received";
         public static final String DIAGNOSTIC_GET_FOUND      = "Diagnostic retrieved successfully";
         public static final String DIAGNOSTIC_GET_NOT_FOUND  = "Diagnostic not found";
+
     }
 
     /**
@@ -198,6 +210,19 @@ public final class LogMessages {
         public static final String MCP_KRUIZE_COST_RECOMMENDATIONS = "Kruize cost recommendations retrieved";
         public static final String MCP_KRUIZE_PERF_RECOMMENDATIONS = "Kruize performance recommendations retrieved";
         public static final String MCP_KRUIZE_SKIPPED_NO_CONTAINER = "Skipping Kruize MCP calls - no container name available";
+
+        // Quarkus MCP
+        public static final String MCP_QUARKUS_RAW_METRICS = "Quarkus raw metrics retrieved";
+
+        // Async Profiler MCP
+        public static final String MCP_ASYNC_PROFILER_POD_LIST     = "Async Profiler pod list retrieved";
+        public static final String MCP_ASYNC_PROFILER_JVM_STATUS   = "Async Profiler JVM status retrieved";
+        public static final String MCP_ASYNC_PROFILER_JVM_STATS    = "Async Profiler JVM statistics retrieved";
+        public static final String MCP_ASYNC_PROFILER_RECORDING    = "Async Profiler recording retrieved";
+        public static final String MCP_ASYNC_PROFILER_REPORT       = "Async Profiler recording report retrieved";
+        public static final String MCP_ASYNC_PROFILER_JFR_SUMMARY  = "Async Profiler JFR summary retrieved";
+        public static final String MCP_ASYNC_PROFILER_FLAME_GRAPH  = "Async Profiler flame graph retrieved";
+        public static final String MCP_ASYNC_PROFILER_NO_RECORDING = "Async Profiler: no latestRecordingId — skipping recording tools";
 
         // Cryostat MCP
         public static final String MCP_CRYOSTAT_GC_ANALYSIS = "Cryostat GC analysis retrieved";
@@ -255,5 +280,97 @@ public final class LogMessages {
         public static final String FS_SKILLS_LOADED        = "External filesystem skills loaded";
         public static final String FS_SKILLS_FAILED        = "Failed to load external skills from filesystem";
         public static final String SKILLS_MERGED           = "Skills merged";
+    }
+
+    /**
+     * Validation pipeline log messages.
+     */
+    public static final class Validation {
+        private Validation() {}
+
+        // YAML Rule Engine
+        public static final String YAML_RULES_INITIALIZING = "Initializing YAML-based rule sets";
+        public static final String YAML_RULES_LOADING = "Loading YAML rule sets";
+        public static final String YAML_RULES_LOADED = "YAML rule sets loaded";
+        public static final String YAML_RULES_INITIALIZED = "YAML rule sets initialized";
+        public static final String YAML_RULE_RELOADING = "Reloading modified rule set";
+        public static final String YAML_RULES_HOT_RELOADED = "Hot-reloaded rule sets";
+        public static final String YAML_RULE_LOAD_FAILED = "Failed to check for rule set modifications";
+
+        // Hypothesis Validation
+        public static final String HYPOTHESIS_VALIDATION_STARTED = "Validating RCA hypothesis with rule-based approach";
+        public static final String HYPOTHESIS_VALIDATION_COMPLETED = "Rule-based hypothesis validation completed";
+        public static final String HYPOTHESIS_VALIDATION_FAILED = "Rule-based hypothesis validation failed";
+        public static final String HYPOTHESIS_IDENTIFIED = "Hypothesis identified";
+        public static final String SIGNALS_EXTRACTED = "Signals extracted from diagnostic context";
+        public static final String NO_RULESET_AVAILABLE = "No rule set available for hypothesis";
+        public static final String YAML_RULESET_LOADED = "Loaded YAML-based rule set";
+        public static final String NO_RULESET_FOUND = "No rule set found for hypothesis - check YAML configuration";
+
+        // Validation API
+        public static final String VALIDATION_DETAIL_REQUESTED = "Validation detail request received";
+        public static final String VALIDATION_DETAIL_RETRIEVED = "Validation detail retrieved";
+        public static final String VALIDATION_REQUEST_MISSING_ID = "Validation request missing diagnosticId parameter";
+        public static final String VALIDATION_DATA_UNAVAILABLE = "Validation data not available for diagnostic";
+        public static final String VALIDATION_DATA_PARSE_FAILED = "Failed to parse validation data";
+        public static final String DIAGNOSTIC_NOT_FOUND = "Diagnostic not found";
+
+        // LLM Assertion Analyzer
+        public static final String ASSERTION_ANALYZING = "Analyzing assertion with LLM";
+        public static final String ASSERTION_ANALYSIS_COMPLETED = "LLM assertion analysis completed";
+        public static final String ASSERTION_ANALYSIS_FAILED = "LLM assertion analysis failed";
+        public static final String ASSERTION_BATCH_START = "Analyzing all assertions with LLM in parallel";
+        public static final String ASSERTION_BATCH_COMPLETED = "Batch analysis completed";
+        public static final String ASSERTION_SKIP_RECOMMENDATION = "Recommendations are not validated against evidence";
+        public static final String ASSERTION_NO_JSON = "No JSON object found in LLM response";
+    }
+
+    /**
+     * Pagination-related log messages.
+     */
+    public static final class Pagination {
+        private Pagination() {}
+
+        public static final String INVALID_PAGE      = "Invalid page parameter — must be >= 1";
+        public static final String INVALID_PAGE_SIZE = "Invalid page_size — must be between 1 and the configured maximum";
+        public static final String INVALID_PARAM     = "Invalid pagination parameter";
+    }
+
+    /**
+     * Common log field names.
+     */
+    public static final class Fields {
+        private Fields() {}
+
+        // Common
+        public static final String DIAGNOSTIC_ID = "diagnosticId";
+        public static final String ALERT_ID = "alertId";
+        public static final String STATUS = "status";
+        public static final String EXCEPTION = "exception";
+
+        // Validation
+        public static final String HYPOTHESIS = "hypothesis";
+        public static final String ANOMALY_TYPE = "anomalyType";
+        public static final String ISSUE_TITLE = "issueTitle";
+        public static final String SIGNAL_COUNT = "signalCount";
+        public static final String CONFIDENCE = "confidence";
+        public static final String SCORE = "score";
+        public static final String REQUIRED_PASSED = "requiredPassed";
+        public static final String REQUIRED_TOTAL = "requiredTotal";
+        public static final String SUPPORTING_MATCHED = "supportingMatched";
+        public static final String EXCLUSION_MATCHED = "exclusionMatched";
+        public static final String FINAL_STATUS = "finalStatus";
+
+        // YAML Rules
+        public static final String HOT_RELOAD_ENABLED = "hotReloadEnabled";
+        public static final String TOTAL_RULE_SETS = "totalRuleSets";
+        public static final String LOADED_RULE_SETS = "loadedRuleSets";
+        public static final String HYPOTHESES = "hypotheses";
+        public static final String FILE = "file";
+        public static final String COUNT = "count";
+        public static final String SOURCE = "source";
+        public static final String CLASSPATH_DIR = "classpathDir";
+        public static final String EXTERNAL_DIR = "externalDir";
+        public static final String EXPECTED_LOCATION = "expectedLocation";
     }
 }
