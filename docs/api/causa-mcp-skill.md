@@ -22,7 +22,7 @@ When a developer asks something like *"Why is my application crashing?"* or *"Ru
 | Requirement | Notes |
 |---|---|
 | [Causa MCP server](https://github.com/causaai/causa-mcp) | Must be registered in the agent's MCP configuration |
-| Kubernetes MCP server | Required for pod discovery |
+| Kubernetes MCP server or `kubectl` access | Required for pod discovery |
 | `LLM_SKILLS_ENABLED` | Must be `true` in Causa backend configuration |
 
 ---

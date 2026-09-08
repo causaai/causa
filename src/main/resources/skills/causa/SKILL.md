@@ -1,7 +1,7 @@
 ---
 name: causa-rca
 description: Activate when a developer asks about application health, diagnostics, root cause analysis, existing RCA results, or why their application is failing. Checks for existing diagnostics before starting new ones.
-compatibility: Requires the Causa MCP server to be configured in Bob with tools initiate_rca and get_rca_result.
+compatibility: Requires the Causa MCP server to be configured in the AI agent with tools initiate_rca and get_rca_result, plus Kubernetes MCP tools or kubectl access for pod discovery.
 metadata:
   category: diagnostics
   domain: kubernetes, jvm
