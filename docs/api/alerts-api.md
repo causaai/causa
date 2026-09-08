@@ -165,8 +165,6 @@ This payload used `severity: info` while the current minimum accepted severity i
 - Rejected alerts are returned as a map of `source identifier -> rejection reason`.
 - The payload above is the provided `causa-high-memory` webhook payload.
 - Re-sending the same alert can trigger cooldown rejection, as shown above.
-
-
 ---
 
 ## POST `/api/v1/alerts`
