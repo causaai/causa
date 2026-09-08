@@ -2,7 +2,7 @@
 
 Causa ships an AI agent skill — `causa-rca` — that lets developers trigger and query root cause analyses directly from their AI assistant (Bob, Cursor, Claude Desktop, or any MCP-compatible agent), without manually calling the Causa API.
 
-The skill is bundled at `src/main/resources/skills/causa/SKILL.md` and is loaded automatically when the agent connects to the [Causa MCP server](https://github.com/causaai/causa-mcp).
+The skill is bundled at `docs/skills/SKILL.md` and is loaded automatically when the agent connects to the [Causa MCP server](https://github.com/causaai/causa-mcp).
 
 ---
 
@@ -23,7 +23,6 @@ When a developer asks something like *"Why is my application crashing?"* or *"Ru
 |---|---|
 | [Causa MCP server](https://github.com/causaai/causa-mcp) | Must be registered in the agent's MCP configuration |
 | Kubernetes MCP server or `kubectl` access | Required for pod discovery |
-| `LLM_SKILLS_ENABLED` | Must be `true` in Causa backend configuration |
 
 ---
 
@@ -45,4 +44,4 @@ When a developer asks something like *"Why is my application crashing?"* or *"Ru
 | `INVESTIGATE` | "Why is my app failing?", "Check for OOM" | Uses existing recent result if available; starts fresh if stale or absent |
 | `FORCE_RUN` | "Run RCA", "Analyze from scratch" | Always starts a new analysis, skips existing result check |
 
-For the full workflow, trigger phrase list, and output format, see [`src/main/resources/skills/causa/SKILL.md`](../../src/main/resources/skills/causa/SKILL.md).
+For the full workflow, trigger phrase list, and output format, see [`docs/skills/SKILL.md`](../../docs/skills/SKILL.md).
