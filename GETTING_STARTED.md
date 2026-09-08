@@ -373,30 +373,71 @@ curl -X POST http://<causa-route>/api/v1/configs \
 
 ## 5. Onboard a Java Workload
 
-To have Causa monitor and diagnose a workload you need to do two things:
+To have Causa monitor and diagnose a workload you need to do three things:
 
-1. Configure a **Prometheus alert rule** so Causa is notified when something goes wrong.
-2. Optionally, **opt your pod into Jafra** so async-profiler continuously captures CPU, allocation, lock, and GC data that Causa can feed into its AI analysis.
+1. **Label your pod** with `causa.ai/monitoring=true` so Causa knows to watch it.
+2. **Apply the PrometheusRule** so Causa is notified when something goes wrong.
+3. Optionally, **opt your pod into Jafra** so async-profiler continuously captures CPU, allocation, lock, and GC data that Causa can feed into its AI analysis.
+
+### Prerequisite — label your workload for monitoring
+
+> **This label is required.** Every alert rule shipped with Causa filters on `causa.ai/monitoring="true"`. Pods without this label are ignored, even if Prometheus is scraping them.
+
+Add the label to your Deployment's pod template so it persists across restarts:
+
+```yaml
+# In your Deployment spec.template.metadata.labels:
+labels:
+  causa.ai/monitoring: "true"
+```
+
+Or apply it imperatively to a running pod (for quick testing only — it is lost on pod restart):
+
+```bash
+kubectl label pod <pod-name> causa.ai/monitoring=true -n <namespace>
+```
+
+Or patch the Deployment directly:
+
+```bash
+kubectl patch deployment <your-deployment> -n <your-namespace> \
+  --type=merge \
+  -p='{"spec":{"template":{"metadata":{"labels":{"causa.ai/monitoring":"true"}}}}}'
+kubectl rollout status deployment/<your-deployment> -n <your-namespace>
+```
+
+---
 
 ### Enable Prometheus alerting
 
-The installer ships a default PrometheusRule that fires when any pod in the `causa-rca` namespace exceeds 50% of its configured memory limit. If your workload is in a different namespace, apply the rule there:
+The installer applies the PrometheusRule from `installer/manifests/prometheus/prometheusrule.yaml`. It defines five alert rules, all scoped to pods carrying `causa.ai/monitoring=true`:
+
+| Alert | Severity | Condition |
+|---|---|---|
+| `CausaAppHighMemoryUsage` | warning | Container exceeds **80 %** of its memory limit |
+| `CausaAppOOMKilled` | critical | Container was killed by the kernel OOM reaper |
+| `CausaAppCrashLoopBackOff` | critical | Pod restarts **> 2** times in 10 minutes |
+| `CausaAppCPUThrottling` | warning | Container CPU throttling **> 50 %** for 2 minutes |
+| `CausaAppFrequentRestarts` | warning | Pod restarts **> 5** times in 30 minutes |
+
+When any of these alerts fire, Alertmanager POSTs the payload to `causa-backend` at `/api/v1/webhooks/alerts`, which triggers an automatic RCA for the affected workload. A 15-minute cooldown prevents duplicate analyses.
+
+If the rule was not applied automatically (e.g. you are onboarding a workload in a non-default namespace), apply it manually after substituting the namespace placeholder:
 
 ```bash
-# Apply the default alert rule (ships with the installer)
-kubectl apply -f manifests/prometheus/prometheus-alert.yaml
+# Replace PLACEHOLDER_NAMESPACE with your target namespace, then apply
+sed 's/PLACEHOLDER_NAMESPACE/<your-namespace>/g' \
+  installer/manifests/prometheus/prometheusrule.yaml | kubectl apply -f -
 ```
 
-For a custom threshold, use the template:
+The installer also applies a NetworkPolicy (`installer/manifests/prometheus/networkpolicy.yaml`) that allows Alertmanager to reach `causa-backend` on port 8080. Apply it the same way if your cluster uses a default-deny ingress policy:
 
 ```bash
-APP_NAME=<your-app-name> \
-APP_NAMESPACE=<your-namespace> \
-MEMORY_THRESHOLD=0.75 \
-  envsubst < manifests/prometheus/causa-memory-alert-template.yaml | kubectl apply -f -
+sed 's/PLACEHOLDER_NAMESPACE/<your-namespace>/g' \
+  installer/manifests/prometheus/networkpolicy.yaml | kubectl apply -f -
 ```
 
-The alert must route to the Causa webhook. The installer configures Alertmanager automatically. Verify:
+Verify the rule is registered:
 
 ```bash
 # Kind
@@ -533,16 +574,16 @@ Use `http://localhost:30005/mcp` as the streamable-HTTP MCP endpoint. On OpenShi
 
 ### Install the causa-rca skill (Bob and Claude Code)
 
-The `causa-rca` skill tells your AI assistant how to use the Causa MCP tools. Copy it to your skills directory:
+The `causa-rca` skill tells your AI assistant how to use the Causa MCP tools. The skill is bundled with Causa at `causa/docs/skills/SKILL.md`. Copy it to your skills directory:
 
 ```bash
 # Bob
 mkdir -p ~/.bob/skills/causa-rca
-cp causa-demos/skills/causa-rca/SKILL.md ~/.bob/skills/causa-rca/SKILL.md
+cp causa/docs/skills/SKILL.md ~/.bob/skills/causa-rca/SKILL.md
 
 # Claude Code
 mkdir -p ~/.claude/skills/causa-rca
-cp causa-demos/skills/causa-rca/SKILL.md ~/.claude/skills/causa-rca/SKILL.md
+cp causa/docs/skills/SKILL.md ~/.claude/skills/causa-rca/SKILL.md
 ```
 
 Once the skill is installed, you can trigger RCA with natural language:
