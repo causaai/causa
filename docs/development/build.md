@@ -16,9 +16,11 @@ The `scripts/development/build_and_push.sh` script provides a comprehensive solu
 
 1. **Java 17+**
 2. **Maven** (uses the Maven wrapper `./mvnw` included in the project)
-3. **podman** with `buildx` support — **required when `BUILD_IMAGE=true` (the default)**
-   - Install: https://podman.io/getting-started/installation
-   - Verify: `podman buildx --help`
+3. **podman** or **docker** with `buildx` support — **required when `BUILD_IMAGE=true` (the default)**
+   - The script auto-detects which tool is available (podman preferred; falls back to docker)
+   - podman install: https://podman.io/getting-started/installation
+   - docker install: https://docs.docker.com/get-docker/
+   - Verify: `podman buildx --help` or `docker buildx --help`
 4. **Authentication** to your container registry (only required when `-p true`)
 
 ## Quick Start
@@ -46,13 +48,14 @@ The `scripts/development/build_and_push.sh` script provides a comprehensive solu
 |--------|-------------|---------|
 | `-i IMAGE_NAME` | Full image name (registry/repository:tag) | - |
 | `-r REGISTRY` | Container registry | `quay.io` |
-| `-n REPO_NAME` | Repository name | `causa-ai-hub/causa-backend` |
+| `-n REPO_NAME` | Repository name | `causaai/causa` |
 | `-t TAG` | Image tag (used if -i not provided) | `latest` |
 | `-b BUILD` | Build image (true/false) | `true` |
 | `-p PUSH` | Push image (true/false) | `false` |
 | `-l PLATFORMS` | Target platforms | `linux/amd64,linux/arm64` |
 | `-c CLEAN` | Run clean build (true/false) | `true` |
 | `-s SKIP_TESTS` | Skip tests during build (true/false) | `false` |
+| `-d TOOL` | Container tool (`podman` or `docker`) | auto-detect |
 | `-h` | Show help message | - |
 
 ### Environment Variables
@@ -70,6 +73,7 @@ Alternative to command-line flags (flags take precedence):
 | `PLATFORMS` | Target platforms |
 | `CLEAN_BUILD` | Clean build (true/false) |
 | `SKIP_TESTS` | Skip tests (true/false) |
+| `CONTAINER_TOOL` | Container tool: `podman` or `docker` (auto-detected if unset) |
 
 ## Examples
 
@@ -94,6 +98,12 @@ Alternative to command-line flags (flags take precedence):
 
 # Build and push to Docker Hub
 ./scripts/dev/build_and_push.sh -r docker.io -n myusername/causa -t latest -p true
+
+# Force docker instead of podman
+./scripts/dev/build_and_push.sh -d docker -t latest -p true
+
+# Force podman explicitly
+./scripts/dev/build_and_push.sh -d podman -t latest -p true
 ```
 
 ### Architecture-Specific Builds
@@ -176,16 +186,30 @@ podman login ghcr.io
 
 The script performs the following steps:
 
-1. **Validation**: Checks for required tools (`podman`, `podman buildx`, `mvnw`) and the `Dockerfile.jvm`
-2. **Configuration**: Processes command-line flags and environment variables
+1. **Validation**: Checks for required tools (container tool + `buildx`, `mvnw`) and the `Dockerfile.jvm`
+2. **Configuration**: Processes command-line flags and environment variables; auto-detects `podman` or `docker`
 3. **Step 1 — Maven package**: Runs `./mvnw package -Dquarkus.container-image.build=false`; image building is intentionally skipped here
-4. **Step 2 — podman buildx**: Builds a multi-arch manifest using `Dockerfile.jvm` (amd64 + arm64)
-5. **Push** (optional): Pushes the manifest and all platform images via `podman manifest push --all`
+4. **Step 2 — buildx**: Builds a multi-arch image using `Dockerfile.jvm` (amd64 + arm64)
+   - **podman**: uses `--manifest` to store the multi-arch manifest locally before pushing
+   - **docker**: uses `--push` directly when pushing; single-platform builds use `--load`
+5. **Push** (optional):
+   - **podman**: `podman manifest push --all`
+   - **docker**: handled inline via `--push` in the build step
+
+### Tool Selection
+
+The script picks the container tool in this order:
+
+1. `-d TOOL` flag (highest priority)
+2. `CONTAINER_TOOL` environment variable
+3. Auto-detect: `podman` if installed, otherwise `docker`
+
+> **Note:** `docker buildx` cannot load a multi-platform image into the local daemon — it must be pushed to a registry. If you run with multiple platforms and `PUSH_IMAGE=false` using docker, the build completes but the image won't be available locally. Use `podman` or pass `-p true` to push.
 
 ### Under the Hood
 
 - **`Dockerfile.jvm`** at `src/main/docker/Dockerfile.jvm` — used for the actual container image
-- **podman buildx** — builds and assembles the multi-arch manifest locally
+- **podman / docker buildx** — builds and assembles the multi-arch manifest
 - **Maven Wrapper** (`./mvnw`) — compiles and packages the application JAR
 
 
