@@ -76,6 +76,7 @@ Developer sees root cause + prioritised remediation steps
 |---|---|---|
 | `causa` | [causaai/causa](https://github.com/causaai/causa) | Quarkus-based AI RCA agent; receives Prometheus alerts and produces diagnoses |
 | `causa-mcp` | [causaai/causa-mcp](https://github.com/causaai/causa-mcp) | MCP server bridging your IDE/agent to the Causa engine |
+| **Jafra (Experimental)** | — | Continuous profiling ecosystem for Java workloads in Kubernetes — see [docs/tools/jafra.md](docs/tools/jafra.md) |
 | `jafra-controller - Experimental` | [bharathappali/jafra-controller](https://github.com/bharathappali/jafra-controller) | Go mutating webhook; injects async-profiler into opted-in Java pods |
 | `jafra-agent - Experimental` | [bharathappali/jafra-agent](https://github.com/bharathappali/jafra-agent) | Rust DaemonSet; streams JFR chunks from nodes to the analyzer |
 | `jafra-analyzer - Experimental` | [bharathappali/jafra-analyzer](https://github.com/bharathappali/jafra-analyzer) | Quarkus service; stores recordings and serves automated JFR analysis |
