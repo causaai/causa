@@ -10,16 +10,13 @@ NC='\033[0m' # No Color
 # Usage function
 usage() {
     local exit_code="${1:-1}"
-    echo "Usage: $0 [OPTIONS]"
+    echo "Usage: $0 -i IMAGE_NAME [OPTIONS]"
     echo ""
-    echo "Build and push Docker images for causa-backend with multi-architecture support"
+    echo "Build and push Docker images for causa-backend with multi-architecture support."
     echo "Uses podman or docker buildx + Dockerfile.jvm for multi-arch builds (amd64 + arm64)."
     echo ""
     echo "Options:"
-    echo "  -i IMAGE_NAME    Full image name (registry/repository:tag)"
-    echo "  -r REGISTRY      Container registry (default: quay.io)"
-    echo "  -n REPO_NAME     Repository name (default: causaai/causa)"
-    echo "  -t TAG           Image tag (default: version from pom.xml) - used only if -i is not provided"
+    echo "  -i IMAGE_NAME    (REQUIRED) Full image name (registry/repository:tag)"
     echo "  -b BUILD         Build image true/false (default: true)"
     echo "  -p PUSH          Push image true/false (default: false)"
     echo "  -l PLATFORMS     Target platforms (default: linux/amd64,linux/arm64)"
@@ -28,11 +25,17 @@ usage() {
     echo "  -d TOOL          Container tool: podman or docker (default: auto-detect)"
     echo "  -h               Show this help message"
     echo ""
-    echo "Environment Variables (alternative to flags):"
-    echo "  IMAGE_NAME       Full image name"
-    echo "  REGISTRY         Container registry"
-    echo "  REPO_NAME        Repository name"
-    echo "  IMAGE_TAG        Image tag (default: version from pom.xml)"
+    echo "Image naming conventions:"
+    echo "  Production releases : quay.io/causaai/causa:<version>"
+    echo "  Overnight/CI builds : quay.io/causaai/causa-dev:<tag>"
+    echo "  Fork/custom builds  : quay.io/<your-org>/<your-repo>:<tag>"
+    echo ""
+    echo "  Use causaai/causa for stable production images."
+    echo "  Use causaai/causa-dev for pipeline automation and nightly builds."
+    echo "  Use your own fork registry path when building and testing custom changes."
+    echo ""
+    echo "Environment Variables (alternative to -i):"
+    echo "  IMAGE_NAME       Full image name (required if -i is not passed)"
     echo "  BUILD_IMAGE      Build image (true/false)"
     echo "  PUSH_IMAGE       Push image (true/false)"
     echo "  PLATFORMS        Target platforms"
@@ -41,22 +44,20 @@ usage() {
     echo "  CONTAINER_TOOL   Container tool: podman or docker"
     echo ""
     echo "Examples:"
-    echo "  # Build and push with custom full image name"
-    echo "  $0 -i quay.io/causa/causa-backend:1.0.0 -b true -p true"
+    echo "  # Production build and push"
+    echo "  $0 -i quay.io/causaai/causa:1.0.0 -b true -p true"
     echo ""
     echo "  # Build only with custom tag (no push)"
-    echo "  $0 -t v1.0.0-beta -b true -p false"
+    echo "  $0 -i quay.io/causaai/causa:1.0.0 -b true"
     echo ""
     echo "  # Build for AMD64 only and push"
-    echo "  $0 -t dev -l linux/amd64 -p true"
+    echo "  $0 -i quay.io/causaai/causa:1.0.0 -l linux/amd64 -p true"
     echo ""
-    echo "  # Build with custom registry and repo"
-    echo "  $0 -r docker.io -n myorg/causa-backend -t latest -p true"
     echo ""
-    echo "  # Using environment variables"
-    echo "  IMAGE_TAG=v2.0.0 PUSH_IMAGE=true ./build_and_push.sh"
+    echo "  # Using environment variable"
+    echo "  IMAGE_NAME=quay.io/causaai/causa-dev:0.0.1 PUSH_IMAGE=true ./build_and_push.sh"
     echo ""
-    echo "Note: Command-line flags take precedence over environment variables"
+    echo "Note: -i (or IMAGE_NAME env var) is required. Command-line flags take precedence over environment variables."
     exit "${exit_code}"
 }
 
@@ -138,9 +139,6 @@ resolve_container_tool() {
 }
 
 # Default values from environment or hardcoded defaults
-REGISTRY="${REGISTRY:-quay.io}"
-REPO_NAME="${REPO_NAME:-causaai/causa}"
-IMAGE_TAG="${IMAGE_TAG:-$(resolve_app_version)}"
 BUILD_IMAGE="${BUILD_IMAGE:-true}"
 PUSH_IMAGE="${PUSH_IMAGE:-false}"
 PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
@@ -150,19 +148,10 @@ IMAGE_NAME="${IMAGE_NAME:-}"
 CONTAINER_TOOL="${CONTAINER_TOOL:-$(resolve_container_tool)}"
 
 # Parse command line arguments (these override environment variables)
-while getopts "i:r:n:t:b:p:l:c:s:d:h" opt; do
+while getopts "i:b:p:l:c:s:d:h" opt; do
     case ${opt} in
         i )
             IMAGE_NAME="$OPTARG"
-            ;;
-        r )
-            REGISTRY="$OPTARG"
-            ;;
-        n )
-            REPO_NAME="$OPTARG"
-            ;;
-        t )
-            IMAGE_TAG="$OPTARG"
             ;;
         b )
             BUILD_IMAGE="$OPTARG"
@@ -192,6 +181,14 @@ while getopts "i:r:n:t:b:p:l:c:s:d:h" opt; do
     esac
 done
 
+# Require IMAGE_NAME — must be supplied via -i or the IMAGE_NAME environment variable
+if [ -z "$IMAGE_NAME" ]; then
+    print_error "Option -i IMAGE_NAME is required."
+    print_error "  Production:  -i quay.io/causaai/causa:<version>"
+    print_error "  Overnight:   -i quay.io/causaai/causa-dev:<tag>"
+    usage 1
+fi
+
 # Validate boolean flags
 validate_boolean "$BUILD_IMAGE" "BUILD_IMAGE (-b)"
 validate_boolean "$PUSH_IMAGE"  "PUSH_IMAGE (-p)"
@@ -208,11 +205,6 @@ fi
 if [ "$PUSH_IMAGE" = "true" ] && [ "$BUILD_IMAGE" = "false" ]; then
     print_error "PUSH_IMAGE=true requires BUILD_IMAGE=true. Cannot push without building."
     exit 1
-fi
-
-# If IMAGE_NAME is not provided via -i or env, construct it from components
-if [ -z "$IMAGE_NAME" ]; then
-    IMAGE_NAME="${REGISTRY}/${REPO_NAME}:${IMAGE_TAG}"
 fi
 
 # Validate project root structure
