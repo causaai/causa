@@ -10,50 +10,54 @@ NC='\033[0m' # No Color
 # Usage function
 usage() {
     local exit_code="${1:-1}"
-    echo "Usage: $0 [OPTIONS]"
+    echo "Usage: $0 -i IMAGE_NAME [OPTIONS]"
     echo ""
-    echo "Build and push Docker images for causa-backend with multi-architecture support"
+    echo "Build and push Docker images for causa-backend with multi-architecture support."
+    echo "Uses podman or docker buildx + Dockerfile.jvm for multi-arch builds (amd64 + arm64)."
     echo ""
     echo "Options:"
-    echo "  -i IMAGE_NAME    Full image name (registry/repository:tag)"
-    echo "  -r REGISTRY      Container registry (default: quay.io)"
-    echo "  -n REPO_NAME     Repository name (default: causa/causa-backend)"
-    echo "  -t TAG           Image tag (default: version from pom.xml) - used only if -i is not provided"
+    echo "  -i IMAGE_NAME    (REQUIRED) Full image name (registry/repository:tag)"
     echo "  -b BUILD         Build image true/false (default: true)"
     echo "  -p PUSH          Push image true/false (default: false)"
     echo "  -l PLATFORMS     Target platforms (default: linux/amd64,linux/arm64)"
     echo "  -c CLEAN         Run clean build true/false (default: true)"
     echo "  -s SKIP_TESTS    Skip tests during build true/false (default: false)"
+    echo "  -d TOOL          Container tool: podman or docker (default: auto-detect)"
     echo "  -h               Show this help message"
     echo ""
-    echo "Environment Variables (alternative to flags):"
-    echo "  IMAGE_NAME       Full image name"
-    echo "  REGISTRY         Container registry"
-    echo "  REPO_NAME        Repository name"
-    echo "  IMAGE_TAG        Image tag (default: version from pom.xml)"
+    echo "Image naming conventions:"
+    echo "  Production releases : quay.io/causaai/causa:<version>"
+    echo "  Overnight/CI builds : quay.io/causaai/causa-dev:<tag>"
+    echo "  Fork/custom builds  : quay.io/<your-org>/<your-repo>:<tag>"
+    echo ""
+    echo "  Use causaai/causa for stable production images."
+    echo "  Use causaai/causa-dev for pipeline automation and nightly builds."
+    echo "  Use your own fork registry path when building and testing custom changes."
+    echo ""
+    echo "Environment Variables (alternative to -i):"
+    echo "  IMAGE_NAME       Full image name (required if -i is not passed)"
     echo "  BUILD_IMAGE      Build image (true/false)"
     echo "  PUSH_IMAGE       Push image (true/false)"
     echo "  PLATFORMS        Target platforms"
     echo "  CLEAN_BUILD      Clean build (true/false)"
     echo "  SKIP_TESTS       Skip tests (true/false)"
+    echo "  CONTAINER_TOOL   Container tool: podman or docker"
     echo ""
     echo "Examples:"
-    echo "  # Build and push with custom full image name"
-    echo "  $0 -i quay.io/causa/causa-backend:1.0.0 -b true -p true"
+    echo "  # Production build and push"
+    echo "  $0 -i quay.io/causaai/causa:1.0.0 -b true -p true"
     echo ""
     echo "  # Build only with custom tag (no push)"
-    echo "  $0 -t v1.0.0-beta -b true -p false"
+    echo "  $0 -i quay.io/causaai/causa:1.0.0 -b true"
     echo ""
     echo "  # Build for AMD64 only and push"
-    echo "  $0 -t dev -l linux/amd64 -p true"
+    echo "  $0 -i quay.io/causaai/causa:1.0.0 -l linux/amd64 -p true"
     echo ""
-    echo "  # Build with custom registry and repo"
-    echo "  $0 -r docker.io -n myorg/causa-backend -t latest -p true"
     echo ""
-    echo "  # Using environment variables"
-    echo "  IMAGE_TAG=v2.0.0 PUSH_IMAGE=true ./build_and_push.sh"
+    echo "  # Using environment variable"
+    echo "  IMAGE_NAME=quay.io/causaai/causa-dev:0.0.1 PUSH_IMAGE=true ./build_and_push.sh"
     echo ""
-    echo "Note: Command-line flags take precedence over environment variables"
+    echo "Note: -i (or IMAGE_NAME env var) is required. Command-line flags take precedence over environment variables."
     exit "${exit_code}"
 }
 
@@ -79,6 +83,20 @@ print_warn() {
 print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
+
+# Trap to print a failure banner on any unexpected non-zero exit.
+# Works with `set -e` — fires whenever the script aborts early.
+on_exit() {
+    local code=$?
+    if [ $code -ne 0 ]; then
+        echo ""
+        print_error "=== Build Failed ==="
+        print_error "Build process failed. Check the logs above for details."
+        echo ""
+    fi
+    exit $code
+}
+trap on_exit EXIT
 
 # Resolve the project root pom.xml relative to this script's location,
 # regardless of the working directory the script is invoked from.
@@ -109,31 +127,31 @@ resolve_app_version() {
     echo "$ver"
 }
 
+# Auto-detect container tool: prefer podman if available, fall back to docker
+resolve_container_tool() {
+    if command -v podman &>/dev/null; then
+        echo "podman"
+    elif command -v docker &>/dev/null; then
+        echo "docker"
+    else
+        echo ""
+    fi
+}
+
 # Default values from environment or hardcoded defaults
-REGISTRY="${REGISTRY:-quay.io}"
-REPO_NAME="${REPO_NAME:-causa/causa-backend}"
-IMAGE_TAG="${IMAGE_TAG:-$(resolve_app_version)}"
 BUILD_IMAGE="${BUILD_IMAGE:-true}"
 PUSH_IMAGE="${PUSH_IMAGE:-false}"
 PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
 CLEAN_BUILD="${CLEAN_BUILD:-true}"
 SKIP_TESTS="${SKIP_TESTS:-false}"
 IMAGE_NAME="${IMAGE_NAME:-}"
+CONTAINER_TOOL="${CONTAINER_TOOL:-$(resolve_container_tool)}"
 
 # Parse command line arguments (these override environment variables)
-while getopts "i:r:n:t:b:p:l:c:s:h" opt; do
+while getopts "i:b:p:l:c:s:d:h" opt; do
     case ${opt} in
         i )
             IMAGE_NAME="$OPTARG"
-            ;;
-        r )
-            REGISTRY="$OPTARG"
-            ;;
-        n )
-            REPO_NAME="$OPTARG"
-            ;;
-        t )
-            IMAGE_TAG="$OPTARG"
             ;;
         b )
             BUILD_IMAGE="$OPTARG"
@@ -150,6 +168,9 @@ while getopts "i:r:n:t:b:p:l:c:s:h" opt; do
         s )
             SKIP_TESTS="$OPTARG"
             ;;
+        d )
+            CONTAINER_TOOL="$OPTARG"
+            ;;
         h )
             usage 0
             ;;
@@ -160,15 +181,30 @@ while getopts "i:r:n:t:b:p:l:c:s:h" opt; do
     esac
 done
 
+# Require IMAGE_NAME — must be supplied via -i or the IMAGE_NAME environment variable
+if [ -z "$IMAGE_NAME" ]; then
+    print_error "Option -i IMAGE_NAME is required."
+    print_error "  Production:  -i quay.io/causaai/causa:<version>"
+    print_error "  Overnight:   -i quay.io/causaai/causa-dev:<tag>"
+    usage 1
+fi
+
 # Validate boolean flags
 validate_boolean "$BUILD_IMAGE" "BUILD_IMAGE (-b)"
-validate_boolean "$PUSH_IMAGE" "PUSH_IMAGE (-p)"
+validate_boolean "$PUSH_IMAGE"  "PUSH_IMAGE (-p)"
 validate_boolean "$CLEAN_BUILD" "CLEAN_BUILD (-c)"
-validate_boolean "$SKIP_TESTS" "SKIP_TESTS (-s)"
+validate_boolean "$SKIP_TESTS"  "SKIP_TESTS (-s)"
 
-# If IMAGE_NAME is not provided via -i or env, construct it from components
-if [ -z "$IMAGE_NAME" ]; then
-    IMAGE_NAME="${REGISTRY}/${REPO_NAME}:${IMAGE_TAG}"
+# Validate CONTAINER_TOOL
+if [[ ! "$CONTAINER_TOOL" =~ ^(podman|docker)$ ]]; then
+    print_error "CONTAINER_TOOL (-d) must be 'podman' or 'docker', got: '${CONTAINER_TOOL}'"
+    usage 1
+fi
+
+# Reject the invalid combination: push requested but no image will be built
+if [ "$PUSH_IMAGE" = "true" ] && [ "$BUILD_IMAGE" = "false" ]; then
+    print_error "PUSH_IMAGE=true requires BUILD_IMAGE=true. Cannot push without building."
+    exit 1
 fi
 
 # Validate project root structure
@@ -183,6 +219,29 @@ if [ ! -f "${PROJECT_ROOT}/mvnw" ]; then
     exit 1
 fi
 
+DOCKERFILE="${PROJECT_ROOT}/src/main/docker/Dockerfile.jvm"
+
+# Container tool and Dockerfile are only required when actually building an image
+if [ "$BUILD_IMAGE" = "true" ]; then
+    if ! command -v "${CONTAINER_TOOL}" &>/dev/null; then
+        print_error "'${CONTAINER_TOOL}' is not installed or not on PATH. Multi-arch builds require ${CONTAINER_TOOL}."
+        exit 1
+    fi
+    if ! "${CONTAINER_TOOL}" buildx --help &>/dev/null 2>&1; then
+        print_error "'${CONTAINER_TOOL} buildx' is not available."
+        if [ "$CONTAINER_TOOL" = "podman" ]; then
+            print_error "Upgrade podman or install the buildx plugin. See: https://podman.io/getting-started/installation"
+        else
+            print_error "Install Docker Desktop or the buildx plugin. See: https://docs.docker.com/buildx/working-with-buildx/"
+        fi
+        exit 1
+    fi
+    if [ ! -f "${DOCKERFILE}" ]; then
+        print_error "Dockerfile not found at ${DOCKERFILE}."
+        exit 1
+    fi
+fi
+
 # Run all Maven commands from the project root
 cd "${PROJECT_ROOT}"
 
@@ -193,11 +252,15 @@ chmod +x ./mvnw
 echo ""
 print_info "=== Build Configuration ==="
 print_info "Image Name:      ${IMAGE_NAME}"
+print_info "Container Tool:  ${CONTAINER_TOOL}"
 print_info "Build:           ${BUILD_IMAGE}"
 print_info "Push:            ${PUSH_IMAGE}"
 print_info "Platforms:       ${PLATFORMS}"
 print_info "Clean Build:     ${CLEAN_BUILD}"
 print_info "Skip Tests:      ${SKIP_TESTS}"
+if [ "$BUILD_IMAGE" = "true" ]; then
+    print_info "Dockerfile:      ${DOCKERFILE}"
+fi
 echo ""
 
 # Warn if pushing is enabled
@@ -207,54 +270,117 @@ if [ "$PUSH_IMAGE" = "true" ]; then
     echo ""
 fi
 
-# Build Maven command
-MAVEN_CMD="./mvnw"
+# ── Step 1: Maven package ─────────────────────────────────────────────────────
+MAVEN_CMD=("./mvnw")
 
-# Add clean if requested
 if [ "$CLEAN_BUILD" = "true" ]; then
-    MAVEN_CMD="${MAVEN_CMD} clean"
+    MAVEN_CMD+=("clean")
 fi
 
-# Add package goal
-MAVEN_CMD="${MAVEN_CMD} package"
+MAVEN_CMD+=("package" "-Dquarkus.container-image.build=false")
 
-# Add skip tests if requested
 if [ "$SKIP_TESTS" = "true" ]; then
-    MAVEN_CMD="${MAVEN_CMD} -DskipTests"
+    MAVEN_CMD+=("-DskipTests")
 fi
 
-# Add Quarkus container image properties
-MAVEN_CMD="${MAVEN_CMD} -Dquarkus.container-image.build=${BUILD_IMAGE}"
-MAVEN_CMD="${MAVEN_CMD} -Dquarkus.container-image.image=${IMAGE_NAME}"
-MAVEN_CMD="${MAVEN_CMD} -Dquarkus.container-image.push=${PUSH_IMAGE}"
-MAVEN_CMD="${MAVEN_CMD} -Dquarkus.jib.platforms=${PLATFORMS}"
-
-# Display the command
-print_info "Executing Maven command:"
-echo "${MAVEN_CMD}"
-echo ""
-
-# Execute the build
-print_info "Starting build process..."
-if eval "${MAVEN_CMD}"; then
-    echo ""
-    print_info "=== Build Summary ==="
-    print_info "✓ Build completed successfully"
-    print_info "Image: ${IMAGE_NAME}"
-    print_info "Platforms: ${PLATFORMS}"
-    
-    if [ "$PUSH_IMAGE" = "true" ]; then
-        print_info "✓ Image pushed to registry"
-    else
-        print_warn "Image was built but not pushed (PUSH_IMAGE=false)"
-    fi
-    echo ""
-    exit 0
+if [ "$BUILD_IMAGE" = "true" ]; then
+    print_info "Step 1/2 — Maven package"
 else
+    print_info "Step 1/1 — Maven package"
+fi
+print_info "Executing: ${MAVEN_CMD[*]}"
+echo ""
+"${MAVEN_CMD[@]}"
+
+# ── Step 2: multi-arch build (and optional push) ─────────────────────────────
+if [ "$BUILD_IMAGE" = "true" ]; then
     echo ""
-    print_error "=== Build Failed ==="
-    print_error "Build process failed. Check the logs above for details."
-    echo ""
-    exit 1
+
+    MANIFEST_NAME="${IMAGE_NAME}"
+
+    if [ "$CONTAINER_TOOL" = "podman" ]; then
+        # Remove any stale local manifest so podman doesn't error on re-runs.
+        podman manifest rm "${MANIFEST_NAME}" 2>/dev/null || true
+
+        # --manifest stores a multi-arch manifest locally; can be inspected
+        # before pushing with: podman manifest inspect <name>
+        BUILD_CMD=(
+            "podman" "buildx" "build"
+            "--platform" "${PLATFORMS}"
+            "--manifest" "${MANIFEST_NAME}"
+            "-f" "${DOCKERFILE}"
+            "${PROJECT_ROOT}"
+        )
+
+        print_info "Step 2/2 — podman buildx multi-arch image build"
+        print_info "Executing: ${BUILD_CMD[*]}"
+        echo ""
+        "${BUILD_CMD[@]}"
+
+        if [ "$PUSH_IMAGE" = "true" ]; then
+            echo ""
+            print_info "Pushing multi-arch manifest to registry..."
+            podman manifest push --all "${MANIFEST_NAME}" "docker://${MANIFEST_NAME}"
+        fi
+    else
+        # docker buildx: build (and push in one step if requested, otherwise
+        # load into the local daemon — note docker buildx cannot load
+        # multi-platform images into the local daemon, so --push is required
+        # when PLATFORMS contains more than one entry).
+        BUILD_CMD=(
+            "docker" "buildx" "build"
+            "--platform" "${PLATFORMS}"
+            "-t" "${MANIFEST_NAME}"
+            "-f" "${DOCKERFILE}"
+        )
+
+        if [ "$PUSH_IMAGE" = "true" ]; then
+            BUILD_CMD+=("--push")
+        else
+            # Single-platform builds can be loaded locally; multi-platform
+            # cannot — warn the user if that is the case.
+            platform_count=$(echo "${PLATFORMS}" | tr ',' '\n' | wc -l | tr -d ' ')
+            if [ "${platform_count}" -gt 1 ]; then
+                print_warn "docker buildx cannot load multi-platform images into the local daemon."
+                print_warn "The image will be built but NOT loaded locally. Use -p true to push instead."
+            else
+                BUILD_CMD+=("--load")
+            fi
+        fi
+
+        BUILD_CMD+=("${PROJECT_ROOT}")
+
+        print_info "Step 2/2 — docker buildx multi-arch image build"
+        print_info "Executing: ${BUILD_CMD[*]}"
+        echo ""
+        "${BUILD_CMD[@]}"
+    fi
 fi
 
+# ── Summary ───────────────────────────────────────────────────────────────────
+echo ""
+print_info "=== Build Summary ==="
+print_info "✓ Maven package completed successfully"
+
+if [ "$BUILD_IMAGE" = "true" ]; then
+    if [ "$PUSH_IMAGE" = "true" ]; then
+        print_info "✓ Multi-arch image pushed: ${IMAGE_NAME}"
+        print_info "  Platforms: ${PLATFORMS}"
+        if [ "$CONTAINER_TOOL" = "podman" ]; then
+            print_info "  Verify: podman manifest inspect ${IMAGE_NAME}"
+        else
+            print_info "  Verify: docker manifest inspect ${IMAGE_NAME}"
+        fi
+    else
+        if [ "$CONTAINER_TOOL" = "podman" ]; then
+            print_info "✓ Multi-arch manifest built locally: ${IMAGE_NAME}"
+            print_info "  Platforms: ${PLATFORMS}"
+            print_info "  Inspect locally: podman manifest inspect ${IMAGE_NAME}"
+        else
+            print_info "✓ Image built: ${IMAGE_NAME}"
+            print_info "  Platforms: ${PLATFORMS}"
+        fi
+        print_warn "Image not pushed (PUSH_IMAGE=false). Re-run with -p true to push."
+    fi
+fi
+echo ""

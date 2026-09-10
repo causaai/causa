@@ -14,19 +14,23 @@ The `scripts/development/build_and_push.sh` script provides a comprehensive solu
 
 ## Prerequisites
 
-1. **Docker** or **Podman** installed and running
-2. **Maven** (uses Maven wrapper included in project)
-3. **Authentication** to your container registry (if pushing images)
-4. **Quarkus Container Image Jib Extension** (already configured in `pom.xml`)
+1. **Java 17+**
+2. **Maven** (uses the Maven wrapper `./mvnw` included in the project)
+3. **podman** or **docker** with `buildx` support — **required when `BUILD_IMAGE=true` (the default)**
+   - The script auto-detects which tool is available (podman preferred; falls back to docker)
+   - podman install: https://podman.io/getting-started/installation
+   - docker install: https://docs.docker.com/get-docker/
+   - Verify: `podman buildx --help` or `docker buildx --help`
+4. **Authentication** to your container registry (only required when `-p true`)
 
 ## Quick Start
 
 ```bash
 # Build image locally (no push)
-./scripts/dev/build_and_push.sh
+./scripts/dev/build_and_push.sh -i quay.io/causaai/causa-dev:local
 
 # Build and push with custom tag
-./scripts/dev/build_and_push.sh -t v1.0.0 -p true
+./scripts/dev/build_and_push.sh -i quay.io/causaai/causa:v1.0.0 -p true
 
 # Build with custom full image name
 ./scripts/dev/build_and_push.sh -i quay.io/myorg/causa-backend:latest -b true -p true
@@ -35,22 +39,20 @@ The `scripts/development/build_and_push.sh` script provides a comprehensive solu
 ## Usage
 
 ```bash
-./scripts/dev/build_and_push.sh [OPTIONS]
+./scripts/dev/build_and_push.sh -i IMAGE_NAME [OPTIONS]
 ```
 
 ### Command-Line Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `-i IMAGE_NAME` | Full image name (registry/repository:tag) | - |
-| `-r REGISTRY` | Container registry | `quay.io` |
-| `-n REPO_NAME` | Repository name | `causa/causa-backend` |
-| `-t TAG` | Image tag (used if -i not provided) | `latest` |
+| `-i IMAGE_NAME` | **(Required)** Full image name (registry/repository:tag) | — |
 | `-b BUILD` | Build image (true/false) | `true` |
 | `-p PUSH` | Push image (true/false) | `false` |
 | `-l PLATFORMS` | Target platforms | `linux/amd64,linux/arm64` |
 | `-c CLEAN` | Run clean build (true/false) | `true` |
 | `-s SKIP_TESTS` | Skip tests during build (true/false) | `false` |
+| `-d TOOL` | Container tool (`podman` or `docker`) | auto-detect |
 | `-h` | Show help message | - |
 
 ### Environment Variables
@@ -59,15 +61,13 @@ Alternative to command-line flags (flags take precedence):
 
 | Variable | Description |
 |----------|-------------|
-| `IMAGE_NAME` | Full image name |
-| `REGISTRY` | Container registry |
-| `REPO_NAME` | Repository name |
-| `IMAGE_TAG` | Image tag |
+| `IMAGE_NAME` | **(Required if `-i` not passed)** Full image name |
 | `BUILD_IMAGE` | Build image (true/false) |
 | `PUSH_IMAGE` | Push image (true/false) |
 | `PLATFORMS` | Target platforms |
 | `CLEAN_BUILD` | Clean build (true/false) |
 | `SKIP_TESTS` | Skip tests (true/false) |
+| `CONTAINER_TOOL` | Container tool: `podman` or `docker` (auto-detected if unset) |
 
 ## Examples
 
@@ -76,42 +76,48 @@ Alternative to command-line flags (flags take precedence):
 
 ```bash
 # Build with default settings
-./scripts/dev/build_and_push.sh
+./scripts/dev/build_and_push.sh -i quay.io/causaai/causa-dev:local
 
 # Build with custom tag for testing
-./scripts/dev/build_and_push.sh -t dev-$(date +%Y%m%d)
+./scripts/dev/build_and_push.sh -i quay.io/causaai/causa-dev:dev-$(date +%Y%m%d)
 
 # Fast build (skip tests, no clean)
-./scripts/dev/build_and_push.sh -c false -s true -t dev
+./scripts/dev/build_and_push.sh -i quay.io/causaai/causa-dev:dev -c false -s true
 
 # Build and push with version tag
-./scripts/dev/build_and_push.sh -t v1.0.0 -p true
+./scripts/dev/build_and_push.sh -i quay.io/causaai/causa:v1.0.0 -p true
 
 # Build and push with custom full image name
 ./scripts/dev/build_and_push.sh -i quay.io/myorg/causa-backend:1.0.0 -p true
 
 # Build and push to Docker Hub
-./scripts/dev/build_and_push.sh -r docker.io -n myusername/causa -t latest -p true
+./scripts/dev/build_and_push.sh -i docker.io/myusername/causa:latest -p true
+
+# Force docker instead of podman
+./scripts/dev/build_and_push.sh -i quay.io/causaai/causa-dev:local -d docker
+
+# Force podman explicitly
+./scripts/dev/build_and_push.sh -i quay.io/causaai/causa-dev:local -d podman
 ```
 
 ### Architecture-Specific Builds
 
 ```bash
 # Build for AMD64 only
-./scripts/dev/build_and_push.sh -t amd64-only -l linux/amd64
+./scripts/dev/build_and_push.sh -i quay.io/causaai/causa-dev:amd64-only -l linux/amd64
 
 # Build for ARM64 only (e.g., Apple Silicon)
-./scripts/dev/build_and_push.sh -t arm64-only -l linux/arm64
+./scripts/dev/build_and_push.sh -i quay.io/causaai/causa-dev:arm64-only -l linux/arm64
 
 # Build for both (default)
-./scripts/dev/build_and_push.sh -t multi-arch -l linux/amd64,linux/arm64
+./scripts/dev/build_and_push.sh -i quay.io/causaai/causa-dev:multi-arch -l linux/amd64,linux/arm64
 ```
 
 ### Using Environment Variables
 
 ```bash
 # Set environment variables
-export IMAGE_TAG=v2.0.0
+export IMAGE_NAME=quay.io/causaai/causa-dev:v2.0.0
 export PUSH_IMAGE=true
 export PLATFORMS=linux/amd64
 
@@ -119,7 +125,7 @@ export PLATFORMS=linux/amd64
 ./scripts/dev/build_and_push.sh
 
 # Or inline
-IMAGE_TAG=v2.0.0 PUSH_IMAGE=true ./scripts/dev/build_and_push.sh
+IMAGE_NAME=quay.io/causaai/causa-dev:v2.0.0 PUSH_IMAGE=true ./scripts/dev/build_and_push.sh
 ```
 
 ### CI/CD Pipeline
@@ -174,28 +180,31 @@ podman login ghcr.io
 
 The script performs the following steps:
 
-1. **Validation**: Checks for required files (`pom.xml`, `mvnw`)
-2. **Configuration**: Processes command-line flags and environment variables
-3. **Maven Build**: Executes Maven with Quarkus container image plugin
-4. **Image Build**: Uses Jib to build multi-architecture images
-5. **Push** (optional): Pushes images to the specified registry
+1. **Validation**: Checks for required tools (container tool + `buildx`, `mvnw`) and the `Dockerfile.jvm`
+2. **Configuration**: Processes command-line flags and environment variables; auto-detects `podman` or `docker`
+3. **Step 1 — Maven package**: Runs `./mvnw package -Dquarkus.container-image.build=false`; image building is intentionally skipped here
+4. **Step 2 — buildx**: Builds a multi-arch image using `Dockerfile.jvm` (amd64 + arm64)
+   - **podman**: uses `--manifest` to store the multi-arch manifest locally before pushing
+   - **docker**: uses `--push` directly when pushing; single-platform builds use `--load`
+5. **Push** (optional):
+   - **podman**: `podman manifest push --all`
+   - **docker**: handled inline via `--push` in the build step
+
+### Tool Selection
+
+The script picks the container tool in this order:
+
+1. `-d TOOL` flag (highest priority)
+2. `CONTAINER_TOOL` environment variable
+3. Auto-detect: `podman` if installed, otherwise `docker`
+
+> **Note:** `docker buildx` cannot load a multi-platform image into the local daemon — it must be pushed to a registry. If you run with multiple platforms and `PUSH_IMAGE=false` using docker, the build completes but the image won't be available locally. Use `podman` or pass `-p true` to push.
 
 ### Under the Hood
 
-The script uses:
-- **Quarkus Container Image Jib Extension** for building images
-- **Maven Wrapper** (`./mvnw`) for consistent builds
-- **Jib** for multi-architecture support without Docker daemon
-- **Quarkus properties** for configuration
-
-Example Maven command generated:
-```bash
-./mvnw clean package \
-  -Dquarkus.container-image.build=true \
-  -Dquarkus.container-image.image=quay.io/rh-ee-shesaxen/causa-backend:v1.0.0 \
-  -Dquarkus.container-image.push=true \
-  -Dquarkus.jib.platforms=linux/amd64,linux/arm64
-```
+- **`Dockerfile.jvm`** at `src/main/docker/Dockerfile.jvm` — used for the actual container image
+- **podman / docker buildx** — builds and assembles the multi-arch manifest
+- **Maven Wrapper** (`./mvnw`) — compiles and packages the application JAR
 
 
 
@@ -220,36 +229,10 @@ Example Maven command generated:
 - Store registry credentials securely
 - Build and push only on main/release branches
 
-## Configuration Files
-
-### pom.xml
-
-The `pom.xml` includes the Quarkus Container Image Jib extension:
-
-```xml
-<dependency>
-    <groupId>io.quarkus</groupId>
-    <artifactId>quarkus-container-image-jib</artifactId>
-</dependency>
-```
-
-### application.yml
-
-You can also configure container image settings in `src/main/resources/application.yml`:
-
-```yaml
-quarkus:
-  container-image:
-    registry: quay.io
-    group: causa
-    name: causa-backend
-    tag: latest
-```
-
 ## Related Documentation
 
+- [podman buildx Documentation](https://docs.podman.io/en/latest/markdown/podman-buildx.1.html)
 - [Quarkus Container Images Guide](https://quarkus.io/guides/container-image)
-- [Jib Documentation](https://github.com/GoogleContainerTools/jib)
 
 ## Support
 

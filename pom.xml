@@ -87,10 +87,10 @@
             <artifactId>quarkus-hibernate-validator</artifactId>
         </dependency>
 
-        <!-- Container Image Build (Jib) -->
+        <!-- Container Image Build (Docker/Podman via Dockerfile) -->
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-container-image-jib</artifactId>
+            <artifactId>quarkus-container-image-docker</artifactId>
         </dependency>
 
         <!-- OpenAPI/Swagger -->
