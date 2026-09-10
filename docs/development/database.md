@@ -12,6 +12,7 @@ This guide covers the PostgreSQL database connection pool setup for Causa Backen
 - [Kubernetes Deployment](#kubernetes-deployment)
 - [Embedding Strategy](#embedding-strategy)
 - [Connection Pool Tuning](#connection-pool-tuning)
+- [Profile-Based Configuration](#profile-based-configuration)
 
 
 ---
@@ -22,8 +23,9 @@ Causa Backend uses PostgreSQL 17 with the pgvector extension for data persistenc
 
 - **Connection Pool:** Agroal (Quarkus built-in)
 - **ORM:** Hibernate ORM with Panache
-- **Schema Management:** Hibernate auto-update (will migrate to Flyway later)
+- **Schema Management:** Flyway (runs migrations on startup)
 - **Architecture Layer:** `infrastructure/persistence/` (Secondary Adapter)
+- **Dev Services:** Quarkus Dev Services (automatic containerised PostgreSQL for local dev — zero config)
 
 ### Why Agroal?
 
@@ -131,12 +133,16 @@ All database configuration is in `src/main/resources/application.yml`.
 
 ### Datasource Configuration
 
-| Property | Environment Variable | Default | Description |
-|----------|---------------------|---------|-------------|
-| `quarkus.datasource.db-kind` | - | `postgresql` | Database type |
-| `quarkus.datasource.username` | `CAUSA_DB_USERNAME` | `causa_backend` | Database username |
-| `quarkus.datasource.password` | `CAUSA_DB_PASSWORD` | _(empty)_ | Database password |
-| `quarkus.datasource.jdbc.url` | `CAUSA_DB_URL` | K8s service URL | JDBC connection URL |
+| Property | Environment Variable | Profile | Default | Description |
+|----------|---------------------|---------|---------|-------------|
+| `quarkus.datasource.db-kind` | - | all | `postgresql` | Database type |
+| `quarkus.datasource.jdbc.url` | `CAUSA_DB_URL` | `%prod` | `jdbc:postgresql://iri-db-rw:5432/iri-db` | JDBC connection URL |
+| `quarkus.datasource.username` | `CAUSA_DB_USERNAME` | `%prod` | `causa_backend` | Database username |
+| `quarkus.datasource.password` | `CAUSA_DB_PASSWORD` | `%prod` | _(empty — required via Secret)_ | Database password |
+| `quarkus.datasource.username` | - | `%dev` | `causa_dev` | Dev Services container username |
+| `quarkus.datasource.password` | - | `%dev` | `dev_password` | Dev Services container password |
+
+> **Note:** In `%dev`, `jdbc.url` is intentionally absent so Quarkus Dev Services activates automatically. In `%prod`, the URL defaults to the CloudNativePG service inside the cluster; override with `CAUSA_DB_URL` for external deployments.
 
 ### Connection Pool Configuration
 
@@ -156,16 +162,53 @@ All database configuration is in `src/main/resources/application.yml`.
 
 | Property | Default | Description |
 |----------|---------|-------------|
-| `quarkus.hibernate-orm.database.generation` | `update` | Auto-create/update schema from entities |
-| `quarkus.hibernate-orm.log.sql` | `true` | Log SQL statements (set to `false` in production) |
+| `quarkus.hibernate-orm.database.generation` | `none` | Schema managed exclusively by Flyway — Hibernate must not touch DDL |
+| `quarkus.hibernate-orm.log.sql` | `false` | SQL statement logging (enable temporarily for debugging) |
 
 ---
 
 ## Local Development Setup
 
-### Option 1: Docker PostgreSQL (Recommended)
+### Option 1: Quarkus Dev Services (Recommended — Zero Config)
 
-Start PostgreSQL 17 with Docker:
+**No database setup required.** When you run `./mvnw quarkus:dev`, Quarkus Dev Services automatically:
+
+1. Pulls `pgvector/pgvector:pg17` from Docker Hub (cached after first pull)
+2. Starts a temporary PostgreSQL 17 container with the `vector` extension pre-installed
+3. Runs [`src/main/resources/db/dev-init.sql`](../../src/main/resources/db/dev-init.sql) (`CREATE EXTENSION IF NOT EXISTS vector`)
+4. Runs Flyway migrations against it
+5. Tears the container down on `Ctrl+C`
+
+```bash
+# That's it — just run:
+./mvnw quarkus:dev
+```
+
+Dev Services container credentials (wired automatically — no `.env` needed):
+
+| Setting | Value |
+|---|---|
+| Database | `iri-db` |
+| Username | `causa_dev` |
+| Password | `dev_password` |
+| Port | Randomly assigned by Testcontainers; Quarkus wires it automatically |
+
+**Data persistence per session:**
+
+| Action | Container | Data |
+|---|---|---|
+| Hot reload (file save) | ✅ Keeps running | ✅ Persisted |
+| `s` restart (dev console) | ✅ Keeps running | ✅ Persisted |
+| `Ctrl+C` → `./mvnw quarkus:dev` | New container started | ❌ Wiped (Flyway re-runs migrations) |
+
+> **Why `pgvector/pgvector:pg17` and not the production image?**
+> The production image (`quay.io/rh-ee-shesaxen/postgres-pgvector:17`) is built on the CloudNativePG base which bakes CNPG-specific CMD flags (`--max_prepared_transactions=100`) into the container. Testcontainers launches the container directly without the CNPG operator, causing an OCI runtime crash. `pgvector/pgvector:pg17` is the correct standalone image — same Postgres 17 version, same `vector` extension, no CNPG dependency.
+
+### Option 2: Docker PostgreSQL (Manual)
+
+Use this if you want full control over the database container or need data to persist across `Ctrl+C` restarts.
+
+Start PostgreSQL 17 with pgvector using Docker:
 
 ```bash
 docker run -d \
@@ -174,7 +217,14 @@ docker run -d \
   -e POSTGRES_PASSWORD=dev_password \
   -e POSTGRES_DB=diagnostics-tool-db \
   -p 5432:5432 \
-  postgres:17
+  pgvector/pgvector:pg17
+```
+
+Then initialise the vector extension:
+
+```bash
+docker exec causa-postgres psql -U causa_backend -d diagnostics-tool-db \
+  -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
 
 Set environment variables:
@@ -298,10 +348,26 @@ max-size: 10       # Up to 10 concurrent connections
 idle-removal: PT2M # Remove idle connections after 2 minutes
 max-lifetime: PT10M # Recycle connections after 10 minutes
 ```
+
+---
+
+## Profile-Based Configuration
+
+The database URL is split across Quarkus profiles so Dev Services activates cleanly in development without polluting production config:
+
+| Profile | Activated by | URL behaviour |
+|---|---|---|
+| `%dev` | `./mvnw quarkus:dev` | No `jdbc.url` set → Dev Services starts `pgvector/pgvector:pg17` automatically |
+| `%prod` | `java -jar` / `docker run` | `${CAUSA_DB_URL:jdbc:postgresql://iri-db-rw:5432/iri-db}` (override via env var) |
+
+The base config block contains only shared pool tuning (min/max size, timeouts, validation). Credentials and URL live exclusively in their respective profile.
+
 ---
 
 ## References
 
 - [Quarkus Datasource Guide](https://quarkus.io/guides/datasource)
+- [Quarkus Dev Services](https://quarkus.io/guides/dev-services)
 - [Quarkus Hibernate ORM with Panache](https://quarkus.io/guides/hibernate-orm-panache)
 - [Agroal Connection Pool](https://agroal.github.io/)
+- [pgvector/pgvector Docker Hub](https://hub.docker.com/r/pgvector/pgvector)
