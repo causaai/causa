@@ -27,10 +27,10 @@ The `scripts/development/build_and_push.sh` script provides a comprehensive solu
 
 ```bash
 # Build image locally (no push)
-./scripts/dev/build_and_push.sh
+./scripts/dev/build_and_push.sh -i quay.io/causaai/causa-dev:local
 
 # Build and push with custom tag
-./scripts/dev/build_and_push.sh -t v1.0.0 -p true
+./scripts/dev/build_and_push.sh -i quay.io/causaai/causa:v1.0.0 -p true
 
 # Build with custom full image name
 ./scripts/dev/build_and_push.sh -i quay.io/myorg/causa-backend:latest -b true -p true
@@ -39,17 +39,14 @@ The `scripts/development/build_and_push.sh` script provides a comprehensive solu
 ## Usage
 
 ```bash
-./scripts/dev/build_and_push.sh [OPTIONS]
+./scripts/dev/build_and_push.sh -i IMAGE_NAME [OPTIONS]
 ```
 
 ### Command-Line Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `-i IMAGE_NAME` | Full image name (registry/repository:tag) | - |
-| `-r REGISTRY` | Container registry | `quay.io` |
-| `-n REPO_NAME` | Repository name | `causaai/causa` |
-| `-t TAG` | Image tag (used if -i not provided) | `latest` |
+| `-i IMAGE_NAME` | **(Required)** Full image name (registry/repository:tag) | — |
 | `-b BUILD` | Build image (true/false) | `true` |
 | `-p PUSH` | Push image (true/false) | `false` |
 | `-l PLATFORMS` | Target platforms | `linux/amd64,linux/arm64` |
@@ -64,10 +61,7 @@ Alternative to command-line flags (flags take precedence):
 
 | Variable | Description |
 |----------|-------------|
-| `IMAGE_NAME` | Full image name |
-| `REGISTRY` | Container registry |
-| `REPO_NAME` | Repository name |
-| `IMAGE_TAG` | Image tag |
+| `IMAGE_NAME` | **(Required if `-i` not passed)** Full image name |
 | `BUILD_IMAGE` | Build image (true/false) |
 | `PUSH_IMAGE` | Push image (true/false) |
 | `PLATFORMS` | Target platforms |
@@ -82,48 +76,48 @@ Alternative to command-line flags (flags take precedence):
 
 ```bash
 # Build with default settings
-./scripts/dev/build_and_push.sh
+./scripts/dev/build_and_push.sh -i quay.io/causaai/causa-dev:local
 
 # Build with custom tag for testing
-./scripts/dev/build_and_push.sh -t dev-$(date +%Y%m%d)
+./scripts/dev/build_and_push.sh -i quay.io/causaai/causa-dev:dev-$(date +%Y%m%d)
 
 # Fast build (skip tests, no clean)
-./scripts/dev/build_and_push.sh -c false -s true -t dev
+./scripts/dev/build_and_push.sh -i quay.io/causaai/causa-dev:dev -c false -s true
 
 # Build and push with version tag
-./scripts/dev/build_and_push.sh -t v1.0.0 -p true
+./scripts/dev/build_and_push.sh -i quay.io/causaai/causa:v1.0.0 -p true
 
 # Build and push with custom full image name
 ./scripts/dev/build_and_push.sh -i quay.io/myorg/causa-backend:1.0.0 -p true
 
 # Build and push to Docker Hub
-./scripts/dev/build_and_push.sh -r docker.io -n myusername/causa -t latest -p true
+./scripts/dev/build_and_push.sh -i docker.io/myusername/causa:latest -p true
 
 # Force docker instead of podman
-./scripts/dev/build_and_push.sh -d docker -t latest -p true
+./scripts/dev/build_and_push.sh -i quay.io/causaai/causa-dev:local -d docker
 
 # Force podman explicitly
-./scripts/dev/build_and_push.sh -d podman -t latest -p true
+./scripts/dev/build_and_push.sh -i quay.io/causaai/causa-dev:local -d podman
 ```
 
 ### Architecture-Specific Builds
 
 ```bash
 # Build for AMD64 only
-./scripts/dev/build_and_push.sh -t amd64-only -l linux/amd64
+./scripts/dev/build_and_push.sh -i quay.io/causaai/causa-dev:amd64-only -l linux/amd64
 
 # Build for ARM64 only (e.g., Apple Silicon)
-./scripts/dev/build_and_push.sh -t arm64-only -l linux/arm64
+./scripts/dev/build_and_push.sh -i quay.io/causaai/causa-dev:arm64-only -l linux/arm64
 
 # Build for both (default)
-./scripts/dev/build_and_push.sh -t multi-arch -l linux/amd64,linux/arm64
+./scripts/dev/build_and_push.sh -i quay.io/causaai/causa-dev:multi-arch -l linux/amd64,linux/arm64
 ```
 
 ### Using Environment Variables
 
 ```bash
 # Set environment variables
-export IMAGE_TAG=v2.0.0
+export IMAGE_NAME=quay.io/causaai/causa-dev:v2.0.0
 export PUSH_IMAGE=true
 export PLATFORMS=linux/amd64
 
@@ -131,7 +125,7 @@ export PLATFORMS=linux/amd64
 ./scripts/dev/build_and_push.sh
 
 # Or inline
-IMAGE_TAG=v2.0.0 PUSH_IMAGE=true ./scripts/dev/build_and_push.sh
+IMAGE_NAME=quay.io/causaai/causa-dev:v2.0.0 PUSH_IMAGE=true ./scripts/dev/build_and_push.sh
 ```
 
 ### CI/CD Pipeline
