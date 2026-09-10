@@ -69,35 +69,7 @@ public class SimpleAssertionExtractor implements AssertionExtractor {
             ));
         }
 
-        // Extract from issue description
-        if (rca.issueDescription() != null && !rca.issueDescription().isBlank()) {
-            assertions.addAll(extractFromText(
-                rca.issueDescription(),
-                Assertion.AssertionSource.ISSUE_DESCRIPTION,
-                "issueDescription"
-            ));
-        }
-
-        // Extract from technical description
-        if (rca.technicalDescription() != null && !rca.technicalDescription().isBlank()) {
-            assertions.addAll(extractFromText(
-                rca.technicalDescription(),
-                Assertion.AssertionSource.TECHNICAL_DESCRIPTION,
-                "technicalDescription"
-            ));
-        }
-
-        // Extract from recommendations
-        if (rca.recommendations() != null && !rca.recommendations().isEmpty()) {
-            for (int i = 0; i < rca.recommendations().size(); i++) {
-                var recommendation = rca.recommendations().get(i);
-                assertions.addAll(extractFromText(
-                    recommendation.solutionTitle(),
-                    Assertion.AssertionSource.POSSIBLE_SOLUTIONS,
-                    "recommendations[" + i + "]"
-                ));
-            }
-        }
+        // Only ROOT_CAUSE assertions — ISSUE_DESCRIPTION, TECHNICAL_DESCRIPTION, POSSIBLE_SOLUTIONS skipped
 
         log.info("Assertions extracted")
             .field("totalAssertions", assertions.size())

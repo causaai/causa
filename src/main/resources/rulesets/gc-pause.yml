@@ -1,0 +1,130 @@
+# GC Pause Rule Set
+#
+# Validates GC pressure hypothesis using JVM GC logs and metrics.
+# Mapped from anomaly type: POSSIBLE_GC_PAUSE
+
+hypothesis: GC_PAUSE
+name: "GC Pause Validation Rules"
+description: "Deterministic validation rules for GC pressure hypothesis based on JVM GC log patterns"
+
+
+thresholds:
+  minSupportedScore: 10
+  minPartiallySupportedScore: 5
+
+required:
+  - id: gc.required.full_gc_detected
+    description: "Full GC events detected in logs"
+    weight: 10
+    match:
+      signalType: LOG_PATTERN
+      signalName: full.gc.count
+      condition: GREATER_THAN
+      threshold: 0
+    messages:
+      success: "Full GC events detected"
+      failure: "No Full GC events found in logs"
+
+  - id: gc.required.long_gc_pause
+    description: "GC pause duration exceeds 30ms"
+    weight: 10
+    match:
+      signalType: METRIC
+      signalName: gc.pause.max
+      condition: GREATER_THAN
+      threshold: 30
+    messages:
+      success: "Long GC pauses detected (>30ms)"
+      failure: "No long GC pauses detected"
+
+  - id: gc.required.heap_after_gc_high
+    description: "Heap usage remains high after GC (poor reclamation)"
+    weight: 10
+    match:
+      signalType: METRIC
+      signalName: heap.after.gc.ratio
+      condition: GREATER_THAN
+      threshold: 0.50
+    messages:
+      success: "Heap remains >50% full after GC — poor reclamation"
+      failure: "Heap reclamation is adequate after GC"
+
+supporting:
+  - id: gc.supporting.frequent_full_gc
+    description: "Frequent Full GC events (more than 5)"
+    weight: 3
+    match:
+      signalType: LOG_PATTERN
+      signalName: full.gc.count
+      condition: GREATER_THAN
+      threshold: 5
+    messages:
+      success: "Frequent Full GC events detected"
+      failure: "Full GC count below threshold"
+
+  - id: gc.supporting.heap_high
+    description: "Heap usage exceeded 80%"
+    weight: 2
+    match:
+      signalType: METRIC
+      signalName: heap.usage
+      condition: GREATER_THAN
+      threshold: 0.80
+    messages:
+      success: "Heap usage above 80%"
+      failure: "Heap usage below threshold"
+
+  - id: gc.supporting.memory_trend_increasing
+    description: "Memory utilization trending upward"
+    weight: 1
+    match:
+      signalType: METRIC
+      signalName: [memory.utilization.trend, heap.usage.trend]
+      signalValue: INCREASING
+      condition: EQUALS
+      matchType: CASE_INSENSITIVE
+    messages:
+      success: "Memory trend increasing"
+      failure: "No increasing memory trend"
+
+  - id: gc.supporting.total_gc_pause_time
+    description: "Total GC pause time exceeds 10% of elapsed time"
+    weight: 2
+    match:
+      signalType: METRIC
+      signalName: gc.pause.percent
+      condition: GREATER_THAN
+      threshold: 0.10
+    messages:
+      success: "Total GC pause time exceeds 10% of elapsed time"
+      failure: "Total GC pause time under threshold"
+
+exclusion:
+  - id: gc.exclusion.oom_killed
+    description: "Pod was OOM killed (different hypothesis)"
+    weight: -10
+    match:
+      signalType: CONTAINER_STATUS
+      signalName: terminationReason
+      signalValue: OOMKilled
+      condition: EQUALS
+    messages:
+      success: "Pod was OOM killed — likely OOM, not GC pressure"
+      failure: "No OOM kill"
+
+  - id: gc.exclusion.exit_code_137
+    description: "Container exited with 137 (SIGKILL/OOM)"
+    weight: -8
+    match:
+      signalType: CONTAINER_STATUS
+      signalName: exitCode
+      signalValue: 137
+      condition: EQUALS
+    messages:
+      success: "Exit code 137 detected — likely OOM kill"
+      failure: "No exit code 137"
+
+metadata:
+  version: "1.0.0"
+  author: "Causa Team"
+  tags: [gc, pause, jvm, performance]
