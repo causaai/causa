@@ -21,6 +21,10 @@ import org.apache.commons.lang3.RandomStringUtils;
  *   configurations → cnfg_&lt;16&gt;
  *   integrations   → intg_&lt;16&gt;
  *   health_checks  → hchk_&lt;16&gt;
+ *   auth_configurations → auth_&lt;16&gt;
+ *   llm_configurations → llmc_&lt;16&gt;
+ *   mcp_configurations → mcpc_&lt;16&gt;
+ *   skills_configurations → sklc_&lt;16&gt;
  * </pre>
  *
  * @since 0.0.1
@@ -53,6 +57,38 @@ public final class IdUtils {
      */
     public static String generateConfigurationId() {
         return "cnfg_" + randomAlphanumeric16();
+    }
+
+    /**
+     * Generates a unique auth configuration ID: {@code auth_<16-char-alphanumeric>}.
+     * Total length = 21 chars.
+     */
+    public static String generateAuthId() {
+        return "auth_" + randomAlphanumeric16();
+    }
+
+    /**
+     * Generates a unique LLM configuration ID: {@code llmc_<16-char-alphanumeric>}.
+     * Total length = 21 chars.
+     */
+    public static String generateLlmProviderId() {
+        return "llmc_" + randomAlphanumeric16();
+    }
+
+    /**
+     * Generates a unique MCP configuration ID: {@code mcpc_<16-char-alphanumeric>}.
+     * Total length = 21 chars.
+     */
+    public static String generateMcpServerId() {
+        return "mcpc_" + randomAlphanumeric16();
+    }
+
+    /**
+     * Generates a unique skill configuration ID: {@code sklc_<16-char-alphanumeric>}.
+     * Total length = 21 chars.
+     */
+    public static String generateSkillId() {
+        return "sklc_" + randomAlphanumeric16();
     }
 
     /** Returns 16 alphanumeric characters from a SecureRandom source. */

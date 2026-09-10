@@ -11,6 +11,10 @@
 --   configurations → cnfg_<16>
 --   integrations  → intg_<16>
 --   health_checks → hchk_<16>
+--   auth_configurations → auth_<16>
+--   llm_configurations → llmc_<16>
+--   mcp_configurations → mcpc_<16>
+--   skills_configurations → sklc_<16>
 --
 -- IDs are generated and validated by the application layer.
 -- =============================================================================
@@ -170,7 +174,7 @@ CREATE TABLE IF NOT EXISTS integrations (
     id              VARCHAR(21)  NOT NULL,
     target_platform VARCHAR(64)  NOT NULL,   -- JIRA, SLACK, DATADOG, GITHUB
     target_details  JSONB        NOT NULL,
-    is_active       BOOLEAN      NOT NULL DEFAULT TRUE,
+    active          BOOLEAN      NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -202,10 +206,10 @@ CREATE INDEX IF NOT EXISTS idx_health_cleanup ON health_checks (created_at);
 -- PG LISTEN/NOTIFY for Distributed Config Cache Invalidation
 -- =============================================================================
 
--- Notify function: broadcasts cache invalidation events
+-- Notify function: broadcasts cache invalidation events on config_cache_channel
 CREATE OR REPLACE FUNCTION notify_config_change() RETURNS trigger AS $$
 BEGIN
-    PERFORM pg_notify('config_cache_channel', 'reload');
+    PERFORM pg_notify('config_cache_channel', TG_TABLE_NAME);
     RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
@@ -213,4 +217,117 @@ $$ LANGUAGE plpgsql;
 -- Trigger: fires after any modification to configurations table
 CREATE TRIGGER trg_config_notify
     AFTER INSERT OR UPDATE OR DELETE ON configurations
+    FOR EACH STATEMENT EXECUTE FUNCTION notify_config_change();
+
+
+-- =============================================================================
+-- 8. AUTH CONFIGURATIONS TABLE (Shared Authentication for LLM & MCP)
+-- ID convention: auth_<16-char-alphanumeric>
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS auth_configurations (
+    id         VARCHAR(21)              NOT NULL,
+    name       VARCHAR(255)             NOT NULL,
+    type       VARCHAR(32)              NOT NULL,   -- API_KEY, BEARER_TOKEN, ADC, NONE
+    config     JSONB                    NOT NULL,   -- Field-level encrypted auth config
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_auth_configurations PRIMARY KEY (id),
+    CONSTRAINT uq_auth_name UNIQUE (name)
+);
+
+CREATE INDEX IF NOT EXISTS idx_auth_type ON auth_configurations (type);
+
+
+-- =============================================================================
+-- 9. LLM CONFIGURATIONS TABLE (LLM Provider Definitions)
+-- ID convention: llmc_<16-char-alphanumeric>
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS llm_configurations (
+    id         VARCHAR(21)              NOT NULL,
+    name       VARCHAR(255)             NOT NULL,
+    provider   VARCHAR(64)              NOT NULL,   -- anthropic, vertex-ai-anthropic, bob
+    model      VARCHAR(255)             NOT NULL,
+    auth_id    VARCHAR(21),                         -- FK to auth_configurations, nullable
+    settings   JSONB                    NOT NULL,   -- temperature, max_tokens, timeout, skills config
+    active     BOOLEAN                  NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_llm_configurations PRIMARY KEY (id),
+    CONSTRAINT uq_llm_name UNIQUE (name),
+    CONSTRAINT fk_llm_auth FOREIGN KEY (auth_id) REFERENCES auth_configurations (id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_llm_provider ON llm_configurations (provider);
+CREATE INDEX IF NOT EXISTS idx_llm_active ON llm_configurations (active);
+
+
+-- =============================================================================
+-- 10. MCP CONFIGURATIONS TABLE (MCP Server Definitions)
+-- ID convention: mcpc_<16-char-alphanumeric>
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS mcp_configurations (
+    id         VARCHAR(21)              NOT NULL,
+    name       VARCHAR(255)             NOT NULL,
+    url        TEXT                     NOT NULL,
+    health_url TEXT,
+    tools      JSONB                    NOT NULL,   -- Array of tool names
+    auth_id    VARCHAR(21),                         -- FK to auth_configurations, nullable
+    settings   JSONB                    NOT NULL,   -- timeout_ms, retry config, platform
+    active     BOOLEAN                  NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_mcp_configurations PRIMARY KEY (id),
+    CONSTRAINT uq_mcp_name UNIQUE (name),
+    CONSTRAINT fk_mcp_auth FOREIGN KEY (auth_id) REFERENCES auth_configurations (id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_mcp_active ON mcp_configurations (active);
+
+
+-- =============================================================================
+-- 11. SKILLS CONFIGURATIONS TABLE (Reusable Skill Definitions)
+-- ID convention: sklc_<16-char-alphanumeric>
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS skills_configurations (
+    id                    VARCHAR(21)              NOT NULL,
+    mcp_configuration_id  VARCHAR(21)              NOT NULL,
+    name                  VARCHAR(255)             NOT NULL,
+    source_type           VARCHAR(16)              NOT NULL,   -- INLINE, PATH, URL
+    uri                   TEXT,                                -- Path or URL, nullable for INLINE
+    content               TEXT,                                -- Markdown content for INLINE
+    metadata              JSONB,
+    active                BOOLEAN                  NOT NULL DEFAULT TRUE,
+    created_at            TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at            TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT pk_skills_configurations PRIMARY KEY (id),
+    CONSTRAINT fk_skills_mcp FOREIGN KEY (mcp_configuration_id) REFERENCES mcp_configurations (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_skills_mcp ON skills_configurations (mcp_configuration_id);
+CREATE INDEX IF NOT EXISTS idx_skills_active ON skills_configurations (active);
+
+
+-- Triggers for entity cache invalidation (reuse notify_config_change → config_cache_channel)
+CREATE TRIGGER trg_auth_notify
+    AFTER INSERT OR UPDATE OR DELETE ON auth_configurations
+    FOR EACH STATEMENT EXECUTE FUNCTION notify_config_change();
+
+CREATE TRIGGER trg_llm_notify
+    AFTER INSERT OR UPDATE OR DELETE ON llm_configurations
+    FOR EACH STATEMENT EXECUTE FUNCTION notify_config_change();
+
+CREATE TRIGGER trg_mcp_notify
+    AFTER INSERT OR UPDATE OR DELETE ON mcp_configurations
+    FOR EACH STATEMENT EXECUTE FUNCTION notify_config_change();
+
+CREATE TRIGGER trg_skills_notify
+    AFTER INSERT OR UPDATE OR DELETE ON skills_configurations
     FOR EACH STATEMENT EXECUTE FUNCTION notify_config_change();
