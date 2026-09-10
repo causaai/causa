@@ -42,7 +42,7 @@ public class IntegrationEntity extends BaseEntity {
 
     /** Whether this integration is currently active. */
     @Column(nullable = false)
-    private Boolean isActive = true;
+    private Boolean active = true;
 
     // -------------------------------------------------------------------------
     // Getters and Setters
@@ -57,6 +57,6 @@ public class IntegrationEntity extends BaseEntity {
     public JsonNode getTargetDetails() { return targetDetails; }
     public void setTargetDetails(JsonNode targetDetails) { this.targetDetails = targetDetails; }
 
-    public Boolean isActive() { return isActive; }
-    public void setActive(Boolean active) { this.isActive = active; }
+    public Boolean getActive() { return active; }
+    public void setActive(Boolean active) { this.active = active; }
 }

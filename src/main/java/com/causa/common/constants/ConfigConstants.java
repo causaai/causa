@@ -226,6 +226,49 @@ public final class ConfigConstants {
     }
 
     /**
+     * Authentication mechanism types for LLM providers and MCP servers.
+     *
+     * <p>Persisted as a string ({@code @Enumerated(EnumType.STRING)}) in
+     * {@code auth_configurations.type} (max length 32).
+     */
+    public enum AuthType {
+        /** Static API key passed as a request header (e.g. {@code x-api-key}). */
+        API_KEY,
+        /** Bearer token passed in the {@code Authorization} header. */
+        BEARER_TOKEN,
+        /** Application Default Credentials — uses the ambient GCP identity. */
+        ADC,
+        /** No authentication required. */
+        NONE
+    }
+
+    /**
+     * Skill content source types for {@code skills_configurations.source_type}.
+     *
+     * <p>Persisted as a string ({@code @Enumerated(EnumType.STRING)}) (max length 16).
+     *
+     * <ul>
+     *   <li>{@link #INLINE} — Markdown content stored directly in the {@code content} column;
+     *       {@code uri} must be {@code null}.</li>
+     *   <li>{@link #PATH} — local filesystem path stored in {@code uri};
+     *       {@code content} must be {@code null}.</li>
+     *   <li>{@link #URL} — remote HTTP(S) resource stored in {@code uri};
+     *       {@code content} must be {@code null}.</li>
+     * </ul>
+     *
+     * <p>The {@code uri}/{@code content} mutual-exclusivity rule is enforced by the
+     * application/service layer, not the entity itself.
+     */
+    public enum SkillSourceType {
+        /** Content stored inline in the {@code content} column. */
+        INLINE,
+        /** Local filesystem path in the {@code uri} column. */
+        PATH,
+        /** Remote URL in the {@code uri} column. */
+        URL
+    }
+
+    /**
      * Structured logging field names for config operations.
      */
     public static final class LogFields {
