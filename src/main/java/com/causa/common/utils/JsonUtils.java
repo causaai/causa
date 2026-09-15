@@ -62,17 +62,17 @@ public final class JsonUtils {
 
     /**
      * Converts Map&lt;String, String&gt; to JsonNode for JSONB database storage.
+     * Returns an empty ObjectNode (not null) for null or empty maps so that
+     * JSONB columns always store a valid JSON object.
      *
      * @param map the map to convert
-     * @return JsonNode representation, or null if map is null/empty
+     * @return JsonNode representation, or empty ObjectNode if map is null/empty
      */
     public static JsonNode mapToJsonNode(Map<String, String> map) {
-        if (map == null || map.isEmpty()) {
-            return null;
-        }
-
         ObjectNode jsonNode = OBJECT_MAPPER.createObjectNode();
-        map.forEach(jsonNode::put);
+        if (map != null) {
+            map.forEach(jsonNode::put);
+        }
         return jsonNode;
     }
 

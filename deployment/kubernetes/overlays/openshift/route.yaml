@@ -4,11 +4,6 @@ metadata:
   name: causa-backend
   labels:
     app.kubernetes.io/name: causa-backend
-    app.kubernetes.io/component: route
-    app.kubernetes.io/part-of: causa
-  annotations:
-    description: "Route for Causa Backend API"
-    haproxy.router.openshift.io/timeout: "60s"
 spec:
   host: ""  # OpenShift will auto-generate
   to:

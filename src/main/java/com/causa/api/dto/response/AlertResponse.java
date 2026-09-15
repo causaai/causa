@@ -1,77 +1,79 @@
 package com.causa.api.dto.response;
 
-import com.causa.common.constants.AlertConstants;
+import com.causa.core.domain.Alert;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.Instant;
-import java.util.List;
+import java.util.Map;
 
 /**
- * Alert Response DTO
+ * Alert detail DTO — returned by GET /api/v1/alerts.
  *
- * <p>Response sent back to Prometheus Alertmanager after processing webhook alerts.
+ * <p>All fields present in the DB schema are exposed; {@code alert_metadata} fields
+ * (labels, annotations, alert_source) are included in full.
  *
- * @param status the overall status (accepted/partial/rejected)
- * @param message human-readable message
- * @param totalReceived total number of alerts received
- * @param totalAccepted number of alerts accepted for processing
- * @param totalFiltered number of alerts filtered out
- * @param acceptedAlertIds list of alert IDs that were accepted
- * @param diagnosticIds list of diagnostic IDs that were triggered
- * @param timestamp response timestamp
  * @since 0.0.1
  */
 public record AlertResponse(
+
+    @JsonProperty("id")
+    String alertId,
+
+    @JsonProperty("source_alert_id")
+    String sourceAlertId,
+
+    @JsonProperty("alert_name")
+    String alertName,
+
+    @JsonProperty("alert_timestamp")
+    Instant alertTimestamp,
+
+    @JsonProperty("severity")
+    String severity,
+
+    @JsonProperty("status")
     String status,
-    String message,
-    int totalReceived,
-    int totalAccepted,
-    int totalFiltered,
-    List<String> acceptedAlertIds,
-    List<String> diagnosticIds,
-    Instant timestamp
+
+    @JsonProperty("workload_info")
+    WorkloadInfoDto workloadInfo,
+
+    @JsonProperty("workload_name")
+    String workloadName,
+
+    @JsonProperty("labels")
+    Map<String, String> labels,
+
+    @JsonProperty("annotations")
+    Map<String, String> annotations,
+
+    @JsonProperty("alert_source")
+    String alertSource
 ) {
 
-    /**
-     * Factory method to create an AlertResponse based on accepted alerts and diagnostics.
-     *
-     * <p>Status determination:
-     * <ul>
-     *   <li>All accepted → "accepted"</li>
-     *   <li>Some accepted → "partial"</li>
-     *   <li>None accepted → "rejected"</li>
-     * </ul>
-     *
-     * @param alertIds the list of accepted alert IDs
-     * @param diagnosticIds the list of diagnostic IDs triggered
-     * @param totalReceived the total number of alerts received
-     * @return the constructed AlertResponse
-     */
-    public static AlertResponse accepted(List<String> alertIds, List<String> diagnosticIds, int totalReceived) {
-        int accepted = alertIds.size();
-        String status;
-        String message;
+    public record WorkloadInfoDto(
+        @JsonProperty("pod_name")      String podName,
+        @JsonProperty("container_name") String containerName,
+        @JsonProperty("namespace")     String namespace,
+        @JsonProperty("cluster_name")  String clusterName,
+        @JsonProperty("workload_type") String workloadType
+    ) {}
 
-        if (accepted == totalReceived) {
-            status = AlertConstants.Response.ACCEPTED;
-            message = String.format("All %d alerts accepted and diagnostics initiated", accepted);
-        } else if (accepted > 0) {
-            status = AlertConstants.Response.PARTIAL;
-            message = String.format("%d alerts accepted, %d filtered; diagnostics initiated for accepted alerts",
-                                    accepted, totalReceived - accepted);
-        } else {
-            status = AlertConstants.Response.REJECTED;
-            message = String.format("All %d alerts filtered (severity/namespace/cooldown)", totalReceived);
-        }
+    public static AlertResponse from(Alert a) {
+        Alert.WorkloadInfo wi = a.getWorkloadInfo();
+        Alert.AlertMetadata am = a.getAlertMetadata();
 
         return new AlertResponse(
-            status,
-            message,
-            totalReceived,
-            accepted,
-            totalReceived - accepted,
-            alertIds,
-            diagnosticIds,
-            Instant.now()
+            a.getAlertId(),
+            a.getSourceAlertId(),
+            a.getAlertName(),
+            a.getAlertTimestamp(),
+            a.getSeverity() != null ? a.getSeverity().getValue() : null,
+            a.getStatus()   != null ? a.getStatus().getValue()   : null,
+            new WorkloadInfoDto(wi.podName(), wi.containerName(), wi.namespace(), wi.clusterName(), wi.workloadType()),
+            a.getWorkloadName(),
+            am.labels(),
+            am.annotations(),
+            am.alertSource()
         );
     }
 }

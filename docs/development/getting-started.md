@@ -1,6 +1,6 @@
 # Getting Started - Development Guide
 
-This guide will help you set up your development environment, build, compile, and run the Causa Backend application.
+This guide will help you set up your development environment, build, compile, and run the Causa application.
 
 ## Table of Contents
 
@@ -138,6 +138,8 @@ Quarkus Dev Mode provides hot reload, continuous testing, and Dev UI.
 # Application will start on http://localhost:8080
 # Dev UI available at http://localhost:8080/q/dev
 ```
+
+**Dev Services (zero config database):** Running `./mvnw quarkus:dev` automatically starts a PostgreSQL 17 container with pgvector via Quarkus Dev Services — no local database setup needed. See [Database Setup Guide](./database.md) for details.
 
 **Dev Mode Features:**
 - 🔥 **Hot Reload**: Code changes are automatically detected and reloaded

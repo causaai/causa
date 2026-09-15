@@ -1,14 +1,17 @@
 package com.causa.core.services;
 
+import java.util.Optional;
 import com.causa.api.dto.ComponentHealthDto;
 import com.causa.api.dto.HealthCheckResponseDto;
 import com.causa.common.constants.AppConstants;
 import com.causa.common.constants.HealthCheckConstants;
-import com.causa.config.LLMConfig;
+import com.causa.config.AppConfig;
+import com.causa.config.LlmConfigSnapshot;
+import com.causa.config.McpConfig;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
+import com.causa.core.ports.llm.PromptSender;
 import com.causa.infrastructure.persistence.DatabaseConnectionService;
-import com.causa.llm.LangChainPromptSender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -20,25 +23,28 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.Statement;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for {@link HealthCheckService}.
- * 
- * <p>Tests the health check service following Hexagonal Architecture principles.
- * All external dependencies are mocked to test the core business logic in isolation.
- * 
- * <p>Test Coverage:
+ *
+ * <p>Pure unit tests — all dependencies are mocked via Mockito.
+ * MCP endpoint checks inside {@link HealthCheckService} use {@code java.net.http.HttpClient}
+ * internally and cannot be mocked at this layer without production refactoring.
+ * Those checks are therefore excluded here; they are covered by integration tests.
+ *
+ * <p>What IS tested here:
  * <ul>
- *   <li>Database health checks</li>
- *   <li>MCP Kubernetes health checks</li>
- *   <li>LLM provider health checks</li>
- *   <li>Overall system status determination</li>
- *   <li>Error handling and edge cases</li>
+ *   <li>Database health logic (ready / not-ready / query-fail / connection-fail)</li>
+ *   <li>LLM provider health logic (ready / not-ready / send-fail / empty / null response)</li>
+ *   <li>Overall status aggregation (UP / DOWN / DEGRADED)</li>
+ *   <li>Response structure (version, timestamp, components map)</li>
  * </ul>
+ *
+ * <p>MCP always resolves to DOWN in these tests (non-routable endpoint + 1ms timeout),
+ * so all assertions about MCP status expect DOWN.
  *
  * @since 0.0.1
  */
@@ -59,140 +65,153 @@ class HealthCheckServiceTest {
     private Statement statement;
 
     @Mock
-    private LangChainPromptSender llmPromptSender;
+    private PromptSender llmPromptSender;
 
     @Mock
-    private LLMConfig llmConfig;
+    private AppConfig appConfig;
+
+    @Mock
+    private LlmConfigSnapshot llmConfigSnapshot;
+
+    @Mock
+    private McpConfig mcpConfig;
+
+    @Mock
+    private McpConfig.QuarkusConfig quarkusConfig;
+
+    @Mock
+    private McpConfig.AsyncProfilerConfig asyncProfilerConfig;
 
     private HealthCheckService healthCheckService;
 
-    private static final String APP_VERSION = "0.0.1";
-    private static final String MCP_ENDPOINT = "http://localhost:8081";
-    private static final String MCP_HEALTH_PATH = "/health";
-    private static final int MCP_TIMEOUT = 5000;
+    private static final String APP_VERSION = "0.0.1-TEST";
+
+    /**
+     * 192.0.2.x is RFC 5737 TEST-NET-1 — guaranteed non-routable.
+     * Combined with a 1ms connect timeout, the HttpClient fails instantly
+     * without blocking the test thread.
+     */
+    private static final String MCP_DEAD_ENDPOINT = "http://192.0.2.1";
+    private static final String MCP_HEALTH_PATH   = "/health";
+    private static final int    MCP_TIMEOUT_MS    = 1;
 
     @BeforeEach
     void setUp() {
+        when(mcpConfig.quarkus()).thenReturn(quarkusConfig);
+        when(quarkusConfig.endpoint()).thenReturn(Optional.of(MCP_DEAD_ENDPOINT));
+        when(quarkusConfig.healthPath()).thenReturn(MCP_HEALTH_PATH);
+        when(quarkusConfig.timeoutMs()).thenReturn(MCP_TIMEOUT_MS);
+
+        when(mcpConfig.asyncProfiler()).thenReturn(asyncProfilerConfig);
+        when(asyncProfilerConfig.endpoint()).thenReturn(Optional.of(MCP_DEAD_ENDPOINT));
+        when(asyncProfilerConfig.healthPath()).thenReturn(MCP_HEALTH_PATH);
+        when(asyncProfilerConfig.timeoutMs()).thenReturn(MCP_TIMEOUT_MS);
+
         healthCheckService = new HealthCheckService(
                 databaseConnectionService,
                 dataSource,
                 APP_VERSION,
-                MCP_ENDPOINT,
-                MCP_HEALTH_PATH,
-                MCP_TIMEOUT,
+                "cluster",
+                MCP_DEAD_ENDPOINT, MCP_HEALTH_PATH, MCP_TIMEOUT_MS,   // k8s
+                MCP_DEAD_ENDPOINT, MCP_HEALTH_PATH, MCP_TIMEOUT_MS,   // kruize
+                MCP_DEAD_ENDPOINT, MCP_HEALTH_PATH, MCP_TIMEOUT_MS,   // cryostat
+                MCP_DEAD_ENDPOINT, MCP_HEALTH_PATH, MCP_TIMEOUT_MS,   // filesystem
+                mcpConfig,
                 llmPromptSender,
-                llmConfig
+                appConfig
         );
     }
 
+    // -------------------------------------------------------------------------
+    // Database health
+    // -------------------------------------------------------------------------
+
     @Nested
-    @DisplayName("Database Health Check Tests")
-    class DatabaseHealthCheckTests {
+    @DisplayName("Database Health Tests")
+    class DatabaseHealthTests {
 
         @Test
-        @DisplayName("Should return UP when database is ready and query succeeds")
-        void shouldReturnUpWhenDatabaseIsHealthy() throws Exception {
-            // Given
+        @DisplayName("UP — database ready and SELECT 1 succeeds")
+        void upWhenDatabaseReadyAndQuerySucceeds() throws Exception {
             when(databaseConnectionService.isReady()).thenReturn(true);
             when(dataSource.getConnection()).thenReturn(connection);
             when(connection.createStatement()).thenReturn(statement);
             when(statement.execute("SELECT 1")).thenReturn(true);
-
-            // Mock LLM and MCP to avoid failures
             when(llmPromptSender.isReady()).thenReturn(false);
 
-            // When
             HealthCheckResponseDto response = healthCheckService.getSystemHealth();
 
-            // Then
-            assertNotNull(response);
-            ComponentHealthDto dbHealth = response.getComponents().get(HealthCheckConstants.ComponentNames.DATABASE);
-            assertNotNull(dbHealth);
-            assertEquals(AppConstants.HealthStatus.UP.getValue(), dbHealth.getStatus());
-            assertTrue(dbHealth.getLatencyMs() >= 0);
-
-            verify(databaseConnectionService).isReady();
+            ComponentHealthDto db = response.getComponents().get(HealthCheckConstants.ComponentNames.DATABASE);
+            assertNotNull(db);
+            assertEquals(AppConstants.HealthStatus.UP.getValue(), db.getStatus());
+            assertTrue(db.getLatencyMs() >= 0);
             verify(dataSource).getConnection();
-            verify(connection).createStatement();
             verify(statement).execute("SELECT 1");
             verify(connection).close();
         }
 
         @Test
-        @DisplayName("Should return DOWN when database is not ready")
-        void shouldReturnDownWhenDatabaseNotReady() {
-            // Given
+        @DisplayName("DOWN — databaseConnectionService.isReady() returns false")
+        void downWhenNotReady() {
             when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(false);
 
-            // When
             HealthCheckResponseDto response = healthCheckService.getSystemHealth();
 
-            // Then
-            assertNotNull(response);
-            ComponentHealthDto dbHealth = response.getComponents().get(HealthCheckConstants.ComponentNames.DATABASE);
-            assertNotNull(dbHealth);
-            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), dbHealth.getStatus());
-            assertEquals(0L, dbHealth.getLatencyMs());
-
-            verify(databaseConnectionService).isReady();
+            ComponentHealthDto db = response.getComponents().get(HealthCheckConstants.ComponentNames.DATABASE);
+            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), db.getStatus());
+            assertEquals(0L, db.getLatencyMs());
             verifyNoInteractions(dataSource);
         }
 
         @Test
-        @DisplayName("Should return DOWN when database query fails")
-        void shouldReturnDownWhenDatabaseQueryFails() throws Exception {
-            // Given
+        @DisplayName("DOWN — SELECT 1 throws exception")
+        void downWhenQueryFails() throws Exception {
             when(databaseConnectionService.isReady()).thenReturn(true);
             when(dataSource.getConnection()).thenReturn(connection);
             when(connection.createStatement()).thenReturn(statement);
             when(statement.execute("SELECT 1")).thenThrow(new RuntimeException("Query failed"));
             when(llmPromptSender.isReady()).thenReturn(false);
 
-            // When
             HealthCheckResponseDto response = healthCheckService.getSystemHealth();
 
-            // Then
-            assertNotNull(response);
-            ComponentHealthDto dbHealth = response.getComponents().get(HealthCheckConstants.ComponentNames.DATABASE);
-            assertNotNull(dbHealth);
-            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), dbHealth.getStatus());
-            assertTrue(dbHealth.getMessage().contains("failed"));
-
+            ComponentHealthDto db = response.getComponents().get(HealthCheckConstants.ComponentNames.DATABASE);
+            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), db.getStatus());
+            assertTrue(db.getMessage().contains("failed"));
             verify(connection).close();
         }
 
         @Test
-        @DisplayName("Should handle connection acquisition failure")
-        void shouldHandleConnectionAcquisitionFailure() throws Exception {
-            // Given
+        @DisplayName("DOWN — DataSource.getConnection() throws exception")
+        void downWhenConnectionAcquisitionFails() throws Exception {
             when(databaseConnectionService.isReady()).thenReturn(true);
-            when(dataSource.getConnection()).thenThrow(new RuntimeException("Connection pool exhausted"));
+            when(dataSource.getConnection()).thenThrow(new RuntimeException("Pool exhausted"));
             when(llmPromptSender.isReady()).thenReturn(false);
 
-            // When
             HealthCheckResponseDto response = healthCheckService.getSystemHealth();
 
-            // Then
-            assertNotNull(response);
-            ComponentHealthDto dbHealth = response.getComponents().get(HealthCheckConstants.ComponentNames.DATABASE);
-            assertNotNull(dbHealth);
-            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), dbHealth.getStatus());
-            assertTrue(dbHealth.getMessage().contains("failed"));
+            ComponentHealthDto db = response.getComponents().get(HealthCheckConstants.ComponentNames.DATABASE);
+            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), db.getStatus());
+            assertTrue(db.getMessage().contains("failed"));
         }
     }
 
+    // -------------------------------------------------------------------------
+    // LLM provider health
+    // -------------------------------------------------------------------------
+
     @Nested
-    @DisplayName("LLM Health Check Tests")
-    class LlmHealthCheckTests {
+    @DisplayName("LLM Provider Health Tests")
+    class LlmHealthTests {
 
         @Test
-        @DisplayName("Should return UP when LLM is ready and responds")
-        void shouldReturnUpWhenLlmIsHealthy() {
-            // Given
+        @DisplayName("UP — isReady true and send() returns non-empty response")
+        void upWhenReadyAndResponds() {
             when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(true);
-            when(llmConfig.modelName()).thenReturn("claude-sonnet-4-6");
+            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
+            when(llmConfigSnapshot.getProvider()).thenReturn("bob");
+            when(llmConfigSnapshot.getModelName()).thenReturn("bob");
             
             LLMResponse mockResponse = new LLMResponse(
                     "OK",
@@ -205,7 +224,6 @@ class HealthCheckServiceTest {
             );
             when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(mockResponse);
 
-            // When
             HealthCheckResponseDto response = healthCheckService.getSystemHealth();
 
             // Then
@@ -213,7 +231,8 @@ class HealthCheckServiceTest {
             ComponentHealthDto llmHealth = response.getComponents().get(HealthCheckConstants.ComponentNames.LLM_PROVIDER);
             assertNotNull(llmHealth);
             assertEquals(AppConstants.HealthStatus.UP.getValue(), llmHealth.getStatus());
-            assertTrue(llmHealth.getMessage().contains("claude-sonnet-4-6"));
+            assertTrue(llmHealth.getMessage().contains("bob / bob"),
+                    "Expected message to contain 'bob / bob' (provider / model), but was: " + llmHealth.getMessage());
             assertNotNull(llmHealth.getLatencyMs());
             assertTrue(llmHealth.getLatencyMs() >= 0);
 
@@ -222,95 +241,86 @@ class HealthCheckServiceTest {
         }
 
         @Test
-        @DisplayName("Should return DOWN when LLM is not ready")
-        void shouldReturnDownWhenLlmNotReady() {
-            // Given
+        @DisplayName("UP — modelName absent in config falls back to 'unknown' label")
+        void upWithUnknownFallbackWhenModelNameAbsent() {
+            when(databaseConnectionService.isReady()).thenReturn(false);
+            when(llmPromptSender.isReady()).thenReturn(true);
+            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
+            when(llmConfigSnapshot.getProvider()).thenReturn("bob");
+            when(llmConfigSnapshot.getModelName()).thenReturn("");
+            when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(
+                    new LLMResponse("OK", "bob", 1L, 1L, 0L, 0L, 10L));
+
+            HealthCheckResponseDto response = healthCheckService.getSystemHealth();
+
+            ComponentHealthDto llm = response.getComponents().get(HealthCheckConstants.ComponentNames.LLM_PROVIDER);
+            assertEquals(AppConstants.HealthStatus.UP.getValue(), llm.getStatus());
+            assertTrue(llm.getMessage().contains("unknown"));
+        }
+
+        @Test
+        @DisplayName("DOWN — isReady() returns false; send() never called")
+        void downWhenNotReady() {
             when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(false);
 
-            // When
             HealthCheckResponseDto response = healthCheckService.getSystemHealth();
 
-            // Then
-            assertNotNull(response);
-            ComponentHealthDto llmHealth = response.getComponents().get(HealthCheckConstants.ComponentNames.LLM_PROVIDER);
-            assertNotNull(llmHealth);
-            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), llmHealth.getStatus());
-
-            verify(llmPromptSender).isReady();
+            ComponentHealthDto llm = response.getComponents().get(HealthCheckConstants.ComponentNames.LLM_PROVIDER);
+            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), llm.getStatus());
             verify(llmPromptSender, never()).send(any(LLMRequest.class));
         }
 
         @Test
-        @DisplayName("Should return DOWN when LLM test prompt fails")
-        void shouldReturnDownWhenLlmTestPromptFails() {
-            // Given
+        @DisplayName("DOWN — send() throws an exception")
+        void downWhenSendThrows() {
             when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(true);
             when(llmPromptSender.send(any(LLMRequest.class)))
                     .thenThrow(new RuntimeException("LLM request failed"));
 
-            // When
             HealthCheckResponseDto response = healthCheckService.getSystemHealth();
 
-            // Then
-            assertNotNull(response);
-            ComponentHealthDto llmHealth = response.getComponents().get(HealthCheckConstants.ComponentNames.LLM_PROVIDER);
-            assertNotNull(llmHealth);
-            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), llmHealth.getStatus());
-            assertTrue(llmHealth.getMessage().contains("failed"));
+            ComponentHealthDto llm = response.getComponents().get(HealthCheckConstants.ComponentNames.LLM_PROVIDER);
+            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), llm.getStatus());
+            assertTrue(llm.getMessage().contains("failed"));
         }
 
         @Test
-        @DisplayName("Should return DOWN when LLM returns empty response")
-        void shouldReturnDownWhenLlmReturnsEmptyResponse() {
-            // Given
+        @DisplayName("DOWN — send() returns response with empty text")
+        void downWhenSendReturnsEmptyText() {
             when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(true);
-            
-            LLMResponse emptyResponse = new LLMResponse(
-                    "",
-                    "claude-sonnet-4-6",
-                    11L,
-                    0L,
-                    0L,
-                    0L,
-                    100L
-            );
-            when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(emptyResponse);
+            when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(
+                    new LLMResponse("", "claude-sonnet-4-6", 11L, 0L, 0L, 0L, 100L));
 
-            // When
             HealthCheckResponseDto response = healthCheckService.getSystemHealth();
 
-            // Then
-            assertNotNull(response);
-            ComponentHealthDto llmHealth = response.getComponents().get(HealthCheckConstants.ComponentNames.LLM_PROVIDER);
-            assertNotNull(llmHealth);
-            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), llmHealth.getStatus());
+            ComponentHealthDto llm = response.getComponents().get(HealthCheckConstants.ComponentNames.LLM_PROVIDER);
+            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), llm.getStatus());
         }
 
         @Test
-        @DisplayName("Should return DOWN when LLM returns null response")
-        void shouldReturnDownWhenLlmReturnsNullResponse() {
-            // Given
+        @DisplayName("DOWN — send() returns null")
+        void downWhenSendReturnsNull() {
             when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(true);
             when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(null);
 
-            // When
             HealthCheckResponseDto response = healthCheckService.getSystemHealth();
 
-            // Then
-            assertNotNull(response);
-            ComponentHealthDto llmHealth = response.getComponents().get(HealthCheckConstants.ComponentNames.LLM_PROVIDER);
-            assertNotNull(llmHealth);
-            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), llmHealth.getStatus());
+            ComponentHealthDto llm = response.getComponents().get(HealthCheckConstants.ComponentNames.LLM_PROVIDER);
+            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), llm.getStatus());
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Overall status aggregation
+    // -------------------------------------------------------------------------
+
     @Nested
-    @DisplayName("Overall System Status Tests")
-    class OverallSystemStatusTests {
+    @DisplayName("Overall Status Aggregation Tests")
+    class OverallStatusTests {
 
         @Test
         @DisplayName("Should return UP when all components are UP")
@@ -323,8 +333,10 @@ class HealthCheckServiceTest {
 
             // Given - LLM UP
             when(llmPromptSender.isReady()).thenReturn(true);
-            when(llmConfig.modelName()).thenReturn("claude-sonnet-4-6");
-            LLMResponse mockResponse = new LLMResponse("OK", "claude-sonnet-4-6", 11L, 4L, 0L, 0L, 100L);
+            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
+            when(llmConfigSnapshot.getProvider()).thenReturn("bob");
+            when(llmConfigSnapshot.getModelName()).thenReturn("bob");
+            LLMResponse mockResponse = new LLMResponse("OK", "bob", 11L, 4L, 0L, 0L, 100L);
             when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(mockResponse);
 
             // When
@@ -341,164 +353,309 @@ class HealthCheckServiceTest {
         void shouldReturnDownWhenDatabaseIsDown() {
             // Given - Database DOWN
             when(databaseConnectionService.isReady()).thenReturn(false);
-
-            // Given - LLM UP
+            // LLM UP — doesn't matter, DB is critical
             when(llmPromptSender.isReady()).thenReturn(true);
-            when(llmConfig.modelName()).thenReturn("claude-sonnet-4-6");
-            LLMResponse mockResponse = new LLMResponse("OK", "claude-sonnet-4-6", 11L, 4L, 0L, 0L, 100L);
+            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
+            when(llmConfigSnapshot.getProvider()).thenReturn("bob");
+            when(llmConfigSnapshot.getModelName()).thenReturn("bob");
+            LLMResponse mockResponse = new LLMResponse("OK", "bob", 11L, 4L, 0L, 0L, 100L);
             when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(mockResponse);
 
-            // When
-            HealthCheckResponseDto response = healthCheckService.getSystemHealth();
-
-            // Then
-            assertNotNull(response);
-            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), response.getStatus());
+            assertEquals(AppConstants.HealthStatus.DOWN.getValue(),
+                    healthCheckService.getSystemHealth().getStatus());
         }
 
         @Test
-        @DisplayName("Should return DEGRADED when database is UP but LLM is DOWN")
-        void shouldReturnDegradedWhenDatabaseUpButLlmDown() throws Exception {
-            // Given - Database UP
+        @DisplayName("DEGRADED — database UP but LLM DOWN")
+        void degradedWhenDatabaseUpButLlmDown() throws Exception {
             when(databaseConnectionService.isReady()).thenReturn(true);
             when(dataSource.getConnection()).thenReturn(connection);
             when(connection.createStatement()).thenReturn(statement);
             when(statement.execute("SELECT 1")).thenReturn(true);
-
-            // Given - LLM DOWN
             when(llmPromptSender.isReady()).thenReturn(false);
 
-            // When
-            HealthCheckResponseDto response = healthCheckService.getSystemHealth();
-
-            // Then
-            assertNotNull(response);
-            assertEquals(AppConstants.HealthStatus.DEGRADED.getValue(), response.getStatus());
+            assertEquals(AppConstants.HealthStatus.DEGRADED.getValue(),
+                    healthCheckService.getSystemHealth().getStatus());
         }
 
         @Test
-        @DisplayName("Should return DEGRADED when database is UP but MCP is DOWN")
-        void shouldReturnDegradedWhenDatabaseUpButMcpDown() throws Exception {
-            // Given - Database UP
+        @DisplayName("DEGRADED — database UP, LLM UP, MCP always DOWN (no real HTTP in unit tests)")
+        void degradedWhenDatabaseAndLlmUpButMcpDown() throws Exception {
+            // DB UP
             when(databaseConnectionService.isReady()).thenReturn(true);
             when(dataSource.getConnection()).thenReturn(connection);
             when(connection.createStatement()).thenReturn(statement);
             when(statement.execute("SELECT 1")).thenReturn(true);
+            // LLM UP
+            when(llmPromptSender.isReady()).thenReturn(true);
+            when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(
+                    new LLMResponse("OK", "claude-sonnet-4-6", 10L, 4L, 0L, 0L, 50L));
+            // MCP → DOWN (192.0.2.1 + 1ms timeout → instant fail)
 
-            // Given - LLM DOWN
-            when(llmPromptSender.isReady()).thenReturn(false);
-
-            // When
-            HealthCheckResponseDto response = healthCheckService.getSystemHealth();
-
-            // Then
-            assertNotNull(response);
-            assertEquals(AppConstants.HealthStatus.DEGRADED.getValue(), response.getStatus());
-            
-            // Verify MCP component exists and is DOWN
-            ComponentHealthDto mcpHealth = response.getComponents().get(HealthCheckConstants.ComponentNames.MCP_KUBERNETES);
-            assertNotNull(mcpHealth);
-            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), mcpHealth.getStatus());
+            // Overall must be DEGRADED (not DOWN — DB and LLM are UP)
+            assertEquals(AppConstants.HealthStatus.DEGRADED.getValue(),
+                    healthCheckService.getSystemHealth().getStatus());
         }
     }
+
+    // -------------------------------------------------------------------------
+    // Response structure
+    // -------------------------------------------------------------------------
 
     @Nested
     @DisplayName("Response Structure Tests")
     class ResponseStructureTests {
 
-        @Test
-        @DisplayName("Should include all required fields in response")
-        void shouldIncludeAllRequiredFieldsInResponse() {
-            // Given
+        @BeforeEach
+        void allDown() {
             when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(false);
-
-            // When
-            HealthCheckResponseDto response = healthCheckService.getSystemHealth();
-
-            // Then
-            assertNotNull(response);
-            assertNotNull(response.getStatus());
-            assertNotNull(response.getTimestamp());
-            assertNotNull(response.getVersion());
-            assertNotNull(response.getComponents());
-            assertEquals(APP_VERSION, response.getVersion());
         }
 
         @Test
-        @DisplayName("Should include all component health checks")
-        void shouldIncludeAllComponentHealthChecks() {
-            // Given
-            when(databaseConnectionService.isReady()).thenReturn(false);
-            when(llmPromptSender.isReady()).thenReturn(false);
-
-            // When
-            HealthCheckResponseDto response = healthCheckService.getSystemHealth();
-
-            // Then
-            assertNotNull(response.getComponents());
-            assertTrue(response.getComponents().containsKey(HealthCheckConstants.ComponentNames.DATABASE));
-            assertTrue(response.getComponents().containsKey(HealthCheckConstants.ComponentNames.MCP_KUBERNETES));
-            assertTrue(response.getComponents().containsKey(HealthCheckConstants.ComponentNames.LLM_PROVIDER));
+        @DisplayName("Response includes version from constructor")
+        void responseIncludesVersion() {
+            assertEquals(APP_VERSION, healthCheckService.getSystemHealth().getVersion());
         }
 
         @Test
-        @DisplayName("Should have valid timestamp format")
-        void shouldHaveValidTimestampFormat() {
-            // Given
-            when(databaseConnectionService.isReady()).thenReturn(false);
-            when(llmPromptSender.isReady()).thenReturn(false);
+        @DisplayName("Response includes ISO-8601 timestamp")
+        void responseIncludesIsoTimestamp() {
+            String ts = healthCheckService.getSystemHealth().getTimestamp();
+            assertNotNull(ts);
+            assertTrue(ts.contains("T") && ts.contains("Z"));
+            assertDoesNotThrow(() -> java.time.Instant.parse(ts));
+        }
 
-            // When
-            HealthCheckResponseDto response = healthCheckService.getSystemHealth();
+        @Test
+        @DisplayName("Response always contains database component")
+        void responseContainsDatabaseComponent() {
+            assertTrue(healthCheckService.getSystemHealth().getComponents()
+                    .containsKey(HealthCheckConstants.ComponentNames.DATABASE));
+        }
 
-            // Then
-            assertNotNull(response.getTimestamp());
-            assertTrue(response.getTimestamp().contains("T"));
-            assertTrue(response.getTimestamp().contains("Z"));
-            // Should be parseable as ISO 8601
-            assertDoesNotThrow(() -> java.time.Instant.parse(response.getTimestamp()));
+        @Test
+        @DisplayName("Response always contains llm_provider component")
+        void responseContainsLlmComponent() {
+            assertTrue(healthCheckService.getSystemHealth().getComponents()
+                    .containsKey(HealthCheckConstants.ComponentNames.LLM_PROVIDER));
+        }
+
+        @Test
+        @DisplayName("Response always contains mcp_kubernetes component in cluster mode")
+        void responseContainsMcpKubernetesComponent() {
+            assertTrue(healthCheckService.getSystemHealth().getComponents()
+                    .containsKey(HealthCheckConstants.ComponentNames.MCP_KUBERNETES));
+        }
+
+        @Test
+        @DisplayName("Successive calls produce different timestamps")
+        void successiveCallsProduceDifferentTimestamps() {
+            String ts1 = healthCheckService.getSystemHealth().getTimestamp();
+            String ts2 = healthCheckService.getSystemHealth().getTimestamp();
+            // Timestamps may be equal if both calls happen within the same millisecond,
+            // but they must both be non-null valid ISO strings
+            assertNotNull(ts1);
+            assertNotNull(ts2);
+            assertDoesNotThrow(() -> java.time.Instant.parse(ts1));
+            assertDoesNotThrow(() -> java.time.Instant.parse(ts2));
+        }
+
+        @Test
+        @DisplayName("MCP kubernetes component is DOWN in unit tests (no real HTTP)")
+        void mcpAlwaysDownInUnitTests() {
+            ComponentHealthDto mcp = healthCheckService.getSystemHealth().getComponents()
+                    .get(HealthCheckConstants.ComponentNames.MCP_KUBERNETES);
+            assertNotNull(mcp);
+            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), mcp.getStatus());
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Quarkus MCP health — cluster mode
+    // -------------------------------------------------------------------------
+
     @Nested
-    @DisplayName("Edge Case Tests")
-    class EdgeCaseTests {
+    @DisplayName("Quarkus MCP Health Tests (cluster mode)")
+    class QuarkusHealthTests {
 
         @Test
-        @DisplayName("Should handle null from database connection service")
-        void shouldHandleNullFromDatabaseConnectionService() {
-            // Given
+        @DisplayName("Cluster mode — mcp_quarkus component present and DOWN (no real HTTP)")
+        void clusterModeIncludesQuarkusComponent() {
             when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(false);
 
-            // When
             HealthCheckResponseDto response = healthCheckService.getSystemHealth();
 
-            // Then
-            assertNotNull(response);
-            ComponentHealthDto dbHealth = response.getComponents().get(HealthCheckConstants.ComponentNames.DATABASE);
-            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), dbHealth.getStatus());
+            ComponentHealthDto quarkus = response.getComponents()
+                    .get(HealthCheckConstants.ComponentNames.MCP_QUARKUS);
+            assertNotNull(quarkus, "mcp_quarkus component must be present in cluster mode");
+            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), quarkus.getStatus());
+            assertNotNull(quarkus.getLatencyMs());
         }
 
         @Test
-        @DisplayName("Should handle concurrent health check calls")
-        void shouldHandleConcurrentHealthCheckCalls() throws Exception {
-            // Given
+        @DisplayName("DEGRADED — database UP, LLM UP, quarkus DOWN")
+        void degradedWhenDbAndLlmUpButQuarkusDown() throws Exception {
+            // DB UP
             when(databaseConnectionService.isReady()).thenReturn(true);
             when(dataSource.getConnection()).thenReturn(connection);
             when(connection.createStatement()).thenReturn(statement);
             when(statement.execute("SELECT 1")).thenReturn(true);
+            // LLM UP
+            when(llmPromptSender.isReady()).thenReturn(true);
+            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
+            when(llmConfigSnapshot.getProvider()).thenReturn("bob");
+            when(llmConfigSnapshot.getModelName()).thenReturn("bob");
+            when(llmPromptSender.send(any(LLMRequest.class)))
+                    .thenReturn(new LLMResponse("OK", "bob", 1L, 1L, 0L, 0L, 10L));
+            // quarkus → DOWN (192.0.2.1 + 1ms timeout)
+
+            assertEquals(AppConstants.HealthStatus.DEGRADED.getValue(),
+                    healthCheckService.getSystemHealth().getStatus(),
+                    "System must be DEGRADED (not DOWN) when only non-critical MCPs are down");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Async Profiler MCP health — cluster mode
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("Async Profiler MCP Health Tests (cluster mode)")
+    class AsyncProfilerHealthTests {
+
+        @Test
+        @DisplayName("Cluster mode — mcp_async_profiler component present and DOWN (no real HTTP)")
+        void clusterModeIncludesAsyncProfilerComponent() {
+            when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(false);
 
-            // When - Call multiple times
-            HealthCheckResponseDto response1 = healthCheckService.getSystemHealth();
-            HealthCheckResponseDto response2 = healthCheckService.getSystemHealth();
+            HealthCheckResponseDto response = healthCheckService.getSystemHealth();
 
-            // Then - Both should succeed
-            assertNotNull(response1);
-            assertNotNull(response2);
-            assertNotEquals(response1.getTimestamp(), response2.getTimestamp());
+            ComponentHealthDto asyncProfiler = response.getComponents()
+                    .get(HealthCheckConstants.ComponentNames.MCP_ASYNC_PROFILER);
+            assertNotNull(asyncProfiler, "mcp_async_profiler component must be present in cluster mode when endpoint is configured");
+            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), asyncProfiler.getStatus());
+            assertNotNull(asyncProfiler.getLatencyMs());
+        }
+
+        @Test
+        @DisplayName("DEGRADED — database UP, LLM UP, async profiler DOWN")
+        void degradedWhenDbAndLlmUpButAsyncProfilerDown() throws Exception {
+            // DB UP
+            when(databaseConnectionService.isReady()).thenReturn(true);
+            when(dataSource.getConnection()).thenReturn(connection);
+            when(connection.createStatement()).thenReturn(statement);
+            when(statement.execute("SELECT 1")).thenReturn(true);
+            // LLM UP
+            when(llmPromptSender.isReady()).thenReturn(true);
+            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
+            when(llmConfigSnapshot.getProvider()).thenReturn("bob");
+            when(llmConfigSnapshot.getModelName()).thenReturn("bob");
+            when(llmPromptSender.send(any(LLMRequest.class)))
+                    .thenReturn(new LLMResponse("OK", "bob", 1L, 1L, 0L, 0L, 10L));
+            // async profiler → DOWN (192.0.2.1 + 1ms timeout)
+
+            assertEquals(AppConstants.HealthStatus.DEGRADED.getValue(),
+                    healthCheckService.getSystemHealth().getStatus(),
+                    "System must be DEGRADED (not DOWN) when only non-critical MCPs are down");
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // VM platform mode — filesystem MCP only
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("VM Platform Mode Tests")
+    class VmPlatformTests {
+
+        private HealthCheckService vmHealthService;
+
+        @BeforeEach
+        void setUpVm() {
+            when(mcpConfig.quarkus()).thenReturn(quarkusConfig);
+            when(quarkusConfig.endpoint()).thenReturn(Optional.of(MCP_DEAD_ENDPOINT));
+            when(quarkusConfig.healthPath()).thenReturn(MCP_HEALTH_PATH);
+            when(quarkusConfig.timeoutMs()).thenReturn(MCP_TIMEOUT_MS);
+
+            when(mcpConfig.asyncProfiler()).thenReturn(asyncProfilerConfig);
+            when(asyncProfilerConfig.endpoint()).thenReturn(Optional.of(MCP_DEAD_ENDPOINT));
+            when(asyncProfilerConfig.healthPath()).thenReturn(MCP_HEALTH_PATH);
+            when(asyncProfilerConfig.timeoutMs()).thenReturn(MCP_TIMEOUT_MS);
+
+            vmHealthService = new HealthCheckService(
+                    databaseConnectionService,
+                    dataSource,
+                    APP_VERSION,
+                    "vm",
+                    MCP_DEAD_ENDPOINT, MCP_HEALTH_PATH, MCP_TIMEOUT_MS,
+                    MCP_DEAD_ENDPOINT, MCP_HEALTH_PATH, MCP_TIMEOUT_MS,
+                    MCP_DEAD_ENDPOINT, MCP_HEALTH_PATH, MCP_TIMEOUT_MS,
+                    MCP_DEAD_ENDPOINT, MCP_HEALTH_PATH, MCP_TIMEOUT_MS,
+                    mcpConfig,
+                    llmPromptSender,
+                    appConfig
+            );
+        }
+
+        @Test
+        @DisplayName("VM mode — mcp_filesystem component present instead of mcp_kubernetes")
+        void vmModeIncludesFilesystemNotKubernetes() {
+            when(databaseConnectionService.isReady()).thenReturn(false);
+            when(llmPromptSender.isReady()).thenReturn(false);
+
+            HealthCheckResponseDto response = vmHealthService.getSystemHealth();
+
+            assertTrue(response.getComponents()
+                    .containsKey(HealthCheckConstants.ComponentNames.MCP_FILESYSTEM));
+            assertFalse(response.getComponents()
+                    .containsKey(HealthCheckConstants.ComponentNames.MCP_KUBERNETES));
+        }
+
+        @Test
+        @DisplayName("VM mode — mcp_quarkus absent in VM mode")
+        void vmModeOmitsQuarkus() {
+            when(databaseConnectionService.isReady()).thenReturn(false);
+            when(llmPromptSender.isReady()).thenReturn(false);
+
+            HealthCheckResponseDto response = vmHealthService.getSystemHealth();
+
+            assertFalse(response.getComponents()
+                    .containsKey(HealthCheckConstants.ComponentNames.MCP_QUARKUS),
+                    "mcp_quarkus must NOT appear in VM mode");
+        }
+
+        @Test
+        @DisplayName("VM mode — overall DOWN when database is DOWN")
+        void vmModeDownWhenDatabaseDown() {
+            when(databaseConnectionService.isReady()).thenReturn(false);
+            when(llmPromptSender.isReady()).thenReturn(false);
+
+            assertEquals(AppConstants.HealthStatus.DOWN.getValue(),
+                    vmHealthService.getSystemHealth().getStatus());
+        }
+
+        @Test
+        @DisplayName("VM mode — overall status unaffected by absent quarkus MCP")
+        void vmModeOverallStatusIgnoresQuarkus() throws Exception {
+            // DB UP, LLM UP — quarkus not checked in VM mode
+            when(databaseConnectionService.isReady()).thenReturn(true);
+            when(dataSource.getConnection()).thenReturn(connection);
+            when(connection.createStatement()).thenReturn(statement);
+            when(statement.execute("SELECT 1")).thenReturn(true);
+            when(llmPromptSender.isReady()).thenReturn(true);
+            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
+            when(llmConfigSnapshot.getProvider()).thenReturn("bob");
+            when(llmConfigSnapshot.getModelName()).thenReturn("bob");
+            when(llmPromptSender.send(any(LLMRequest.class)))
+                    .thenReturn(new LLMResponse("OK", "bob", 1L, 1L, 0L, 0L, 10L));
+
+            // Only filesystem MCP is checked — it will be DOWN (dead endpoint)
+            // so overall should be DEGRADED, not UP, and NOT caused by quarkus
+            assertEquals(AppConstants.HealthStatus.DEGRADED.getValue(),
+                    vmHealthService.getSystemHealth().getStatus());
         }
     }
 }

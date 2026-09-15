@@ -78,7 +78,7 @@ public class DatabaseConnectionService {
                 .field(DatabaseConstants.POOL_FIELD, DatabaseConstants.POOL_NAME)
                 .log();
         } else {
-            log.error(LogMessages.Database.CONNECTION_FAILED)
+            log.warn(LogMessages.Database.CONNECTION_FAILED)
                 .field(DatabaseConstants.DB_KIND_FIELD, DatabaseConstants.DB_KIND_VALUE)
                 .field(DatabaseConstants.POOL_FIELD, DatabaseConstants.POOL_NAME)
                 .log();

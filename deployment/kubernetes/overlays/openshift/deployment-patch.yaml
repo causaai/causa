@@ -4,10 +4,6 @@ metadata:
   name: causa-backend
 spec:
   template:
-    metadata:
-      annotations:
-        # OpenShift-specific annotations
-        openshift.io/scc: restricted
     spec:
       # OpenShift security context
       securityContext:
@@ -24,8 +20,8 @@ spec:
               - ALL
         resources:
           requests:
-            cpu: 200m
-            memory: 512Mi
+            cpu: 250m
+            memory: 256Mi
           limits:
-            cpu: 1000m
-            memory: 1Gi
+            cpu: 500m
+            memory: 512Mi

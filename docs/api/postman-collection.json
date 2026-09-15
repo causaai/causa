@@ -1,0 +1,285 @@
+{
+  "info": {
+    "name": "Causa Backend API",
+    "description": "Collection for the current localhost:8080 API surface.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    }
+  ],
+  "item": [
+    {
+      "name": "Alerts",
+      "item": [
+        {
+          "name": "Webhook Alerts",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receiver\": \"Critical\",\n  \"status\": \"firing\",\n  \"alerts\": [\n    {\n      \"status\": \"firing\",\n      \"labels\": {\n        \"alertname\": \"causa-high-memory\",\n        \"app\": \"${APP_NAME}\",\n        \"container\": \"${CONTAINER_NAME}\",\n        \"namespace\": \"${APP_NAMESPACE}\",\n        \"openshift_io_alert_source\": \"platform\",\n        \"pod\": \"${POD_NAME}\",\n        \"prometheus\": \"openshift-monitoring/k8s\",\n        \"severity\": \"critical\"\n      },\n      \"annotations\": {\n        \"app_name\": \"${APP_NAME}\",\n        \"container_name\": \"${CONTAINER_NAME}\",\n        \"description\": \"Pod currently using more memory than threshold.\",\n        \"diagnostic_hint\": \"possible_memory_pressure\",\n        \"memory_threshold\": \"${MEMORY_THRESHOLD}\",\n        \"namespace\": \"${APP_NAMESPACE}\",\n        \"pod_name\": \"${POD_NAME}\",\n        \"summary\": \"Container is using more than ${MEMORY_THRESHOLD} of its memory limit.\",\n        \"workload_name\": \"${CONTAINER_NAME}\"\n      },\n      \"startsAt\": \"2026-08-05T10:24:19.001Z\",\n      \"endsAt\": \"0001-01-01T00:00:00Z\",\n      \"generatorURL\": \"https://console-openshift-console.apps.cluster-9lsk4.9lsk4.sandbox2138.opentlc.com/monitoring/\",\n      \"fingerprint\": \"bdb17c2f6ad077fc\"\n    }\n  ],\n  \"groupLabels\": {\n    \"namespace\": \"${APP_NAMESPACE}\"\n  },\n  \"commonLabels\": {\n    \"alertname\": \"causa-high-memory\",\n    \"app\": \"${APP_NAME}\",\n    \"container\": \"${CONTAINER_NAME}\",\n    \"namespace\": \"${APP_NAMESPACE}\",\n    \"openshift_io_alert_source\": \"platform\",\n    \"pod\": \"${POD_NAME}\",\n    \"prometheus\": \"openshift-monitoring/k8s\",\n    \"severity\": \"critical\"\n  },\n  \"commonAnnotations\": {\n    \"app_name\": \"${APP_NAME}\",\n    \"container_name\": \"${CONTAINER_NAME}\",\n    \"description\": \"App: ${APP_NAME}\\nContainer ${CONTAINER_NAME} in pod ${POD_NAME} (namespace ${APP_NAMESPACE})\\n is currently using more memory than threshold ${MEMORY_THRESHOLD}.\\n\",\n    \"diagnostic_hint\": \"possible_memory_pressure\",\n    \"memory_threshold\": \"${MEMORY_THRESHOLD}\",\n    \"namespace\": \"${APP_NAMESPACE}\",\n    \"pod_name\": \"${POD_NAME}\",\n    \"summary\": \"Container ${CONTAINER_NAME} in pod ${POD_NAME} (${APP_NAME}) is using more than ${MEMORY_THRESHOLD} of its memory limit.\",\n    \"workload_name\": \"${CONTAINER_NAME}\"\n  },\n  \"externalURL\": \"https://console-openshift-console.apps.cluster-9lsk4.9lsk4.sandbox2138.opentlc.com/monitoring\",\n  \"version\": \"4\",\n  \"groupKey\": \"{}/{alertname=~\\\".*causa.*\\\"}:{namespace=\\\"${APP_NAMESPACE}\\\"}\",\n  \"truncatedAlerts\": 0\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/webhooks/alerts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "webhooks",
+                "alerts"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Alerts",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/alerts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "alerts"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Alert By Id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/alerts/alrt_wXhKJWpfPoJTWMZN",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "alerts",
+                "alrt_wXhKJWpfPoJTWMZN"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Diagnostics",
+      "item": [
+        {
+          "name": "List Diagnostics",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/diagnostics",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "diagnostics"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Diagnostic By Id",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/diagnostics/diag_6YuCDWBMfwzWoMhY",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "diagnostics",
+                "diag_6YuCDWBMfwzWoMhY"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Configs",
+      "item": [
+        {
+          "name": "List Configs",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "configs"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Alert Configs",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs?category=alerts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "configs"
+              ],
+              "query": [
+                {
+                  "key": "category",
+                  "value": "alerts"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Config By Key",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/ALERT_FILTER_SEVERITY",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "configs",
+                "ALERT_FILTER_SEVERITY"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Configs",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"configs\": {\n    \"ALERT_FILTER_SEVERITY\": \"critical\",\n    \"VERTEX_PROJECT_ID\": \"test-project\",\n    \"UNKNOWN_KEY\": \"x\",\n    \"LLM_TIMEOUT_SECONDS\": \"abc\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "configs"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Healthz",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/healthz",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "healthz"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Quarkus Health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/q/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "q",
+                "health"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Quarkus Live",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/q/health/live",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "q",
+                "health",
+                "live"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Quarkus Ready",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/q/health/ready",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "q",
+                "health",
+                "ready"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

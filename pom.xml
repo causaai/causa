@@ -6,6 +6,7 @@
     <version>0.0.1-SNAPSHOT</version>
 
     <properties>
+        <quarkus.application.version>${project.version}</quarkus.application.version>
         <compiler-plugin.version>3.15.0</compiler-plugin.version>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -17,6 +18,7 @@
         <surefire-plugin.version>3.5.6</surefire-plugin.version>
         <langchain4j.version>1.15.1</langchain4j.version>
         <langchain4j-vertex-anthropic.version>1.15.1-beta25</langchain4j-vertex-anthropic.version>
+        <hibernate.version>7.3.6.Final</hibernate.version>
     </properties>
 
     <dependencyManagement>
@@ -60,10 +62,23 @@
             <artifactId>quarkus-jdbc-postgresql</artifactId>
         </dependency>
 
+        <!-- Flyway - Database Migration -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-flyway</artifactId>
+        </dependency>
+
         <!-- Hibernate ORM with Panache -->
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-hibernate-orm-panache</artifactId>
+        </dependency>
+
+        <!-- Hibernate Vector — native pgvector support (requires Hibernate 6.4+) -->
+        <dependency>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-vector</artifactId>
+            <version>${hibernate.version}</version>
         </dependency>
 
         <!-- Hibernate Validator -->
@@ -88,6 +103,19 @@
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-scheduler</artifactId>
+        </dependency>
+
+        <!-- Jackson YAML support for YAML-based rule definitions -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+        </dependency>
+
+        <!-- LangChain4J Skills - DISABLED (not used in this deployment) -->
+        <dependency>
+            <groupId>io.quarkiverse.langchain4j</groupId>
+            <artifactId>quarkus-langchain4j-skills</artifactId>
+            <version>1.11.0</version>
         </dependency>
 
         <!-- LangChain4J Core -->
@@ -124,8 +152,14 @@
             <artifactId>langchain4j-vertex-ai-anthropic</artifactId>
             <version>${langchain4j-vertex-anthropic.version}</version>
         </dependency>
-
+        
         <!-- Test Dependencies -->
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>3.27.3</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-junit5</artifactId>
@@ -151,6 +185,20 @@
             <artifactId>mockito-junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- SnakeYAML for YAML prompt template parsing -->
+        <dependency>
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+            <version>2.2</version>
+        </dependency>
+
+        <!-- Apache Commons Lang — SecureRandom-backed ID generation -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>3.20.0</version>
+        </dependency>
     </dependencies>
 
     <build>
@@ -172,6 +220,26 @@
                 </executions>
             </plugin>
             <plugin>
+                <artifactId>maven-clean-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <!-- Wipe test-logs before every test run so the log file is fresh -->
+                        <id>clean-test-logs</id>
+                        <phase>initialize</phase>
+                        <goals><goal>clean</goal></goals>
+                        <configuration>
+                            <excludeDefaultDirectories>true</excludeDefaultDirectories>
+                            <filesets>
+                                <fileset>
+                                    <directory>${project.build.directory}/test-logs</directory>
+                                    <includes><include>**/*</include></includes>
+                                </fileset>
+                            </filesets>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>${compiler-plugin.version}</version>
                 <configuration>
@@ -182,11 +250,61 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${surefire-plugin.version}</version>
                 <configuration>
+                    <!-- Redirect forked JVM stdout/stderr to target/surefire-reports/*.txt -->
+                    <redirectTestOutputToFile>true</redirectTestOutputToFile>
+                    <!-- Disable CDS to suppress "Sharing is only supported for boot loader classes" JVM warning -->
+                    <argLine>@{argLine} -Xshare:off</argLine>
                     <systemPropertyVariables>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
+                        <logging.configuration>file:${project.basedir}/src/test/resources/logging.properties</logging.configuration>
                         <maven.home>${maven.home}</maven.home>
                     </systemPropertyVariables>
                 </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <!-- 0.8.13 adds Java 24/25 support (class file major version 68/69) -->
+                <version>0.8.13</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals><goal>prepare-agent</goal></goals>
+                        <configuration>
+                            <!-- Exclude JDK bootstrap classes that JaCoCo cannot instrument -->
+                            <excludes>
+                                <exclude>java/**</exclude>
+                                <exclude>javax/**</exclude>
+                                <exclude>jdk/**</exclude>
+                                <exclude>sun/**</exclude>
+                                <exclude>com/sun/**</exclude>
+                            </excludes>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>test</phase>
+                        <goals><goal>report</goal></goals>
+                    </execution>
+                    <execution>
+                        <id>check</id>
+                        <goals><goal>check</goal></goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>INSTRUCTION</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.70</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <plugin>
                 <artifactId>maven-failsafe-plugin</artifactId>
