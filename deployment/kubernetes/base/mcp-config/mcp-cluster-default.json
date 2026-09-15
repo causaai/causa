@@ -71,11 +71,11 @@
       "metadata": { "retryDelayMs": 5000, "maxRetries": 3 },
       "description": "Cryostat MCP — JFR-based GC, memory, thread, exception, and container analysis",
       "tools": [
-        { "name": "get_gc_analysis", "contextKey": "GC_ANALYSIS", "arguments": { "pod_name": "${podName}" }, "retryUntilContains": "RECORDING_CREATED" },
-        { "name": "get_memory_analysis", "contextKey": "MEMORY_ANALYSIS", "arguments": { "pod_name": "${podName}" }, "retryUntilContains": "RECORDING_CREATED" },
-        { "name": "get_thread_analysis", "contextKey": "THREAD_ANALYSIS", "arguments": { "pod_name": "${podName}" }, "retryUntilContains": "RECORDING_CREATED" },
-        { "name": "get_exception_analysis", "contextKey": "EXCEPTION_ANALYSIS", "arguments": { "pod_name": "${podName}" }, "retryUntilContains": "RECORDING_CREATED" },
-        { "name": "get_container_analysis", "contextKey": "CONTAINER_ANALYSIS", "arguments": { "pod_name": "${podName}" }, "retryUntilContains": "RECORDING_CREATED" }
+        { "name": "get_gc_analysis", "contextKey": "GC_ANALYSIS", "description": "GC behaviour analysis from JFR.", "arguments": { "pod_name": "${podName}" } },
+        { "name": "get_memory_analysis", "contextKey": "MEMORY_ANALYSIS", "description": "Memory pool analysis from JFR.", "arguments": { "pod_name": "${podName}" } },
+        { "name": "get_thread_analysis", "contextKey": "THREAD_ANALYSIS", "description": "Thread analysis from JFR.", "arguments": { "pod_name": "${podName}" } },
+        { "name": "get_exception_analysis", "contextKey": "EXCEPTION_ANALYSIS", "description": "Exception analysis from JFR.", "arguments": { "pod_name": "${podName}" } },
+        { "name": "get_container_analysis", "contextKey": "CONTAINER_ANALYSIS", "description": "Container resource analysis from JFR.", "arguments": { "pod_name": "${podName}" } }
       ]
     }
   }
