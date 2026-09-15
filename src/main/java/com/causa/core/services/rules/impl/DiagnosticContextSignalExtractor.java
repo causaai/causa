@@ -238,7 +238,7 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
         Matcher afterGcMatcher = HEAP_AFTER_GC_PATTERN.matcher(context);
         if (afterGcMatcher.find()) {
             double afterGc = Double.parseDouble(afterGcMatcher.group(1));
-            signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.HEAP_USAGE)
+            signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.HEAP_AFTER_GC_RATIO)
                 .value(afterGc)
                 .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_QUARKUS_AFTER_GC)
                 .build());
