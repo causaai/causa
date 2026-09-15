@@ -1,0 +1,177 @@
+# OOMKilled Rule Set
+#
+# This rule set validates the OOMKilled hypothesis using signals from
+# Kubernetes events, container status, metrics, and logs.
+#
+# To add a new rule set, simply create a new YAML file in this directory!
+
+hypothesis: OOM_KILLED
+name: "OOMKilled Validation Rules"
+description: "Deterministic validation rules for OOMKilled hypothesis based on Kubernetes container termination patterns"
+
+# Score thresholds for validation verdict
+thresholds:
+  minSupportedScore: 10
+  minPartiallySupportedScore: 5
+
+# REQUIRED RULES - All must pass for hypothesis to be supported
+required:
+  - id: oom.required.exit_code_137
+    description: "Container terminated with exit code 137 (SIGKILL)"
+    weight: 10
+    match:
+      signalType: CONTAINER_STATUS
+      signalName: exitCode
+      signalValue: 137
+      condition: EQUALS
+    messages:
+      success: "Found container exit code 137"
+      failure: "Exit code 137 not found in container status"
+
+  - id: oom.required.reason_oomkilled
+    description: "Container termination reason is OOMKilled"
+    weight: 10
+    match:
+      signalType: [KUBERNETES_EVENT, CONTAINER_STATUS]
+      signalName: [terminationReason, reason]
+      signalValue: OOMKilled
+      condition: EQUALS
+      matchType: CASE_INSENSITIVE
+    messages:
+      success: "Found OOMKilled termination reason"
+      failure: "No OOMKilled termination reason found"
+
+  - id: oom.required.memory_increasing
+    description: "Memory utilization continuously increased"
+    weight: 10
+    match:
+      signalType: METRIC
+      signalName: memory.utilization.trend
+      signalValue: INCREASING
+      condition: EQUALS
+      matchType: CASE_INSENSITIVE
+    messages:
+      success: "Found increasing memory trend"
+      failure: "No increasing memory trend detected"
+
+# SUPPORTING RULES - Add positive weight to confidence
+supporting:
+  - id: oom.supporting.heap_exceeded
+    description: "Heap usage exceeded 90% threshold"
+    weight: 3
+    match:
+      signalType: [METRIC, JVM_ANALYSIS]
+      signalName: heap.usage
+      condition: GREATER_THAN
+      threshold: 0.90
+    messages:
+      success: "Heap usage exceeded 90%"
+      failure: "Heap usage did not exceed threshold"
+
+  - id: oom.supporting.heap_trend_increasing
+    description: "Heap usage trending upward"
+    weight: 1
+    match:
+      signalType: METRIC
+      signalName: heap.usage.trend
+      signalValue: INCREASING
+      condition: EQUALS
+      matchType: CASE_INSENSITIVE
+    messages:
+      success: "Heap usage trending upward"
+      failure: "No increasing heap trend"
+
+  - id: oom.supporting.oom_error_in_logs
+    description: "OutOfMemoryError found in logs"
+    weight: 3
+    match:
+      signalType: LOG_PATTERN
+      signalName: error.oom
+      signalValue: OutOfMemoryError
+      condition: CONTAINS
+    messages:
+      success: "Found OutOfMemoryError in logs"
+      failure: "No OOM errors in logs"
+
+  - id: oom.supporting.crash_loop
+    description: "Pod in CrashLoopBackOff state due to repeated OOM kills"
+    weight: 2
+    match:
+      signalType: POD_STATUS
+      signalName: podState
+      signalValue: CrashLoopBackOff
+      condition: EQUALS
+    messages:
+      success: "Pod is in CrashLoopBackOff — repeated crash cycle"
+      failure: "Pod is not in CrashLoopBackOff"
+
+  - id: oom.supporting.sustained_memory_pressure
+    description: "Sustained memory pressure indicated by repeated OOM restarts"
+    weight: 2
+    match:
+      signalType: METRIC
+      signalName: memory.pressure.duration
+      condition: GREATER_THAN
+      threshold: 600
+    messages:
+      success: "Sustained memory pressure detected from repeated OOM restarts"
+      failure: "No sustained memory pressure"
+
+  - id: oom.supporting.high_restart_count
+    description: "High restart count indicates repeated OOM kill cycles"
+    weight: 2
+    match:
+      signalType: METRIC
+      signalName: memory.pressure.duration
+      condition: GREATER_THAN
+      threshold: 3000
+    messages:
+      success: "Very high restart count — chronic OOM condition"
+      failure: "Restart count not high enough for chronic OOM"
+
+# EXCLUSION RULES - Subtract weight if matched (negative indicators)
+exclusion:
+  - id: oom.exclusion.manual_restart
+    description: "Pod was manually restarted"
+    weight: -5
+    match:
+      signalType: KUBERNETES_EVENT
+      signalName: [restart.reason, deletion.reason]
+      signalValue: manual
+      condition: CONTAINS
+      matchType: CASE_INSENSITIVE
+    messages:
+      success: "Manual restart detected"
+      failure: "No manual restart"
+
+  - id: oom.exclusion.deployment_rollout
+    description: "Pod terminated due to deployment rollout"
+    weight: -10
+    match:
+      signalType: KUBERNETES_EVENT
+      signalName: reason
+      signalValue: deployment
+      condition: CONTAINS
+      matchType: CASE_INSENSITIVE
+    messages:
+      success: "Deployment rollout restart detected"
+      failure: "Not a deployment restart"
+
+  - id: oom.exclusion.node_eviction
+    description: "Pod evicted due to node pressure"
+    weight: -8
+    match:
+      signalType: KUBERNETES_EVENT
+      signalName: reason
+      signalValue: [Evicted, NodePressure]
+      condition: EQUALS
+    messages:
+      success: "Node eviction detected"
+      failure: "Not a node eviction"
+
+# Metadata (optional)
+metadata:
+  version: "1.0.0"
+  author: "Causa Team"
+  tags: [oom, memory, kubernetes]
+  documentation: "https://docs.causa.ai/rules/oom-killed"
