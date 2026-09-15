@@ -103,30 +103,6 @@ trap on_exit EXIT
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-# Resolve application version from pom.xml (used as the default image tag).
-# Uses mvn help:evaluate for an authoritative project.version read — avoids
-# accidentally picking up a parent or plugin <version> via grep.
-# If the version contains SNAPSHOT, appends a UTC timestamp so each dev build
-# gets a unique, sortable tag (e.g. 0.0.1-SNAPSHOT-20250127143012).
-resolve_app_version() {
-    local pom="${PROJECT_ROOT}/pom.xml"
-    local ver="latest"
-    if [ -f "${pom}" ]; then
-        local mvnw="${PROJECT_ROOT}/mvnw"
-        local mvn_cmd="mvn"
-        [ -f "${mvnw}" ] && mvn_cmd="${mvnw}"
-        ver=$(cd "${PROJECT_ROOT}" && \
-              ${mvn_cmd} help:evaluate -Dexpression=project.version -q -DforceStdout 2>/dev/null)
-        ver="${ver:-latest}"
-    fi
-    if [[ "$ver" == *SNAPSHOT* ]]; then
-        local ts
-        ts=$(date -u +"%Y%m%d%H%M%S")
-        ver="${ver}-${ts}"
-    fi
-    echo "$ver"
-}
-
 # Auto-detect container tool: prefer podman if available, fall back to docker
 resolve_container_tool() {
     if command -v podman &>/dev/null; then
@@ -195,8 +171,8 @@ validate_boolean "$PUSH_IMAGE"  "PUSH_IMAGE (-p)"
 validate_boolean "$CLEAN_BUILD" "CLEAN_BUILD (-c)"
 validate_boolean "$SKIP_TESTS"  "SKIP_TESTS (-s)"
 
-# Validate CONTAINER_TOOL
-if [[ ! "$CONTAINER_TOOL" =~ ^(podman|docker)$ ]]; then
+# Validate CONTAINER_TOOL — only required when actually building an image
+if [ "$BUILD_IMAGE" = "true" ] && [[ ! "$CONTAINER_TOOL" =~ ^(podman|docker)$ ]]; then
     print_error "CONTAINER_TOOL (-d) must be 'podman' or 'docker', got: '${CONTAINER_TOOL}'"
     usage 1
 fi
@@ -265,6 +241,7 @@ echo ""
 
 # Warn if pushing is enabled
 if [ "$PUSH_IMAGE" = "true" ]; then
+    REGISTRY="${IMAGE_NAME%%/*}"
     print_warn "Push is enabled. Image will be pushed to registry."
     print_warn "Make sure you are authenticated to ${REGISTRY}"
     echo ""
