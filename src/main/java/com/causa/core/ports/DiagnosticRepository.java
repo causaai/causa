@@ -27,7 +27,8 @@ public interface DiagnosticRepository {
      * according to {@code pageRequest}.
      *
      * @param pageRequest page and size
+     * @param filter 
      * @return a paginated result containing diagnostics and total count
      */
-    PageResult<Diagnostic> search(PageRequest pageRequest);
+    PageResult<Diagnostic> search(Diagnostic.Filter filter, PageRequest pageRequest);
 }

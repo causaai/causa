@@ -99,6 +99,8 @@ public final class ApiConstants {
             public static final String BASE       = Version.API_V1 + "/diagnostics";
             public static final String PATH_PARAM = "id";
             public static final String BY_ID      = "/{" + PATH_PARAM + "}";
+            public static final String QUERY_NAMESPACE = "namespace";
+            public static final String QUERY_CONTAINER = "container";
         }
 
         /**
