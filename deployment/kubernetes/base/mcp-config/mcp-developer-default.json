@@ -89,11 +89,11 @@
       "timeoutMs": 15000,
       "description": "Async Profiler MCP — JVM profiling via async-profiler agent",
       "tools": [
-        { "name": "list_profiled_pods", "contextKey": "PROFILED_PODS", "resultKey": "recordingId", "extractStrategy": "LATEST_RECORDING_ID" },
+        { "name": "list_profiled_pods", "contextKey": "PROFILED_PODS", "description": "Pods currently registered with the profiler, including their latest recording ID." },
         { "name": "get_pod_jvm_status", "contextKey": "AP_JVM_STATUS", "arguments": { "pod_name": "${podName}" } },
         { "name": "get_jvm_statistics", "contextKey": "AP_JVM_STATISTICS", "arguments": { "pod_name": "${podName}" } },
-        { "name": "get_recording", "contextKey": "AP_RECORDING", "dependsOn": "list_profiled_pods", "arguments": { "recording_id": "${recordingId}", "format": "json" } },
-        { "name": "get_flame_graph", "contextKey": "AP_FLAME_GRAPH", "dependsOn": "list_profiled_pods", "arguments": { "recording_id": "${recordingId}", "format": "json" } },
+        { "name": "get_recording", "contextKey": "AP_RECORDING", "description": "Status of the latest recording for this pod.", "arguments": { "recording_id": "${recordingId}", "format": "json" } },
+        { "name": "get_flame_graph", "contextKey": "AP_FLAME_GRAPH", "description": "Call-stack frame tree for the latest recording.", "arguments": { "recording_id": "${recordingId}", "format": "json" } },
         { "name": "get_recording_report", "contextKey": "AP_RECORDING_REPORT", "arguments": { "pod": "${podName}", "container": "${containerName}", "namespace": "${namespace}", "last": "5m" } },
         { "name": "get_jfr_summary", "contextKey": "AP_JFR_SUMMARY", "arguments": { "pod": "${podName}", "container": "${containerName}", "namespace": "${namespace}", "last": "5m" } }
       ]
