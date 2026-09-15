@@ -190,6 +190,9 @@ causa:
       password: ${CAUSA_DB_PASSWORD:}
       jdbc:
         url: ${CAUSA_DB_URL:jdbc:postgresql://iri-db-rw:5432/iri-db}
+  causa:
+    mcp:
+      config-path: ${MCP_CONFIG_PATH:/etc/causa/mcp.json}
 
 # ============================================================
 # Development Profile Configuration
@@ -208,6 +211,8 @@ causa:
         # Run the post-init SQL to enable vector extension
         init-script-path: db/dev-init.sql
   causa:
+    mcp:
+      config-path: ${MCP_CONFIG_PATH:deployment/kubernetes/base/mcp-config/mcp-cluster-default.json}
     # LLM Configuration (LangChain4J)
     llm:
       provider: ${LLM_PROVIDER:vertex-ai-anthropic}
