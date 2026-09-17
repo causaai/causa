@@ -1,7 +1,7 @@
 package com.causa.core.ports;
 
 import com.causa.common.constants.ConfigConstants.PlatformCategory;
-import com.causa.infrastructure.persistence.entity.ExternalConfigEntity;
+import com.causa.core.domain.ExternalConfig;
 
 import java.util.List;
 import java.util.Optional;
@@ -17,16 +17,16 @@ import java.util.Optional;
 public interface ExternalConfigRepository {
 
     /** Returns all configs for the given category. */
-    List<ExternalConfigEntity> findByCategory(PlatformCategory category);
+    List<ExternalConfig> findByCategory(PlatformCategory category);
 
     /** Returns the config for a specific platform within a category, or empty if not found. */
-    Optional<ExternalConfigEntity> findByCategoryAndPlatform(PlatformCategory category, String platform);
+    Optional<ExternalConfig> findByCategoryAndPlatform(PlatformCategory category, String platform);
 
-    /** Persists a new or updated config entity. */
-    void save(ExternalConfigEntity entity);
+    /** Persists a new or updated config. */
+    ExternalConfig save(ExternalConfig externalConfig);
 
     /**
-     * Deletes the config row for the given category and platform.
+     * Deletes the config for the given category and platform.
      *
      * @return {@code true} if a row was deleted, {@code false} if none existed
      */
