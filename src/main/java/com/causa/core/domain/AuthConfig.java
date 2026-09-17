@@ -29,7 +29,7 @@ import java.util.Map;
  * </pre>
  *
  * @see com.causa.common.constants.ConfigConstants#SENSITIVE_AUTH_FIELDS
- * @since 0.1.0
+ * @since 0.0.3
  */
 public record AuthConfig(
 

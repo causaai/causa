@@ -7,7 +7,7 @@ package com.causa.common.exceptions;
  * and by the settings service layer for constraint violations (e.g. unknown platform,
  * deleting the active LLM provider).
  *
- * @since 0.1.0
+ * @since 0.0.3
  */
 public class ConfigException extends RuntimeException {
 
