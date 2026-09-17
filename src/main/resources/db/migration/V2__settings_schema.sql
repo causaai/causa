@@ -6,14 +6,14 @@
 
 
 -- =============================================================================
--- 1. PLATFORM CONFIGS TABLE
+-- 1. EXTERNAL CONFIGS TABLE
 --    Covers both Observability (DATADOG | INSTANA | OTHER) and
 --    Integration (SLACK | JIRA | GITHUB) platforms via the category discriminator.
 --    UNIQUE(category, platform) — one config per platform per category.
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS external_configs (
-    id                VARCHAR(21)              NOT NULL,   -- pltf_<16-alphanumeric>
+    id                VARCHAR(21)              NOT NULL,   -- extc_<16-alphanumeric>
     category          VARCHAR(32)              NOT NULL,   -- OBSERVABILITY | INTEGRATION
     platform          VARCHAR(64)              NOT NULL,   -- DATADOG | INSTANA | OTHER | SLACK | JIRA | GITHUB
     url               VARCHAR(512), 
@@ -41,7 +41,7 @@ CREATE INDEX IF NOT EXISTS idx_external_configs_active   ON external_configs (ca
 CREATE TABLE IF NOT EXISTS llm_configs (
     id                VARCHAR(21)              NOT NULL,   -- llmc_<16-alphanumeric>
     name              VARCHAR(128)             NOT NULL,
-    provider          VARCHAR(64)              NOT NULL,   -- OPENAI | ANTHROPIC | AZURE_OPENAI | WATSONX | VERTEX_AI | CUSTOM
+    provider          VARCHAR(64)              NOT NULL,   -- OPENAI | ANTHROPIC | AZURE_OPENAI | WATSONX
     model             VARCHAR(128)             NOT NULL,
     auth_type         VARCHAR(32)              NOT NULL,   -- API_KEY | VERTEX_AI | CUSTOM_HEADERS
     temperature       NUMERIC(4,2),
