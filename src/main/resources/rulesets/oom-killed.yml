@@ -41,9 +41,11 @@ required:
       success: "Found OOMKilled termination reason"
       failure: "No OOMKilled termination reason found"
 
-  - id: oom.required.memory_increasing
+# SUPPORTING RULES - Add positive weight to confidence
+supporting:
+  - id: oom.supporting.memory_increasing
     description: "Memory utilization continuously increased"
-    weight: 10
+    weight: 3
     match:
       signalType: METRIC
       signalName: memory.utilization.trend
@@ -53,9 +55,6 @@ required:
     messages:
       success: "Found increasing memory trend"
       failure: "No increasing memory trend detected"
-
-# SUPPORTING RULES - Add positive weight to confidence
-supporting:
   - id: oom.supporting.heap_exceeded
     description: "Heap usage exceeded 90% threshold"
     weight: 3
@@ -122,12 +121,12 @@ supporting:
     weight: 2
     match:
       signalType: METRIC
-      signalName: memory.pressure.duration
+      signalName: container.restart.count
       condition: GREATER_THAN
-      threshold: 3000
+      threshold: 3
     messages:
-      success: "Very high restart count — chronic OOM condition"
-      failure: "Restart count not high enough for chronic OOM"
+      success: "High restart count detected — chronic OOM condition"
+      failure: "Restart count below threshold"
 
 # EXCLUSION RULES - Subtract weight if matched (negative indicators)
 exclusion:
