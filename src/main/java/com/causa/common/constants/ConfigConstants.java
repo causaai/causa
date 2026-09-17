@@ -233,13 +233,10 @@ public final class ConfigConstants {
     //  what is no longer needed from this class.
 
     /** Discriminator for {@code external_configs} rows and settings tabs. */
-    public enum PlatformCategory { OBSERVABILITY, INTEGRATION, LLM, GENERIC }
+    public enum PlatformCategory { OBSERVABILITY, INTEGRATION }
 
-    /** Observability alert platforms — used when {@code category = OBSERVABILITY}. */
-    public enum ObservabilityPlatform { DATADOG, INSTANA, OTHER }
-
-    /** Third-party integration platforms — used when {@code category = INTEGRATION}. */
-    public enum IntegrationPlatform { SLACK, JIRA, GITHUB }
+    /** Observability alert and Integration platforms — used when {@code category = OBSERVABILITY/INTEGRATION}. */
+    public enum ObservabilityPlatform { DATADOG, INSTANA, OTHER, SLACK, JIRA, GITHUB }
 
     /** LLM providers stored in {@code llm_configs.provider}. */
     public enum LlmProvider { OPENAI, ANTHROPIC, AZURE_OPENAI, WATSONX }
