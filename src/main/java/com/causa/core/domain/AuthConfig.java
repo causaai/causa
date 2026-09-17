@@ -1,5 +1,6 @@
 package com.causa.core.domain;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.Map;
 
 /**
@@ -31,6 +32,7 @@ import java.util.Map;
  * @see com.causa.common.constants.ConfigConstants#SENSITIVE_AUTH_FIELDS
  * @since 0.0.3
  */
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record AuthConfig(
 
     String apiKey,              // encrypted — DATADOG (ingest), LLM (API_KEY, CUSTOM)
