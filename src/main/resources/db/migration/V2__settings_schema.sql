@@ -12,7 +12,7 @@
 --    UNIQUE(category, platform) — one config per platform per category.
 -- =============================================================================
 
-CREATE TABLE IF NOT EXISTS platform_configs (
+CREATE TABLE IF NOT EXISTS external_configs (
     id                VARCHAR(21)              NOT NULL,   -- pltf_<16-alphanumeric>
     category          VARCHAR(32)              NOT NULL,   -- OBSERVABILITY | INTEGRATION
     platform          VARCHAR(64)              NOT NULL,   -- DATADOG | INSTANA | OTHER | SLACK | JIRA | GITHUB
@@ -24,12 +24,12 @@ CREATE TABLE IF NOT EXISTS platform_configs (
     created_at        TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at        TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT pk_platform_configs           PRIMARY KEY (id),
-    CONSTRAINT uq_platform_configs_cat_plat  UNIQUE (category, platform)
+    CONSTRAINT pk_external_configs           PRIMARY KEY (id),
+    CONSTRAINT uq_external_configs_cat_plat  UNIQUE (category, platform)
 );
 
-CREATE INDEX IF NOT EXISTS idx_platform_configs_category ON platform_configs (category);
-CREATE INDEX IF NOT EXISTS idx_platform_configs_active   ON platform_configs (category, is_active);
+CREATE INDEX IF NOT EXISTS idx_external_configs_category ON external_configs (category);
+CREATE INDEX IF NOT EXISTS idx_external_configs_active   ON external_configs (category, is_active);
 
 
 -- =============================================================================
