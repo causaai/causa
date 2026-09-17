@@ -18,7 +18,7 @@ required:
     weight: 10
     match:
       signalType: LOG_PATTERN
-      signalName: full.gc.count
+      signalName: gc.full.count
       condition: GREATER_THAN
       threshold: 0
     messages:
@@ -55,7 +55,7 @@ supporting:
     weight: 3
     match:
       signalType: LOG_PATTERN
-      signalName: full.gc.count
+      signalName: gc.full.count
       condition: GREATER_THAN
       threshold: 5
     messages:
