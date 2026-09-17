@@ -42,6 +42,7 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
     private static final Pattern REASON_PATTERN = Pattern.compile("Reason:\\s*(\\w+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern EXIT_CODE_PATTERN = Pattern.compile("Exit Code:\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern POD_STATUS_PATTERN = Pattern.compile("Status:\\s*(\\w+)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern RESTART_COUNT_PATTERN = Pattern.compile("Restart Count:\\s*(\\d+)", Pattern.CASE_INSENSITIVE);
 
     // Memory patterns
     private static final Pattern MEMORY_TREND_PATTERN = Pattern.compile(
@@ -62,9 +63,6 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
     );
     private static final Pattern HEAP_MAX_BYTES_PATTERN = Pattern.compile(
         "jvm_memory_max_bytes\\{[^}]*area=\"?heap\"?[^}]*id=\"?(?:Tenured Gen|G1 Old Gen)\"?[^}]*}\\s*[\":]*(\\d+\\.?\\d*E?\\d*)"
-    );
-    private static final Pattern RESTART_COUNT_PATTERN = Pattern.compile(
-        "Restart Count:\\s*(\\d+)", Pattern.CASE_INSENSITIVE
     );
     private static final Pattern REMAINING_PATTERN = Pattern.compile(
         "remaining=(\\d+)B.*max=(\\d+)B"
@@ -183,6 +181,15 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
             signals.add(Signal.builder(Signal.SignalType.CONTAINER_STATUS, SignalNames.TERMINATION_REASON)
                 .value(SignalValues.OOM_KILLED)
                 .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_EXIT_CODE_137)
+                .build());
+        }
+
+        // Extract Restart Count
+        Matcher restartCountMatcher = RESTART_COUNT_PATTERN.matcher(context);
+        if (restartCountMatcher.find()) {
+            int restartCount = Integer.parseInt(restartCountMatcher.group(1));
+            signals.add(Signal.builder(Signal.SignalType.CONTAINER_STATUS, "container.restart.count")
+                .value(restartCount)
                 .build());
         }
 
