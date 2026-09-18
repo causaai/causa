@@ -27,6 +27,9 @@ public final class HealthCheckConstants {
         public static final String MCP_FILESYSTEM = "mcp_filesystem";
         public static final String MCP_QUARKUS = "mcp_quarkus";
         public static final String MCP_ASYNC_PROFILER = "mcp_async_profiler";
+
+        /** Synthetic component reported when the MCP registry itself failed to initialize. */
+        public static final String MCP_CONFIG = "mcp_config";
     }
 
     /**
