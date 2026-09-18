@@ -14,13 +14,15 @@ import org.apache.commons.lang3.RandomStringUtils;
  *
  * <p>ID prefixes per table:
  * <pre>
- *   alerts         → alrt_&lt;16&gt;
- *   diagnostics    → diag_&lt;16&gt;
- *   context_data   → ctxd_&lt;16&gt;
- *   feedback       → fdbk_&lt;16&gt;
- *   configurations → cnfg_&lt;16&gt;
- *   integrations   → intg_&lt;16&gt;
- *   health_checks  → hchk_&lt;16&gt;
+ *   alerts          → alrt_&lt;16&gt;
+ *   diagnostics     → diag_&lt;16&gt;
+ *   context_data    → ctxd_&lt;16&gt;
+ *   feedback        → fdbk_&lt;16&gt;
+ *   configurations  → cnfg_&lt;16&gt;
+ *   integrations    → intg_&lt;16&gt;
+ *   health_checks   → hchk_&lt;16&gt;
+ *   external_configs → extc_&lt;16&gt;
+ *   llm_configs     → llmc_&lt;16&gt;
  * </pre>
  *
  * @since 0.0.1
@@ -53,6 +55,22 @@ public final class IdUtils {
      */
     public static String generateConfigurationId() {
         return "cnfg_" + randomAlphanumeric16();
+    }
+
+    /**
+     * Generates a unique external-config ID: {@code extc_<16-char-alphanumeric>}.
+     * Total length = 21 chars. Used for {@code external_configs} rows (observability + integrations).
+     */
+    public static String generateExternalConfigId() {
+        return "extc_" + randomAlphanumeric16();
+    }
+
+    /**
+     * Generates a unique LLM-config ID: {@code llmc_<16-char-alphanumeric>}.
+     * Total length = 21 chars. Used for {@code llm_configs} rows.
+     */
+    public static String generateLlmConfigId() {
+        return "llmc_" + randomAlphanumeric16();
     }
 
     /** Returns 16 alphanumeric characters from a SecureRandom source. */

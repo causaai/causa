@@ -14,7 +14,7 @@ import org.jboss.resteasy.reactive.server.ServerExceptionMapper;
  * Global Exception Mapper
  *
  * <p>Application-wide exception handler for all exceptions.
- * <p>Handles domain exceptions (Alert, Diagnostic), HTTP exceptions (400, 404, 405), and unexpected errors.
+ * <p>Handles domain exceptions (Alert, Diagnostic, Config), HTTP exceptions (400, 404, 405), and unexpected errors.
  *
  * @since 0.0.1
  */
@@ -57,6 +57,24 @@ public class GlobalExceptionMapper {
 
         return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
             .entity(ErrorResponse.of(500, "Diagnostic Processing Error", exception.getMessage()))
+            .build();
+    }
+
+    /**
+     * Handles ConfigException — validation and constraint violations from the settings domain.
+     *
+     * @param exception the config exception
+     * @return HTTP 400 with the validation message
+     */
+    @ServerExceptionMapper
+    public Response handleConfigException(ConfigException exception) {
+        log.warn("Config error")
+            .field("errorType", exception.getErrorType())
+            .field("message", exception.getMessage())
+            .log();
+
+        return Response.status(Response.Status.BAD_REQUEST)
+            .entity(ErrorResponse.of(400, "Configuration Error", exception.getMessage()))
             .build();
     }
 
