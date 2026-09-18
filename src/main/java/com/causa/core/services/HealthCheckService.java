@@ -10,38 +10,38 @@ import com.causa.common.constants.LLMConstants;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
 import com.causa.config.AppConfig;
-import com.causa.config.McpConfig;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
 import com.causa.core.ports.llm.PromptSender;
 import com.causa.infrastructure.persistence.DatabaseConnectionService;
+import com.causa.mcp.McpClient;
+import com.causa.mcp.McpRegistry;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import javax.sql.DataSource;
-import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.sql.Connection;
 import java.sql.Statement;
-import java.time.Duration;
 
 /**
  * Health Check Service
  *
  * <p>Aggregates health status from all system components and provides
- * a comprehensive health check response. This service is designed to be
- * extensible for future component additions (LLM providers, MCP servers, etc.).
+ * a comprehensive health check response.
  *
  * <p>The overall system status is determined by:
  * <ul>
  *   <li>UP - All components are healthy</li>
- *   <li>DEGRADED - Some non-critical components are down (future use)</li>
- *   <li>DOWN - Critical components (like database) are down</li>
+ *   <li>DEGRADED - Some non-critical components are down</li>
+ *   <li>DOWN - Critical components (database, or a required MCP server) are down</li>
  * </ul>
+ *
+ * <p>MCP servers are checked dynamically via {@link McpRegistry} — every server declared in
+ * {@code mcp.json} gets a {@code mcp_<name>} component with no code change required to add one.
+ * A server marked {@code optional} in its config being down never affects the overall status; a
+ * non-optional (required) server being down — or the MCP config failing to load at all — makes the
+ * overall status DOWN.
  *
  * @since 0.0.1
  */
@@ -50,30 +50,10 @@ public class HealthCheckService {
 
     private static final CausaLogger log = CausaLogger.getLogger(HealthCheckService.class);
 
-    private static final String PLATFORM_VM = "vm";
-
     private final DatabaseConnectionService databaseConnectionService;
     private final DataSource dataSource;
     private final String applicationVersion;
-    private final String platform;
-    private final String mcpK8sEndpoint;
-    private final String mcpK8sHealthPath;
-    private final int mcpK8sTimeout;
-    private final String mcpKruizeEndpoint;
-    private final String mcpKruizeHealthPath;
-    private final int mcpKruizeTimeout;
-    private final String mcpCryostatHealthEndpoint;
-    private final String mcpCryostatHealthPath;
-    private final int mcpCryostatTimeout;
-    private final String mcpFilesystemEndpoint;
-    private final String mcpFilesystemHealthPath;
-    private final int mcpFilesystemTimeout;
-    private final String mcpQuarkusEndpoint;
-    private final String mcpQuarkusHealthPath;
-    private final int mcpQuarkusTimeout;
-    private final String mcpAsyncProfilerEndpoint;
-    private final String mcpAsyncProfilerHealthPath;
-    private final int mcpAsyncProfilerTimeout;
+    private final McpRegistry mcpRegistry;
     private final PromptSender llmPromptSender;
     private final AppConfig appConfig;
 
@@ -82,64 +62,19 @@ public class HealthCheckService {
             DatabaseConnectionService databaseConnectionService,
             DataSource dataSource,
             @ConfigProperty(name = "quarkus.application.version") String applicationVersion,
-            @ConfigProperty(name = "causa.cluster.target-cluster-type", defaultValue = "cluster") String platform,
-            @ConfigProperty(name = "causa.mcp.kubernetes.endpoint") String mcpK8sEndpoint,
-            @ConfigProperty(name = "causa.mcp.kubernetes.health-path") String mcpK8sHealthPath,
-            @ConfigProperty(name = "causa.mcp.kubernetes.timeout-ms") int mcpK8sTimeout,
-            @ConfigProperty(name = "causa.mcp.kruize.endpoint") String mcpKruizeEndpoint,
-            @ConfigProperty(name = "causa.mcp.kruize.health-path") String mcpKruizeHealthPath,
-            @ConfigProperty(name = "causa.mcp.kruize.timeout-ms") int mcpKruizeTimeout,
-            @ConfigProperty(name = "causa.mcp.cryostat.health-endpoint") String mcpCryostatHealthEndpoint,
-            @ConfigProperty(name = "causa.mcp.cryostat.health-path") String mcpCryostatHealthPath,
-            @ConfigProperty(name = "causa.mcp.cryostat.timeout-ms") int mcpCryostatTimeout,
-            @ConfigProperty(name = "causa.mcp.filesystem.endpoint") String mcpFilesystemEndpoint,
-            @ConfigProperty(name = "causa.mcp.filesystem.health-path") String mcpFilesystemHealthPath,
-            @ConfigProperty(name = "causa.mcp.filesystem.timeout-ms") int mcpFilesystemTimeout,
-            McpConfig mcpConfig,
+            McpRegistry mcpRegistry,
             PromptSender llmPromptSender,
             AppConfig appConfig) {
         this.databaseConnectionService = databaseConnectionService;
         this.dataSource = dataSource;
         this.applicationVersion = applicationVersion;
-        this.platform = platform != null ? platform.trim().toLowerCase() : "cluster";
-        this.mcpK8sEndpoint = mcpK8sEndpoint;
-        this.mcpK8sHealthPath = mcpK8sHealthPath;
-        this.mcpK8sTimeout = mcpK8sTimeout;
-        this.mcpKruizeEndpoint = mcpKruizeEndpoint;
-        this.mcpKruizeHealthPath = mcpKruizeHealthPath;
-        this.mcpKruizeTimeout = mcpKruizeTimeout;
-        this.mcpCryostatHealthEndpoint = mcpCryostatHealthEndpoint;
-        this.mcpCryostatHealthPath = mcpCryostatHealthPath;
-        this.mcpCryostatTimeout = mcpCryostatTimeout;
-        this.mcpFilesystemEndpoint = mcpFilesystemEndpoint;
-        this.mcpFilesystemHealthPath = mcpFilesystemHealthPath;
-        this.mcpFilesystemTimeout = mcpFilesystemTimeout;
-        this.mcpQuarkusEndpoint = mcpConfig.quarkus().endpoint().orElse("");
-        this.mcpQuarkusHealthPath = mcpConfig.quarkus().healthPath();
-        this.mcpQuarkusTimeout = mcpConfig.quarkus().timeoutMs();
-        this.mcpAsyncProfilerEndpoint = mcpConfig.asyncProfiler().endpoint().orElse("");
-        this.mcpAsyncProfilerHealthPath = mcpConfig.asyncProfiler().healthPath();
-        this.mcpAsyncProfilerTimeout = mcpConfig.asyncProfiler().timeoutMs();
+        this.mcpRegistry = mcpRegistry;
         this.llmPromptSender = llmPromptSender;
         this.appConfig = appConfig;
     }
 
     /**
      * Get comprehensive health status of all system components.
-     *
-     * <p>Checks the health of all monitored components and aggregates
-     * them into a single response. Currently checks:
-     * <ul>
-     *   <li>Database connectivity and latency</li>
-     * </ul>
-     *
-     * <p>Future components to be added:
-     * <ul>
-     *   <li>LLM provider (gpt-4-turbo via LangChain4J)</li>
-     *   <li>MCP Kubernetes server</li>
-     *   <li>MCP Cryostat server</li>
-     *   <li>MCP Kruize server</li>
-     * </ul>
      *
      * @return comprehensive health check response with all component statuses
      */
@@ -158,45 +93,12 @@ public class HealthCheckService {
         ComponentHealthDto llmHealth = checkLlmProviderHealth();
         responseBuilder.addComponent(HealthCheckConstants.ComponentNames.LLM_PROVIDER, llmHealth);
 
-        ComponentHealthDto mcpK8sHealth = null;
-        ComponentHealthDto mcpKruizeHealth = null;
-        ComponentHealthDto mcpCryostatHealth = null;
-        ComponentHealthDto mcpFilesystemHealth = null;
-        ComponentHealthDto mcpQuarkusHealth = null;
-        ComponentHealthDto mcpAsyncProfilerHealth = null;
-
-        if (PLATFORM_VM.equals(platform)) {
-            // VM mode: only check filesystem MCP
-            mcpFilesystemHealth = checkMcpFilesystemHealth();
-            responseBuilder.addComponent(HealthCheckConstants.ComponentNames.MCP_FILESYSTEM, mcpFilesystemHealth);
-        } else {
-            // Cluster mode: check Kubernetes, Kruize, Cryostat, and Quarkus MCP servers
-            mcpK8sHealth = checkMcpKubernetesHealth();
-            responseBuilder.addComponent(HealthCheckConstants.ComponentNames.MCP_KUBERNETES, mcpK8sHealth);
-
-            mcpKruizeHealth = checkMcpKruizeHealth();
-            responseBuilder.addComponent(HealthCheckConstants.ComponentNames.MCP_KRUIZE, mcpKruizeHealth);
-
-            mcpCryostatHealth = checkMcpCryostatHealth();
-            responseBuilder.addComponent(HealthCheckConstants.ComponentNames.MCP_CRYOSTAT, mcpCryostatHealth);
-
-            // Only check and report Quarkus MCP if endpoint is configured
-            if (!mcpQuarkusEndpoint.isBlank()) {
-                mcpQuarkusHealth = checkMcpQuarkusHealth();
-                responseBuilder.addComponent(HealthCheckConstants.ComponentNames.MCP_QUARKUS, mcpQuarkusHealth);
-            }
-
-            // Only check and report Async Profiler MCP if endpoint is configured
-            if (!mcpAsyncProfilerEndpoint.isBlank()) {
-                mcpAsyncProfilerHealth = checkMcpAsyncProfilerHealth();
-                responseBuilder.addComponent(HealthCheckConstants.ComponentNames.MCP_ASYNC_PROFILER, mcpAsyncProfilerHealth);
-            }
-        }
+        // Check every MCP server declared in mcp.json, dynamically
+        boolean anyRequiredMcpDown = collectMcpHealth(responseBuilder);
 
         // Determine overall system status
-        AppConstants.HealthStatus overallStatus = determineOverallStatus(
-            databaseHealth, mcpK8sHealth, llmHealth, mcpKruizeHealth, mcpCryostatHealth, mcpFilesystemHealth,
-            mcpQuarkusHealth, mcpAsyncProfilerHealth);
+        AppConstants.HealthStatus overallStatus =
+                determineOverallStatus(databaseHealth, llmHealth, anyRequiredMcpDown);
         responseBuilder.status(overallStatus.getValue());
 
         HealthCheckResponseDto response = responseBuilder.build();
@@ -206,6 +108,42 @@ public class HealthCheckService {
                 .log();
 
         return response;
+    }
+
+    /**
+     * Checks every MCP server currently in the registry and adds a {@code mcp_<name>} component
+     * for each. If the registry itself failed to initialize (e.g. {@code mcp.json} was missing or
+     * invalid at startup), a single synthetic {@code mcp_config} component reports the exact
+     * failure reason instead.
+     *
+     * @param responseBuilder the in-progress health response to append components to
+     * @return {@code true} if any non-optional MCP server is unhealthy, or the config itself
+     *         failed to load — either case makes the overall system status DOWN
+     */
+    private boolean collectMcpHealth(HealthCheckResponseDto.Builder responseBuilder) {
+        if (!mcpRegistry.isInitialized()) {
+            log.warn(LogMessages.HealthCheck.MCP_CONFIG_NOT_INITIALIZED)
+                    .field("error", mcpRegistry.getInitializationError().orElse("unknown error"))
+                    .log();
+            responseBuilder.addComponent(HealthCheckConstants.ComponentNames.MCP_CONFIG,
+                    ComponentHealthDto.builder()
+                            .status(AppConstants.HealthStatus.DOWN.getValue())
+                            .message("MCP configuration failed to load: "
+                                    + mcpRegistry.getInitializationError().orElse("unknown error"))
+                            .build());
+            return true;
+        }
+
+        boolean anyRequiredMcpDown = false;
+        for (McpClient client : mcpRegistry.allClients()) {
+            ComponentHealthDto health = client.checkHealth();
+            responseBuilder.addComponent("mcp_" + client.getServerName(), health);
+            if (!client.getConfig().optional()
+                    && !AppConstants.HealthStatus.UP.getValue().equals(health.getStatus())) {
+                anyRequiredMcpDown = true;
+            }
+        }
+        return anyRequiredMcpDown;
     }
 
     /**
@@ -268,70 +206,6 @@ public class HealthCheckService {
     }
 
     /**
-     * Check MCP Kubernetes server health and measure latency.
-     *
-     * <p>Sends an HTTP GET request to the MCP Kubernetes server health endpoint
-     * and measures the response time. Uses Java's built-in HttpClient with
-     * configured timeout.
-     *
-     * @return component health DTO with MCP Kubernetes status and latency
-     */
-    private ComponentHealthDto checkMcpKubernetesHealth() {
-        log.debug(LogMessages.HealthCheck.MCP_K8S_CHECK_STARTED).log();
-
-        String healthUrl = mcpK8sEndpoint + mcpK8sHealthPath;
-        long startTime = System.currentTimeMillis();
-        boolean isHealthy = false;
-        int statusCode = 0;
-
-        try {
-            HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofMillis(mcpK8sTimeout))
-                    .build();
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(healthUrl))
-                    .timeout(Duration.ofMillis(mcpK8sTimeout))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            statusCode = response.statusCode();
-            isHealthy = (statusCode >= 200 && statusCode < 300);
-
-        } catch (IOException | InterruptedException e) {
-            log.error(LogMessages.HealthCheck.MCP_K8S_CHECK_FAILED)
-                    .field("endpoint", healthUrl)
-                    .exception(e)
-                    .log();
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
-        }
-
-        long latency = System.currentTimeMillis() - startTime;
-
-        if (isHealthy) {
-            log.debug(LogMessages.HealthCheck.MCP_K8S_CHECK_PASSED)
-                    .field(ApiConstants.LogFields.LATENCY_MS, latency)
-                    .field("status_code", statusCode)
-                    .log();
-
-            return ComponentHealthDto.builder()
-                    .status(AppConstants.HealthStatus.UP.getValue())
-                    .message(HealthCheckConstants.Messages.MCP_CONNECTED)
-                    .latencyMs(latency)
-                    .build();
-        } else {
-            return ComponentHealthDto.builder()
-                    .status(AppConstants.HealthStatus.DOWN.getValue())
-                    .message(HealthCheckConstants.Messages.MCP_NOT_AVAILABLE)
-                    .latencyMs(latency)
-                    .build();
-        }
-    }
-
-    /**
      * Checks the health of the LLM provider.
      * Verifies LLM readiness and measures response latency.
      *
@@ -359,7 +233,7 @@ public class HealthCheckService {
             LLMRequest testRequest = LLMRequest.builder(LLMConstants.TestData.CONNECTIVITY_TEST_PROMPT)
                     .maxTokens(LLMConstants.TestData.CONNECTIVITY_TEST_MAX_TOKENS)
                     .build();
-            
+
             LLMResponse testResponse = llmPromptSender.send(testRequest);
 
             if (testResponse == null || testResponse.responseText() == null || testResponse.responseText().trim().isEmpty()) {
@@ -403,371 +277,35 @@ public class HealthCheckService {
     }
 
     /**
-     * Check MCP Kruize server health and measure latency.
-     *
-     * <p>Sends an HTTP GET request to the MCP Kruize server health endpoint
-     * and measures the response time.
-     *
-     * @return component health DTO with MCP Kruize status and latency
-     */
-    private ComponentHealthDto checkMcpKruizeHealth() {
-        log.debug(LogMessages.HealthCheck.MCP_KRUIZE_CHECK_STARTED).log();
-
-        String healthUrl = mcpKruizeEndpoint + mcpKruizeHealthPath;
-        long startTime = System.currentTimeMillis();
-        boolean isHealthy = false;
-        int statusCode = 0;
-
-        try {
-            HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofMillis(mcpKruizeTimeout))
-                    .build();
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(healthUrl))
-                    .timeout(Duration.ofMillis(mcpKruizeTimeout))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            statusCode = response.statusCode();
-            isHealthy = (statusCode >= 200 && statusCode < 300);
-
-        } catch (IOException | InterruptedException e) {
-            log.error(LogMessages.HealthCheck.MCP_KRUIZE_CHECK_FAILED)
-                    .field("endpoint", healthUrl)
-                    .exception(e)
-                    .log();
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
-        }
-
-        long latency = System.currentTimeMillis() - startTime;
-
-        if (isHealthy) {
-            log.debug(LogMessages.HealthCheck.MCP_KRUIZE_CHECK_PASSED)
-                    .field(ApiConstants.LogFields.LATENCY_MS, latency)
-                    .field("status_code", statusCode)
-                    .log();
-
-            return ComponentHealthDto.builder()
-                    .status(AppConstants.HealthStatus.UP.getValue())
-                    .message(HealthCheckConstants.Messages.MCP_CONNECTED)
-                    .latencyMs(latency)
-                    .build();
-        } else {
-            return ComponentHealthDto.builder()
-                    .status(AppConstants.HealthStatus.DOWN.getValue())
-                    .message(HealthCheckConstants.Messages.MCP_NOT_AVAILABLE)
-                    .latencyMs(latency)
-                    .build();
-        }
-    }
-
-    /**
-     * Check MCP Cryostat server health and measure latency.
-     *
-     * <p>Sends an HTTP GET request to the MCP Cryostat server health endpoint
-     * and measures the response time. Note that Cryostat health is on a separate
-     * endpoint from the MCP endpoint (different port).
-     *
-     * @return component health DTO with MCP Cryostat status and latency
-     */
-    private ComponentHealthDto checkMcpCryostatHealth() {
-        log.debug(LogMessages.HealthCheck.MCP_CRYOSTAT_CHECK_STARTED).log();
-
-        String healthUrl = mcpCryostatHealthEndpoint + mcpCryostatHealthPath;
-        long startTime = System.currentTimeMillis();
-        boolean isHealthy = false;
-        int statusCode = 0;
-
-        try {
-            HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofMillis(mcpCryostatTimeout))
-                    .build();
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(healthUrl))
-                    .timeout(Duration.ofMillis(mcpCryostatTimeout))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            statusCode = response.statusCode();
-            isHealthy = (statusCode >= 200 && statusCode < 300);
-
-        } catch (IOException | InterruptedException e) {
-            log.error(LogMessages.HealthCheck.MCP_CRYOSTAT_CHECK_FAILED)
-                    .field("endpoint", healthUrl)
-                    .exception(e)
-                    .log();
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
-        }
-
-        long latency = System.currentTimeMillis() - startTime;
-
-        if (isHealthy) {
-            log.debug(LogMessages.HealthCheck.MCP_CRYOSTAT_CHECK_PASSED)
-                    .field(ApiConstants.LogFields.LATENCY_MS, latency)
-                    .field("status_code", statusCode)
-                    .log();
-
-            return ComponentHealthDto.builder()
-                    .status(AppConstants.HealthStatus.UP.getValue())
-                    .message(HealthCheckConstants.Messages.MCP_CONNECTED)
-                    .latencyMs(latency)
-                    .build();
-        } else {
-            return ComponentHealthDto.builder()
-                    .status(AppConstants.HealthStatus.DOWN.getValue())
-                    .message(HealthCheckConstants.Messages.MCP_NOT_AVAILABLE)
-                    .latencyMs(latency)
-                    .build();
-        }
-    }
-
-    /**
      * Determine overall system status based on component health.
      *
-     * <p>The database is considered a critical component - if it's down, the entire system is DOWN.
-     * All other components (MCP servers, LLM) are non-critical - if they're down but database is UP,
-     * the system status is DEGRADED.
+     * <p>The database is critical: if it's down, the entire system is DOWN. So is any non-optional
+     * ("required") MCP server, or the MCP config itself failing to load — both make the system
+     * DOWN. The LLM provider remains non-critical — if it's down but everything else is fine, the
+     * system status is DEGRADED.
      *
-     * @param databaseHealth the database component health
-     * @param mcpK8sHealth the MCP Kubernetes component health
-     * @param llmHealth the LLM provider component health
-     * @param mcpKruizeHealth the MCP Kruize component health
-     * @param mcpCryostatHealth the MCP Cryostat component health
+     * @param databaseHealth     the database component health
+     * @param llmHealth          the LLM provider component health
+     * @param anyRequiredMcpDown whether any non-optional MCP server is unhealthy (or config load failed)
      * @return overall system status (UP, DOWN, or DEGRADED)
      */
     private AppConstants.HealthStatus determineOverallStatus(
             ComponentHealthDto databaseHealth,
-            ComponentHealthDto mcpK8sHealth,
             ComponentHealthDto llmHealth,
-            ComponentHealthDto mcpKruizeHealth,
-            ComponentHealthDto mcpCryostatHealth,
-            ComponentHealthDto mcpFilesystemHealth,
-            ComponentHealthDto mcpQuarkusHealth,
-            ComponentHealthDto mcpAsyncProfilerHealth) {
+            boolean anyRequiredMcpDown) {
 
-        // Database is a critical component
         if (!AppConstants.HealthStatus.UP.getValue().equals(databaseHealth.getStatus())) {
             return AppConstants.HealthStatus.DOWN;
         }
 
-        // If database is UP but any non-critical component is DOWN -> DEGRADED
-        if ((mcpK8sHealth != null &&
-             !AppConstants.HealthStatus.UP.getValue().equals(mcpK8sHealth.getStatus())) ||
-            (llmHealth != null &&
-             !AppConstants.HealthStatus.UP.getValue().equals(llmHealth.getStatus())) ||
-            (mcpKruizeHealth != null &&
-             !AppConstants.HealthStatus.UP.getValue().equals(mcpKruizeHealth.getStatus())) ||
-            (mcpCryostatHealth != null &&
-             !AppConstants.HealthStatus.UP.getValue().equals(mcpCryostatHealth.getStatus())) ||
-            (mcpFilesystemHealth != null &&
-             !AppConstants.HealthStatus.UP.getValue().equals(mcpFilesystemHealth.getStatus())) ||
-            (mcpQuarkusHealth != null &&
-             !AppConstants.HealthStatus.UP.getValue().equals(mcpQuarkusHealth.getStatus())) ||
-            (mcpAsyncProfilerHealth != null &&
-             !AppConstants.HealthStatus.UP.getValue().equals(mcpAsyncProfilerHealth.getStatus()))) {
+        if (anyRequiredMcpDown) {
+            return AppConstants.HealthStatus.DOWN;
+        }
+
+        if (!AppConstants.HealthStatus.UP.getValue().equals(llmHealth.getStatus())) {
             return AppConstants.HealthStatus.DEGRADED;
         }
 
-        // All components are UP
         return AppConstants.HealthStatus.UP;
     }
-
-    /**
-     * Check MCP Filesystem server health and measure latency.
-     *
-     * <p>Hits {@code causa.mcp.filesystem.endpoint + health-path}. The filesystem MCP
-     * server is non-critical — if it is down but the database is up, the overall status
-     * is DEGRADED rather than DOWN.
-     *
-     * @return component health DTO with MCP Filesystem status and latency
-     */
-    private ComponentHealthDto checkMcpFilesystemHealth() {
-        log.debug(LogMessages.HealthCheck.MCP_FILESYSTEM_CHECK_STARTED).log();
-
-        String healthUrl = mcpFilesystemEndpoint + mcpFilesystemHealthPath;
-        long startTime = System.currentTimeMillis();
-        boolean isHealthy = false;
-        int statusCode = 0;
-
-        try {
-            HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofMillis(mcpFilesystemTimeout))
-                    .build();
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(healthUrl))
-                    .timeout(Duration.ofMillis(mcpFilesystemTimeout))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            statusCode = response.statusCode();
-            isHealthy = (statusCode >= 200 && statusCode < 300);
-
-        } catch (IOException | InterruptedException e) {
-            log.error(LogMessages.HealthCheck.MCP_FILESYSTEM_CHECK_FAILED)
-                    .field("endpoint", healthUrl)
-                    .exception(e)
-                    .log();
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
-        }
-
-        long latency = System.currentTimeMillis() - startTime;
-
-        if (isHealthy) {
-            log.debug(LogMessages.HealthCheck.MCP_FILESYSTEM_CHECK_PASSED)
-                    .field(ApiConstants.LogFields.LATENCY_MS, latency)
-                    .field("status_code", statusCode)
-                    .log();
-
-            return ComponentHealthDto.builder()
-                    .status(AppConstants.HealthStatus.UP.getValue())
-                    .message(HealthCheckConstants.Messages.MCP_CONNECTED)
-                    .latencyMs(latency)
-                    .build();
-        } else {
-            return ComponentHealthDto.builder()
-                    .status(AppConstants.HealthStatus.DOWN.getValue())
-                    .message(HealthCheckConstants.Messages.MCP_NOT_AVAILABLE)
-                    .latencyMs(latency)
-                    .build();
-        }
-    }
-
-    /**
-     * Check MCP Quarkus server health and measure latency.
-     *
-     * <p>Sends an HTTP GET request to the MCP Quarkus server health endpoint
-     * and measures the response time. Non-critical — if down, system reports DEGRADED, not DOWN.
-     *
-     * @return component health DTO with Quarkus MCP status and latency
-     */
-    private ComponentHealthDto checkMcpQuarkusHealth() {
-        log.debug(LogMessages.HealthCheck.MCP_QUARKUS_CHECK_STARTED).log();
-
-        String healthUrl = mcpQuarkusEndpoint + mcpQuarkusHealthPath;
-        long startTime = System.currentTimeMillis();
-        boolean isHealthy = false;
-        int statusCode = 0;
-
-        try {
-            HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofMillis(mcpQuarkusTimeout))
-                    .build();
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(healthUrl))
-                    .timeout(Duration.ofMillis(mcpQuarkusTimeout))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            statusCode = response.statusCode();
-            isHealthy = (statusCode >= 200 && statusCode < 300);
-
-        } catch (IOException | InterruptedException e) {
-            log.error(LogMessages.HealthCheck.MCP_QUARKUS_CHECK_FAILED)
-                    .field("endpoint", healthUrl)
-                    .exception(e)
-                    .log();
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
-        }
-
-        long latency = System.currentTimeMillis() - startTime;
-
-        if (isHealthy) {
-            log.debug(LogMessages.HealthCheck.MCP_QUARKUS_CHECK_PASSED)
-                    .field(ApiConstants.LogFields.LATENCY_MS, latency)
-                    .field("status_code", statusCode)
-                    .log();
-
-            return ComponentHealthDto.builder()
-                    .status(AppConstants.HealthStatus.UP.getValue())
-                    .message(HealthCheckConstants.Messages.MCP_CONNECTED)
-                    .latencyMs(latency)
-                    .build();
-        } else {
-            return ComponentHealthDto.builder()
-                    .status(AppConstants.HealthStatus.DOWN.getValue())
-                    .message(HealthCheckConstants.Messages.MCP_NOT_AVAILABLE)
-                    .latencyMs(latency)
-                    .build();
-        }
-    }
-
-    /**
-     * Check MCP Async Profiler server health and measure latency.
-     *
-     * <p>Sends an HTTP GET request to the Async Profiler MCP server health endpoint
-     * and measures the response time. Non-critical — if down, system reports DEGRADED, not DOWN.
-     *
-     * @return component health DTO with Async Profiler MCP status and latency
-     */
-    private ComponentHealthDto checkMcpAsyncProfilerHealth() {
-        log.debug(LogMessages.HealthCheck.MCP_ASYNC_PROFILER_CHECK_STARTED).log();
-
-        String healthUrl = mcpAsyncProfilerEndpoint + mcpAsyncProfilerHealthPath;
-        long startTime = System.currentTimeMillis();
-        boolean isHealthy = false;
-        int statusCode = 0;
-
-        try {
-            HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofMillis(mcpAsyncProfilerTimeout))
-                    .build();
-
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(healthUrl))
-                    .timeout(Duration.ofMillis(mcpAsyncProfilerTimeout))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            statusCode = response.statusCode();
-            isHealthy = (statusCode >= 200 && statusCode < 300);
-
-        } catch (IOException | InterruptedException e) {
-            log.error(LogMessages.HealthCheck.MCP_ASYNC_PROFILER_CHECK_FAILED)
-                    .field("endpoint", healthUrl)
-                    .exception(e)
-                    .log();
-            if (e instanceof InterruptedException) {
-                Thread.currentThread().interrupt();
-            }
-        }
-
-        long latency = System.currentTimeMillis() - startTime;
-
-        if (isHealthy) {
-            log.debug(LogMessages.HealthCheck.MCP_ASYNC_PROFILER_CHECK_PASSED)
-                    .field(ApiConstants.LogFields.LATENCY_MS, latency)
-                    .field("status_code", statusCode)
-                    .log();
-
-            return ComponentHealthDto.builder()
-                    .status(AppConstants.HealthStatus.UP.getValue())
-                    .message(HealthCheckConstants.Messages.MCP_CONNECTED)
-                    .latencyMs(latency)
-                    .build();
-        } else {
-            return ComponentHealthDto.builder()
-                    .status(AppConstants.HealthStatus.DOWN.getValue())
-                    .message(HealthCheckConstants.Messages.MCP_NOT_AVAILABLE)
-                    .latencyMs(latency)
-                    .build();
-        }
-    }
-
 }
