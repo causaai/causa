@@ -236,7 +236,7 @@ public final class ConfigConstants {
     public enum PlatformCategory { OBSERVABILITY, INTEGRATION }
 
     /** Observability platforms — used when {@code category = OBSERVABILITY}. */
-    public enum ObservabilityPlatform { DATADOG, INSTANA, OTHER }
+    public enum ObservabilityPlatform { DATADOG, INSTANA }
 
     /** Integration platforms — used when {@code category = INTEGRATION}. */
     public enum IntegrationPlatform { SLACK, JIRA, GITHUB }
@@ -254,21 +254,22 @@ public final class ConfigConstants {
      * Sensitive {@link com.causa.core.domain.AuthConfig} fields per platform/provider.
      *
      * <p>The service encrypts these before serialising to JSONB and masks them in GET responses.
-     * Keyed by the enum {@code .name()} string (e.g. {@code "DATADOG"}, {@code "OPENAI"}).
+     * Keyed by the enum {@code .name()} string (e.g. {@code "DATADOG"}, {@code "API_KEY"}, {@code "SLACK"}).
+     * LLM entries are keyed by {@link LlmAuthType} name; all others by platform name.
      */
     public static final Map<String, Set<String>> SENSITIVE_AUTH_FIELDS = Map.ofEntries(
         // Observability
-        entry("DATADOG",      Set.of("apiKey", "applicationKey")),
-        entry("INSTANA",      Set.of("apiToken")),
-        entry("OTHER",        Set.of("apiToken")),
+        entry("DATADOG",      Set.of("apiKey", "appKey")),
+        entry("INSTANA",      Set.of("token")),
+        entry("OTHER",        Set.of("token")),
         // LLM — keyed by auth_type (sensitive fields differ by how you authenticate)
         entry("API_KEY",        Set.of("apiKey")),
         entry("VERTEX_AI",      Set.of("credentialsJson")),
         entry("CUSTOM_HEADERS", Set.of("headers")),
         // Integrations
-        entry("SLACK",        Set.of("webhookUrl", "apiToken")),
-        entry("JIRA",         Set.of("apiToken")),
-        entry("GITHUB",       Set.of("apiToken"))
+        entry("SLACK",        Set.of("token")),
+        entry("JIRA",         Set.of("token", "password")),
+        entry("GITHUB",       Set.of("token"))
     );
 
     /**

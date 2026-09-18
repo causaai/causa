@@ -17,16 +17,17 @@ import java.util.Map;
  *   Observability — INSTANA:   apiToken*
  *   Observability — OTHER:     apiToken*
  *
- *   LLM — API_KEY:             baseUrl, apiKey*
+ *   LLM — API_KEY:             apiKey*
  *   LLM — VERTEX_AI:           projectId, location, credentialsJson*  (ANTHROPIC via Google Cloud)
- *   LLM — CUSTOM_HEADERS:      baseUrl, headers*
+ *   LLM — CUSTOM_HEADERS:      headers*
  *
- *   Integrations — SLACK:      webhookUrl*, apiToken*
- *   Integrations — JIRA:       usernameEmail, apiToken*
- *   Integrations — GITHUB:     apiToken*
+ *   Integrations — SLACK:      token*
+ *   Integrations — JIRA:       username, token*
+ *   Integrations — GITHUB:     token*
  *
- *   Behavioural config (channel, projectName, issueType, ownerRepo, baseUrl for Jira)
+ *   Behavioural config (channel, projectName, issueType, ownerRepo)
  *   goes in additional_config JSONB — not here.
+ *   URL for each platform goes in the external_configs.url typed column — not here.
  * </pre>
  *
  * @see com.causa.common.constants.ConfigConstants#SENSITIVE_AUTH_FIELDS
@@ -35,16 +36,15 @@ import java.util.Map;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record AuthConfig(
 
-    String apiKey,              // encrypted — DATADOG (ingest), LLM (API_KEY, CUSTOM)
-    String applicationKey,      // encrypted — DATADOG only (read/query access)
-    String apiToken,            // encrypted — INSTANA, OTHER, SLACK, JIRA, GITHUB
+    String apiKey,              // encrypted — DATADOG (ingest), LLM (API_KEY)
+    String appKey,              // encrypted — DATADOG only (read/query access)
+    String token,               // encrypted — INSTANA, OTHER, SLACK, JIRA, GITHUB: bearer/api/jwt token
 
-    String baseUrl,             // plain     — API_KEY, CUSTOM_HEADERS: endpoint URL
     String projectId,           // plain     — VERTEX_AI: GCP project ID
     String location,            // plain     — VERTEX_AI: GCP region (e.g. us-central1)
     String credentialsJson,     // encrypted — VERTEX_AI auth: service-account JSON blob
     Map<String, String> headers,// encrypted — CUSTOM_HEADERS auth: full header map
 
-    String webhookUrl,          // encrypted — SLACK: secret inbound webhook URL
-    String usernameEmail        // plain     — JIRA: account email (auth identity for API token)
+    String username,            // plain     — JIRA: account username / email
+    String password             // encrypted — basic auth password
 ) {}
