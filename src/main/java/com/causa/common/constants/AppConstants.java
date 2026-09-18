@@ -30,6 +30,9 @@ public final class AppConstants {
 
         /** Configuration loading from DB+ENV priority. */
         public static final int CONFIG_PRIORITY = 20;
+
+        /** MCP registry initialization priority — after config loading. */
+        public static final int MCP_PRIORITY = 25;
     }
 
     /**
