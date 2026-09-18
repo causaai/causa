@@ -1,4 +1,4 @@
-package com.causa.mcp;
+package com.causa.mcp.util;
 
 import com.causa.config.McpConfig;
 import org.junit.jupiter.api.BeforeEach;
