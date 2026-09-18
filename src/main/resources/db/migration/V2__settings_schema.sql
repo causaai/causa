@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS llm_configs (
     temperature       NUMERIC(4,2),
     max_tokens        INTEGER,
     timeout_ms        INTEGER,
-    is_active         BOOLEAN                  NOT NULL DEFAULT FALSE,
+    is_active         BOOLEAN                  NOT NULL DEFAULT TRUE,
     auth_config       JSONB                    NOT NULL,
     additional_config JSONB,
     created_at        TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
