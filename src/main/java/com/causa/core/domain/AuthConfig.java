@@ -21,7 +21,7 @@ import java.util.Map;
  *   LLM — VERTEX_AI:           projectId, location, credentialsJson*  (ANTHROPIC via Google Cloud)
  *   LLM — CUSTOM_HEADERS:      baseUrl, headers*
  *
- *   Integrations — SLACK:      token*
+ *   Integrations — SLACK:      webhookUrl, token*
  *   Integrations — JIRA:       username, token*
  *   Integrations — GITHUB:     token*
  *
@@ -45,6 +45,7 @@ public record AuthConfig(
     String credentialsJson,     // encrypted — VERTEX_AI auth: service-account JSON blob
     Map<String, String> headers,// encrypted — CUSTOM_HEADERS auth: full header map
 
+    String webhookUrl,          // encrypted — SLACK: secret inbound webhook URL
     String username,            // plain     — JIRA: account username / email
     String password             // encrypted — basic auth password
 ) {}
