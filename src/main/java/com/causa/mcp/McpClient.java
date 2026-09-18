@@ -69,7 +69,7 @@ public class McpClient {
                     .optional(config.optional())
                     .build();
 
-        } catch (IOException | InterruptedException e) {
+        } catch (IOException | InterruptedException | IllegalArgumentException e) {
             long latency = System.currentTimeMillis() - startTime;
             log.warn("MCP health check failed")
                     .field("server", serverName)
