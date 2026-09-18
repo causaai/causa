@@ -99,6 +99,8 @@ public final class ApiConstants {
             public static final String BASE       = Version.API_V1 + "/diagnostics";
             public static final String PATH_PARAM = "id";
             public static final String BY_ID      = "/{" + PATH_PARAM + "}";
+            public static final String QUERY_NAMESPACE = "namespace";
+            public static final String QUERY_WORKLOAD  = "workload_name";
         }
 
         /**
@@ -143,7 +145,7 @@ public final class ApiConstants {
             /** Default number of items returned per page when {@code page_size} is omitted. */
             public static final String DEFAULT_PAGE_SIZE = "20";
 
-            /** Hard upper cap — requests above this are rejected with HTTP 400. */
+            /** Hard upper cap on page_size — requests above this are rejected with HTTP 400. */
             public static final int MAX_PAGE_SIZE = 100;
         }
 

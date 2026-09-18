@@ -139,6 +139,8 @@ Quarkus Dev Mode provides hot reload, continuous testing, and Dev UI.
 # Dev UI available at http://localhost:8080/q/dev
 ```
 
+**Dev Services (zero config database):** Running `./mvnw quarkus:dev` automatically starts a PostgreSQL 17 container with pgvector via Quarkus Dev Services — no local database setup needed. See [Database Setup Guide](./database.md) for details.
+
 **Dev Mode Features:**
 - 🔥 **Hot Reload**: Code changes are automatically detected and reloaded
 - 🧪 **Continuous Testing**: Tests run automatically on code changes

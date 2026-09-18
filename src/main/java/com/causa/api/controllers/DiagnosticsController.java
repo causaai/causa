@@ -13,6 +13,7 @@ import com.causa.core.domain.PageResult;
 import com.causa.core.ports.AlertRepository;
 import com.causa.core.services.DiagnosticService;
 import jakarta.inject.Inject;
+import jakarta.validation.constraints.Size;
 import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
@@ -61,14 +62,17 @@ public class DiagnosticsController {
     @GET
     public Response listDiagnostics(
             @QueryParam(ApiConstants.Paths.Pagination.QUERY_PAGE)      @DefaultValue("1")                                              int page,
-            @QueryParam(ApiConstants.Paths.Pagination.QUERY_PAGE_SIZE) @DefaultValue(ApiConstants.Paths.Pagination.DEFAULT_PAGE_SIZE) int pageSize) {
+            @QueryParam(ApiConstants.Paths.Pagination.QUERY_PAGE_SIZE) @DefaultValue(ApiConstants.Paths.Pagination.DEFAULT_PAGE_SIZE) int pageSize,
+            @QueryParam(ApiConstants.Paths.Diagnostics.QUERY_WORKLOAD)  @Size(max = 255) String workloadName,
+            @QueryParam(ApiConstants.Paths.Diagnostics.QUERY_NAMESPACE) @Size(max = 255) String namespace) {
 
         log.info(LogMessages.Diagnostic.DIAGNOSTICS_LIST_REQUEST)
             .field("page", page)
             .field("page_size", pageSize)
             .log();
 
-        PageResult<Diagnostic> result = diagnosticService.listDiagnostics(PageRequest.of(page, pageSize));
+        Diagnostic.Filter filter = new Diagnostic.Filter(workloadName, namespace);
+        PageResult<Diagnostic> result = diagnosticService.listDiagnostics(filter, PageRequest.of(page, pageSize));
 
         List<DiagnosticListItemResponse> items = result.items().stream()
             .map(d -> {

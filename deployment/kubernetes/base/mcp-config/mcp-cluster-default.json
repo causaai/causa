@@ -1,0 +1,82 @@
+{
+  "mcpServers": {
+    "kubernetes": {
+      "type": "streamable-http",
+      "url": "http://kubernetes-mcp-server:8080/mcp",
+      "headers": {},
+      "optional": false,
+      "alwaysAllow": ["pods_get", "pods_log", "events_list"],
+      "healthCheck": { "url": "http://kubernetes-mcp-server:8080/healthz", "timeoutMs": 5000 },
+      "timeoutMs": 5000,
+      "description": "Kubernetes MCP — live pod status, events, and container logs from the cluster API",
+      "tools": [
+        {
+          "name": "pods_get",
+          "contextKey": "POD_STATUS",
+          "description": "Current pod phase, container statuses, restart counts, and resource requests/limits.",
+          "arguments": { "name": "${podName}", "namespace": "${namespace}" }
+        },
+        {
+          "name": "events_list",
+          "contextKey": "POD_EVENTS",
+          "description": "Kubernetes events for the pod (Type, Reason, Message, Timestamp).",
+          "arguments": { "namespace": "${namespace}", "fieldSelector": "involvedObject.name=${podName}" }
+        },
+        {
+          "name": "pods_log",
+          "contextKey": "POD_LOGS",
+          "description": "Current container logs, last 25 lines.",
+          "arguments": { "name": "${podName}", "namespace": "${namespace}", "container": "${containerName}", "previous": "false", "tailLines": "25" }
+        },
+        {
+          "name": "pods_log",
+          "contextKey": "POD_LOGS_PREVIOUS",
+          "description": "Previous (crashed/restarted) container logs, last 25 lines.",
+          "arguments": { "name": "${podName}", "namespace": "${namespace}", "container": "${containerName}", "previous": "true", "tailLines": "25" }
+        }
+      ]
+    },
+    "kruize": {
+      "type": "streamable-http",
+      "url": "http://kruize-mcp-server-service:8080/mcp",
+      "headers": {},
+      "optional": false,
+      "alwaysAllow": ["getCostOptimizedRecommendations", "getPerformanceOptimizedRecommendations"],
+      "healthCheck": { "url": "http://kruize-mcp-server-service:8080/q/health/ready", "timeoutMs": 10000 },
+      "timeoutMs": 10000,
+      "description": "Kruize MCP — CPU and memory resource optimisation recommendations",
+      "tools": [
+        {
+          "name": "getCostOptimizedRecommendations",
+          "contextKey": "KRUIZE_COST_RECOMMENDATIONS",
+          "description": "Container resource-request/limit suggestions optimised for cost.",
+          "arguments": { "containerName": "${containerName}", "namespace": "${namespace}" }
+        },
+        {
+          "name": "getPerformanceOptimizedRecommendations",
+          "contextKey": "KRUIZE_PERFORMANCE_RECOMMENDATIONS",
+          "description": "Container resource-request/limit suggestions optimised for performance.",
+          "arguments": { "containerName": "${containerName}", "namespace": "${namespace}" }
+        }
+      ]
+    },
+    "cryostat": {
+      "type": "streamable-http",
+      "url": "http://cryostat-mcp:8000/mcp",
+      "headers": {},
+      "optional": true,
+      "alwaysAllow": ["get_gc_analysis", "get_memory_analysis", "get_thread_analysis", "get_exception_analysis", "get_container_analysis"],
+      "healthCheck": { "url": "http://cryostat-mcp-api:8080/healthz", "timeoutMs": 15000 },
+      "timeoutMs": 15000,
+      "metadata": { "retryDelayMs": 5000, "maxRetries": 3 },
+      "description": "Cryostat MCP — JFR-based GC, memory, thread, exception, and container analysis",
+      "tools": [
+        { "name": "get_gc_analysis", "contextKey": "GC_ANALYSIS", "description": "GC behaviour analysis from JFR.", "arguments": { "pod_name": "${podName}" } },
+        { "name": "get_memory_analysis", "contextKey": "MEMORY_ANALYSIS", "description": "Memory pool analysis from JFR.", "arguments": { "pod_name": "${podName}" } },
+        { "name": "get_thread_analysis", "contextKey": "THREAD_ANALYSIS", "description": "Thread analysis from JFR.", "arguments": { "pod_name": "${podName}" } },
+        { "name": "get_exception_analysis", "contextKey": "EXCEPTION_ANALYSIS", "description": "Exception analysis from JFR.", "arguments": { "pod_name": "${podName}" } },
+        { "name": "get_container_analysis", "contextKey": "CONTAINER_ANALYSIS", "description": "Container resource analysis from JFR.", "arguments": { "pod_name": "${podName}" } }
+      ]
+    }
+  }
+}

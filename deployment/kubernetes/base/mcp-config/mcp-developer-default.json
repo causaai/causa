@@ -1,0 +1,102 @@
+{
+  "mcpServers": {
+    "kubernetes": {
+      "type": "streamable-http",
+      "url": "http://kubernetes-mcp-server:8080/mcp",
+      "headers": {},
+      "optional": false,
+      "alwaysAllow": ["pods_get", "pods_log", "events_list"],
+      "healthCheck": { "url": "http://kubernetes-mcp-server:8080/healthz", "timeoutMs": 5000 },
+      "timeoutMs": 5000,
+      "description": "Kubernetes MCP — live pod status, events, and container logs from the cluster API",
+      "tools": [
+        {
+          "name": "pods_get",
+          "contextKey": "POD_STATUS",
+          "description": "Current pod phase, container statuses, restart counts, and resource requests/limits.",
+          "arguments": { "name": "${podName}", "namespace": "${namespace}" }
+        },
+        {
+          "name": "events_list",
+          "contextKey": "POD_EVENTS",
+          "description": "Kubernetes events for the pod (Type, Reason, Message, Timestamp).",
+          "arguments": { "namespace": "${namespace}", "fieldSelector": "involvedObject.name=${podName}" }
+        },
+        {
+          "name": "pods_log",
+          "contextKey": "POD_LOGS",
+          "description": "Current container logs, last 25 lines.",
+          "arguments": { "name": "${podName}", "namespace": "${namespace}", "container": "${containerName}", "previous": "false", "tailLines": "25" }
+        },
+        {
+          "name": "pods_log",
+          "contextKey": "POD_LOGS_PREVIOUS",
+          "description": "Previous (crashed/restarted) container logs, last 25 lines.",
+          "arguments": { "name": "${podName}", "namespace": "${namespace}", "container": "${containerName}", "previous": "true", "tailLines": "25" }
+        }
+      ]
+    },
+    "kruize": {
+      "type": "streamable-http",
+      "url": "http://kruize-mcp-server-service:8080/mcp",
+      "headers": {},
+      "optional": false,
+      "alwaysAllow": ["getCostOptimizedRecommendations", "getPerformanceOptimizedRecommendations"],
+      "healthCheck": { "url": "http://kruize-mcp-server-service:8080/q/health/ready", "timeoutMs": 10000 },
+      "timeoutMs": 10000,
+      "description": "Kruize MCP — CPU and memory resource optimisation recommendations",
+      "tools": [
+        {
+          "name": "getCostOptimizedRecommendations",
+          "contextKey": "KRUIZE_COST_RECOMMENDATIONS",
+          "description": "Container resource-request/limit suggestions optimised for cost.",
+          "arguments": { "containerName": "${containerName}", "namespace": "${namespace}" }
+        },
+        {
+          "name": "getPerformanceOptimizedRecommendations",
+          "contextKey": "KRUIZE_PERFORMANCE_RECOMMENDATIONS",
+          "description": "Container resource-request/limit suggestions optimised for performance.",
+          "arguments": { "containerName": "${containerName}", "namespace": "${namespace}" }
+        }
+      ]
+    },
+    "quarkus": {
+      "type": "streamable-http",
+      "url": "http://quarkus-mcp-server:8080/mcp",
+      "headers": {},
+      "optional": false,
+      "alwaysAllow": ["fetch_raw_metrics_from_endpoint"],
+      "healthCheck": { "url": "http://quarkus-mcp-server:8080/healthz", "timeoutMs": 10000 },
+      "timeoutMs": 10000,
+      "metadata": { "metricsBaseUrl": "http://quarkus-app.default.svc.cluster.local:8080/q/metrics" },
+      "description": "Quarkus MCP — raw Prometheus-format metrics scraped from the target application's metrics endpoint",
+      "tools": [
+        {
+          "name": "fetch_raw_metrics_from_endpoint",
+          "contextKey": "QUARKUS_RAW_METRICS",
+          "description": "Raw Prometheus-format metrics text scraped from the application's /q/metrics endpoint.",
+          "arguments": { "pod_name": "${podName}", "namespace": "${namespace}", "baseUrl": "${metadata.metricsBaseUrl}" }
+        }
+      ]
+    },
+    "async-profiler": {
+      "type": "streamable-http",
+      "url": "http://async-profiler-mcp-server:8080/mcp",
+      "headers": {},
+      "optional": false,
+      "alwaysAllow": ["list_profiled_pods", "get_pod_jvm_status", "get_jvm_statistics", "get_recording", "get_recording_report", "get_jfr_summary", "get_flame_graph"],
+      "healthCheck": { "url": "http://async-profiler-mcp-server:8080/healthz", "timeoutMs": 15000 },
+      "timeoutMs": 15000,
+      "description": "Async Profiler MCP — JVM profiling via async-profiler agent",
+      "tools": [
+        { "name": "list_profiled_pods", "contextKey": "PROFILED_PODS", "description": "Pods currently registered with the profiler, including their latest recording ID." },
+        { "name": "get_pod_jvm_status", "contextKey": "AP_JVM_STATUS", "arguments": { "pod_name": "${podName}" } },
+        { "name": "get_jvm_statistics", "contextKey": "AP_JVM_STATISTICS", "arguments": { "pod_name": "${podName}" } },
+        { "name": "get_recording", "contextKey": "AP_RECORDING", "description": "Status of the latest recording for this pod.", "arguments": { "recording_id": "${recordingId}", "format": "json" } },
+        { "name": "get_flame_graph", "contextKey": "AP_FLAME_GRAPH", "description": "Call-stack frame tree for the latest recording.", "arguments": { "recording_id": "${recordingId}", "format": "json" } },
+        { "name": "get_recording_report", "contextKey": "AP_RECORDING_REPORT", "arguments": { "pod": "${podName}", "container": "${containerName}", "namespace": "${namespace}", "last": "5m" } },
+        { "name": "get_jfr_summary", "contextKey": "AP_JFR_SUMMARY", "arguments": { "pod": "${podName}", "container": "${containerName}", "namespace": "${namespace}", "last": "5m" } }
+      ]
+    }
+  }
+}

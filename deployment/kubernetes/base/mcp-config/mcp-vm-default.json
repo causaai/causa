@@ -1,0 +1,42 @@
+{
+  "mcpServers": {
+    "jmx": {
+      "type": "streamable-http",
+      "url": "http://jmx-mcp-server:8080/mcp",
+      "headers": {},
+      "optional": false,
+      "alwaysAllow": ["getHeapStatus", "getGcActivity", "getThreadState", "getGcPressureAnalysis", "getMemoryLeakIndicators", "getThreadContentionAnalysis", "getJvmRuntimeInfo"],
+      "healthCheck": { "url": "http://jmx-mcp-server:8080/healthz", "timeoutMs": 10000 },
+      "timeoutMs": 10000,
+      "description": "JMX MCP — direct JVM heap, GC, thread, and runtime metrics via MBeanServer",
+      "tools": [
+        { "name": "getHeapStatus", "contextKey": "JMX_HEAP_STATUS", "description": "Current heap memory status with utilization and trends." },
+        { "name": "getGcActivity", "contextKey": "JMX_GC_ACTIVITY", "description": "GC collection counts and pause times." },
+        { "name": "getThreadState", "contextKey": "JMX_THREAD_STATE", "description": "Current thread counts and health metrics." },
+        { "name": "getGcPressureAnalysis", "contextKey": "JMX_GC_PRESSURE", "description": "GC pressure score and recommendations." },
+        { "name": "getMemoryLeakIndicators", "contextKey": "JMX_MEMORY_LEAK_INDICATORS", "description": "Memory leak likelihood using trend analysis." },
+        { "name": "getThreadContentionAnalysis", "contextKey": "JMX_THREAD_CONTENTION", "description": "Thread contention and deadlock detection." },
+        { "name": "getJvmRuntimeInfo", "contextKey": "JMX_RUNTIME_INFO", "description": "JVM vendor, version, and heap configuration." }
+      ]
+    },
+    "filesystem": {
+      "type": "streamable-http",
+      "url": "http://filesystem-mcp-server:8080/mcp",
+      "headers": {},
+      "optional": false,
+      "alwaysAllow": ["list_directory", "list_directory_with_sizes", "read_text_file"],
+      "healthCheck": { "url": "http://filesystem-mcp-server:8080/healthz", "timeoutMs": 10000 },
+      "timeoutMs": 10000,
+      "metadata": { "libertyLogsDir": "/logs", "alertWindowMinutes": 5 },
+      "description": "Filesystem MCP — Liberty messages.log, verbosegc, and FFDC directory content from the VM host",
+      "tools": [
+        {
+          "name": "list_directory_with_sizes",
+          "contextKey": "LIBERTY_LOGS_DIRECTORY_LISTING",
+          "description": "Directory listing (with file sizes) of the Liberty logs root, used to discover which log/FFDC files to read.",
+          "arguments": { "path": "${metadata.libertyLogsDir}" }
+        }
+      ]
+    }
+  }
+}

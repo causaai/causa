@@ -25,12 +25,14 @@ public interface DiagnosticService {
     Diagnostic triggerDiagnostics(Alert alert);
 
     /**
-     * Returns a paginated list of diagnostics ordered by creation time descending.
+     * Returns a paginated list of diagnostics ordered by creation time descending,
+     * optionally filtered by container name and/or namespace.
      *
+     * @param filter      optional container/namespace filter
      * @param pageRequest page and size
      * @return paginated result of diagnostics
      */
-    PageResult<Diagnostic> listDiagnostics(PageRequest pageRequest);
+    PageResult<Diagnostic> listDiagnostics(Diagnostic.Filter filter, PageRequest pageRequest);
 
     /**
      * Returns a single diagnostic by its ID.

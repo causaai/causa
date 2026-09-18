@@ -63,24 +63,37 @@ public class DiagnosticRepositoryImpl implements DiagnosticRepository {
             .map(DiagnosticEntityMapper::toDomain);
     }
 
-    /** Paginated search ordered by {@code created_at} descending. */
+    /** Paginated search ordered by {@code created_at} descending, with optional workload/namespace filters. */
     @Override
-    public PageResult<Diagnostic> search(PageRequest pageRequest) {
-        // Fixed ordering — created_at DESC. Sorting is not user-controllable.
+    @Transactional
+    public PageResult<Diagnostic> search(Diagnostic.Filter filter, PageRequest pageRequest) {
+        boolean hasWorkload   = filter != null && !isBlank(filter.workload());
+        boolean hasNamespace  = filter != null && !isBlank(filter.namespace());
+
         Sort sort = Sort.by("createdAt").descending();
+        Page page = Page.of(pageRequest.panachePage(), pageRequest.size());
 
-        // No filter fields today — always fetch all
-        var query = DiagnosticEntity.<DiagnosticEntity>findAll(sort)
-            .page(Page.of(pageRequest.panachePage(), pageRequest.size()));
+        io.quarkus.hibernate.orm.panache.PanacheQuery<DiagnosticEntity> query;
 
-        List<Diagnostic> items = query.list()
-            .stream()
-            .map(DiagnosticEntityMapper::toDomain)
-            .toList();
+        if (hasWorkload && hasNamespace) {
+            query = DiagnosticEntity.find("alert.workloadName = ?1 and alert.namespace = ?2",
+                sort, filter.workload(), filter.namespace());
+        } else if (hasWorkload) {
+            query = DiagnosticEntity.find("alert.workloadName = ?1", sort, filter.workload());
+        } else if (hasNamespace) {
+            query = DiagnosticEntity.find("alert.namespace = ?1", sort, filter.namespace());
+        } else {
+            query = DiagnosticEntity.findAll(sort);
+        }
 
-        // Panache reuses the same predicate for COUNT — one extra round-trip
-        long total = DiagnosticEntity.count();
+        List<Diagnostic> items = query.page(page).list()
+            .stream().map(DiagnosticEntityMapper::toDomain).toList();
+        long total = query.count();
 
         return PageResult.of(items, total, pageRequest);
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.isBlank();
     }
 }

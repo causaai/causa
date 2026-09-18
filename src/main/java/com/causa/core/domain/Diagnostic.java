@@ -69,6 +69,29 @@ public final class Diagnostic {
 
     public static Builder builder() { return new Builder(); }
 
+
+    /**
+     * Optional filter criteria for diagnostic list queries.
+     *
+     * <p>All fields are optional — {@code null} or blank means "skip this filter".
+     * All present (non-blank) fields are AND-ed inside the repository via a JOIN
+     * to the {@code alerts} table.
+     */
+    public record Filter(
+            /** Exact match on {@code workload_name} column (container name for k8s, workload name for VM). Null/blank → skip. */
+            String workload,
+            /** Exact match on {@code workload_info->>'namespace'} (JSONB via alerts JOIN). Null/blank → skip. */
+            String namespace
+    ) {
+        /** Returns a filter with no constraints — matches every diagnostic. */
+        public static Filter empty() { return new Filter(null, null); }
+
+        /** Returns {@code true} when every field is null or blank. */
+        public boolean isEmpty() { return isBlank(workload) && isBlank(namespace); }
+
+        private static boolean isBlank(String s) { return s == null || s.isBlank(); }
+    }
+
     // -------------------------------------------------------------------------
     // Builder
     // -------------------------------------------------------------------------

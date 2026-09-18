@@ -210,22 +210,22 @@ class DiagnosticServiceImplTest {
             Diagnostic d1 = buildDiagnostic("d1", "a1", DiagnosticStatus.COMPLETED);
             Diagnostic d2 = buildDiagnostic("d2", "a2", DiagnosticStatus.PENDING);
             PageResult<Diagnostic> page = PageResult.of(List.of(d1, d2), 2L, PageRequest.of(1, 0));
-            when(diagnosticRepository.search(any())).thenReturn(page);
+            when(diagnosticRepository.search(any(), any())).thenReturn(page);
 
-            PageResult<Diagnostic> result = diagnosticService.listDiagnostics(PageRequest.of(1, 0));
+            PageResult<Diagnostic> result = diagnosticService.listDiagnostics(Diagnostic.Filter.empty(), PageRequest.of(1, 0));
 
             assertEquals(2, result.items().size());
             assertEquals(2L, result.total());
-            verify(diagnosticRepository).search(any());
+            verify(diagnosticRepository).search(any(), any());
         }
 
         @Test
         @DisplayName("Should return empty page when no diagnostics")
         void shouldReturnEmptyListWhenNoDiagnostics() {
             PageResult<Diagnostic> page = PageResult.of(List.of(), 0L, PageRequest.of(1, 0));
-            when(diagnosticRepository.search(any())).thenReturn(page);
+            when(diagnosticRepository.search(any(), any())).thenReturn(page);
 
-            PageResult<Diagnostic> result = diagnosticService.listDiagnostics(PageRequest.of(1, 0));
+            PageResult<Diagnostic> result = diagnosticService.listDiagnostics(Diagnostic.Filter.empty(), PageRequest.of(1, 0));
 
             assertTrue(result.items().isEmpty());
             assertEquals(0L, result.total());

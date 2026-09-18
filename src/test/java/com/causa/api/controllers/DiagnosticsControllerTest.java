@@ -17,6 +17,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -85,9 +86,9 @@ class DiagnosticsControllerTest {
         @DisplayName("Should return 200 with empty page when no diagnostics")
         void shouldReturn200WithEmptyList() {
             PageResult<Diagnostic> page = PageResult.of(List.of(), 0L, PageRequest.of(1, 20));
-            when(diagnosticService.listDiagnostics(any())).thenReturn(page);
+            when(diagnosticService.listDiagnostics(any(), any())).thenReturn(page);
 
-            Response response = controller.listDiagnostics(1, 20);
+            Response response = controller.listDiagnostics(1, 20, null, null);
 
             assertEquals(200, response.getStatus());
             @SuppressWarnings("unchecked")
@@ -102,14 +103,14 @@ class DiagnosticsControllerTest {
             Diagnostic d1 = buildDiagnostic("diag-1", "alert-1");
             Diagnostic d2 = buildDiagnostic("diag-2", "alert-2");
             PageResult<Diagnostic> page = PageResult.of(List.of(d1, d2), 2L, PageRequest.of(1, 20));
-            when(diagnosticService.listDiagnostics(any())).thenReturn(page);
+            when(diagnosticService.listDiagnostics(any(), any())).thenReturn(page);
 
             Alert a1 = buildAlert("alert-1");
             Alert a2 = buildAlert("alert-2");
             when(alertRepository.findById("alert-1")).thenReturn(Optional.of(a1));
             when(alertRepository.findById("alert-2")).thenReturn(Optional.of(a2));
 
-            Response response = controller.listDiagnostics(1, 20);
+            Response response = controller.listDiagnostics(1, 20, null, null);
 
             assertEquals(200, response.getStatus());
             @SuppressWarnings("unchecked")
@@ -123,10 +124,10 @@ class DiagnosticsControllerTest {
         void shouldHandleMissingAlertGracefully() {
             Diagnostic d1 = buildDiagnostic("diag-1", "alert-orphan");
             PageResult<Diagnostic> page = PageResult.of(List.of(d1), 1L, PageRequest.of(1, 20));
-            when(diagnosticService.listDiagnostics(any())).thenReturn(page);
+            when(diagnosticService.listDiagnostics(any(), any())).thenReturn(page);
             when(alertRepository.findById("alert-orphan")).thenReturn(Optional.empty());
 
-            Response response = controller.listDiagnostics(1, 20);
+            Response response = controller.listDiagnostics(1, 20, null, null);
 
             assertEquals(200, response.getStatus());
             @SuppressWarnings("unchecked")
@@ -142,13 +143,39 @@ class DiagnosticsControllerTest {
             Diagnostic d1 = buildDiagnostic("diag-1", "alert-1");
             Diagnostic d2 = buildDiagnostic("diag-2", "alert-2");
             PageResult<Diagnostic> page = PageResult.of(List.of(d1, d2), 2L, PageRequest.of(1, 20));
-            when(diagnosticService.listDiagnostics(any())).thenReturn(page);
+            when(diagnosticService.listDiagnostics(any(), any())).thenReturn(page);
             when(alertRepository.findById(anyString())).thenReturn(Optional.empty());
 
-            controller.listDiagnostics(1, 20);
+            controller.listDiagnostics(1, 20, null, null);
 
             verify(alertRepository).findById("alert-1");
             verify(alertRepository).findById("alert-2");
+        }
+
+        @Test
+        @DisplayName("Should pass namespace filter to service")
+        void shouldPassNamespaceFilterToService() {
+            PageResult<Diagnostic> page = PageResult.of(List.of(), 0L, PageRequest.of(1, 20));
+            ArgumentCaptor<Diagnostic.Filter> filterCaptor = ArgumentCaptor.forClass(Diagnostic.Filter.class);
+            when(diagnosticService.listDiagnostics(filterCaptor.capture(), any())).thenReturn(page);
+
+            controller.listDiagnostics(1, 20, null, "prod");
+
+            assertEquals("prod", filterCaptor.getValue().namespace());
+            assertNull(filterCaptor.getValue().workload());
+        }
+
+        @Test
+        @DisplayName("Should pass workload filter to service")
+        void shouldPassWorkloadFilterToService() {
+            PageResult<Diagnostic> page = PageResult.of(List.of(), 0L, PageRequest.of(1, 20));
+            ArgumentCaptor<Diagnostic.Filter> filterCaptor = ArgumentCaptor.forClass(Diagnostic.Filter.class);
+            when(diagnosticService.listDiagnostics(filterCaptor.capture(), any())).thenReturn(page);
+
+            controller.listDiagnostics(1, 20, "my-app", null);
+
+            assertEquals("my-app", filterCaptor.getValue().workload());
+            assertNull(filterCaptor.getValue().namespace());
         }
     }
 
