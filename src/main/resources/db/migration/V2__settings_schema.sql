@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS external_configs (
     category          VARCHAR(32)              NOT NULL,   -- OBSERVABILITY | INTEGRATION
     platform          VARCHAR(64)              NOT NULL,   -- DATADOG | INSTANA | OTHER | SLACK | JIRA | GITHUB
     name              VARCHAR(128)             NOT NULL,   -- user-defined label, e.g. "instana-prod"
-    url               VARCHAR(512),
+    url               TEXT,
     auth_type         VARCHAR(32)              NOT NULL,   -- API_KEY | API_TOKEN | WEBHOOK | PAT
     is_active         BOOLEAN                  NOT NULL DEFAULT TRUE,
     auth_config       JSONB                    NOT NULL,
