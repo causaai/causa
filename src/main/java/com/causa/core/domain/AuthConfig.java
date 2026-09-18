@@ -17,9 +17,9 @@ import java.util.Map;
  *   Observability — INSTANA:   apiToken*
  *   Observability — OTHER:     apiToken*
  *
- *   LLM — API_KEY:             apiKey*
+ *   LLM — API_KEY:             baseUrl, apiKey*
  *   LLM — VERTEX_AI:           projectId, location, credentialsJson*  (ANTHROPIC via Google Cloud)
- *   LLM — CUSTOM_HEADERS:      headers*
+ *   LLM — CUSTOM_HEADERS:      baseUrl, headers*
  *
  *   Integrations — SLACK:      token*
  *   Integrations — JIRA:       username, token*
@@ -27,7 +27,6 @@ import java.util.Map;
  *
  *   Behavioural config (channel, projectName, issueType, ownerRepo)
  *   goes in additional_config JSONB — not here.
- *   URL for each platform goes in the external_configs.url typed column — not here.
  * </pre>
  *
  * @see com.causa.common.constants.ConfigConstants#SENSITIVE_AUTH_FIELDS
@@ -40,6 +39,7 @@ public record AuthConfig(
     String appKey,              // encrypted — DATADOG only (read/query access)
     String token,               // encrypted — INSTANA, OTHER, SLACK, JIRA, GITHUB: bearer/api/jwt token
 
+    String baseUrl,             // plain     — LLM (API_KEY, CUSTOM_HEADERS): endpoint URL
     String projectId,           // plain     — VERTEX_AI: GCP project ID
     String location,            // plain     — VERTEX_AI: GCP region (e.g. us-central1)
     String credentialsJson,     // encrypted — VERTEX_AI auth: service-account JSON blob
