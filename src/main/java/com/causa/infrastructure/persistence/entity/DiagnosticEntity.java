@@ -90,6 +90,16 @@ public class DiagnosticEntity extends BaseEntity {
     @Column(columnDefinition = "jsonb")
     private JsonNode evidence;
 
+    /**
+     * Complete evidence items from validation pipeline stored as JSONB.
+     * Shape: {@code [ { "id": "...", "source": "...", "type": "...", ... }, ... ]}.
+     * This stores all EvidenceItem instances (11-field model) for debugging and audit.
+     * The top 3-5 are transformed to Evidence (5-field model) for API response.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private JsonNode allEvidence;
+
     /** Outcome of the optional validation step (e.g. {@code VALIDATED}, {@code DISPUTED}). */
     @Column(length = 64)
     private String validationResult;
@@ -163,6 +173,9 @@ public class DiagnosticEntity extends BaseEntity {
 
     public JsonNode getEvidence() { return evidence; }
     public void setEvidence(JsonNode evidence) { this.evidence = evidence; }
+
+    public JsonNode getAllEvidence() { return allEvidence; }
+    public void setAllEvidence(JsonNode allEvidence) { this.allEvidence = allEvidence; }
 
     public String getValidationResult() { return validationResult; }
     public void setValidationResult(String validationResult) { this.validationResult = validationResult; }
