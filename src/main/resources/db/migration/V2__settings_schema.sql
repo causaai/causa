@@ -9,23 +9,24 @@
 -- 1. EXTERNAL CONFIGS TABLE
 --    Covers both Observability (DATADOG | INSTANA | OTHER) and
 --    Integration (SLACK | JIRA | GITHUB) platforms via the category discriminator.
---    UNIQUE(category, platform) — one config per platform per category.
+--    UNIQUE(platform, name) — multiple named configs per platform allowed.
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS external_configs (
     id                VARCHAR(21)              NOT NULL,   -- extc_<16-alphanumeric>
     category          VARCHAR(32)              NOT NULL,   -- OBSERVABILITY | INTEGRATION
     platform          VARCHAR(64)              NOT NULL,   -- DATADOG | INSTANA | OTHER | SLACK | JIRA | GITHUB
-    url               VARCHAR(512), 
+    name              VARCHAR(128)             NOT NULL,   -- user-defined label, e.g. "instana-prod"
+    url               VARCHAR(512),
     auth_type         VARCHAR(32)              NOT NULL,   -- API_KEY | API_TOKEN | WEBHOOK | PAT
-    is_active         BOOLEAN                  NOT NULL DEFAULT FALSE,
+    is_active         BOOLEAN                  NOT NULL DEFAULT TRUE,
     auth_config       JSONB                    NOT NULL,
     additional_config JSONB,
     created_at        TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at        TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT pk_external_configs           PRIMARY KEY (id),
-    CONSTRAINT uq_external_configs_cat_plat  UNIQUE (category, platform)
+    CONSTRAINT uq_external_configs_plat_name UNIQUE (platform, name)
 );
 
 CREATE INDEX IF NOT EXISTS idx_external_configs_category ON external_configs (category);
@@ -42,7 +43,7 @@ CREATE TABLE IF NOT EXISTS llm_configs (
     id                VARCHAR(21)              NOT NULL,   -- llmc_<16-alphanumeric>
     name              VARCHAR(128)             NOT NULL,
     provider          VARCHAR(64)              NOT NULL,   -- OPENAI | ANTHROPIC | AZURE_OPENAI | WATSONX
-    model             VARCHAR(128)             NOT NULL,
+    models            TEXT[]                   NOT NULL,   -- e.g. {gpt-4o, gpt-4o-mini}
     auth_type         VARCHAR(32)              NOT NULL,   -- API_KEY | VERTEX_AI | CUSTOM_HEADERS
     temperature       NUMERIC(4,2),
     max_tokens        INTEGER,
