@@ -1,17 +1,18 @@
 package com.causa.core.services;
 
-import java.util.Optional;
 import com.causa.api.dto.ComponentHealthDto;
 import com.causa.api.dto.HealthCheckResponseDto;
 import com.causa.common.constants.AppConstants;
 import com.causa.common.constants.HealthCheckConstants;
 import com.causa.config.AppConfig;
 import com.causa.config.LlmConfigSnapshot;
-import com.causa.config.McpConfig;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
 import com.causa.core.ports.llm.PromptSender;
 import com.causa.infrastructure.persistence.DatabaseConnectionService;
+import com.causa.mcp.McpClient;
+import com.causa.mcp.McpRegistry;
+import com.causa.mcp.config.McpSettings;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -23,6 +24,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.Statement;
+import java.util.List;
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -30,21 +34,10 @@ import static org.mockito.Mockito.*;
 /**
  * Unit tests for {@link HealthCheckService}.
  *
- * <p>Pure unit tests — all dependencies are mocked via Mockito.
- * MCP endpoint checks inside {@link HealthCheckService} use {@code java.net.http.HttpClient}
- * internally and cannot be mocked at this layer without production refactoring.
- * Those checks are therefore excluded here; they are covered by integration tests.
- *
- * <p>What IS tested here:
- * <ul>
- *   <li>Database health logic (ready / not-ready / query-fail / connection-fail)</li>
- *   <li>LLM provider health logic (ready / not-ready / send-fail / empty / null response)</li>
- *   <li>Overall status aggregation (UP / DOWN / DEGRADED)</li>
- *   <li>Response structure (version, timestamp, components map)</li>
- * </ul>
- *
- * <p>MCP always resolves to DOWN in these tests (non-routable endpoint + 1ms timeout),
- * so all assertions about MCP status expect DOWN.
+ * <p>Pure unit tests — all dependencies are mocked via Mockito, including {@link McpRegistry} and
+ * {@link McpClient} — since {@code McpClient} is a plain class (not raw {@code HttpClient} usage
+ * inline), MCP health can now be fully mocked and deterministic, unlike the previous
+ * implementation.
  *
  * @since 0.0.1
  */
@@ -74,52 +67,70 @@ class HealthCheckServiceTest {
     private LlmConfigSnapshot llmConfigSnapshot;
 
     @Mock
-    private McpConfig mcpConfig;
-
-    @Mock
-    private McpConfig.QuarkusConfig quarkusConfig;
-
-    @Mock
-    private McpConfig.AsyncProfilerConfig asyncProfilerConfig;
+    private McpRegistry mcpRegistry;
 
     private HealthCheckService healthCheckService;
 
     private static final String APP_VERSION = "0.0.1-TEST";
 
-    /**
-     * 192.0.2.x is RFC 5737 TEST-NET-1 — guaranteed non-routable.
-     * Combined with a 1ms connect timeout, the HttpClient fails instantly
-     * without blocking the test thread.
-     */
-    private static final String MCP_DEAD_ENDPOINT = "http://192.0.2.1";
-    private static final String MCP_HEALTH_PATH   = "/health";
-    private static final int    MCP_TIMEOUT_MS    = 1;
-
     @BeforeEach
     void setUp() {
-        when(mcpConfig.quarkus()).thenReturn(quarkusConfig);
-        when(quarkusConfig.endpoint()).thenReturn(Optional.of(MCP_DEAD_ENDPOINT));
-        when(quarkusConfig.healthPath()).thenReturn(MCP_HEALTH_PATH);
-        when(quarkusConfig.timeoutMs()).thenReturn(MCP_TIMEOUT_MS);
-
-        when(mcpConfig.asyncProfiler()).thenReturn(asyncProfilerConfig);
-        when(asyncProfilerConfig.endpoint()).thenReturn(Optional.of(MCP_DEAD_ENDPOINT));
-        when(asyncProfilerConfig.healthPath()).thenReturn(MCP_HEALTH_PATH);
-        when(asyncProfilerConfig.timeoutMs()).thenReturn(MCP_TIMEOUT_MS);
-
         healthCheckService = new HealthCheckService(
                 databaseConnectionService,
                 dataSource,
                 APP_VERSION,
-                "cluster",
-                MCP_DEAD_ENDPOINT, MCP_HEALTH_PATH, MCP_TIMEOUT_MS,   // k8s
-                MCP_DEAD_ENDPOINT, MCP_HEALTH_PATH, MCP_TIMEOUT_MS,   // kruize
-                MCP_DEAD_ENDPOINT, MCP_HEALTH_PATH, MCP_TIMEOUT_MS,   // cryostat
-                MCP_DEAD_ENDPOINT, MCP_HEALTH_PATH, MCP_TIMEOUT_MS,   // filesystem
-                mcpConfig,
+                mcpRegistry,
                 llmPromptSender,
                 appConfig
         );
+    }
+
+    // -------------------------------------------------------------------------
+    // Test helpers
+    // -------------------------------------------------------------------------
+
+    private static ComponentHealthDto up() {
+        return ComponentHealthDto.builder()
+                .status(AppConstants.HealthStatus.UP.getValue())
+                .message("Connected successfully")
+                .latencyMs(5L)
+                .build();
+    }
+
+    private static ComponentHealthDto down() {
+        return ComponentHealthDto.builder()
+                .status(AppConstants.HealthStatus.DOWN.getValue())
+                .message("MCP server not available")
+                .latencyMs(5L)
+                .build();
+    }
+
+    private static McpSettings.ServerConfig serverConfig(boolean optional) {
+        return new McpSettings.ServerConfig(
+                "streamable-http",
+                "http://example:8080/mcp",
+                Map.of(),
+                optional,
+                List.of("some_tool"),
+                new McpSettings.HealthCheckConfig("http://example:8080/healthz", 5000),
+                5000,
+                Map.of(),
+                null,
+                List.of());
+    }
+
+    private static McpClient mockClient(String name, boolean optional, ComponentHealthDto health) {
+        McpClient client = mock(McpClient.class);
+        lenient().when(client.getServerName()).thenReturn(name);
+        lenient().when(client.getConfig()).thenReturn(serverConfig(optional));
+        lenient().when(client.checkHealth()).thenReturn(health);
+        return client;
+    }
+
+    /** Registry with no configured servers — isolates DB/LLM tests from MCP entirely. */
+    private void mcpRegistryEmpty() {
+        when(mcpRegistry.isInitialized()).thenReturn(true);
+        when(mcpRegistry.allClients()).thenReturn(List.of());
     }
 
     // -------------------------------------------------------------------------
@@ -129,6 +140,11 @@ class HealthCheckServiceTest {
     @Nested
     @DisplayName("Database Health Tests")
     class DatabaseHealthTests {
+
+        @BeforeEach
+        void mcpEmpty() {
+            mcpRegistryEmpty();
+        }
 
         @Test
         @DisplayName("UP — database ready and SELECT 1 succeeds")
@@ -204,6 +220,11 @@ class HealthCheckServiceTest {
     @DisplayName("LLM Provider Health Tests")
     class LlmHealthTests {
 
+        @BeforeEach
+        void mcpEmpty() {
+            mcpRegistryEmpty();
+        }
+
         @Test
         @DisplayName("UP — isReady true and send() returns non-empty response")
         void upWhenReadyAndResponds() {
@@ -212,21 +233,12 @@ class HealthCheckServiceTest {
             when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
             when(llmConfigSnapshot.getProvider()).thenReturn("bob");
             when(llmConfigSnapshot.getModelName()).thenReturn("bob");
-            
-            LLMResponse mockResponse = new LLMResponse(
-                    "OK",
-                    "claude-sonnet-4-6",
-                    11L,
-                    4L,
-                    0L,
-                    0L,
-                    100L
-            );
+
+            LLMResponse mockResponse = new LLMResponse("OK", "claude-sonnet-4-6", 11L, 4L, 0L, 0L, 100L);
             when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(mockResponse);
 
             HealthCheckResponseDto response = healthCheckService.getSystemHealth();
 
-            // Then
             assertNotNull(response);
             ComponentHealthDto llmHealth = response.getComponents().get(HealthCheckConstants.ComponentNames.LLM_PROVIDER);
             assertNotNull(llmHealth);
@@ -315,6 +327,63 @@ class HealthCheckServiceTest {
     }
 
     // -------------------------------------------------------------------------
+    // Dynamic MCP health (McpRegistry-driven)
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("MCP Health Tests (dynamic, McpRegistry-driven)")
+    class McpHealthTests {
+
+        @Test
+        @DisplayName("Each registered client produces a mcp_<name> component")
+        void eachClientProducesAComponent() {
+            when(databaseConnectionService.isReady()).thenReturn(false);
+            when(llmPromptSender.isReady()).thenReturn(false);
+            List<McpClient> clients = List.of(
+                    mockClient("kubernetes", false, up()),
+                    mockClient("cryostat", true, down()));
+            when(mcpRegistry.isInitialized()).thenReturn(true);
+            when(mcpRegistry.allClients()).thenReturn(clients);
+
+            HealthCheckResponseDto response = healthCheckService.getSystemHealth();
+
+            assertEquals(AppConstants.HealthStatus.UP.getValue(),
+                    response.getComponents().get("mcp_kubernetes").getStatus());
+            assertEquals(AppConstants.HealthStatus.DOWN.getValue(),
+                    response.getComponents().get("mcp_cryostat").getStatus());
+        }
+
+        @Test
+        @DisplayName("No mcp_config component when the registry is initialized")
+        void noMcpConfigComponentWhenInitialized() {
+            when(databaseConnectionService.isReady()).thenReturn(false);
+            when(llmPromptSender.isReady()).thenReturn(false);
+            mcpRegistryEmpty();
+
+            HealthCheckResponseDto response = healthCheckService.getSystemHealth();
+
+            assertFalse(response.getComponents().containsKey(HealthCheckConstants.ComponentNames.MCP_CONFIG));
+        }
+
+        @Test
+        @DisplayName("mcp_config DOWN with the exact load-failure reason when the registry failed to initialize")
+        void mcpConfigComponentWhenNotInitialized() {
+            when(databaseConnectionService.isReady()).thenReturn(false);
+            when(llmPromptSender.isReady()).thenReturn(false);
+            when(mcpRegistry.isInitialized()).thenReturn(false);
+            when(mcpRegistry.getInitializationError()).thenReturn(java.util.Optional.of("bad JSON at line 3"));
+
+            HealthCheckResponseDto response = healthCheckService.getSystemHealth();
+
+            ComponentHealthDto mcpConfig = response.getComponents().get(HealthCheckConstants.ComponentNames.MCP_CONFIG);
+            assertNotNull(mcpConfig);
+            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), mcpConfig.getStatus());
+            assertTrue(mcpConfig.getMessage().contains("bad JSON at line 3"));
+            verify(mcpRegistry, never()).allClients();
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Overall status aggregation
     // -------------------------------------------------------------------------
 
@@ -322,78 +391,96 @@ class HealthCheckServiceTest {
     @DisplayName("Overall Status Aggregation Tests")
     class OverallStatusTests {
 
-        @Test
-        @DisplayName("Should return UP when all components are UP")
-        void shouldReturnUpWhenAllComponentsAreUp() throws Exception {
-            // Given - Database UP
+        private void dbUp() throws Exception {
             when(databaseConnectionService.isReady()).thenReturn(true);
             when(dataSource.getConnection()).thenReturn(connection);
             when(connection.createStatement()).thenReturn(statement);
             when(statement.execute("SELECT 1")).thenReturn(true);
+        }
 
-            // Given - LLM UP
+        private void llmUp() {
             when(llmPromptSender.isReady()).thenReturn(true);
             when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
             when(llmConfigSnapshot.getProvider()).thenReturn("bob");
             when(llmConfigSnapshot.getModelName()).thenReturn("bob");
-            LLMResponse mockResponse = new LLMResponse("OK", "bob", 11L, 4L, 0L, 0L, 100L);
-            when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(mockResponse);
-
-            // When
-            HealthCheckResponseDto response = healthCheckService.getSystemHealth();
-
-            // Then
-            assertNotNull(response);
-            // Note: MCP will be DOWN (connection refused), so overall should be DEGRADED
-            assertEquals(AppConstants.HealthStatus.DEGRADED.getValue(), response.getStatus());
+            when(llmPromptSender.send(any(LLMRequest.class)))
+                    .thenReturn(new LLMResponse("OK", "bob", 1L, 1L, 0L, 0L, 10L));
         }
 
         @Test
-        @DisplayName("Should return DOWN when database is DOWN")
-        void shouldReturnDownWhenDatabaseIsDown() {
-            // Given - Database DOWN
+        @DisplayName("UP — database, LLM, and all MCP servers up")
+        void upWhenEverythingUp() throws Exception {
+            dbUp();
+            llmUp();
+            List<McpClient> clients = List.of(mockClient("kubernetes", false, up()));
+            when(mcpRegistry.isInitialized()).thenReturn(true);
+            when(mcpRegistry.allClients()).thenReturn(clients);
+
+            assertEquals(AppConstants.HealthStatus.UP.getValue(),
+                    healthCheckService.getSystemHealth().getStatus());
+        }
+
+        @Test
+        @DisplayName("DOWN — database is down (regardless of everything else)")
+        void downWhenDatabaseIsDown() {
             when(databaseConnectionService.isReady()).thenReturn(false);
-            // LLM UP — doesn't matter, DB is critical
-            when(llmPromptSender.isReady()).thenReturn(true);
-            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
-            when(llmConfigSnapshot.getProvider()).thenReturn("bob");
-            when(llmConfigSnapshot.getModelName()).thenReturn("bob");
-            LLMResponse mockResponse = new LLMResponse("OK", "bob", 11L, 4L, 0L, 0L, 100L);
-            when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(mockResponse);
+            llmUp();
+            mcpRegistryEmpty();
 
             assertEquals(AppConstants.HealthStatus.DOWN.getValue(),
                     healthCheckService.getSystemHealth().getStatus());
         }
 
         @Test
-        @DisplayName("DEGRADED — database UP but LLM DOWN")
-        void degradedWhenDatabaseUpButLlmDown() throws Exception {
-            when(databaseConnectionService.isReady()).thenReturn(true);
-            when(dataSource.getConnection()).thenReturn(connection);
-            when(connection.createStatement()).thenReturn(statement);
-            when(statement.execute("SELECT 1")).thenReturn(true);
+        @DisplayName("DOWN — a required (non-optional) MCP server is down")
+        void downWhenRequiredMcpDown() throws Exception {
+            dbUp();
+            llmUp();
+            List<McpClient> clients = List.of(mockClient("kubernetes", false, down()));
+            when(mcpRegistry.isInitialized()).thenReturn(true);
+            when(mcpRegistry.allClients()).thenReturn(clients);
+
+            assertEquals(AppConstants.HealthStatus.DOWN.getValue(),
+                    healthCheckService.getSystemHealth().getStatus());
+        }
+
+        @Test
+        @DisplayName("UP — only an optional MCP server is down; it does not affect overall status")
+        void upWhenOnlyOptionalMcpDown() throws Exception {
+            dbUp();
+            llmUp();
+            List<McpClient> clients = List.of(
+                    mockClient("kubernetes", false, up()),
+                    mockClient("cryostat", true, down()));
+            when(mcpRegistry.isInitialized()).thenReturn(true);
+            when(mcpRegistry.allClients()).thenReturn(clients);
+
+            assertEquals(AppConstants.HealthStatus.UP.getValue(),
+                    healthCheckService.getSystemHealth().getStatus());
+        }
+
+        @Test
+        @DisplayName("DEGRADED — database and MCP up, LLM down")
+        void degradedWhenLlmDown() throws Exception {
+            dbUp();
             when(llmPromptSender.isReady()).thenReturn(false);
+            List<McpClient> clients = List.of(mockClient("kubernetes", false, up()));
+            when(mcpRegistry.isInitialized()).thenReturn(true);
+            when(mcpRegistry.allClients()).thenReturn(clients);
 
             assertEquals(AppConstants.HealthStatus.DEGRADED.getValue(),
                     healthCheckService.getSystemHealth().getStatus());
         }
 
         @Test
-        @DisplayName("DEGRADED — database UP, LLM UP, MCP always DOWN (no real HTTP in unit tests)")
-        void degradedWhenDatabaseAndLlmUpButMcpDown() throws Exception {
-            // DB UP
-            when(databaseConnectionService.isReady()).thenReturn(true);
-            when(dataSource.getConnection()).thenReturn(connection);
-            when(connection.createStatement()).thenReturn(statement);
-            when(statement.execute("SELECT 1")).thenReturn(true);
-            // LLM UP
-            when(llmPromptSender.isReady()).thenReturn(true);
-            when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(
-                    new LLMResponse("OK", "claude-sonnet-4-6", 10L, 4L, 0L, 0L, 50L));
-            // MCP → DOWN (192.0.2.1 + 1ms timeout → instant fail)
+        @DisplayName("DOWN — MCP config failed to load, even though database and LLM are up")
+        void downWhenMcpConfigFailedToLoad() throws Exception {
+            dbUp();
+            llmUp();
+            when(mcpRegistry.isInitialized()).thenReturn(false);
+            when(mcpRegistry.getInitializationError()).thenReturn(java.util.Optional.empty());
 
-            // Overall must be DEGRADED (not DOWN — DB and LLM are UP)
-            assertEquals(AppConstants.HealthStatus.DEGRADED.getValue(),
+            assertEquals(AppConstants.HealthStatus.DOWN.getValue(),
                     healthCheckService.getSystemHealth().getStatus());
         }
     }
@@ -410,6 +497,7 @@ class HealthCheckServiceTest {
         void allDown() {
             when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(false);
+            mcpRegistryEmpty();
         }
 
         @Test
@@ -442,220 +530,14 @@ class HealthCheckServiceTest {
         }
 
         @Test
-        @DisplayName("Response always contains mcp_kubernetes component in cluster mode")
-        void responseContainsMcpKubernetesComponent() {
-            assertTrue(healthCheckService.getSystemHealth().getComponents()
-                    .containsKey(HealthCheckConstants.ComponentNames.MCP_KUBERNETES));
-        }
-
-        @Test
         @DisplayName("Successive calls produce different timestamps")
         void successiveCallsProduceDifferentTimestamps() {
             String ts1 = healthCheckService.getSystemHealth().getTimestamp();
             String ts2 = healthCheckService.getSystemHealth().getTimestamp();
-            // Timestamps may be equal if both calls happen within the same millisecond,
-            // but they must both be non-null valid ISO strings
             assertNotNull(ts1);
             assertNotNull(ts2);
             assertDoesNotThrow(() -> java.time.Instant.parse(ts1));
             assertDoesNotThrow(() -> java.time.Instant.parse(ts2));
-        }
-
-        @Test
-        @DisplayName("MCP kubernetes component is DOWN in unit tests (no real HTTP)")
-        void mcpAlwaysDownInUnitTests() {
-            ComponentHealthDto mcp = healthCheckService.getSystemHealth().getComponents()
-                    .get(HealthCheckConstants.ComponentNames.MCP_KUBERNETES);
-            assertNotNull(mcp);
-            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), mcp.getStatus());
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // Quarkus MCP health — cluster mode
-    // -------------------------------------------------------------------------
-
-    @Nested
-    @DisplayName("Quarkus MCP Health Tests (cluster mode)")
-    class QuarkusHealthTests {
-
-        @Test
-        @DisplayName("Cluster mode — mcp_quarkus component present and DOWN (no real HTTP)")
-        void clusterModeIncludesQuarkusComponent() {
-            when(databaseConnectionService.isReady()).thenReturn(false);
-            when(llmPromptSender.isReady()).thenReturn(false);
-
-            HealthCheckResponseDto response = healthCheckService.getSystemHealth();
-
-            ComponentHealthDto quarkus = response.getComponents()
-                    .get(HealthCheckConstants.ComponentNames.MCP_QUARKUS);
-            assertNotNull(quarkus, "mcp_quarkus component must be present in cluster mode");
-            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), quarkus.getStatus());
-            assertNotNull(quarkus.getLatencyMs());
-        }
-
-        @Test
-        @DisplayName("DEGRADED — database UP, LLM UP, quarkus DOWN")
-        void degradedWhenDbAndLlmUpButQuarkusDown() throws Exception {
-            // DB UP
-            when(databaseConnectionService.isReady()).thenReturn(true);
-            when(dataSource.getConnection()).thenReturn(connection);
-            when(connection.createStatement()).thenReturn(statement);
-            when(statement.execute("SELECT 1")).thenReturn(true);
-            // LLM UP
-            when(llmPromptSender.isReady()).thenReturn(true);
-            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
-            when(llmConfigSnapshot.getProvider()).thenReturn("bob");
-            when(llmConfigSnapshot.getModelName()).thenReturn("bob");
-            when(llmPromptSender.send(any(LLMRequest.class)))
-                    .thenReturn(new LLMResponse("OK", "bob", 1L, 1L, 0L, 0L, 10L));
-            // quarkus → DOWN (192.0.2.1 + 1ms timeout)
-
-            assertEquals(AppConstants.HealthStatus.DEGRADED.getValue(),
-                    healthCheckService.getSystemHealth().getStatus(),
-                    "System must be DEGRADED (not DOWN) when only non-critical MCPs are down");
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // Async Profiler MCP health — cluster mode
-    // -------------------------------------------------------------------------
-
-    @Nested
-    @DisplayName("Async Profiler MCP Health Tests (cluster mode)")
-    class AsyncProfilerHealthTests {
-
-        @Test
-        @DisplayName("Cluster mode — mcp_async_profiler component present and DOWN (no real HTTP)")
-        void clusterModeIncludesAsyncProfilerComponent() {
-            when(databaseConnectionService.isReady()).thenReturn(false);
-            when(llmPromptSender.isReady()).thenReturn(false);
-
-            HealthCheckResponseDto response = healthCheckService.getSystemHealth();
-
-            ComponentHealthDto asyncProfiler = response.getComponents()
-                    .get(HealthCheckConstants.ComponentNames.MCP_ASYNC_PROFILER);
-            assertNotNull(asyncProfiler, "mcp_async_profiler component must be present in cluster mode when endpoint is configured");
-            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), asyncProfiler.getStatus());
-            assertNotNull(asyncProfiler.getLatencyMs());
-        }
-
-        @Test
-        @DisplayName("DEGRADED — database UP, LLM UP, async profiler DOWN")
-        void degradedWhenDbAndLlmUpButAsyncProfilerDown() throws Exception {
-            // DB UP
-            when(databaseConnectionService.isReady()).thenReturn(true);
-            when(dataSource.getConnection()).thenReturn(connection);
-            when(connection.createStatement()).thenReturn(statement);
-            when(statement.execute("SELECT 1")).thenReturn(true);
-            // LLM UP
-            when(llmPromptSender.isReady()).thenReturn(true);
-            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
-            when(llmConfigSnapshot.getProvider()).thenReturn("bob");
-            when(llmConfigSnapshot.getModelName()).thenReturn("bob");
-            when(llmPromptSender.send(any(LLMRequest.class)))
-                    .thenReturn(new LLMResponse("OK", "bob", 1L, 1L, 0L, 0L, 10L));
-            // async profiler → DOWN (192.0.2.1 + 1ms timeout)
-
-            assertEquals(AppConstants.HealthStatus.DEGRADED.getValue(),
-                    healthCheckService.getSystemHealth().getStatus(),
-                    "System must be DEGRADED (not DOWN) when only non-critical MCPs are down");
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // VM platform mode — filesystem MCP only
-    // -------------------------------------------------------------------------
-
-    @Nested
-    @DisplayName("VM Platform Mode Tests")
-    class VmPlatformTests {
-
-        private HealthCheckService vmHealthService;
-
-        @BeforeEach
-        void setUpVm() {
-            when(mcpConfig.quarkus()).thenReturn(quarkusConfig);
-            when(quarkusConfig.endpoint()).thenReturn(Optional.of(MCP_DEAD_ENDPOINT));
-            when(quarkusConfig.healthPath()).thenReturn(MCP_HEALTH_PATH);
-            when(quarkusConfig.timeoutMs()).thenReturn(MCP_TIMEOUT_MS);
-
-            when(mcpConfig.asyncProfiler()).thenReturn(asyncProfilerConfig);
-            when(asyncProfilerConfig.endpoint()).thenReturn(Optional.of(MCP_DEAD_ENDPOINT));
-            when(asyncProfilerConfig.healthPath()).thenReturn(MCP_HEALTH_PATH);
-            when(asyncProfilerConfig.timeoutMs()).thenReturn(MCP_TIMEOUT_MS);
-
-            vmHealthService = new HealthCheckService(
-                    databaseConnectionService,
-                    dataSource,
-                    APP_VERSION,
-                    "vm",
-                    MCP_DEAD_ENDPOINT, MCP_HEALTH_PATH, MCP_TIMEOUT_MS,
-                    MCP_DEAD_ENDPOINT, MCP_HEALTH_PATH, MCP_TIMEOUT_MS,
-                    MCP_DEAD_ENDPOINT, MCP_HEALTH_PATH, MCP_TIMEOUT_MS,
-                    MCP_DEAD_ENDPOINT, MCP_HEALTH_PATH, MCP_TIMEOUT_MS,
-                    mcpConfig,
-                    llmPromptSender,
-                    appConfig
-            );
-        }
-
-        @Test
-        @DisplayName("VM mode — mcp_filesystem component present instead of mcp_kubernetes")
-        void vmModeIncludesFilesystemNotKubernetes() {
-            when(databaseConnectionService.isReady()).thenReturn(false);
-            when(llmPromptSender.isReady()).thenReturn(false);
-
-            HealthCheckResponseDto response = vmHealthService.getSystemHealth();
-
-            assertTrue(response.getComponents()
-                    .containsKey(HealthCheckConstants.ComponentNames.MCP_FILESYSTEM));
-            assertFalse(response.getComponents()
-                    .containsKey(HealthCheckConstants.ComponentNames.MCP_KUBERNETES));
-        }
-
-        @Test
-        @DisplayName("VM mode — mcp_quarkus absent in VM mode")
-        void vmModeOmitsQuarkus() {
-            when(databaseConnectionService.isReady()).thenReturn(false);
-            when(llmPromptSender.isReady()).thenReturn(false);
-
-            HealthCheckResponseDto response = vmHealthService.getSystemHealth();
-
-            assertFalse(response.getComponents()
-                    .containsKey(HealthCheckConstants.ComponentNames.MCP_QUARKUS),
-                    "mcp_quarkus must NOT appear in VM mode");
-        }
-
-        @Test
-        @DisplayName("VM mode — overall DOWN when database is DOWN")
-        void vmModeDownWhenDatabaseDown() {
-            when(databaseConnectionService.isReady()).thenReturn(false);
-            when(llmPromptSender.isReady()).thenReturn(false);
-
-            assertEquals(AppConstants.HealthStatus.DOWN.getValue(),
-                    vmHealthService.getSystemHealth().getStatus());
-        }
-
-        @Test
-        @DisplayName("VM mode — overall status unaffected by absent quarkus MCP")
-        void vmModeOverallStatusIgnoresQuarkus() throws Exception {
-            // DB UP, LLM UP — quarkus not checked in VM mode
-            when(databaseConnectionService.isReady()).thenReturn(true);
-            when(dataSource.getConnection()).thenReturn(connection);
-            when(connection.createStatement()).thenReturn(statement);
-            when(statement.execute("SELECT 1")).thenReturn(true);
-            when(llmPromptSender.isReady()).thenReturn(true);
-            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
-            when(llmConfigSnapshot.getProvider()).thenReturn("bob");
-            when(llmConfigSnapshot.getModelName()).thenReturn("bob");
-            when(llmPromptSender.send(any(LLMRequest.class)))
-                    .thenReturn(new LLMResponse("OK", "bob", 1L, 1L, 0L, 0L, 10L));
-
-            // Only filesystem MCP is checked — it will be DOWN (dead endpoint)
-            // so overall should be DEGRADED, not UP, and NOT caused by quarkus
-            assertEquals(AppConstants.HealthStatus.DEGRADED.getValue(),
-                    vmHealthService.getSystemHealth().getStatus());
         }
     }
 }
