@@ -41,7 +41,6 @@ CREATE INDEX IF NOT EXISTS idx_external_configs_active   ON external_configs (ca
 
 CREATE TABLE IF NOT EXISTS llm_configs (
     id                VARCHAR(21)              NOT NULL,   -- llmc_<16-alphanumeric>
-    name              VARCHAR(128)             NOT NULL,
     provider          VARCHAR(64)              NOT NULL,   -- OPENAI | ANTHROPIC | AZURE_OPENAI | WATSONX
     models            TEXT[]                   NOT NULL,   -- e.g. {gpt-4o, gpt-4o-mini}
     auth_type         VARCHAR(32)              NOT NULL,   -- API_KEY | VERTEX_AI | CUSTOM_HEADERS
