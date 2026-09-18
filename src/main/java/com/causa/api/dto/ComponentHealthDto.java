@@ -26,6 +26,9 @@ public class ComponentHealthDto {
     @JsonProperty("latency_ms")
     private Long latencyMs;
 
+    @JsonProperty("optional")
+    private Boolean optional;
+
     /**
      * Default constructor for JSON deserialization
      */
@@ -83,12 +86,28 @@ public class ComponentHealthDto {
     }
 
     /**
+     * Whether this component is optional — i.e. it being down never affects overall system
+     * health. Only populated for MCP server components; {@code null} (omitted from JSON) for
+     * non-MCP components like database/LLM.
+     *
+     * @return {@code true}/{@code false} for MCP components, {@code null} otherwise
+     */
+    public Boolean getOptional() {
+        return optional;
+    }
+
+    public void setOptional(Boolean optional) {
+        this.optional = optional;
+    }
+
+    /**
      * Builder for fluent construction
      */
     public static class Builder {
         private String status;
         private String message;
         private Long latencyMs;
+        private Boolean optional;
 
         public Builder status(String status) {
             this.status = status;
@@ -105,8 +124,15 @@ public class ComponentHealthDto {
             return this;
         }
 
+        public Builder optional(Boolean optional) {
+            this.optional = optional;
+            return this;
+        }
+
         public ComponentHealthDto build() {
-            return new ComponentHealthDto(status, message, latencyMs);
+            ComponentHealthDto dto = new ComponentHealthDto(status, message, latencyMs);
+            dto.setOptional(optional);
+            return dto;
         }
     }
 
