@@ -88,10 +88,21 @@ ENV LANGUAGE='en_US:en'
 USER 0
 
 # Install Node.js (required by BOB Shell installation script - needs v22.15+)
-# Using NodeSource repository for latest Node.js
-RUN curl -fsSL https://rpm.nodesource.com/setup_22.x | bash - && \
-    microdnf install -y nodejs && \
-    microdnf clean all
+# Use the official Node.js binary tarball so both amd64 and arm64 are supported.
+# $TARGETARCH is set automatically by docker buildx ('amd64' or 'arm64').
+ARG TARGETARCH
+ARG NODE_VERSION=22.15.0
+RUN microdnf install -y gzip tar && microdnf clean all
+RUN set -eux; \
+    case "${TARGETARCH}" in \
+      amd64) NODE_ARCH="x64" ;; \
+      arm64) NODE_ARCH="arm64" ;; \
+      *) echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
+    esac; \
+    curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.gz" \
+      -o /tmp/nodejs.tar.gz; \
+    tar -xzf /tmp/nodejs.tar.gz -C /usr/local --strip-components=1; \
+    rm /tmp/nodejs.tar.gz
 
 # Verify Node.js installation
 RUN node --version && npm --version
