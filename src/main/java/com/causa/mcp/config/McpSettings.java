@@ -21,10 +21,12 @@ import java.util.Map;
  * @param mcpServers server name → server config
  * @since 0.0.1
  */
-public record McpSettings(@NotEmpty Map<String, @Valid ServerConfig> mcpServers) {
+public record McpSettings(@NotEmpty Map<String, @NotNull @Valid ServerConfig> mcpServers) {
 
     public McpSettings {
-        mcpServers = mcpServers != null ? Map.copyOf(mcpServers) : Map.of();
+        // Map.copyOf() would throw NPE on a null-valued entry before Bean Validation ever runs;
+        // @NotNull above reports it as a validation failure instead, so we just null-coalesce here.
+        mcpServers = mcpServers != null ? mcpServers : Map.of();
     }
 
     /**
