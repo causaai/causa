@@ -59,6 +59,22 @@ public record DiagnosticDetailResponse(
         @JsonProperty("workload_type") String workloadType
     ) {}
 
+    /**
+     * Evidence - UI Model (5 fields).
+     *
+     * <p>User-friendly evidence for API response. Selected from top 3-5
+     * EvidenceItems by priority and transformed for display.
+     *
+     * @since 0.0.1
+     */
+    public record Evidence(
+        @JsonProperty("supportingEvidence") String supportingEvidence,
+        @JsonProperty("explanation")        String explanation,
+        @JsonProperty("source")             String source,
+        @JsonProperty("rawSnippet")         String rawSnippet,
+        @JsonProperty("reliability")        String reliability
+    ) {}
+
     public record DiagnosisInfo(
         @JsonProperty("issue_title")           String issueTitle,
         @JsonProperty("issue_summary")         String issueSummary,
@@ -66,7 +82,7 @@ public record DiagnosticDetailResponse(
         @JsonProperty("technical_description") String technicalDescription,
         @JsonProperty("anomaly_type")          String anomalyType,
         @JsonProperty("root_cause")            String rootCause,
-        @JsonProperty("evidences")             List<String> evidences,
+        @JsonProperty("evidences")             List<Evidence> evidences,
         @JsonProperty("supporting_logs")       List<String> supportingLogs,
         @JsonProperty("rca_confidence_score")  Double rcaConfidenceScore,
         @JsonProperty("confidence_summary")    String confidenceSummaryText,
@@ -125,6 +141,8 @@ public record DiagnosticDetailResponse(
                     .toList();
             }
 
+            // TODO: Once validation pipeline is integrated, transform EvidenceItem -> Evidence
+            // For now, evidences field is null (backward compatible until implementation)
             diagnosisInfo = new DiagnosisInfo(
                 rca.issueTitle(),
                 rca.issueSummary(),
@@ -132,7 +150,7 @@ public record DiagnosticDetailResponse(
                 rca.technicalDescription(),
                 rca.anomalyType() != null ? rca.anomalyType().name() : null,
                 rca.rootCause(),
-                rca.evidences(),
+                null,  // evidences - will be populated from allEvidence in future
                 rca.supportingLogs(),
                 rcaScore,
                 summaryText,
