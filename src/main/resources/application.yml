@@ -221,3 +221,11 @@ causa:
         project-id: ${VERTEX_PROJECT_ID:}
         location: ${VERTEX_LOCATION:us-east5}
 
+# ============================================================
+# Test Profile Configuration
+# ============================================================
+"%test":
+  causa:
+    mcp:
+      config-path: ${MCP_CONFIG_PATH:deployment/kubernetes/base/mcp-config/mcp-cluster-default.json}
+

@@ -118,7 +118,8 @@ public final class LogMessages {
         public static final String LLM_CHECK_STARTED = "LLM health check started";
         public static final String LLM_CHECK_PASSED = "LLM health check passed";
         public static final String LLM_CHECK_FAILED = "LLM health check failed";
-    }     
+        public static final String MCP_CONFIG_NOT_INITIALIZED = "MCP configuration not initialized";
+    }
     
     /**
      * Alert ingestion log messages.
