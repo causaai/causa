@@ -1,4 +1,4 @@
-package com.causa.mcp;
+package com.causa.mcp.util;
 
 import java.net.URI;
 import java.net.http.HttpClient;

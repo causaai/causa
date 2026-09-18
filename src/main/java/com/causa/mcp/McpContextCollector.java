@@ -13,6 +13,7 @@ import com.causa.common.logging.LogMessages;
 import com.causa.config.McpConfig;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.DiagnosticContext;
+import com.causa.mcp.util.LibertyLogsContextCollector;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
