@@ -323,6 +323,20 @@ public final class LogMessages {
         public static final String ASSERTION_BATCH_COMPLETED = "Batch analysis completed";
         public static final String ASSERTION_SKIP_RECOMMENDATION = "Recommendations are not validated against evidence";
         public static final String ASSERTION_NO_JSON = "No JSON object found in LLM response";
+
+        // Rule Engine (PATH B)
+        public static final String PATH_B_RUNNING = "PATH B: Running rule-based hypothesis validation";
+        public static final String PATH_B_SIGNAL_EXTRACTED = "PATH B Signal extracted";
+        public static final String RULE_EVALUATED = "Rule evaluated";
+        public static final String RULE_EVALUATION_ERROR = "Rule evaluation failed";
+        public static final String RULESET_LOADED = "Loaded ruleset from YAML";
+        public static final String RULESET_FILE_NOT_FOUND = "Ruleset file not found";
+        public static final String RULESET_LOAD_FAILED = "Failed to load ruleset";
+        public static final String VALIDATION_COMPLETED = "Rule-based validation completed";
+        public static final String NO_RULESET_EXPLANATION_PREFIX = "No ruleset available for anomaly type: ";
+
+        // Signal Extractor
+        public static final String EMPTY_DIAGNOSTIC_CONTEXT = "Empty diagnostic context, no signals to extract";
     }
 
     /**
