@@ -267,7 +267,7 @@ public final class ConfigConstants {
         entry("VERTEX_AI",      Set.of("credentialsJson")),
         entry("CUSTOM_HEADERS", Set.of("headers")),
         // Integrations
-        entry("SLACK",        Set.of("webhookUrl", "token")),
+        entry("SLACK",        Set.of("token")),
         entry("JIRA",         Set.of("token", "password")),
         entry("GITHUB",       Set.of("token"))
     );
