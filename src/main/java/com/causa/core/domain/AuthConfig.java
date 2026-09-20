@@ -13,15 +13,15 @@ import java.util.Map;
  *
  * <p>Fields by platform (* = AES-256-GCM encrypted):
  * <pre>
- *   Observability — DATADOG:   apiKey*, applicationKey*
- *   Observability — INSTANA:   apiToken*
- *   Observability — OTHER:     apiToken*
+ *   Observability — DATADOG:   apiKey*, appKey*
+ *   Observability — INSTANA:   token*
+ *   Observability — OTHER:     token*
  *
- *   LLM — API_KEY:             baseUrl, apiKey*
+ *   LLM — API_KEY:             apiKey*
  *   LLM — VERTEX_AI:           projectId, location, credentialsJson*  (ANTHROPIC via Google Cloud)
- *   LLM — CUSTOM_HEADERS:      baseUrl, headers*
+ *   LLM — CUSTOM_HEADERS:      headers*
  *
- *   Integrations — SLACK:      webhookUrl, token*
+ *   Integrations — SLACK:      token*
  *   Integrations — JIRA:       username, token*
  *   Integrations — GITHUB:     token*
  *
@@ -39,13 +39,11 @@ public record AuthConfig(
     String appKey,              // encrypted — DATADOG only (read/query access)
     String token,               // encrypted — INSTANA, OTHER, SLACK, JIRA, GITHUB: bearer/api/jwt token
 
-    String baseUrl,             // plain     — LLM (API_KEY, CUSTOM_HEADERS): endpoint URL
     String projectId,           // plain     — VERTEX_AI: GCP project ID
     String location,            // plain     — VERTEX_AI: GCP region (e.g. us-central1)
     String credentialsJson,     // encrypted — VERTEX_AI auth: service-account JSON blob
     Map<String, String> headers,// encrypted — CUSTOM_HEADERS auth: full header map
 
-    String webhookUrl,          // encrypted — SLACK: secret inbound webhook URL
     String username,            // plain     — JIRA: account username / email
     String password             // encrypted — basic auth password
 ) {}
