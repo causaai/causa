@@ -17,14 +17,15 @@ import java.util.Map;
  *   Observability — INSTANA:   token*
  *   Observability — OTHER:     token*
  *
- *   LLM — API_KEY:             apiKey*
- *   LLM — VERTEX_AI:           projectId, location, credentialsJson*  (ANTHROPIC via Google Cloud)
- *   LLM — CUSTOM_HEADERS:      headers*
+ *   LLM — API_KEY:             authType, apiKey*
+ *   LLM — VERTEX_AI:           authType, projectId, location, credentialsJson*
+ *   LLM — CUSTOM_HEADERS:      authType, headers*
  *
- *   Integrations — SLACK:      token*
- *   Integrations — JIRA:       username, token*
- *   Integrations — GITHUB:     token*
+ *   Integrations — SLACK:      authType, token*
+ *   Integrations — JIRA:       authType, username, token*
+ *   Integrations — GITHUB:     authType, token*
  *
+ *   url for all platforms stored in respective table url column — not here.
  *   Behavioural config (channel, projectName, issueType, ownerRepo)
  *   goes in additional_config JSONB — not here.
  * </pre>
@@ -34,6 +35,8 @@ import java.util.Map;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record AuthConfig(
+
+    String authType,            // plain     — auth strategy (API_KEY | VERTEX_AI | CUSTOM_HEADERS | API_TOKEN | WEBHOOK | PAT)
 
     String apiKey,              // encrypted — DATADOG (ingest), LLM (API_KEY)
     String appKey,              // encrypted — DATADOG only (read/query access)

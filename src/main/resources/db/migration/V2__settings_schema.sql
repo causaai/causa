@@ -18,7 +18,6 @@ CREATE TABLE IF NOT EXISTS external_configs (
     platform          VARCHAR(64)              NOT NULL,   -- DATADOG | INSTANA | OTHER | SLACK | JIRA | GITHUB
     name              VARCHAR(128)             NOT NULL,   -- user-defined label, e.g. "instana-prod"
     url               TEXT,
-    auth_type         VARCHAR(32)              NOT NULL,   -- API_KEY | API_TOKEN | WEBHOOK | PAT
     is_active         BOOLEAN                  NOT NULL DEFAULT TRUE,
     auth_config       JSONB                    NOT NULL,
     additional_config JSONB,
@@ -44,7 +43,6 @@ CREATE TABLE IF NOT EXISTS llm_configs (
     provider          VARCHAR(64)              NOT NULL,   -- OPENAI | ANTHROPIC | AZURE_OPENAI | WATSONX
     url               TEXT                     NOT NULL,   -- LLM API endpoint URL
     models            TEXT[]                   NOT NULL,   -- e.g. {gpt-4o, gpt-4o-mini}
-    auth_type         VARCHAR(32)              NOT NULL,   -- API_KEY | VERTEX_AI | CUSTOM_HEADERS
     temperature       NUMERIC(4,2),
     max_tokens        INTEGER,
     timeout_ms        INTEGER,
