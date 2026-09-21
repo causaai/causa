@@ -23,6 +23,9 @@ public class DatadogConfigValidator implements ExternalConfigValidator {
 
     @Override
     public void validate(ExternalConfigRequest request) {
+        if (request == null) {
+            throw new ConfigException("Request body is required for DATADOG", "VALIDATION_ERROR");
+        }
         requireNonBlank(request.getName(), "name is required for DATADOG");
         requireNonBlank(request.getUrl(),  "url is required for DATADOG");
         if (request.getAuthConfig() == null) {
