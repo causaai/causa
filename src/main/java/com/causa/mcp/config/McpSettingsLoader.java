@@ -16,9 +16,9 @@ import java.util.stream.Collectors;
 /**
  * MCP Settings Loader
  *
- * <p>Reads and validates whatever file {@code causa.mcp.config-path} points to — the loader never
+ * <p>Reads and validates whatever file {@code causa.mcp.config-file} points to — the loader never
  * hardcodes which of the deployment-mode JSONs (cluster/developer/vm) that is; that choice is made
- * entirely by {@code application.yml}/{@code MCP_CONFIG_PATH}.
+ * entirely by {@code application.yml}/{@code MCP_CONFIG_FILE}.
  *
  * <p>Uses the existing Jackson {@link ObjectMapper} and Jakarta {@link Validator} CDI beans — no
  * hand-written parsing or manual null/blank checks.
@@ -30,16 +30,16 @@ public class McpSettingsLoader {
 
     private final ObjectMapper objectMapper;
     private final Validator validator;
-    private final String configPath;
+    private final String configFile;
 
     @Inject
     public McpSettingsLoader(
             ObjectMapper objectMapper,
             Validator validator,
-            @ConfigProperty(name = "causa.mcp.config-path") String configPath) {
+            @ConfigProperty(name = "causa.mcp.config-file") String configFile) {
         this.objectMapper = objectMapper;
         this.validator = validator;
-        this.configPath = configPath;
+        this.configFile = configFile;
     }
 
     /**
@@ -52,15 +52,15 @@ public class McpSettingsLoader {
     public McpSettings load() {
         McpSettings settings;
         try {
-            settings = objectMapper.readValue(new File(configPath), McpSettings.class);
+            settings = objectMapper.readValue(new File(configFile), McpSettings.class);
         } catch (IOException e) {
             throw new McpConfigLoadException(
-                    "Failed to read MCP config file at " + configPath, "IOException", e);
+                    "Failed to read MCP config file at " + configFile, "IOException", e);
         }
 
         if (settings == null) {
             throw new McpConfigLoadException(
-                    "MCP config at " + configPath + " is empty or null", "ValidationFailed");
+                    "MCP config at " + configFile + " is empty or null", "ValidationFailed");
         }
 
         Set<ConstraintViolation<McpSettings>> violations = validator.validate(settings);
@@ -69,7 +69,7 @@ public class McpSettingsLoader {
                     .map(v -> v.getPropertyPath() + " " + v.getMessage())
                     .collect(Collectors.joining("; "));
             throw new McpConfigLoadException(
-                    "MCP config at " + configPath + " failed validation: " + details, "ValidationFailed");
+                    "MCP config at " + configFile + " failed validation: " + details, "ValidationFailed");
         }
 
         return settings;
