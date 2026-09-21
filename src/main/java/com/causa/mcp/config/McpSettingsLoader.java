@@ -63,11 +63,6 @@ public class McpSettingsLoader {
                     "MCP config at " + configFile + " is empty or null", "ValidationFailed");
         }
 
-        if (settings == null) {
-            throw new McpConfigLoadException(
-                    "MCP config at " + configPath + " is empty or null", "ValidationFailed");
-        }
-
         Set<ConstraintViolation<McpSettings>> violations = validator.validate(settings);
         if (!violations.isEmpty()) {
             String details = violations.stream()
