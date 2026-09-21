@@ -242,10 +242,10 @@ public final class ConfigConstants {
     public enum IntegrationPlatform { SLACK, JIRA, GITHUB }
 
     /** LLM providers stored in {@code llm_configs.provider}. */
-    public enum LlmProvider { OPENAI, ANTHROPIC, AZURE_OPENAI, WATSONX }
+    public enum LlmProvider { OPENAI, ANTHROPIC, AZURE_OPENAI, WATSONX, VERTEX_AI }
 
     /** LLM authentication strategies — determines which AuthConfig fields are required. */
-    public enum LlmAuthType { API_KEY, VERTEX_AI, CUSTOM_HEADERS }
+    public enum LlmAuthType { API_KEY, SA_JSON_KEY, CUSTOM_HEADERS }
 
     /** Auth type values stored in {@code external_configs.auth_type}. */
     public enum ExternalAuthType { API_KEY, API_TOKEN, WEBHOOK, PAT }
@@ -264,7 +264,7 @@ public final class ConfigConstants {
         entry("OTHER",        Set.of("token")),
         // LLM — keyed by auth_type (sensitive fields differ by how you authenticate)
         entry("API_KEY",        Set.of("apiKey")),
-        entry("VERTEX_AI",      Set.of("credentialsJson")),
+        entry("SA_JSON_KEY",    Set.of("credentialsJson")),
         entry("CUSTOM_HEADERS", Set.of("headers")),
         // Integrations
         entry("SLACK",        Set.of("token")),

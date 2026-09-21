@@ -40,7 +40,7 @@ CREATE INDEX IF NOT EXISTS idx_external_configs_active   ON external_configs (ca
 
 CREATE TABLE IF NOT EXISTS llm_configs (
     id                VARCHAR(24)              NOT NULL,   -- llm_cnf_<16-alphanumeric>
-    provider          VARCHAR(64)              NOT NULL,   -- OPENAI | ANTHROPIC | AZURE_OPENAI | WATSONX
+    provider          VARCHAR(64)              NOT NULL,   -- OPENAI | ANTHROPIC | AZURE_OPENAI | WATSONX | VERTEX_AI
     url               TEXT                     NOT NULL,   -- LLM API endpoint URL
     models            TEXT[]                   NOT NULL,   -- e.g. {gpt-4o, gpt-4o-mini}
     temperature       NUMERIC(4,2),

@@ -18,7 +18,7 @@ import java.util.Map;
  *   Observability — OTHER:     token*
  *
  *   LLM — API_KEY:             authType, apiKey*
- *   LLM — VERTEX_AI:           authType, projectId, location, credentialsJson*
+ *   LLM — SA_JSON_KEY:         authType, credentialsJson*  (projectId, location → additional_config)
  *   LLM — CUSTOM_HEADERS:      authType, headers*
  *
  *   Integrations — SLACK:      authType, token*
@@ -26,7 +26,7 @@ import java.util.Map;
  *   Integrations — GITHUB:     authType, token*
  *
  *   url for all platforms stored in respective table url column — not here.
- *   Behavioural config (channel, projectName, issueType, ownerRepo)
+ *   Behavioural config (channel, projectName, issueType, ownerRepo, projectId, location)
  *   goes in additional_config JSONB — not here.
  * </pre>
  *
@@ -36,16 +36,14 @@ import java.util.Map;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record AuthConfig(
 
-    String authType,            // plain     — auth strategy (API_KEY | VERTEX_AI | CUSTOM_HEADERS | API_TOKEN | WEBHOOK | PAT)
+    String authType,            // plain     — auth strategy (API_KEY | SA_JSON_KEY | CUSTOM_HEADERS | API_TOKEN | WEBHOOK | PAT)
 
     String apiKey,              // encrypted — DATADOG (ingest), LLM (API_KEY)
     String appKey,              // encrypted — DATADOG only (read/query access)
     String token,               // encrypted — INSTANA, OTHER, SLACK, JIRA, GITHUB: bearer/api/jwt token
 
-    String projectId,           // plain     — VERTEX_AI: GCP project ID
-    String location,            // plain     — VERTEX_AI: GCP region (e.g. us-central1)
-    String credentialsJson,     // encrypted — VERTEX_AI auth: service-account JSON blob
-    Map<String, String> headers,// encrypted — CUSTOM_HEADERS auth: full header map
+    String credentialsJson,     // encrypted — SA_JSON_KEY: service-account JSON blob
+    Map<String, String> headers,// encrypted — CUSTOM_HEADERS: full header map
 
     String username,            // plain     — JIRA: account username / email
     String password             // encrypted — basic auth password
