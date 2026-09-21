@@ -130,6 +130,35 @@ public final class ApiConstants {
         }
 
         /**
+         * Settings API — /api/v1/settings/*
+         * GET  /api/v1/settings                            — combined view: observability + llm + integrations + generic
+         * GET  /api/v1/settings/observability              — list config for all observability platforms
+         * PUT  /api/v1/settings/observability/{platform}   — upsert platform config
+         * DEL  /api/v1/settings/observability/{platform}   — remove platform config
+         * GET  /api/v1/settings/llm                        — list config for all LLM providers
+         * PUT  /api/v1/settings/llm/{provider}             — upsert provider config
+         * DEL  /api/v1/settings/llm/{provider}             — remove provider config
+         * GET  /api/v1/settings/integrations               — list config for all integration platforms
+         * PUT  /api/v1/settings/integrations/{platform}    — upsert platform config
+         * DEL  /api/v1/settings/integrations/{platform}    — remove platform config
+         */
+        public static final class Settings {
+            private Settings() {}
+
+            /** {@code GET /api/v1/settings} — combined snapshot of all settings categories. */
+            public static final String BASE                 = Version.API_V1 + "/settings";
+            public static final String OBSERVABILITY        = BASE + "/observability";
+            public static final String LLM                  = BASE + "/llm";
+            public static final String INTEGRATIONS         = BASE + "/integrations";
+
+            public static final String PATH_PARAM_PLATFORM  = "platform";
+            public static final String PATH_PARAM_PROVIDER  = "provider";
+
+            public static final String BY_PLATFORM          = "/{" + PATH_PARAM_PLATFORM + "}";
+            public static final String BY_PROVIDER          = "/{" + PATH_PARAM_PROVIDER + "}";
+        }
+
+        /**
          * Pagination query parameter names shared across paginated list endpoints.
          *
          * <p>Default values and the max page size cap are configured in
