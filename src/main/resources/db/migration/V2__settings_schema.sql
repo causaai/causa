@@ -13,11 +13,12 @@
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS external_configs (
-    id                VARCHAR(24)              NOT NULL,   -- ext_cnf_<16-alphanumeric>
+    id                VARCHAR(21)              NOT NULL,   -- extc_<16-alphanumeric>
     category          VARCHAR(32)              NOT NULL,   -- OBSERVABILITY | INTEGRATION
     platform          VARCHAR(64)              NOT NULL,   -- DATADOG | INSTANA | OTHER | SLACK | JIRA | GITHUB
     name              VARCHAR(128)             NOT NULL,   -- user-defined label, e.g. "instana-prod"
     url               TEXT,
+    auth_type         VARCHAR(32)              NOT NULL,   -- API_KEY | API_TOKEN | WEBHOOK | PAT
     is_active         BOOLEAN                  NOT NULL DEFAULT TRUE,
     auth_config       JSONB                    NOT NULL,
     additional_config JSONB,
@@ -39,10 +40,10 @@ CREATE INDEX IF NOT EXISTS idx_external_configs_active   ON external_configs (ca
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS llm_configs (
-    id                VARCHAR(24)              NOT NULL,   -- llm_cnf_<16-alphanumeric>
-    provider          VARCHAR(64)              NOT NULL,   -- OPENAI | ANTHROPIC | AZURE_OPENAI | WATSONX | VERTEX_AI
-    url               TEXT                     NOT NULL,   -- LLM API endpoint URL
+    id                VARCHAR(21)              NOT NULL,   -- llmc_<16-alphanumeric>
+    provider          VARCHAR(64)              NOT NULL,   -- OPENAI | ANTHROPIC | AZURE_OPENAI | WATSONX
     models            TEXT[]                   NOT NULL,   -- e.g. {gpt-4o, gpt-4o-mini}
+    auth_type         VARCHAR(32)              NOT NULL,   -- API_KEY | VERTEX_AI | CUSTOM_HEADERS
     temperature       NUMERIC(4,2),
     max_tokens        INTEGER,
     timeout_ms        INTEGER,
