@@ -24,7 +24,6 @@ class McpRegistryTest {
                 "http://example:8080/mcp",
                 Map.of(),
                 false,
-                List.of("some_tool"),
                 new McpSettings.HealthCheckConfig("http://example:8080/healthz", 5000),
                 5000,
                 Map.of(),

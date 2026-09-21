@@ -72,7 +72,6 @@ class McpSettingsLoaderTest {
         assertNotNull(kubernetes);
         assertEquals("http://kubernetes-mcp-server:8080/mcp", kubernetes.url());
         assertFalse(kubernetes.optional());
-        assertEquals(2, kubernetes.alwaysAllow().size());
         assertEquals(5000, kubernetes.healthCheck().timeoutMs());
         assertEquals(1, kubernetes.tools().size());
         assertEquals("POD_STATUS", kubernetes.tools().get(0).contextKey());

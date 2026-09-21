@@ -67,7 +67,6 @@ class McpClientTest {
                 "http://localhost:" + port + "/mcp",
                 Map.of(),
                 false,
-                List.of("some_tool"),
                 new McpSettings.HealthCheckConfig("http://localhost:" + port + path, timeoutMs),
                 5000,
                 Map.of(),
@@ -103,7 +102,6 @@ class McpClientTest {
         }
         McpSettings.ServerConfig config = new McpSettings.ServerConfig(
                 "streamable-http", "http://localhost:" + deadPort + "/mcp", Map.of(), false,
-                List.of("some_tool"),
                 new McpSettings.HealthCheckConfig("http://localhost:" + deadPort + "/healthz", 2000),
                 5000, Map.of(), null, List.of());
 
@@ -117,7 +115,6 @@ class McpClientTest {
     void downOnMalformedUrl() {
         McpSettings.ServerConfig config = new McpSettings.ServerConfig(
                 "streamable-http", "http://example:8080/mcp", Map.of(), false,
-                List.of("some_tool"),
                 new McpSettings.HealthCheckConfig("http://bad host with spaces/healthz", 2000),
                 5000, Map.of(), null, List.of());
 
