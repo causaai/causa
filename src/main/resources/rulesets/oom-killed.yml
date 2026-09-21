@@ -14,36 +14,30 @@ thresholds:
   minSupportedScore: 10
   minPartiallySupportedScore: 5
 
-# REQUIRED RULES - All must pass for hypothesis to be supported
+# REQUIRED RULES - At least one termination signal must be present
 required:
-  - id: oom.required.exit_code_137
-    description: "Container terminated with exit code 137 (SIGKILL)"
-    weight: 1
-    match:
-      signalType: CONTAINER_STATUS
-      signalName: exitCode
-      signalValue: 137
-      condition: EQUALS
-    messages:
-      success: "Found container exit code 137"
-      failure: "No exit code 137 found in container status"
+  - id: oom.required.termination_signal
+    description: "Container was terminated due to OOM (definitive termination signal)"
+    weight: 10
+    matchAny:
+      - signalType: CONTAINER_STATUS
+        signalName: terminationReason
+        signalValue: OOMKilled
+        condition: EQUALS
 
-  - id: oom.required.reason_oomkilled
-    description: "Container termination reason is OOMKilled"
-    weight: 1
-    match:
-      signalType: [KUBERNETES_EVENT, CONTAINER_STATUS]
-      signalName: [terminationReason, reason]
-      signalValue: OOMKilled
-      condition: EQUALS
-      matchType: CASE_INSENSITIVE
+      - signalType: CONTAINER_STATUS
+        signalName: exitCode
+        signalValue: 137
+        condition: EQUALS
     messages:
-      success: "Found OOMKilled termination reason"
-      failure: "No OOMKilled termination reason found"
+      success: "Valid OOM termination signal detected (OOMKilled or exit code 137)"
+      failure: "No OOMKilled termination status or exit code 137 found"
 
-  - id: oom.required.memory_increasing
+# SUPPORTING RULES - Add positive weight to confidence
+supporting:
+  - id: oom.supporting.memory_increasing
     description: "Memory utilization continuously increased"
-    weight: 1
+    weight: 3
     match:
       signalType: METRIC
       signalName: memory.utilization.trend
@@ -53,69 +47,77 @@ required:
     messages:
       success: "Found increasing memory trend"
       failure: "No increasing memory trend detected"
-
-# SUPPORTING RULES - Add positive weight to confidence
-supporting:
   - id: oom.supporting.heap_exceeded
-    description: "Heap usage exceeded 90% threshold"
-    weight: 5
+    description: "Heap usage exceeded 90% threshold (ratio: 0.0-1.0 scale)"
+    weight: 3
     match:
       signalType: [METRIC, JVM_ANALYSIS]
-      signalName: heap.usage
+      signalName: heap.usage.ratio
       condition: GREATER_THAN
       threshold: 0.90
     messages:
       success: "Heap usage exceeded 90%"
       failure: "Heap usage did not exceed threshold"
 
-  - id: oom.supporting.full_gc_frequent
-    description: "Frequent Full GC events detected"
-    weight: 3
+  - id: oom.supporting.oom_heap_space
+    description: "Java heap space OOM error in logs"
+    weight: 2
     match:
-      signalType: [LOG_PATTERN, JVM_ANALYSIS]
-      signalName: full.gc.count
-      condition: GREATER_THAN
-      threshold: 5
+      signalType: LOG_PATTERN
+      signalName: log.message
+      signalValue: "Java heap space"
+      condition: CONTAINS
     messages:
-      success: "Detected frequent Full GC events"
-      failure: "No frequent Full GC detected"
+      success: "Java heap space OOM detected"
+      failure: "No Java heap space OOM in logs"
 
-  - id: oom.supporting.heap_trend_increasing
-    description: "Heap usage trending upward"
+  - id: oom.supporting.oom_direct_buffer
+    description: "Direct buffer memory OOM error in logs"
+    weight: 2
+    match:
+      signalType: LOG_PATTERN
+      signalName: log.message
+      signalValue: "Direct buffer memory"
+      condition: CONTAINS
+    messages:
+      success: "Direct buffer memory OOM detected"
+      failure: "No direct buffer OOM in logs"
+
+  - id: oom.supporting.crash_loop
+    description: "Pod in CrashLoopBackOff state due to repeated OOM kills"
+    weight: 2
+    match:
+      signalType: POD_STATUS
+      signalName: podState
+      signalValue: CrashLoopBackOff
+      condition: EQUALS
+    messages:
+      success: "Pod is in CrashLoopBackOff — repeated crash cycle"
+      failure: "Pod is not in CrashLoopBackOff"
+
+  - id: oom.supporting.sustained_memory_pressure_ratio
+    description: "Memory pressure sustained for majority of pod runtime (>70% of total runtime)"
     weight: 2
     match:
       signalType: METRIC
-      signalName: heap.usage.trend
-      signalValue: INCREASING
-      condition: EQUALS
-      matchType: CASE_INSENSITIVE
-    messages:
-      success: "Heap usage trending upward"
-      failure: "No increasing heap trend"
-
-  - id: oom.supporting.oom_error_in_logs
-    description: "OutOfMemoryError found in logs"
-    weight: 4
-    match:
-      signalType: LOG_PATTERN
-      signalName: error.oom
-      signalValue: OutOfMemoryError
-      condition: CONTAINS
-    messages:
-      success: "Found OutOfMemoryError in logs"
-      failure: "No OOM errors in logs"
-
-  - id: oom.supporting.kruize_memory_recommendation
-    description: "Kruize recommends increasing memory limit"
-    weight: 3
-    match:
-      signalType: KRUIZE_RECOMMENDATION
-      signalName: memory.limit.recommendation
+      signalName: memory.pressure_to_runtime.ratio
       condition: GREATER_THAN
-      threshold: 0
+      threshold: 0.70
     messages:
-      success: "Kruize recommends memory increase"
-      failure: "No Kruize memory recommendations"
+      success: "High memory pressure sustained (>70% of total runtime)"
+      failure: "Memory pressure was transitory (<70% of total runtime)"
+
+  - id: oom.supporting.high_restart_count
+    description: "High restart count indicates repeated OOM kill cycles"
+    weight: 2
+    match:
+      signalType: METRIC
+      signalName: container.restart.count
+      condition: GREATER_THAN
+      threshold: 3
+    messages:
+      success: "High restart count detected — chronic OOM condition"
+      failure: "Restart count below threshold"
 
 # EXCLUSION RULES - Subtract weight if matched (negative indicators)
 exclusion:
