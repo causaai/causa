@@ -72,8 +72,6 @@ public record DiagnosticDetailResponse(
         @JsonProperty("explanation")        String explanation,
         @JsonProperty("source")             String source,
         @JsonProperty("rawSnippet")         String rawSnippet,
-        // Qualitative strength (DEFINITIVE/STRONG/MODERATE/WEAK/CIRCUMSTANTIAL), not the internal confidence score.
-        // Example: Exit code 137 has reliability="DEFINITIVE" even if confidence=0.95 (uncertain extraction).
         @JsonProperty("reliability")        String reliability
     ) {}
 
