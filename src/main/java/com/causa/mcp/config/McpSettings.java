@@ -1,5 +1,6 @@
 package com.causa.mcp.config;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -36,19 +37,18 @@ public record McpSettings(@NotEmpty Map<String, @NotNull @Valid ServerConfig> mc
      * @param url         MCP endpoint URL
      * @param headers     extra HTTP headers to send on every request
      * @param optional    if {@code true}, this server being down never affects overall system health
-     * @param alwaysAllow tool names this server is permitted to invoke
      * @param healthCheck health-probe endpoint (may differ from {@code url} — e.g. Cryostat)
      * @param timeoutMs   default request timeout for this server (unused until tool-calling lands)
      * @param metadata    server-wide tunables referenced by future argument templating
      * @param description short plain-English summary of the server (LLM-context fallback, unused for now)
      * @param tools       ordered tool-invocation plan (unused until tool-calling lands)
      */
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record ServerConfig(
             @NotBlank String type,
             @NotBlank String url,
             Map<String, String> headers,
             boolean optional,
-            @NotEmpty List<String> alwaysAllow,
             @NotNull @Valid HealthCheckConfig healthCheck,
             int timeoutMs,
             Map<String, Object> metadata,
