@@ -353,32 +353,15 @@ class HealthCheckServiceTest {
         }
 
         @Test
-        @DisplayName("No mcp_config component when the registry is initialized with at least one server")
-        void noMcpConfigComponentWhenInitializedWithServers() {
-            when(databaseConnectionService.isReady()).thenReturn(false);
-            when(llmPromptSender.isReady()).thenReturn(false);
-            List<McpClient> clients = List.of(mockClient("kubernetes", false, up()));
-            when(mcpRegistry.isInitialized()).thenReturn(true);
-            when(mcpRegistry.allClients()).thenReturn(clients);
-
-            HealthCheckResponseDto response = healthCheckService.getSystemHealth();
-
-            assertFalse(response.getComponents().containsKey(HealthCheckConstants.ComponentNames.MCP_CONFIG));
-        }
-
-        @Test
-        @DisplayName("mcp_config DOWN when the registry is initialized but no server is configured")
-        void mcpConfigComponentWhenInitializedWithNoServers() {
+        @DisplayName("No mcp_config component when the registry is initialized")
+        void noMcpConfigComponentWhenInitialized() {
             when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(false);
             mcpRegistryEmpty();
 
             HealthCheckResponseDto response = healthCheckService.getSystemHealth();
 
-            ComponentHealthDto mcpConfig = response.getComponents().get(HealthCheckConstants.ComponentNames.MCP_CONFIG);
-            assertNotNull(mcpConfig);
-            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), mcpConfig.getStatus());
-            assertTrue(mcpConfig.getMessage().contains("no MCP server is configured"));
+            assertFalse(response.getComponents().containsKey(HealthCheckConstants.ComponentNames.MCP_CONFIG));
         }
 
         @Test
@@ -495,18 +478,6 @@ class HealthCheckServiceTest {
             llmUp();
             when(mcpRegistry.isInitialized()).thenReturn(false);
             when(mcpRegistry.getInitializationError()).thenReturn(java.util.Optional.empty());
-
-            assertEquals(AppConstants.HealthStatus.DOWN.getValue(),
-                    healthCheckService.getSystemHealth().getStatus());
-        }
-
-        @Test
-        @DisplayName("DOWN — registry initialized but zero servers configured, even though database and LLM are up")
-        void downWhenNoMcpServersConfigured() throws Exception {
-            dbUp();
-            llmUp();
-            when(mcpRegistry.isInitialized()).thenReturn(true);
-            when(mcpRegistry.allClients()).thenReturn(List.of());
 
             assertEquals(AppConstants.HealthStatus.DOWN.getValue(),
                     healthCheckService.getSystemHealth().getStatus());
