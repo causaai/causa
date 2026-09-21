@@ -2,8 +2,11 @@ package com.causa.common.constants;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import static java.util.Map.entry;
 
 /**
  * Configuration Constants Registry
@@ -224,6 +227,50 @@ public final class ConfigConstants {
     private static KeyDef key(String name, String category, ValueType type, boolean sensitive, String mpConfigPath) {
         return new KeyDef(name, category, type, sensitive, mpConfigPath);
     }
+
+    // TODO: [CLEANUP] The platform-config enums and SENSITIVE_AUTH_FIELDS below were added as part of the
+    // new Configuration Settings. Once the settings feature is fully shipped, evaluate and remove
+    //  what is no longer needed from this class.
+
+    /** Discriminator for {@code external_configs} rows and settings tabs. */
+    public enum PlatformCategory { OBSERVABILITY, INTEGRATION }
+
+    /** Observability platforms — used when {@code category = OBSERVABILITY}. */
+    public enum ObservabilityPlatform { DATADOG, INSTANA }
+
+    /** Integration platforms — used when {@code category = INTEGRATION}. */
+    public enum IntegrationPlatform { SLACK, JIRA, GITHUB }
+
+    /** LLM providers stored in {@code llm_configs.provider}. */
+    public enum LlmProvider { OPENAI, ANTHROPIC, AZURE_OPENAI, WATSONX, VERTEX_AI }
+
+    /** LLM authentication strategies — determines which AuthConfig fields are required. */
+    public enum LlmAuthType { API_KEY, SA_JSON_KEY, CUSTOM_HEADERS }
+
+    /** Auth type values stored in {@code external_configs.auth_type}. */
+    public enum ExternalAuthType { API_KEY, API_TOKEN, WEBHOOK, PAT }
+
+    /**
+     * Sensitive {@link com.causa.core.domain.AuthConfig} fields per platform/provider.
+     *
+     * <p>The service encrypts these before serialising to JSONB and masks them in GET responses.
+     * Keyed by the enum {@code .name()} string (e.g. {@code "DATADOG"}, {@code "API_KEY"}, {@code "SLACK"}).
+     * LLM entries are keyed by {@link LlmAuthType} name; all others by platform name.
+     */
+    public static final Map<String, Set<String>> SENSITIVE_AUTH_FIELDS = Map.ofEntries(
+        // Observability
+        entry("DATADOG",      Set.of("apiKey", "appKey")),
+        entry("INSTANA",      Set.of("token")),
+        entry("OTHER",        Set.of("token")),
+        // LLM — keyed by auth_type (sensitive fields differ by how you authenticate)
+        entry("API_KEY",        Set.of("apiKey")),
+        entry("SA_JSON_KEY",    Set.of("credentialsJson")),
+        entry("CUSTOM_HEADERS", Set.of("headers")),
+        // Integrations
+        entry("SLACK",        Set.of("token")),
+        entry("JIRA",         Set.of("token", "password")),
+        entry("GITHUB",       Set.of("token"))
+    );
 
     /**
      * Structured logging field names for config operations.

@@ -5,8 +5,10 @@ import org.apache.commons.lang3.RandomStringUtils;
 /**
  * Application-layer ID generation utilities.
  *
- * <p>All entity IDs follow the convention {@code {prefix}_{16-char-alphanumeric}},
- * which is exactly 21 characters — matching the {@code VARCHAR(21)} PK columns.
+ * <p>All entity IDs follow the convention {@code {prefix}_{16-char-alphanumeric}}.
+ * Most IDs are 21 characters (4-char prefix + _ + 16 random).
+ * Settings IDs use longer prefixes and {@code VARCHAR(24)} PK columns:
+ * {@code ext_cnf_} and {@code llm_cnf_} = 24 characters total.
  *
  * <p>Uses {@link RandomStringUtils#secure()} which is backed by {@link java.security.SecureRandom}
  * — cryptographically strong and thread-safe. Produces 16 characters from a 62-char alphabet
@@ -14,13 +16,15 @@ import org.apache.commons.lang3.RandomStringUtils;
  *
  * <p>ID prefixes per table:
  * <pre>
- *   alerts         → alrt_&lt;16&gt;
- *   diagnostics    → diag_&lt;16&gt;
- *   context_data   → ctxd_&lt;16&gt;
- *   feedback       → fdbk_&lt;16&gt;
- *   configurations → cnfg_&lt;16&gt;
- *   integrations   → intg_&lt;16&gt;
- *   health_checks  → hchk_&lt;16&gt;
+ *   alerts          → alrt_&lt;16&gt;
+ *   diagnostics     → diag_&lt;16&gt;
+ *   context_data    → ctxd_&lt;16&gt;
+ *   feedback        → fdbk_&lt;16&gt;
+ *   configurations  → cnfg_&lt;16&gt;
+ *   integrations    → intg_&lt;16&gt;
+ *   health_checks   → hchk_&lt;16&gt;
+ *   external_configs → ext_cnf_&lt;16&gt;
+ *   llm_configs      → llm_cnf_&lt;16&gt;
  * </pre>
  *
  * @since 0.0.1
@@ -53,6 +57,22 @@ public final class IdUtils {
      */
     public static String generateConfigurationId() {
         return "cnfg_" + randomAlphanumeric16();
+    }
+
+    /**
+     * Generates a unique external-config ID: {@code ext_cnf_<16-char-alphanumeric>}.
+     * Total length = 24 chars. Used for {@code external_configs} rows (observability + integrations).
+     */
+    public static String generateExternalConfigId() {
+        return "ext_cnf_" + randomAlphanumeric16();
+    }
+
+    /**
+     * Generates a unique LLM-config ID: {@code llm_cnf_<16-char-alphanumeric>}.
+     * Total length = 24 chars. Used for {@code llm_configs} rows.
+     */
+    public static String generateLlmConfigId() {
+        return "llm_cnf_" + randomAlphanumeric16();
     }
 
     /** Returns 16 alphanumeric characters from a SecureRandom source. */
