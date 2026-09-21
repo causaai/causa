@@ -16,7 +16,9 @@ import java.util.Map;
  */
 public record EvidenceItem(
     String id,
-    EvidenceSource source,
+    // Source of evidence (MCP server name or tool identifier). String to support plug-and-play MCP servers.
+    // Examples: "kubernetes-mcp", "prometheus-mcp", "kruize-mcp", "cryostat-mcp", "custom-profiler-mcp"
+    String source,
     EvidenceType type,
     EvidenceStrength strength,
     EvidenceHypothesisAlignment evidenceHypothesisAlignment,
@@ -27,29 +29,6 @@ public record EvidenceItem(
     Instant collectedAt,
     Map<String, String> metadata
 ) {
-
-    /**
-     * Source of evidence - where it came from.
-     */
-    public enum EvidenceSource {
-        /** Kubernetes MCP server */
-        KUBERNETES_MCP,
-
-        /** Prometheus MCP server */
-        PROMETHEUS_MCP,
-
-        /** Kruize MCP server */
-        KRUIZE_MCP,
-
-        /** Cryostat MCP server (JFR/profiling) */
-        CRYOSTAT_MCP,
-
-        /** Quarkus MCP server (app metrics) */
-        QUARKUS_MCP,
-
-        /** Unknown source */
-        UNKNOWN
-    }
 
     /**
      * Type of evidence - what kind of data it is.
@@ -143,7 +122,7 @@ public record EvidenceItem(
      */
     public static class Builder {
         private String id;
-        private EvidenceSource source;
+        private String source;
         private EvidenceType type;
         private EvidenceStrength strength;
         private EvidenceHypothesisAlignment evidenceHypothesisAlignment;
@@ -159,7 +138,7 @@ public record EvidenceItem(
             return this;
         }
 
-        public Builder source(EvidenceSource source) {
+        public Builder source(String source) {
             this.source = source;
             return this;
         }

@@ -72,6 +72,8 @@ public record DiagnosticDetailResponse(
         @JsonProperty("explanation")        String explanation,
         @JsonProperty("source")             String source,
         @JsonProperty("rawSnippet")         String rawSnippet,
+        // Qualitative strength (DEFINITIVE/STRONG/MODERATE/WEAK/CIRCUMSTANTIAL), not the internal confidence score.
+        // Example: Exit code 137 has reliability="DEFINITIVE" even if confidence=0.95 (uncertain extraction).
         @JsonProperty("reliability")        String reliability
     ) {}
 
@@ -82,7 +84,8 @@ public record DiagnosticDetailResponse(
         @JsonProperty("technical_description") String technicalDescription,
         @JsonProperty("anomaly_type")          String anomalyType,
         @JsonProperty("root_cause")            String rootCause,
-        @JsonProperty("evidences")             List<Evidence> evidences,
+        @JsonProperty("evidences")             List<String> evidences,  // LLM-generated evidences (existing)
+        @JsonProperty("validation_evidences")  List<Evidence> validationEvidences,  // Structured evidences from validation pipeline (new)
         @JsonProperty("supporting_logs")       List<String> supportingLogs,
         @JsonProperty("rca_confidence_score")  Double rcaConfidenceScore,
         @JsonProperty("confidence_summary")    String confidenceSummaryText,
@@ -142,7 +145,7 @@ public record DiagnosticDetailResponse(
             }
 
             // TODO: Once validation pipeline is integrated, transform EvidenceItem -> Evidence
-            // For now, evidences field is null (backward compatible until implementation)
+            // For now, validationEvidences is null; existing RCA evidences are preserved
             diagnosisInfo = new DiagnosisInfo(
                 rca.issueTitle(),
                 rca.issueSummary(),
@@ -150,7 +153,8 @@ public record DiagnosticDetailResponse(
                 rca.technicalDescription(),
                 rca.anomalyType() != null ? rca.anomalyType().name() : null,
                 rca.rootCause(),
-                null,  // evidences - will be populated from allEvidence in future
+                rca.evidences(),  // LLM-generated evidences (backward compatible)
+                null,  // validationEvidences - will be populated from allEvidence in future
                 rca.supportingLogs(),
                 rcaScore,
                 summaryText,
