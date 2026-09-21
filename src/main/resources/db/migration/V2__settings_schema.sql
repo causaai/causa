@@ -35,7 +35,7 @@ CREATE INDEX IF NOT EXISTS idx_external_configs_active   ON external_configs (ca
 -- =============================================================================
 -- 2. LLM CONFIGS TABLE
 --    One row per provider. UNIQUE(provider).
---    Only one is_active=true at a time — enforced by the service layer.
+--    Only one is_active=true at a time — enforced at DB level via partial unique index.
 -- =============================================================================
 
 CREATE TABLE IF NOT EXISTS llm_configs (
@@ -55,3 +55,5 @@ CREATE TABLE IF NOT EXISTS llm_configs (
     CONSTRAINT pk_llm_configs      PRIMARY KEY (id),
     CONSTRAINT uq_llm_configs_prov UNIQUE (provider)
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_llm_configs_single_active ON llm_configs (is_active) WHERE is_active = TRUE;
