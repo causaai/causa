@@ -27,7 +27,7 @@ public class ExternalConfigRequest {
     private String url;
 
     @JsonProperty("is_active")
-    private boolean isActive;
+    private Boolean isActive;
 
     @JsonProperty("auth_config")
     private AuthConfig authConfig;
@@ -51,11 +51,11 @@ public class ExternalConfigRequest {
         this.url = url;
     }
 
-    public boolean getIsActive() {
+    public Boolean getIsActive() {
         return isActive;
     }
 
-    public void setIsActive(boolean isActive) {
+    public void setIsActive(Boolean isActive) {
         this.isActive = isActive;
     }
 

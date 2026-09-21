@@ -38,7 +38,7 @@ public class LlmConfigRequest {
     private Integer timeoutMs;
 
     @JsonProperty("is_active")
-    private boolean isActive;
+    private Boolean isActive;
 
     @JsonProperty("auth_config")
     private AuthConfig authConfig;
@@ -86,11 +86,11 @@ public class LlmConfigRequest {
         this.timeoutMs = timeoutMs;
     }
 
-    public boolean getIsActive() {
+    public Boolean getIsActive() {
         return isActive;
     }
 
-    public void setIsActive(boolean isActive) {
+    public void setIsActive(Boolean isActive) {
         this.isActive = isActive;
     }
 
