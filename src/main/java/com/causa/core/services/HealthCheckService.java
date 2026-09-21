@@ -37,8 +37,7 @@ import java.sql.Statement;
  *   <li>DOWN - Critical components (database, or a required MCP server) are down</li>
  * </ul>
  *
- * <p>MCP servers are checked dynamically via {@link McpRegistry} — every server declared in
- * {@code mcp.json} gets a {@code mcp_<name>} component with no code change required to add one.
+ * <p>MCP servers are checked dynamically via {@link McpRegistry} — every server declared in mcp.json
  * A server marked {@code optional} in its config being down never affects the overall status; a
  * non-optional (required) server being down — or the MCP config failing to load at all — makes the
  * overall status DOWN.
