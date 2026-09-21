@@ -113,12 +113,13 @@ public class HealthCheckService {
     /**
      * Checks every MCP server currently in the registry and adds a {@code mcp_<name>} component
      * for each. If the registry itself failed to initialize (e.g. {@code mcp.json} was missing or
-     * invalid at startup), a single synthetic {@code mcp_config} component reports the exact
-     * failure reason instead.
+     * invalid at startup), or it initialized successfully but declares zero servers, a single
+     * synthetic {@code mcp_config} component reports the exact reason instead.
      *
      * @param responseBuilder the in-progress health response to append components to
-     * @return {@code true} if any non-optional MCP server is unhealthy, or the config itself
-     *         failed to load — either case makes the overall system status DOWN
+     * @return {@code true} if any non-optional MCP server is unhealthy, the config failed to
+     *         load, or no servers are configured at all — every case makes the overall system
+     *         status DOWN
      */
     private boolean collectMcpHealth(HealthCheckResponseDto.Builder responseBuilder) {
         if (!mcpRegistry.isInitialized()) {
@@ -130,6 +131,18 @@ public class HealthCheckService {
                             .status(AppConstants.HealthStatus.DOWN.getValue())
                             .message("MCP configuration failed to load: "
                                     + mcpRegistry.getInitializationError().orElse("unknown error"))
+                            .build());
+            return true;
+        }
+
+        if (mcpRegistry.allClients().isEmpty()) {
+            log.warn(LogMessages.HealthCheck.MCP_CONFIG_NOT_INITIALIZED)
+                    .field("error", "MCP registry is initialized but no MCP server is configured")
+                    .log();
+            responseBuilder.addComponent(HealthCheckConstants.ComponentNames.MCP_CONFIG,
+                    ComponentHealthDto.builder()
+                            .status(AppConstants.HealthStatus.DOWN.getValue())
+                            .message("MCP registry is initialized but no MCP server is configured")
                             .build());
             return true;
         }
