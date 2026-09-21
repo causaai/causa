@@ -6,6 +6,7 @@ import com.causa.infrastructure.persistence.entity.LlmConfigEntity;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.jboss.logging.Logger;
 
 import java.util.Arrays;
 import java.util.List;
@@ -28,6 +29,7 @@ import java.util.Map;
  */
 public final class LlmConfigEntityMapper {
 
+    private static final Logger LOG = Logger.getLogger(LlmConfigEntityMapper.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
@@ -54,10 +56,10 @@ public final class LlmConfigEntityMapper {
         entity.setMaxTokens(domain.getMaxTokens());
         entity.setTimeoutMs(domain.getTimeoutMs());
         entity.setIsActive(domain.isActive());
-        entity.setAuthConfig(MAPPER.valueToTree(domain.getAuthConfig()));
+        entity.setAuthConfig(serialiseAuthConfig(domain.getAuthConfig()));
 
         if (domain.getAdditionalConfig() != null && !domain.getAdditionalConfig().isEmpty()) {
-            entity.setAdditionalConfig(MAPPER.valueToTree(domain.getAdditionalConfig()));
+            entity.setAdditionalConfig(serialiseAdditionalConfig(domain.getAdditionalConfig()));
         }
 
         return entity;
@@ -97,6 +99,20 @@ public final class LlmConfigEntityMapper {
     }
 
     // -------------------------------------------------------------------------
+    // Serialise helpers — used by the repository to avoid a second ObjectMapper
+    // -------------------------------------------------------------------------
+
+    /** Serialises an {@link AuthConfig} to a {@link JsonNode} for JSONB storage. */
+    public static JsonNode serialiseAuthConfig(AuthConfig authConfig) {
+        return MAPPER.valueToTree(authConfig);
+    }
+
+    /** Serialises an additional-config map to a {@link JsonNode} for JSONB storage. */
+    public static JsonNode serialiseAdditionalConfig(Map<String, Object> additionalConfig) {
+        return MAPPER.valueToTree(additionalConfig);
+    }
+
+    // -------------------------------------------------------------------------
     // Private helpers
     // -------------------------------------------------------------------------
 
@@ -107,6 +123,7 @@ public final class LlmConfigEntityMapper {
         try {
             return MAPPER.treeToValue(node, AuthConfig.class);
         } catch (Exception e) {
+            LOG.warnf("Failed to deserialise auth_config for llm config — returning empty AuthConfig. Error: %s", e.getMessage());
             return new AuthConfig(null, null, null, null, null, null, null, null);
         }
     }
@@ -118,6 +135,7 @@ public final class LlmConfigEntityMapper {
         try {
             return MAPPER.convertValue(node, MAP_TYPE);
         } catch (Exception e) {
+            LOG.warnf("Failed to deserialise additional_config for llm config — returning empty map. Error: %s", e.getMessage());
             return Map.of();
         }
     }

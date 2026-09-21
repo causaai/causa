@@ -6,7 +6,6 @@ import com.causa.core.domain.ExternalConfig;
 import com.causa.core.ports.ExternalConfigRepository;
 import com.causa.infrastructure.persistence.entity.ExternalConfigEntity;
 import com.causa.infrastructure.persistence.mappers.ExternalConfigEntityMapper;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
@@ -27,8 +26,6 @@ import java.util.Optional;
  */
 @ApplicationScoped
 public class ExternalConfigRepositoryImpl implements ExternalConfigRepository {
-
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Override
     @Transactional(Transactional.TxType.SUPPORTS)
@@ -63,10 +60,10 @@ public class ExternalConfigRepositoryImpl implements ExternalConfigRepository {
             entity.setCategory(externalConfig.getCategory());
             entity.setUrl(externalConfig.getUrl());
             entity.setIsActive(externalConfig.isActive());
-            entity.setAuthConfig(MAPPER.valueToTree(externalConfig.getAuthConfig()));
+            entity.setAuthConfig(ExternalConfigEntityMapper.serialiseAuthConfig(externalConfig.getAuthConfig()));
             entity.setAdditionalConfig(
                 externalConfig.getAdditionalConfig() != null && !externalConfig.getAdditionalConfig().isEmpty()
-                    ? MAPPER.valueToTree(externalConfig.getAdditionalConfig())
+                    ? ExternalConfigEntityMapper.serialiseAdditionalConfig(externalConfig.getAdditionalConfig())
                     : null);
             return ExternalConfigEntityMapper.toDomain(entity);
         } else {

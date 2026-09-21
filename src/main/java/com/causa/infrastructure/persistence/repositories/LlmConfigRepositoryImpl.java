@@ -5,7 +5,6 @@ import com.causa.core.domain.LlmConfig;
 import com.causa.core.ports.LlmConfigRepository;
 import com.causa.infrastructure.persistence.entity.LlmConfigEntity;
 import com.causa.infrastructure.persistence.mappers.LlmConfigEntityMapper;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 
@@ -29,8 +28,6 @@ import java.util.Optional;
  */
 @ApplicationScoped
 public class LlmConfigRepositoryImpl implements LlmConfigRepository {
-
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Override
     @Transactional(Transactional.TxType.SUPPORTS)
@@ -75,10 +72,10 @@ public class LlmConfigRepositoryImpl implements LlmConfigRepository {
             entity.setMaxTokens(llmConfig.getMaxTokens());
             entity.setTimeoutMs(llmConfig.getTimeoutMs());
             entity.setIsActive(llmConfig.isActive());
-            entity.setAuthConfig(MAPPER.valueToTree(llmConfig.getAuthConfig()));
+            entity.setAuthConfig(LlmConfigEntityMapper.serialiseAuthConfig(llmConfig.getAuthConfig()));
             entity.setAdditionalConfig(
                 llmConfig.getAdditionalConfig() != null && !llmConfig.getAdditionalConfig().isEmpty()
-                    ? MAPPER.valueToTree(llmConfig.getAdditionalConfig())
+                    ? LlmConfigEntityMapper.serialiseAdditionalConfig(llmConfig.getAdditionalConfig())
                     : null);
             return LlmConfigEntityMapper.toDomain(entity);
         } else {

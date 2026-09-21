@@ -1,12 +1,12 @@
 package com.causa.infrastructure.persistence.mappers;
 
-import com.causa.common.constants.ConfigConstants.PlatformCategory;
 import com.causa.core.domain.AuthConfig;
 import com.causa.core.domain.ExternalConfig;
 import com.causa.infrastructure.persistence.entity.ExternalConfigEntity;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.jboss.logging.Logger;
 
 import java.util.Map;
 
@@ -24,6 +24,7 @@ import java.util.Map;
  */
 public final class ExternalConfigEntityMapper {
 
+    private static final Logger LOG = Logger.getLogger(ExternalConfigEntityMapper.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
@@ -48,10 +49,10 @@ public final class ExternalConfigEntityMapper {
         entity.setName(domain.getName());
         entity.setUrl(domain.getUrl());
         entity.setIsActive(domain.isActive());
-        entity.setAuthConfig(MAPPER.valueToTree(domain.getAuthConfig()));
+        entity.setAuthConfig(serialiseAuthConfig(domain.getAuthConfig()));
 
         if (domain.getAdditionalConfig() != null && !domain.getAdditionalConfig().isEmpty()) {
-            entity.setAdditionalConfig(MAPPER.valueToTree(domain.getAdditionalConfig()));
+            entity.setAdditionalConfig(serialiseAdditionalConfig(domain.getAdditionalConfig()));
         }
 
         return entity;
@@ -75,7 +76,7 @@ public final class ExternalConfigEntityMapper {
 
         return ExternalConfig.builder()
             .id(entity.getId())
-            .category(PlatformCategory.valueOf(entity.getCategory().name()))
+            .category(entity.getCategory())
             .platform(entity.getPlatform())
             .name(entity.getName())
             .url(entity.getUrl())
@@ -85,6 +86,20 @@ public final class ExternalConfigEntityMapper {
             .createdAt(entity.createdAt)
             .updatedAt(entity.updatedAt)
             .build();
+    }
+
+    // -------------------------------------------------------------------------
+    // Serialise helpers — used by the repository to avoid a second ObjectMapper
+    // -------------------------------------------------------------------------
+
+    /** Serialises an {@link AuthConfig} to a {@link JsonNode} for JSONB storage. */
+    public static JsonNode serialiseAuthConfig(AuthConfig authConfig) {
+        return MAPPER.valueToTree(authConfig);
+    }
+
+    /** Serialises an additional-config map to a {@link JsonNode} for JSONB storage. */
+    public static JsonNode serialiseAdditionalConfig(Map<String, Object> additionalConfig) {
+        return MAPPER.valueToTree(additionalConfig);
     }
 
     // -------------------------------------------------------------------------
@@ -98,6 +113,7 @@ public final class ExternalConfigEntityMapper {
         try {
             return MAPPER.treeToValue(node, AuthConfig.class);
         } catch (Exception e) {
+            LOG.warnf("Failed to deserialise auth_config for external config — returning empty AuthConfig. Error: %s", e.getMessage());
             return new AuthConfig(null, null, null, null, null, null, null, null);
         }
     }
@@ -109,6 +125,7 @@ public final class ExternalConfigEntityMapper {
         try {
             return MAPPER.convertValue(node, MAP_TYPE);
         } catch (Exception e) {
+            LOG.warnf("Failed to deserialise additional_config for external config — returning empty map. Error: %s", e.getMessage());
             return Map.of();
         }
     }
