@@ -78,9 +78,11 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
         Pattern.CASE_INSENSITIVE
     );
 
-    // GC log detail pattern: "303M->220M(365M) 53.562ms"
+    // GC log detail pattern: supports decimal values and K/M/G units
+    // Examples: "303M->220M(365M) 53.562ms", "512.5M->256.2M(365.8M) 42.1ms", "1.5G->900M(2G) 120ms"
     private static final Pattern GC_PAUSE_DETAIL_PATTERN = Pattern.compile(
-        "(\\d+)M->(\\d+)M\\((\\d+)M\\)\\s+(\\d+\\.?\\d*)ms"
+        "(\\d+\\.?\\d*)([KMG])->(\\d+\\.?\\d*)([KMG])\\((\\d+\\.?\\d*)([KMG])\\)\\s+(\\d+\\.?\\d*)ms",
+        Pattern.CASE_INSENSITIVE
     );
 
     // Quarkus GC pause metrics patterns (JSON format from MCP metrics endpoint)
@@ -96,6 +98,22 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
         "kruize.*recommends?.*memory.*limit.*to\\s*(\\d+)",
         Pattern.CASE_INSENSITIVE
     );
+
+    /**
+     * Converts JVM memory size to megabytes.
+     *
+     * @param value The numeric value
+     * @param unit  The unit (K, M, or G - case insensitive)
+     * @return The value in megabytes
+     */
+    private static double convertToMegabytes(double value, String unit) {
+        return switch (unit.toUpperCase()) {
+            case "K" -> value / 1024.0;
+            case "M" -> value;
+            case "G" -> value * 1024.0;
+            default -> value; // Default to megabytes if unit is unknown
+        };
+    }
 
     @Override
     public List<Signal> extractSignals(String diagnosticContext) {
@@ -170,7 +188,7 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
             }
         }
 
-        if (context.contains(ContextKeywords.OOM_KILLED)) {
+        if (context.toLowerCase().contains(ContextKeywords.OOM_KILLED.toLowerCase())) {
             signals.add(Signal.builder(Signal.SignalType.CONTAINER_STATUS, SignalNames.TERMINATION_REASON)
                 .value(SignalValues.OOM_KILLED)
                 .build());
@@ -207,8 +225,8 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
                 .build());
         }
 
-        if (context.contains(SignalValues.CRASH_LOOP_BACK_OFF) ||
-            context.contains(ContextKeywords.BACK_OFF_RESTARTING)) {
+        if (context.toLowerCase().contains(SignalValues.CRASH_LOOP_BACK_OFF.toLowerCase()) ||
+            context.toLowerCase().contains(ContextKeywords.BACK_OFF_RESTARTING.toLowerCase())) {
             signals.add(Signal.builder(Signal.SignalType.POD_STATUS, SignalNames.POD_STATE)
                 .value(SignalValues.CRASH_LOOP_BACK_OFF)
                 .build());
@@ -272,7 +290,7 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
                 .build());
         }
 
-        boolean hasOomEvidence = context.contains(ContextKeywords.OOM_KILLED);
+        boolean hasOomEvidence = context.toLowerCase().contains(ContextKeywords.OOM_KILLED.toLowerCase());
         if (!hasOomEvidence) {
             Matcher exitCheck = EXIT_CODE_PATTERN.matcher(context);
             while (exitCheck.find()) {
@@ -354,10 +372,20 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
         List<Double> beforeGcValues = new ArrayList<>();
         while (gcDetailMatcher.find()) {
             gcDetailCount++;
-            double beforeGc = Double.parseDouble(gcDetailMatcher.group(1));
-            double afterGc = Double.parseDouble(gcDetailMatcher.group(2));
-            double maxHeap = Double.parseDouble(gcDetailMatcher.group(3));
-            double pauseMs = Double.parseDouble(gcDetailMatcher.group(4));
+            // Parse values and units, then normalize to megabytes
+            double beforeGc = convertToMegabytes(
+                Double.parseDouble(gcDetailMatcher.group(1)),
+                gcDetailMatcher.group(2)
+            );
+            double afterGc = convertToMegabytes(
+                Double.parseDouble(gcDetailMatcher.group(3)),
+                gcDetailMatcher.group(4)
+            );
+            double maxHeap = convertToMegabytes(
+                Double.parseDouble(gcDetailMatcher.group(5)),
+                gcDetailMatcher.group(6)
+            );
+            double pauseMs = Double.parseDouble(gcDetailMatcher.group(7));
             beforeGcValues.add(beforeGc);
             totalPause += pauseMs;
             if (pauseMs > maxPause) {
