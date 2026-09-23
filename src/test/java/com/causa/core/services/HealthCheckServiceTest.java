@@ -334,7 +334,7 @@ class HealthCheckServiceTest {
     class McpHealthTests {
 
         @Test
-        @DisplayName("Each registered client produces a mcp_<name> component")
+        @DisplayName("Each registered client produces an entry under mcp_config.servers")
         void eachClientProducesAComponent() {
             when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(false);
@@ -346,22 +346,26 @@ class HealthCheckServiceTest {
 
             HealthCheckResponseDto response = healthCheckService.getSystemHealth();
 
-            assertEquals(AppConstants.HealthStatus.UP.getValue(),
-                    response.getComponents().get("mcp_kubernetes").getStatus());
-            assertEquals(AppConstants.HealthStatus.DOWN.getValue(),
-                    response.getComponents().get("mcp_cryostat").getStatus());
+            ComponentHealthDto mcpConfig = response.getComponents().get(HealthCheckConstants.ComponentNames.MCP_CONFIG);
+            assertNotNull(mcpConfig);
+            assertNotNull(mcpConfig.getServers());
+            assertEquals(AppConstants.HealthStatus.UP.getValue(), mcpConfig.getServers().get("kubernetes").getStatus());
+            assertEquals(AppConstants.HealthStatus.DOWN.getValue(), mcpConfig.getServers().get("cryostat").getStatus());
         }
 
         @Test
-        @DisplayName("No mcp_config component when the registry is initialized")
-        void noMcpConfigComponentWhenInitialized() {
+        @DisplayName("mcp_config aggregates to UP when every server is up or only optional servers are down")
+        void mcpConfigAggregatesToUpWhenInitialized() {
             when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(false);
             mcpRegistryEmpty();
 
             HealthCheckResponseDto response = healthCheckService.getSystemHealth();
 
-            assertFalse(response.getComponents().containsKey(HealthCheckConstants.ComponentNames.MCP_CONFIG));
+            ComponentHealthDto mcpConfig = response.getComponents().get(HealthCheckConstants.ComponentNames.MCP_CONFIG);
+            assertNotNull(mcpConfig);
+            assertEquals(AppConstants.HealthStatus.UP.getValue(), mcpConfig.getStatus());
+            assertTrue(mcpConfig.getServers().isEmpty());
         }
 
         @Test
