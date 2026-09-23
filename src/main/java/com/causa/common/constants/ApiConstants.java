@@ -146,16 +146,20 @@ public final class ApiConstants {
             private Settings() {}
 
             /** {@code GET /api/v1/settings} — combined snapshot of all settings categories. */
-            public static final String BASE                 = Version.API_V1 + "/settings";
-            public static final String OBSERVABILITY        = BASE + "/observability";
-            public static final String LLM                  = BASE + "/llm";
-            public static final String INTEGRATIONS         = BASE + "/integrations";
+            public static final String BASE                  = Version.API_V1 + "/settings";
+
+            /** Relative path segments for use on method-level {@code @Path} inside {@code SettingsController}. */
+            public static final String OBSERVABILITY_SEGMENT = "/observability";
+            public static final String LLM_SEGMENT           = "/llm";
+            public static final String INTEGRATIONS_SEGMENT  = "/integrations";
 
             public static final String PATH_PARAM_PLATFORM  = "platform";
             public static final String PATH_PARAM_PROVIDER  = "provider";
 
             public static final String BY_PLATFORM          = "/{" + PATH_PARAM_PLATFORM + "}";
             public static final String BY_PROVIDER          = "/{" + PATH_PARAM_PROVIDER + "}";
+
+            public static final String BY_PLATFORM_AND_NAME = "/{" + PATH_PARAM_PLATFORM + "}/{name}";
         }
 
         /**
