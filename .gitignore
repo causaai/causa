@@ -82,3 +82,9 @@ gcloud/
 deployment/kubernetes/secrets/*-secret-real.yaml
 deployment/kubernetes/secrets/my-*.yaml
 deployment/kubernetes/vertex-ai/generated/
+
+# Postman generated files
+.postman/
+postman/
+docs/api/
+docs/causa_settings_architecture.html

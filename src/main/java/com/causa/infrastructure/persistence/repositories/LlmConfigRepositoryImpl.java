@@ -1,5 +1,6 @@
 package com.causa.infrastructure.persistence.repositories;
 
+import com.causa.common.constants.ConfigConstants.LlmProvider;
 import com.causa.common.utils.IdUtils;
 import com.causa.core.domain.LlmConfig;
 import com.causa.core.ports.LlmConfigRepository;
@@ -42,7 +43,7 @@ public class LlmConfigRepositoryImpl implements LlmConfigRepository {
     @Transactional(Transactional.TxType.SUPPORTS)
     public Optional<LlmConfig> findByProvider(String provider) {
         return LlmConfigEntity
-            .<LlmConfigEntity>find("provider", provider)
+            .<LlmConfigEntity>find("provider", LlmProvider.valueOf(provider.toUpperCase()))
             .firstResultOptional()
             .map(LlmConfigEntityMapper::toDomain);
     }
@@ -60,7 +61,7 @@ public class LlmConfigRepositoryImpl implements LlmConfigRepository {
     @Transactional
     public LlmConfig save(LlmConfig llmConfig) {
         Optional<LlmConfigEntity> existing = LlmConfigEntity
-            .<LlmConfigEntity>find("provider", llmConfig.getProvider())
+            .<LlmConfigEntity>find("provider", (LlmProvider) llmConfig.getProvider())
             .firstResultOptional();
 
         if (existing.isPresent()) {
@@ -107,7 +108,7 @@ public class LlmConfigRepositoryImpl implements LlmConfigRepository {
     @Override
     @Transactional
     public boolean deleteByProvider(String provider) {
-        long deleted = LlmConfigEntity.delete("provider", provider);
+        long deleted = LlmConfigEntity.delete("provider", LlmProvider.valueOf(provider.toUpperCase()));
         return deleted > 0;
     }
 }
