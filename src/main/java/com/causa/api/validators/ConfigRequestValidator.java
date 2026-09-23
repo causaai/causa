@@ -58,14 +58,15 @@ public class ConfigRequestValidator {
     // -------------------------------------------------------------------------
 
     private static final Map<String, ExternalRules> EXTERNAL_RULES = Map.of(
-        // Observability — name + url NOT NULL in schema; url nullable in schema but required for observability
+        // Observability — name + url required
         "DATADOG", ExternalRules.of(true, true,  List.of("apiKey", "appKey"), List.of()),
         "INSTANA", ExternalRules.of(true, true,  List.of("token"),            List.of()),
         "OTHER",   ExternalRules.of(true, true,  List.of("token"),            List.of()),
-        // Integrations — name NOT NULL in schema; url nullable (Slack/GitHub have no REST url)
+        // Integrations — name required; url required for Slack (incoming webhook URL),
+        // optional for Jira and GitHub (url is nullable in schema)
         "SLACK",   ExternalRules.of(true, true,  List.of("token"),            List.of("channel")),
-        "JIRA",    ExternalRules.of(true, false, List.of("username", "token"),List.of("projectName")),
-        "GITHUB",  ExternalRules.of(true, false, List.of("token"),            List.of("ownerRepo"))
+        "JIRA",    ExternalRules.of(true, false, List.of("username", "token"), List.of("projectName")),
+        "GITHUB",  ExternalRules.of(true, false, List.of("token"),             List.of("ownerRepo"))
     );
 
     private static final Map<String, LlmRules> LLM_RULES = Map.of(
