@@ -86,6 +86,9 @@ public class ConfigRequestValidator {
      * @throws ConfigException if the platform is unknown or any required field is missing
      */
     public void validateExternal(String platform, ExternalConfigRequest request) {
+        if (platform == null || platform.isBlank()) {
+            throw new ConfigException("platform must not be null or blank", "VALIDATION_ERROR");
+        }
         ExternalRules rules = EXTERNAL_RULES.get(platform.toUpperCase());
         if (rules == null) {
             throw new ConfigException("No validator registered for platform: " + platform, "UNKNOWN_PLATFORM");
@@ -122,6 +125,9 @@ public class ConfigRequestValidator {
      * @throws ConfigException if the auth type is unknown or any required field is missing
      */
     public void validateLlm(String authType, LlmConfigRequest request) {
+        if (authType == null || authType.isBlank()) {
+            throw new ConfigException("auth_config.authType must not be null or blank", "VALIDATION_ERROR");
+        }
         LlmRules rules = LLM_RULES.get(authType.toUpperCase());
         if (rules == null) {
             throw new ConfigException("No validator registered for auth type: " + authType, "UNKNOWN_AUTH_TYPE");
