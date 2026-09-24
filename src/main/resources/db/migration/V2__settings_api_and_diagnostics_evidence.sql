@@ -1,5 +1,5 @@
 -- =============================================================================
--- Causa Backend - Settings API Schema
+-- Causa Backend - Settings API Schema + Diagnostics Evidence Column
 -- Flyway Migration: V2
 -- PostgreSQL 14+
 -- =============================================================================
@@ -57,3 +57,36 @@ CREATE TABLE IF NOT EXISTS llm_configs (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_llm_configs_single_active ON llm_configs (is_active) WHERE is_active = TRUE;
+
+
+-- =============================================================================
+-- 3. PG LISTEN/NOTIFY — extend cache invalidation to new config tables
+--    Reuses the existing notify_config_change() function from V1 which fires
+--    pg_notify('config_cache_channel', 'reload').
+--    ConfigCacheListener already listens on this channel and will now trigger
+--    a refresh of LlmConfigCache and ExternalConfigCache as well.
+-- =============================================================================
+
+CREATE TRIGGER trg_llm_config_notify
+    AFTER INSERT OR UPDATE OR DELETE ON llm_configs
+    FOR EACH STATEMENT EXECUTE FUNCTION notify_config_change();
+
+CREATE TRIGGER trg_external_config_notify
+    AFTER INSERT OR UPDATE OR DELETE ON external_configs
+    FOR EACH STATEMENT EXECUTE FUNCTION notify_config_change();
+
+
+-- =============================================================================
+-- 4. DIAGNOSTICS — all_evidence COLUMN
+--    Stores complete EvidenceItem instances (11-field model) from the validation
+--    pipeline for debugging and audit. The top 3-5 are transformed to Evidence
+--    (5-field model) for API responses.
+--
+--    Existing evidence column: LLM-generated evidences from RCA (backward compatible)
+--    New all_evidence column:  Structured validation evidences from PATH A + PATH B
+-- =============================================================================
+
+ALTER TABLE diagnostics
+    ADD COLUMN IF NOT EXISTS all_evidence JSONB;
+
+COMMENT ON COLUMN diagnostics.all_evidence IS 'Complete evidence items from validation pipeline. Shape: [{"id": "...", "source": "...", "type": "...", "strength": "...", ...}, ...]. Stores all EvidenceItem instances (11-field model) for debugging and audit.';
