@@ -10,6 +10,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -17,14 +18,13 @@ import java.util.regex.Pattern;
 import com.causa.common.constants.McpConstants;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
-import com.causa.config.McpConfig;
+import com.causa.mcp.McpClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 
 /**
  * Liberty Logs Context Collector
@@ -92,13 +92,10 @@ public class LibertyLogsContextCollector {
         "(?:exception_summary|ffdc)_(\\d{2})\\.(\\d{2})\\.(\\d{2})_(\\d{2})\\.(\\d{2})\\.(\\d{2})\\.(\\d+)\\.log"
     );
 
-    private final McpConfig mcpConfig;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
 
-    @Inject
-    public LibertyLogsContextCollector(McpConfig mcpConfig) {
-        this.mcpConfig = mcpConfig;
+    public LibertyLogsContextCollector() {
         this.objectMapper = new ObjectMapper();
         this.httpClient = HttpClient.newBuilder()
             .version(HttpClient.Version.HTTP_1_1)
@@ -112,14 +109,18 @@ public class LibertyLogsContextCollector {
      * <p>First calls {@code list_directory_with_sizes} on the configured Liberty logs directory,
      * filters files by timestamp window and size thresholds, then calls {@code read_text_file} for each selected file.
      *
+     * @param client the "filesystem" MCP client — its {@code mcp.json} config supplies endpoint,
+     *               timeout, and the {@code libertyLogsDir}/{@code alertWindowMinutes} metadata
      * @param alertId the alert ID (used only for logging)
-     * @param alertTimestamp the alert timestamp — used to compute 5-minute time window
+     * @param alertTimestamp the alert timestamp — used to compute the time window
      * @return combined log content from all read files, or {@code null} on complete failure
      */
-    public String collectLibertyLogs(String alertId, Instant alertTimestamp) {
-        String libertyLogsDir = mcpConfig.filesystem().libertyLogsDir();
-        int timeoutMs = mcpConfig.filesystem().timeoutMs();
-        String endpoint = mcpConfig.filesystem().endpoint() + McpConstants.Paths.MCP_ENDPOINT;
+    public String collectLibertyLogs(McpClient client, String alertId, Instant alertTimestamp) {
+        Map<String, Object> metadata = client.getConfig().metadata();
+        String libertyLogsDir = String.valueOf(metadata.getOrDefault("libertyLogsDir", "/logs"));
+        int timeoutMs = client.getConfig().timeoutMs();
+        String endpoint = client.getConfig().url();
+        int alertWindowMinutes = ((Number) metadata.getOrDefault("alertWindowMinutes", 5)).intValue();
 
         try {
             // Step 1: list_directory_with_sizes to discover log files with metadata
@@ -147,7 +148,7 @@ public class LibertyLogsContextCollector {
             }
 
             // Step 2: Parse directory listing and filter files by window + size
-            List<LogFileEntry> candidateFiles = parseDirectoryListing(directoryListing, alertId, alertTimestamp);
+            List<LogFileEntry> candidateFiles = parseDirectoryListing(directoryListing, alertId, alertTimestamp, alertWindowMinutes);
 
             // Step 3: read_text_file for each selected file
             StringBuilder combined = new StringBuilder();
@@ -177,7 +178,7 @@ public class LibertyLogsContextCollector {
                         combined.append("=== ").append(entry.filename).append(" ===\n");
                         String content;
                         if (entry.filename.startsWith(VERBOSE_GC_PREFIX)) {
-                            content = filterVerboseGcContent(fileContent, alertTimestamp);
+                            content = filterVerboseGcContent(fileContent, alertTimestamp, alertWindowMinutes);
                         } else if (entry.filename.startsWith(MESSAGES_LOG_PREFIX)) {
                             content = filterMessagesLogContent(fileContent);
                         } else {
@@ -198,7 +199,7 @@ public class LibertyLogsContextCollector {
             }
 
             // Step 4: Collect FFDC logs if ffdc/ directory exists
-            String ffdcContent = collectFfdcLogs(endpoint, libertyLogsDir, alertId, alertTimestamp, timeoutMs);
+            String ffdcContent = collectFfdcLogs(endpoint, libertyLogsDir, alertId, alertTimestamp, timeoutMs, alertWindowMinutes);
             if (ffdcContent != null && !ffdcContent.isBlank()) {
                 combined.append(ffdcContent);
             }
@@ -228,7 +229,7 @@ public class LibertyLogsContextCollector {
      * Collects FFDC exception logs from the ffdc/ subdirectory.
      */
     private String collectFfdcLogs(String endpoint, String logsDir, String alertId,
-                                    Instant alertTimestamp, int timeoutMs) {
+                                    Instant alertTimestamp, int timeoutMs, int alertWindowMinutes) {
         String ffdcDir = logsDir.endsWith("/") ? logsDir + McpConstants.Filesystem.FFDC_DIR
                                                 : logsDir + "/" + McpConstants.Filesystem.FFDC_DIR;
         try {
@@ -250,7 +251,7 @@ public class LibertyLogsContextCollector {
                 return null;
             }
 
-            List<LogFileEntry> ffdcFiles = parseFfdcDirectoryListing(ffdcListing, alertId, alertTimestamp);
+            List<LogFileEntry> ffdcFiles = parseFfdcDirectoryListing(ffdcListing, alertId, alertTimestamp, alertWindowMinutes);
             StringBuilder ffdcContent = new StringBuilder();
 
             for (LogFileEntry entry : ffdcFiles) {
@@ -297,9 +298,9 @@ public class LibertyLogsContextCollector {
      * Filters files by time window and size thresholds.
      * Collects messages.log, archived messages logs within the alert window, and the latest verbosegc.* file.
      */
-    private List<LogFileEntry> parseDirectoryListing(String listing, String alertId, Instant alertTimestamp) {
+    private List<LogFileEntry> parseDirectoryListing(String listing, String alertId, Instant alertTimestamp, int alertWindowMinutes) {
         List<LogFileEntry> result = new ArrayList<>();
-        Instant windowStart = alertTimestamp.minus(Duration.ofMinutes(mcpConfig.filesystem().alertWindowMinutes()));
+        Instant windowStart = alertTimestamp.minus(Duration.ofMinutes(alertWindowMinutes));
         Instant windowEnd = alertTimestamp.plus(Duration.ofMinutes(1)); // 1 min forward tolerance
         LogFileEntry latestVerboseGc = null;
 
@@ -371,9 +372,9 @@ public class LibertyLogsContextCollector {
     /**
      * Parses FFDC directory listing and filters exception_summary and ffdc files by time window and size.
      */
-    private List<LogFileEntry> parseFfdcDirectoryListing(String listing, String alertId, Instant alertTimestamp) {
+    private List<LogFileEntry> parseFfdcDirectoryListing(String listing, String alertId, Instant alertTimestamp, int alertWindowMinutes) {
         List<LogFileEntry> result = new ArrayList<>();
-        Instant windowStart = alertTimestamp.minus(Duration.ofMinutes(mcpConfig.filesystem().alertWindowMinutes()));
+        Instant windowStart = alertTimestamp.minus(Duration.ofMinutes(alertWindowMinutes));
         Instant windowEnd = alertTimestamp.plus(Duration.ofMinutes(1));
 
         for (String line : listing.split("\n")) {
@@ -696,8 +697,8 @@ public class LibertyLogsContextCollector {
      * </ul>
      * Output is capped at {@link #MAX_VERBOSEGC_CHARS} characters.
      */
-    String filterVerboseGcContent(String raw, Instant alertTimestamp) {
-        Instant windowStart = alertTimestamp.minus(Duration.ofMinutes(mcpConfig.filesystem().alertWindowMinutes()));
+    String filterVerboseGcContent(String raw, Instant alertTimestamp, int alertWindowMinutes) {
+        Instant windowStart = alertTimestamp.minus(Duration.ofMinutes(alertWindowMinutes));
         Instant windowEnd = alertTimestamp.plus(Duration.ofMinutes(1));
 
         String[] lines = raw.split("\n");

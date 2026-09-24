@@ -199,69 +199,12 @@ public final class LogMessages {
     public static final class Mcp {
         private Mcp() {}
 
-        public static final String MCP_CONTEXT_COLLECTION_START = "MCP context collection started";
-        public static final String MCP_K8S_POD_STATUS = "Kubernetes pod status retrieved";
-        public static final String MCP_K8S_POD_EVENTS = "Kubernetes pod events retrieved";
-        public static final String MCP_K8S_POD_LOGS = "Kubernetes pod logs retrieved";
         public static final String MCP_CALL_FAILED = "MCP tool call failed";
-        public static final String MCP_ERROR_DETECTED = "MCP response contains error, returning No Data Available";
-        public static final String MCP_SKIPPED_NO_POD = "Skipping Kubernetes MCP calls - no pod name in alert";
-
-        // Kruize MCP
-        public static final String MCP_KRUIZE_COST_RECOMMENDATIONS = "Kruize cost recommendations retrieved";
-        public static final String MCP_KRUIZE_PERF_RECOMMENDATIONS = "Kruize performance recommendations retrieved";
-        public static final String MCP_KRUIZE_SKIPPED_NO_CONTAINER = "Skipping Kruize MCP calls - no container name available";
-
-        // Quarkus MCP
-        public static final String MCP_QUARKUS_RAW_METRICS = "Quarkus raw metrics retrieved";
-
-        // Async Profiler MCP
-        public static final String MCP_ASYNC_PROFILER_POD_LIST     = "Async Profiler pod list retrieved";
-        public static final String MCP_ASYNC_PROFILER_JVM_STATUS   = "Async Profiler JVM status retrieved";
-        public static final String MCP_ASYNC_PROFILER_JVM_STATS    = "Async Profiler JVM statistics retrieved";
-        public static final String MCP_ASYNC_PROFILER_RECORDING    = "Async Profiler recording retrieved";
-        public static final String MCP_ASYNC_PROFILER_REPORT       = "Async Profiler recording report retrieved";
-        public static final String MCP_ASYNC_PROFILER_JFR_SUMMARY  = "Async Profiler JFR summary retrieved";
-        public static final String MCP_ASYNC_PROFILER_FLAME_GRAPH  = "Async Profiler flame graph retrieved";
-        public static final String MCP_ASYNC_PROFILER_NO_RECORDING = "Async Profiler: no latestRecordingId — skipping recording tools";
-
-        // Cryostat MCP
-        public static final String MCP_CRYOSTAT_GC_ANALYSIS = "Cryostat GC analysis retrieved";
-        public static final String MCP_CRYOSTAT_MEMORY_ANALYSIS = "Cryostat memory analysis retrieved";
-        public static final String MCP_CRYOSTAT_THREAD_ANALYSIS = "Cryostat thread analysis retrieved";
-        public static final String MCP_CRYOSTAT_EXCEPTION_ANALYSIS = "Cryostat exception analysis retrieved";
-        public static final String MCP_CRYOSTAT_CONTAINER_ANALYSIS = "Cryostat container analysis retrieved";
-        public static final String MCP_CRYOSTAT_RECORDING_CREATED = "Cryostat recording created, waiting for retry";
-        public static final String MCP_CRYOSTAT_RETRY = "Retrying Cryostat tool call";
-        public static final String MCP_CRYOSTAT_MAX_RETRIES = "Cryostat max retries exceeded";
-
-        // Context collection completion
-        public static final String MCP_CONTEXT_COLLECTION_COMPLETE = "MCP context collection completed";
-
-        // Platform routing
-        public static final String MCP_PLATFORM_DETECTED = "Deployment platform detected";
-        public static final String MCP_VM_CONTEXT_COLLECTION_START = "VM platform MCP context collection started";
-        public static final String MCP_VM_CONTEXT_COLLECTION_COMPLETE = "VM platform MCP context collection completed";
-
-        // Filesystem MCP
-        public static final String MCP_FILESYSTEM_DIR_LISTING  = "Filesystem directory listing retrieved";
-        public static final String MCP_FILESYSTEM_FILE_CONTENT = "Filesystem file content retrieved";
-        public static final String MCP_FILESYSTEM_SKIPPED      = "Skipping Filesystem MCP calls - not yet implemented";
-
-        // JMX MCP
-        public static final String MCP_JMX_HEAP_STATUS             = "JMX heap status retrieved";
-        public static final String MCP_JMX_GC_ACTIVITY             = "JMX GC activity retrieved";
-        public static final String MCP_JMX_THREAD_STATE            = "JMX thread state retrieved";
-        public static final String MCP_JMX_GC_PRESSURE             = "JMX GC pressure analysis retrieved";
-        public static final String MCP_JMX_MEMORY_LEAK_INDICATORS  = "JMX memory leak indicators retrieved";
-        public static final String MCP_JMX_THREAD_CONTENTION       = "JMX thread contention analysis retrieved";
-        public static final String MCP_JMX_JVM_RUNTIME_INFO        = "JMX JVM runtime info retrieved";
 
         // Filesystem MCP (Liberty logs)
         public static final String MCP_FILESYSTEM_LIST_DIRECTORY = "Filesystem MCP list_directory_with_sizes called for Liberty logs";
         public static final String MCP_FILESYSTEM_READ_FILE = "Filesystem MCP read_text_file called for Liberty log file";
         public static final String MCP_FILESYSTEM_LIBERTY_LOGS_COLLECTED = "Liberty log files collected via Filesystem MCP";
-        public static final String MCP_FILESYSTEM_SKIPPED_NO_POD = "Skipping Filesystem MCP calls - no pod name in alert";
         public static final String MCP_FILESYSTEM_FILE_SKIPPED_SIZE = "Skipping Liberty log file — exceeds size threshold";
         public static final String MCP_FILESYSTEM_FILE_SKIPPED_WINDOW = "Skipping Liberty log file — outside alert time window";
         public static final String MCP_FILESYSTEM_FFDC_LIST = "Filesystem MCP list_directory_with_sizes called for Liberty FFDC directory";

@@ -138,42 +138,6 @@ causa:
     ignore-namespaces: ${CAUSA_ALERT_IGNORE_NS:kube-system,istio-system}
     cooldown-cleanup-interval: ${CAUSA_ALERT_COOLDOWN_CLEANUP_INTERVAL:5m}
 
-  mcp:
-    kubernetes:
-      endpoint: ${CAUSA_MCP_K8S_ENDPOINT:http://kubernetes-mcp-server:8080}
-      health-path: ${CAUSA_MCP_K8S_HEALTH_PATH:/healthz}
-      timeout-ms: ${CAUSA_MCP_K8S_TIMEOUT:5000}
-    kruize:
-      endpoint: ${CAUSA_MCP_KRUIZE_ENDPOINT:http://kruize-mcp-server-service:8080}
-      health-path: ${CAUSA_MCP_KRUIZE_HEALTH_PATH:/q/health/ready}
-      timeout-ms: ${CAUSA_MCP_KRUIZE_TIMEOUT:10000}
-    cryostat:
-      endpoint: ${CAUSA_MCP_CRYOSTAT_ENDPOINT:http://cryostat-mcp:8000}
-      health-endpoint: ${CAUSA_MCP_CRYOSTAT_HEALTH_ENDPOINT:http://cryostat-mcp-api:8080}
-      health-path: ${CAUSA_MCP_CRYOSTAT_HEALTH_PATH:/healthz}
-      timeout-ms: ${CAUSA_MCP_CRYOSTAT_TIMEOUT:15000}
-      retry-delay-ms: ${CAUSA_MCP_CRYOSTAT_RETRY_DELAY:5000}
-      max-retries: ${CAUSA_MCP_CRYOSTAT_MAX_RETRIES:3}
-    filesystem:
-      endpoint: ${CAUSA_MCP_FILESYSTEM_ENDPOINT:http://filesystem-mcp-server:8080}
-      health-path: ${CAUSA_MCP_FILESYSTEM_HEALTH_PATH:/healthz}
-      timeout-ms: ${CAUSA_MCP_FILESYSTEM_TIMEOUT:10000}
-      liberty-logs-dir: ${CAUSA_MCP_FILESYSTEM_LIBERTY_LOGS_DIR:/logs}
-      alert-window-minutes: ${CAUSA_MCP_FILESYSTEM_ALERT_WINDOW_MINUTES:5}
-    quarkus:
-      endpoint: ${CAUSA_MCP_QUARKUS_ENDPOINT:}
-      health-path: ${CAUSA_MCP_QUARKUS_HEALTH_PATH:/healthz}
-      timeout-ms: ${CAUSA_MCP_QUARKUS_TIMEOUT:10000}
-      metrics-base-url: ${CAUSA_MCP_QUARKUS_METRICS_BASE_URL:}
-    async-profiler:
-      endpoint: ${CAUSA_MCP_ASYNC_PROFILER_ENDPOINT:}
-      health-path: ${CAUSA_MCP_ASYNC_PROFILER_HEALTH_PATH:/healthz}
-      timeout-ms: ${CAUSA_MCP_ASYNC_PROFILER_TIMEOUT:15000}
-    jmx:
-      endpoint: ${CAUSA_MCP_JMX_ENDPOINT:http://jmx-mcp-server:8080}
-      health-path: ${CAUSA_MCP_JMX_HEALTH_PATH:/healthz}
-      timeout-ms: ${CAUSA_MCP_JMX_TIMEOUT:10000}
-
 #   # Feature Flags (Runtime configurable)
 #   features:
 #     rag-enabled: ${CAUSA_FEATURE_RAG:false}
@@ -192,7 +156,7 @@ causa:
         url: ${CAUSA_DB_URL:jdbc:postgresql://iri-db-rw:5432/iri-db}
   causa:
     mcp:
-      config-file: ${MCP_CONFIG_FILE:/etc/causa/mcp.json}
+      config-file: ${:/etc/causa/mcp.json}
 
 # ============================================================
 # Development Profile Configuration

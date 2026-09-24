@@ -49,8 +49,8 @@ class LogMessagesTest {
     }
 
     @Test void mcpMessages_notBlank() {
-        assertThat(LogMessages.Mcp.MCP_CONTEXT_COLLECTION_START).isNotBlank();
         assertThat(LogMessages.Mcp.MCP_CALL_FAILED).isNotBlank();
+        assertThat(LogMessages.Mcp.MCP_FILESYSTEM_LIST_DIRECTORY).isNotBlank();
     }
 
     @Test void skillsMessages_notBlank() {

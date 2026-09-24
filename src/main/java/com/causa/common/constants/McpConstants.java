@@ -173,18 +173,6 @@ public final class McpConstants {
     }
 
     /**
-     * Output section headers
-     */
-    public static final class OutputHeaders {
-        private OutputHeaders() {}
-
-        public static final String POD_STATUS = "\n=== POD STATUS ===";
-        public static final String KUBERNETES_EVENTS = "\n=== KUBERNETES EVENTS (for pod: %s) ===";
-        public static final String POD_LOGS = "\n=== POD LOGS (last 5 lines) ===";
-        public static final String LIBERTY_LOGS = "\n=== LIBERTY LOGS ===";
-    }
-
-    /**
      * Error messages
      */
     public static final class Errors {
@@ -332,16 +320,6 @@ public final class McpConstants {
         public static final String INVOLVED_OBJECT_NAME_PREFIX = "involvedObject.name=";
         public static final String PARENTHESIS_FORMAT = " (%s)";
         public static final String VERSION = "version";
-    }
-
-    /**
-     * Cryostat-specific constants
-     */
-    public static final class Cryostat {
-        private Cryostat() {}
-
-        public static final String RECORDING_CREATED_STATUS = "RECORDING_CREATED";
-        public static final String STATUS_FIELD = "status";
     }
 
     /**
