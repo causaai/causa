@@ -100,7 +100,9 @@ prompts:
             "snippet": "exact text from context",
             "source": "section name",
             "relevance": 0.0-1.0,
-            "type": "KUBERNETES_EVENT|METRIC|POD_LOG|etc"
+            "type": "KUBERNETES_EVENT|METRIC|POD_LOG|etc",
+            "statement": "one line stating only what this snippet shows, max 80 chars",
+            "reasoning": "why this snippet matters for the assertion - what it proves or rules out"
           }
         ],
         "reasoning": "Explain why this status and confidence",
