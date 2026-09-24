@@ -260,6 +260,8 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
                     dto.source != null ? dto.source : "llm-analysis",
                     parseEvidenceType(dto.type),
                     dto.snippet,
+                    dto.statement,
+                    dto.reasoning,
                     dto.relevance
                 );
                 evidenceList.add(evidence);
@@ -328,6 +330,8 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
         public String source;
         public double relevance;
         public String type;
+        public String statement;
+        public String reasoning;
 
         // Jackson needs default constructor
         public EvidenceDto() {}
