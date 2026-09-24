@@ -22,12 +22,9 @@ prompts:
       2. **PROMETHEUS_METRICS**: CPU Usage: X/Y cores, MEMORY Usage: X/Y MiB.
       3. **APPLICATION_LOGS**: Application events, errors, stack traces. Look for: OutOfMemoryError, heap space issues, fatal errors.
       4. **POD_EVENTS**: Pod state changes, restarts, warnings. Look for: OOMKilled, BackOff, CrashLoopBackOff, exit code 137.
-      5. **JFR_ANALYSIS** (Java Flight Recorder from Cryostat) — JSON-formatted with event types, columns, rows:
-         - 5a. GC_ANALYSIS_CRYOSTAT: GC events, heap summaries, pauses, configuration
-         - 5b. MEMORY_ANALYSIS_CRYOSTAT: Heap usage, memory pools (Eden, Survivor, Tenured Gen)
-         - 5c. THREAD_ANALYSIS: Thread parking, statistics, thread dumps
-         - 5d. EXCEPTION_ANALYSIS: Exception statistics, thrown exceptions
-         - 5e. CONTAINER_ANALYSIS: Container configuration, CPU throttling, memory limits
+      5. **CRYOSTAT** (automated JFR analysis) — two sections, not event tables:
+         - 5a. CRYOSTAT_DISCOVERY: the alert pod's place in the Cryostat tree (namespace, deployment, replica set, pod, jvmId, alias, javaMain). A "not found in the Cryostat discovery tree" note means the workload is not a Cryostat target and CRYOSTAT_ANALYSIS was not requested.
+         - 5b. CRYOSTAT_ANALYSIS: rules with score > 0 only. Each rule has id, name, topic, score, summary, explanation, solution, and suggestions. omittedRuleCount is how many rules were dropped because score was 0 (no problem) or -1 (required JFR event was not enabled). Higher scores are more severe. Topics map as garbage_collection (GC), heap (memory), lock_instances (threads and locks), and exceptions.
       6. **KRUIZE_PERFORMANCE_RECOMMENDATIONS**: Current vs recommended resource values with deltas.
 
       You will receive the following signals (some may be missing):
@@ -48,14 +45,11 @@ prompts:
       - Contains: Pod state changes, container restarts, image pulls, warnings
       - Look for: OOMKilled, BackOff, CrashLoopBackOff, exit codes (especially 137)
 
-      ### 5. JFR_ANALYSIS (Java Flight Recorder from Cryostat)
-      Structured profiling data with multiple analysis files:
-      - **5a. GC_ANALYSIS_CRYOSTAT**: GC events, heap summaries, pauses, configuration (DefNew, SerialOld, G1GC, ParallelGC)
-      - **5b. MEMORY_ANALYSIS_CRYOSTAT**: Heap usage, memory pools (Eden, Survivor, Tenured Gen)
-      - **5c. THREAD_ANALYSIS**: Thread parking, statistics, thread dumps
-      - **5d. EXCEPTION_ANALYSIS**: Exception statistics, thrown exceptions
-      - **5e. CONTAINER_ANALYSIS**: Container configuration, CPU throttling, memory limits
-      - **Note**: JFR data is JSON-formatted with event types, columns, and rows. If missing or empty (row_count: 0), note in llm_notes.
+      ### 5. CRYOSTAT (automated JFR analysis)
+      Two sections from the Cryostat MCP server:
+      - **5a. CRYOSTAT_DISCOVERY**: pruned identity for this pod only — namespace, deployment, replicaSet, pod, jvmId, alias, javaMain. If the text says the pod was not found in the discovery tree, Cryostat has not registered this workload and there is no analysis report.
+      - **5b. CRYOSTAT_ANALYSIS**: automated rules that scored above 0, sorted with the highest score first. Use score, topic, summary, explanation, and solution as the evidence. Do not treat a missing section as healthy. Score -1 rules are already omitted (the recording did not enable that event). Score 0 rules are already omitted (no problem found).
+      - **Note**: If CRYOSTAT_DISCOVERY or CRYOSTAT_ANALYSIS is missing or "No Data Available", say so in llm_notes. A discovery match with no analysis means the report call failed, often because no archived recording covered the alert window.
 
       ### 6. KRUIZE_PERFORMANCE_RECOMMENDATIONS
       - Contains: Resource request/limit recommendations for CPU and memory
@@ -87,7 +81,7 @@ prompts:
       - Key values to reason about:
         - `heapUtilisationPct ≥ 85 %` — heap nearly exhausted; corroborate with POD EVENTS `OOMKilling`
         - `heapMaxMb > container memory limit × 0.75` — JVM heap ceiling exceeds safe cgroup headroom; container will OOMKill before JVM OOM handler fires
-        - `gcPauseTimeMs > 100` — GC pauses causing latency; corroborate with Cryostat GC ANALYSIS
+        - `gcPauseTimeMs > 100` — GC pauses causing latency; corroborate with CRYOSTAT_ANALYSIS rules whose topic is garbage_collection and whose score is elevated
         - Flame graph frame dominating ≥ 30 % of samples — CPU hotspot; distinguish app code from JVM GC/lock internals
         - RECORDING REPORT `MemoryLeakRule` or `ObjectCountAfterGCRule` violations — high-confidence leak evidence
       - **Note**: If sections 8d–8g are absent, `latestRecordingId` was null (no JFR recording yet) — state in `llm_notes`. If all sections are `"No Data Available"`, Async Profiler MCP was not configured — omit from `evidences`.
@@ -117,12 +111,12 @@ prompts:
       ### STEP 2: ROOT CAUSE IDENTIFICATION
 
       **OOM_KILLED / POSSIBLE_OOM_KILLED**: Identify memory exhaustion cause (leaks, unbounded data structures, large allocations). Analyze limits vs usage. Review application behavior.
-      **POSSIBLE_GC_PAUSE**: Identify GC config issues (e.g., Serial GC on multi-core). Check excessive GC activity, heap size vs workload, performance impact.
+      **POSSIBLE_GC_PAUSE**: Identify GC config issues (e.g., Serial GC on multi-core). Check excessive GC activity, heap size vs workload, performance impact, and CRYOSTAT_ANALYSIS garbage_collection rules.
       **HEALTHY**: Confirm all signals normal, note minor observations.
 
       ### STEP 3: EVIDENCE COLLECTION
 
-      Collect from: metrics (exact values), events (with timestamps), logs (verbatim quotes), JFR data, Kruize recommendations.
+      Collect from: metrics (exact values), events (with timestamps), logs (verbatim quotes), CRYOSTAT_ANALYSIS rule scores and summaries, Kruize recommendations.
 
       ### STEP 4: SOLUTIONS
 
@@ -138,7 +132,7 @@ prompts:
 
       ### STEP 5: RCA CONFIDENCE (0.0-1.0)
 
-      1.0: definitive (OOMKilled + logs + JFR). 0.7-0.9: strong (multiple corroborating signals). 0.4-0.6: moderate (signals missing/ambiguous). 0.0-0.3: weak (limited signals).
+      1.0: definitive (OOMKilled + logs + CRYOSTAT_ANALYSIS). 0.7-0.9: strong (multiple corroborating signals). 0.4-0.6: moderate (signals missing/ambiguous). 0.0-0.3: weak (limited signals).
       If insufficient evidence: select most likely category, lower scores, state uncertainty, mention what signals would help.
 
       ## OUTPUT FORMAT
@@ -149,9 +143,9 @@ prompts:
         "issue_description": "<NON-TECHNICAL, 2-4 sentences. Plain English: 'ran out of memory', 'stopped working'. Avoid: GC, JVM, heap, OOM, pod, container, Kubernetes.>",
         "technical_description": "<DETAILED technical analysis, 6-10 sentences. Include: memory values, GC behavior, allocation patterns, heap pools, container limits. Reference all available signals.>",
         "anomaly_type": "<OOM_KILLED | POSSIBLE_OOM_KILLED | POSSIBLE_GC_PAUSE | HEALTHY>",
-        "root_cause": "<4-6 sentences. Causal chain: trigger → escalation → critical. Connect logs, metrics, JFR, events.>",
+        "root_cause": "<4-6 sentences. Causal chain: trigger → escalation → critical. Connect logs, metrics, CRYOSTAT_ANALYSIS, events.>",
         "supporting_logs": ["<Verbatim log lines from APPLICATION_LOGS, or 'No direct supporting logs present'>"],
-        "evidences": ["<Each must be specific and quantifiable: exact metric values, event timestamps, JFR data points, Kruize recommendation gaps>"],
+        "evidences": ["<Each must be specific and quantifiable: exact metric values, event timestamps, CRYOSTAT_ANALYSIS rule id, topic, and score, Kruize recommendation gaps>"],
         "recommendations": [
           {
             "solution_type": "Immediate Mitigation",
@@ -182,7 +176,7 @@ prompts:
           "rca_confidence_score": "<0.0-1.0>",
           "summary_text": "<2-4 sentences: justify score, which signals were strong/missing, evidence chain completeness.>"
         },
-        "llm_notes": "<3-7 sentences: signals available, step-by-step analysis, corroboration, key decisions, ambiguities, JFR influence, confidence reasoning, alternative theories ruled out.>"
+        "llm_notes": "<3-7 sentences: signals available, step-by-step analysis, corroboration, key decisions, ambiguities, whether CRYOSTAT_DISCOVERY and CRYOSTAT_ANALYSIS were present, confidence reasoning, alternative theories ruled out.>"
       }
 
       ## CONSTRAINTS
