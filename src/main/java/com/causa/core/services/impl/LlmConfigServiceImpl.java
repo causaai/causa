@@ -7,6 +7,7 @@ import com.causa.common.constants.ConfigConstants.LlmProvider;
 import com.causa.common.exceptions.ConfigException;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.utils.EncryptionUtils;
+import com.causa.config.LlmConfigCache;
 import com.causa.core.domain.AuthConfig;
 import com.causa.core.domain.LlmConfig;
 import com.causa.core.ports.LlmConfigRepository;
@@ -37,24 +38,28 @@ public class LlmConfigServiceImpl implements LlmConfigService {
     private static final CausaLogger log = CausaLogger.getLogger(LlmConfigServiceImpl.class);
 
     private final LlmConfigRepository repository;
+    private final LlmConfigCache cache;
     private final ConfigRequestValidator validator;
 
     @Inject
     public LlmConfigServiceImpl(LlmConfigRepository repository,
+                                LlmConfigCache cache,
                                 ConfigRequestValidator validator) {
         this.repository = repository;
+        this.cache      = cache;
         this.validator  = validator;
     }
 
     @Override
     public List<LlmConfig> listAll() {
-        return repository.findAll().stream()
+        return cache.getAll().stream()
             .map(this::maskSensitiveFields)
             .toList();
     }
 
     @Override
     public LlmConfig getByProvider(String provider) {
+        // Single-provider lookup still goes to DB — not worth caching per-provider lookup
         return repository.findByProvider(provider.toUpperCase())
             .map(this::maskSensitiveFields)
             .orElseThrow(() -> new ConfigException(
@@ -63,7 +68,7 @@ public class LlmConfigServiceImpl implements LlmConfigService {
 
     @Override
     public Optional<LlmConfig> getActive() {
-        return repository.findActive().map(this::maskSensitiveFields);
+        return cache.getActive().map(this::maskSensitiveFields);
     }
 
     @Override
@@ -106,6 +111,9 @@ public class LlmConfigServiceImpl implements LlmConfigService {
 
         LlmConfig saved = repository.save(toSave);
 
+        // Refresh cache immediately so subsequent reads (e.g. listAll, getActive) are consistent
+        cache.refresh();
+
         log.info("LLM config upserted")
             .field("provider", provider)
             .field("authType", authType)
@@ -129,6 +137,9 @@ public class LlmConfigServiceImpl implements LlmConfigService {
         }
 
         repository.deleteByProvider(providerKey);
+
+        // Refresh cache immediately so subsequent reads reflect the deletion
+        cache.refresh();
 
         log.info("LLM config deleted")
             .field("provider", provider)

@@ -31,7 +31,7 @@ import java.util.Optional;
 public class LlmConfigRepositoryImpl implements LlmConfigRepository {
 
     @Override
-    @Transactional(Transactional.TxType.SUPPORTS)
+    @Transactional(Transactional.TxType.REQUIRES_NEW)
     public List<LlmConfig> findAll() {
         return LlmConfigEntity.<LlmConfigEntity>listAll()
             .stream()
