@@ -1,36 +1,41 @@
 package com.causa.mcp.util;
 
-import com.causa.config.McpConfig;
+import com.causa.mcp.McpClient;
+import com.causa.mcp.config.McpSettings;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
 @DisplayName("LibertyLogsContextCollector Pure-Logic Tests")
 class LibertyLogsContextCollectorTest {
 
-    @Mock McpConfig mcpConfig;
-    @Mock McpConfig.FilesystemConfig filesystemConfig;
-
     LibertyLogsContextCollector collector;
 
     @BeforeEach
     void setUp() {
-        when(mcpConfig.filesystem()).thenReturn(filesystemConfig);
         // Use a real instance — no HTTP client needed for pure-logic tests
-        collector = new LibertyLogsContextCollector(mcpConfig);
+        collector = new LibertyLogsContextCollector();
+    }
+
+    private static McpClient filesystemClient(String url, int timeoutMs, Map<String, Object> metadata) {
+        McpSettings.ServerConfig config = new McpSettings.ServerConfig(
+                "streamable-http", url, Map.of(), false,
+                new McpSettings.HealthCheckConfig(url + "/healthz", timeoutMs),
+                timeoutMs, metadata, null, List.of());
+        return new McpClient("filesystem", config);
     }
 
     // -----------------------------------------------------------------------
@@ -146,16 +151,11 @@ class LibertyLogsContextCollectorTest {
     @DisplayName("filterVerboseGcContent() Tests")
     class FilterVerboseGcTests {
 
-        @BeforeEach
-        void setWindow() {
-            when(filesystemConfig.alertWindowMinutes()).thenReturn(5);
-        }
-
         @Test
         @DisplayName("returns header + end tag when no GC blocks present")
         void noGcBlocks_returnsHeader() {
             String raw = "<verbosegc>\n<initialized><heap/></initialized>\n</verbosegc>\n";
-            String result = collector.filterVerboseGcContent(raw, Instant.now());
+            String result = collector.filterVerboseGcContent(raw, Instant.now(), 5);
             assertThat(result).contains("<verbosegc>\n");
             assertThat(result).contains("</verbosegc>");
         }
@@ -170,7 +170,7 @@ class LibertyLogsContextCollectorTest {
                     + "<gc type=\"global\" />\n"
                     + "<exclusive-end timestamp=\"" + ts + "\" />\n";
             // Alert time far from block — still retained because global
-            String result = collector.filterVerboseGcContent(raw, Instant.parse("2024-01-15T12:00:00Z"));
+            String result = collector.filterVerboseGcContent(raw, Instant.parse("2024-01-15T12:00:00Z"), 5);
             assertThat(result).contains("exclusive-start");
         }
 
@@ -181,7 +181,7 @@ class LibertyLogsContextCollectorTest {
             String raw = "<verbosegc>\n</initialized>\n"
                     + "<exclusive-start timestamp=\"" + ts + "\" />\n"
                     + "<exclusive-end timestamp=\"" + ts + "\" />\n";
-            String result = collector.filterVerboseGcContent(raw, Instant.parse("2024-01-15T10:30:00Z"));
+            String result = collector.filterVerboseGcContent(raw, Instant.parse("2024-01-15T10:30:00Z"), 5);
             // Block should be dropped
             assertThat(result).doesNotContain("exclusive-start");
         }
@@ -195,14 +195,14 @@ class LibertyLogsContextCollectorTest {
             String raw = "<verbosegc>\n</initialized>\n"
                     + "<exclusive-start timestamp=\"" + ts + "\" />\n"
                     + "<exclusive-end timestamp=\"" + ts + "\" />\n";
-            String result = collector.filterVerboseGcContent(raw, alertTime);
+            String result = collector.filterVerboseGcContent(raw, alertTime, 5);
             assertThat(result).contains("exclusive-start");
         }
 
         @Test
         @DisplayName("handles empty raw input gracefully")
         void emptyInput_noThrow() {
-            assertThatCode(() -> collector.filterVerboseGcContent("", Instant.now()))
+            assertThatCode(() -> collector.filterVerboseGcContent("", Instant.now(), 5))
                     .doesNotThrowAnyException();
         }
     }
@@ -217,12 +217,10 @@ class LibertyLogsContextCollectorTest {
         @Test
         @DisplayName("returns null when HTTP endpoint unreachable")
         void returnsNull_whenHttpFails() {
-            when(filesystemConfig.libertyLogsDir()).thenReturn("/logs");
-            when(filesystemConfig.timeoutMs()).thenReturn(1);
-            when(filesystemConfig.endpoint()).thenReturn("http://192.0.2.1"); // TEST-NET, unreachable
-            when(filesystemConfig.alertWindowMinutes()).thenReturn(5);
+            McpClient client = filesystemClient("http://192.0.2.1", 1, // TEST-NET, unreachable
+                    Map.of("libertyLogsDir", "/logs", "alertWindowMinutes", 5));
 
-            String result = collector.collectLibertyLogs("alert-1", Instant.now());
+            String result = collector.collectLibertyLogs(client, "alert-1", Instant.now());
             assertThat(result).isNull();
         }
     }

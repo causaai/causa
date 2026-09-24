@@ -101,7 +101,7 @@ public class McpRegistry {
         }
         switch (client.getServerName()) {
             case "filesystem" -> builder.put("LIBERTY_LOGS",
-                    libertyLogsContextCollector.collectLibertyLogs(alert.getAlertId(), alert.getAlertTimestamp()));
+                    libertyLogsContextCollector.collectLibertyLogs(client, alert.getAlertId(), alert.getAlertTimestamp()));
             case "async-profiler" -> AsyncProfilerContextCollector.collect(client, alert, builder);
             default -> {
                 for (McpSettings.ToolConfig tool : client.getConfig().tools()) {
