@@ -34,7 +34,7 @@ class McpRegistryTest {
     @Test
     @DisplayName("init() populates one client per configured server")
     void initPopulatesClients() {
-        McpRegistry registry = new McpRegistry();
+        McpRegistry registry = new McpRegistry(null);
         McpSettings settings = new McpSettings(Map.of(
                 "kubernetes", serverConfig(),
                 "kruize", serverConfig()));
@@ -52,7 +52,7 @@ class McpRegistryTest {
     @Test
     @DisplayName("markInitFailed() clears clients and records the failure reason")
     void markInitFailedClearsState() {
-        McpRegistry registry = new McpRegistry();
+        McpRegistry registry = new McpRegistry(null);
         registry.init(new McpSettings(Map.of("kubernetes", serverConfig())));
         assertTrue(registry.isInitialized());
 
@@ -66,7 +66,7 @@ class McpRegistryTest {
     @Test
     @DisplayName("A fresh registry starts uninitialized with no clients")
     void freshRegistryIsUninitialized() {
-        McpRegistry registry = new McpRegistry();
+        McpRegistry registry = new McpRegistry(null);
 
         assertFalse(registry.isInitialized());
         assertTrue(registry.allClients().isEmpty());

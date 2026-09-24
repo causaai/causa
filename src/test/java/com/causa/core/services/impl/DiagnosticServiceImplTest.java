@@ -50,7 +50,7 @@ class DiagnosticServiceImplTest {
     private AlertRepository alertRepository;
 
     @Mock
-    private com.causa.mcp.McpContextCollector mcpContextCollector;
+    private com.causa.mcp.McpRegistry mcpRegistry;
 
     @Mock
     private RcaPromptBuilder rcaPromptBuilder;
@@ -78,7 +78,7 @@ class DiagnosticServiceImplTest {
         diagnosticService = new DiagnosticServiceImpl(
                 diagnosticRepository,
                 alertRepository,
-                mcpContextCollector,
+                mcpRegistry,
                 rcaPromptBuilder,
                 promptSender,
                 appConfig,
