@@ -58,32 +58,33 @@ public class McpClient {
             long latency = System.currentTimeMillis() - startTime;
             boolean isHealthy = response.statusCode() >= 200 && response.statusCode() < 300;
 
-            return ComponentHealthDto.builder()
+            ComponentHealthDto.Builder builder = ComponentHealthDto.builder()
                     .status(isHealthy
                             ? AppConstants.HealthStatus.UP.getValue()
                             : AppConstants.HealthStatus.DOWN.getValue())
                     .message(isHealthy
                             ? HealthCheckConstants.Messages.MCP_CONNECTED
-                            : HealthCheckConstants.Messages.MCP_NOT_AVAILABLE)
-                    .latencyMs(latency)
-                    .optional(config.optional())
-                    .build();
+                            : "Unexpected status code: " + response.statusCode())
+                    .optional(config.optional() ? Boolean.TRUE : null);
+            if (isHealthy) {
+                builder.latencyMs(latency);
+            }
+            return builder.build();
 
         } catch (IOException | InterruptedException | IllegalArgumentException e) {
-            long latency = System.currentTimeMillis() - startTime;
+            String reason = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
             log.warn("MCP health check failed")
                     .field("server", serverName)
                     .field("url", healthCheck.url())
-                    .field("error", e.getMessage())
+                    .field("error", reason)
                     .log();
             if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
             return ComponentHealthDto.builder()
                     .status(AppConstants.HealthStatus.DOWN.getValue())
-                    .message(HealthCheckConstants.Messages.MCP_NOT_AVAILABLE)
-                    .latencyMs(latency)
-                    .optional(config.optional())
+                    .message("Unable to connect to the server.")
+                    .optional(config.optional() ? Boolean.TRUE : null)
                     .build();
         }
     }
