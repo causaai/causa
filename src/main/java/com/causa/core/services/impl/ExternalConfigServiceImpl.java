@@ -7,6 +7,7 @@ import com.causa.common.constants.ConfigConstants.PlatformCategory;
 import com.causa.common.exceptions.ConfigException;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.utils.EncryptionUtils;
+import com.causa.config.ExternalConfigCache;
 import com.causa.core.domain.AuthConfig;
 import com.causa.core.domain.ExternalConfig;
 import com.causa.core.ports.ExternalConfigRepository;
@@ -34,18 +35,21 @@ public class ExternalConfigServiceImpl implements ExternalConfigService {
     private static final CausaLogger log = CausaLogger.getLogger(ExternalConfigServiceImpl.class);
 
     private final ExternalConfigRepository repository;
+    private final ExternalConfigCache cache;
     private final ConfigRequestValidator validator;
 
     @Inject
     public ExternalConfigServiceImpl(ExternalConfigRepository repository,
+                                     ExternalConfigCache cache,
                                      ConfigRequestValidator validator) {
         this.repository = repository;
+        this.cache      = cache;
         this.validator  = validator;
     }
 
     @Override
     public List<ExternalConfig> listByCategory(PlatformCategory category) {
-        return repository.findByCategory(category).stream()
+        return cache.getByCategory(category).stream()
             .map(this::maskSensitiveFields)
             .toList();
     }
@@ -80,6 +84,9 @@ public class ExternalConfigServiceImpl implements ExternalConfigService {
 
         ExternalConfig saved = repository.save(toSave);
 
+        // Refresh cache immediately so subsequent listByCategory() reads are consistent
+        cache.refresh();
+
         log.info("External config upserted")
             .field("platform", platformKey)
             .field("name", request.getName())
@@ -97,6 +104,10 @@ public class ExternalConfigServiceImpl implements ExternalConfigService {
                 "No config found for platform '" + platform + "' with name '" + name + "'",
                 "NOT_FOUND");
         }
+
+        // Refresh cache immediately so subsequent reads reflect the deletion
+        cache.refresh();
+
         log.info("External config deleted")
             .field("platform", platform)
             .field("name", name)
