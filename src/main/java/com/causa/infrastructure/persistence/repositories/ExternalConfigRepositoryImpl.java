@@ -28,7 +28,7 @@ import java.util.Optional;
 public class ExternalConfigRepositoryImpl implements ExternalConfigRepository {
 
     @Override
-    @Transactional(Transactional.TxType.SUPPORTS)
+    @Transactional(Transactional.TxType.REQUIRES_NEW)
     public List<ExternalConfig> findByCategory(PlatformCategory category) {
         return ExternalConfigEntity
             .<ExternalConfigEntity>find("category", category)
