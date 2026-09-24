@@ -50,4 +50,3 @@ data:
   # Comma-separated list of namespaces to ignore (e.g., system namespaces)
   CAUSA_ALERT_IGNORE_NS: "kube-system,istio-system"
 
-  # MCP server config is file-based now (mcp.json / MCP_CONFIG_FILE) — no CAUSA_MCP_* env vars needed.
