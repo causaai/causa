@@ -83,8 +83,10 @@ public class DiagnosticEntity extends BaseEntity {
     private JsonNode recommendations;
 
     /**
-     * Supporting evidence bundle stored as JSONB.
-     * Shape: {@code { "supporting_logs": [...], "evidences": [...], "confidence_summary": "..." }}.
+     * User-facing evidence subset stored as JSONB.
+     * Shape: {@code [ { "id": "...", "source": "...", "type": "...", ... }, ... ]}.
+     * The EvidenceItems chosen from {@link #allEvidence} for the API response, selected once
+     * when the diagnostic completes so selection never runs on the per-request path.
      */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
@@ -93,8 +95,8 @@ public class DiagnosticEntity extends BaseEntity {
     /**
      * Complete evidence items from validation pipeline stored as JSONB.
      * Shape: {@code [ { "id": "...", "source": "...", "type": "...", ... }, ... ]}.
-     * This stores all EvidenceItem instances (11-field model) for debugging and audit.
-     * The top 3-5 are transformed to Evidence (5-field model) for API response.
+     * This stores all EvidenceItem instances (13-field model) for debugging and audit.
+     * The top 3-5 are selected into {@link #evidence} for the API response.
      */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")

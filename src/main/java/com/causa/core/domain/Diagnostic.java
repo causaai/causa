@@ -27,6 +27,10 @@ public final class Diagnostic {
     private final RootCauseAnalysis rca;
     private final String validationResult;
     private final String validationData;
+    /** Every {@link com.causa.core.domain.validation.EvidenceItem} collected for this finding, as JSON. */
+    private final String allEvidence;
+    /** The user-facing subset of {@link #allEvidence}, selected once in the pipeline, as JSON. */
+    private final String evidence;
 
     private Diagnostic(Builder builder) {
         this.diagnosticId    = Objects.requireNonNull(builder.diagnosticId, "diagnosticId cannot be null");
@@ -38,6 +42,8 @@ public final class Diagnostic {
         this.rca             = builder.rca;
         this.validationResult = builder.validationResult;
         this.validationData  = builder.validationData;
+        this.allEvidence     = builder.allEvidence;
+        this.evidence        = builder.evidence;
     }
 
     // -------------------------------------------------------------------------
@@ -54,6 +60,10 @@ public final class Diagnostic {
     public RootCauseAnalysis getRca()       { return rca; }
     public String getValidationResult()     { return validationResult; }
     public String getValidationData()       { return validationData; }
+    /** Complete internal evidence record as JSON — null when no evidence was collected. */
+    public String getAllEvidence()          { return allEvidence; }
+    /** Pre-selected user-facing evidence as JSON — null when no evidence was collected. */
+    public String getEvidence()             { return evidence; }
 
     /**
      * Generates a unique diagnostic ID: {@code diag_<16-char-alphanumeric>}.
@@ -106,6 +116,8 @@ public final class Diagnostic {
         private RootCauseAnalysis rca;
         private String validationResult;
         private String validationData;
+        private String allEvidence;
+        private String evidence;
 
         private Builder() {}
 
@@ -118,6 +130,8 @@ public final class Diagnostic {
         public Builder rca(RootCauseAnalysis v)       { this.rca = v;             return this; }
         public Builder validationResult(String v)     { this.validationResult = v; return this; }
         public Builder validationData(String v)       { this.validationData = v;  return this; }
+        public Builder allEvidence(String v)          { this.allEvidence = v;     return this; }
+        public Builder evidence(String v)             { this.evidence = v;        return this; }
 
         public Diagnostic build() { return new Diagnostic(this); }
     }
