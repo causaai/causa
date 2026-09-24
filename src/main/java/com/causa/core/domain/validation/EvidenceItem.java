@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.Map;
 
 /**
- * EvidenceItem - Internal Evidence Model (11 fields).
+ * EvidenceItem - Internal Evidence Model (12 fields).
  *
  * <p>Complete evidence model for storage and debugging. Stores all metadata
  * about evidence collected during validation (PATH A + PATH B).
@@ -12,17 +12,27 @@ import java.util.Map;
  * <p>This is the INTERNAL model - stored in DiagnosticEntity.allEvidence as JSON.
  * For the USER-FACING model, see DiagnosticDetailResponse.Evidence (5 fields).
  *
+ * <p>The prose fields are deliberately distinct: {@link #rawSnippet} is the verbatim text the
+ * source returned, {@link #statement} says what that text shows, and {@link #reasoning} argues
+ * why it settles the question. Collapsing any two makes an item look like corroboration of
+ * itself. What the evidence was offered for is carried by the origin — PATH A's assertion id
+ * and PATH B's rule id, both in {@link #metadata} — not restated on every sibling item.
+ *
  * @since 0.0.1
  */
 public record EvidenceItem(
     String id,
-    // Source of evidence (MCP server name or tool identifier). String to support plug-and-play MCP servers.
-    // Examples: "kubernetes-mcp", "prometheus-mcp", "kruize-mcp", "cryostat-mcp", "custom-profiler-mcp"
+    // Source of evidence: the canonical MCP server name as configured in McpConfig.
+    // One of: "kubernetes", "kruize", "cryostat", "quarkus", "async-profiler", "filesystem", "jmx".
+    // String (not enum) to support plug-and-play MCP servers added purely via mcp.json.
     String source,
     EvidenceType type,
     EvidenceStrength strength,
     EvidenceHypothesisAlignment evidenceHypothesisAlignment,
     String rawSnippet,
+    // One line stating only what rawSnippet shows. Null for rule-derived evidence, which has no
+    // narrator to write one.
+    String statement,
     String reasoning,
     double confidence,
     int priority,
@@ -127,6 +137,7 @@ public record EvidenceItem(
         private EvidenceStrength strength;
         private EvidenceHypothesisAlignment evidenceHypothesisAlignment;
         private String rawSnippet;
+        private String statement;
         private String reasoning;
         private double confidence;
         private int priority;
@@ -163,6 +174,11 @@ public record EvidenceItem(
             return this;
         }
 
+        public Builder statement(String statement) {
+            this.statement = statement;
+            return this;
+        }
+
         public Builder reasoning(String reasoning) {
             this.reasoning = reasoning;
             return this;
@@ -196,6 +212,7 @@ public record EvidenceItem(
                 strength,
                 evidenceHypothesisAlignment,
                 rawSnippet,
+                statement,
                 reasoning,
                 confidence,
                 priority,

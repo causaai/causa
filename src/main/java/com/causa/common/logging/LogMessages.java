@@ -341,6 +341,23 @@ public final class LogMessages {
     }
 
     /**
+     * Evidence collection log messages.
+     */
+    public static final class Evidence {
+        private Evidence() {}
+
+        public static final String COLLECTION_STARTED     = "Collecting evidence for RCA finding";
+        public static final String COLLECTION_COMPLETED   = "Evidence collection completed";
+        public static final String COLLECTION_SKIPPED     = "Evidence collection skipped — no harvester for anomaly type";
+        public static final String COLLECTION_FAILED      = "Evidence collection failed — continuing without evidence";
+        public static final String NO_VALIDATION_RESULT   = "No validation result available, nothing to harvest";
+        public static final String PATH_B_UNAVAILABLE     = "Rule-based validation absent, harvesting PATH A only";
+        public static final String UNRESOLVED_SOURCE      = "Evidence source label could not be attributed to an MCP server";
+        public static final String SELECTION_COMPLETED    = "Selected user-facing evidence";
+        public static final String RENDERING_FAILED       = "Stored evidence could not be rendered — returning no evidence for this response";
+    }
+
+    /**
      * Pagination-related log messages.
      */
     public static final class Pagination {
