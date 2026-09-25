@@ -1,14 +1,19 @@
 -- =============================================================================
 -- V3: Add all_evidence column to diagnostics table
 -- =============================================================================
--- Purpose: Store complete EvidenceItem instances (11-field model) from validation pipeline
--- for debugging and audit. The top 3-5 are transformed to Evidence (5-field model) for API.
+-- Purpose: Store complete EvidenceItem instances from the validation pipeline for
+-- debugging and audit. The top 3-5 are selected into the evidence column and transformed
+-- to the Evidence UI model for the API response.
 --
--- Existing evidence column: LLM-generated evidences from RCA (backward compatible)
--- New all_evidence column: Structured validation evidences from PATH A + PATH B
+-- The evidence column is repurposed here. V1 reserved it for
+-- { supporting_logs, evidences, confidence_summary }, a shape nothing ever wrote —
+-- those fields live inside root_cause_summary. It now holds the selected EvidenceItem
+-- subset, so selection runs once when the diagnostic completes rather than per request.
 -- =============================================================================
 
 ALTER TABLE diagnostics
-    ADD COLUMN all_evidence JSONB;
+    ADD COLUMN IF NOT EXISTS all_evidence JSONB;
 
-COMMENT ON COLUMN diagnostics.all_evidence IS 'Complete evidence items from validation pipeline. Shape: [{"id": "...", "source": "...", "type": "...", "strength": "...", ...}, ...]. Stores all EvidenceItem instances (11-field model) for debugging and audit.';
+COMMENT ON COLUMN diagnostics.all_evidence IS 'Complete evidence items from validation pipeline. Shape: [{"id": "...", "source": "...", "type": "...", "strength": "...", ...}, ...]. Stores all EvidenceItem instances for debugging and audit — see com.causa.core.domain.validation.EvidenceItem for the authoritative shape.';
+
+COMMENT ON COLUMN diagnostics.evidence IS 'User-facing evidence subset. Shape: [{"id": "...", "source": "...", "type": "...", "strength": "...", ...}, ...]. The EvidenceItems chosen from all_evidence for the API response, selected once when the diagnostic completes.';
