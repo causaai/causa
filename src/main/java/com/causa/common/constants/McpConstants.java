@@ -93,11 +93,8 @@ public final class McpConstants {
         public static final String ASYNC_PROFILER_GET_FLAME_GRAPH  = "get_flame_graph";
 
         // Cryostat MCP tools
-        public static final String CRYOSTAT_GET_GC_ANALYSIS = "get_gc_analysis";
-        public static final String CRYOSTAT_GET_MEMORY_ANALYSIS = "get_memory_analysis";
-        public static final String CRYOSTAT_GET_THREAD_ANALYSIS = "get_thread_analysis";
-        public static final String CRYOSTAT_GET_EXCEPTION_ANALYSIS = "get_exception_analysis";
-        public static final String CRYOSTAT_GET_CONTAINER_ANALYSIS = "get_container_analysis";
+        public static final String CRYOSTAT_GET_DISCOVERY_TREE = "getDiscoveryTree";
+        public static final String CRYOSTAT_GET_ANALYSIS_REPORT = "getAnalysisReport";
 
         // Filesystem MCP tools
         public static final String FILESYSTEM_LIST_DIRECTORY = "list_directory";
@@ -194,9 +191,6 @@ public final class McpConstants {
         public static final String UNABLE_TO_GET_EVENTS = "Unable to retrieve events: %s";
         public static final String UNABLE_TO_GET_LOGS = "Unable to retrieve logs: %s";
         public static final String UNABLE_TO_GET_KRUIZE_RECOMMENDATIONS = "Unable to retrieve Kruize recommendations: %s";
-        public static final String UNABLE_TO_GET_CRYOSTAT_ANALYSIS = "Unable to retrieve Cryostat %s analysis: %s";
-        public static final String CRYOSTAT_RECORDING_CREATED = "Cryostat recording created, retrying after delay";
-        public static final String CRYOSTAT_MAX_RETRIES_EXCEEDED = "Cryostat max retries exceeded for %s";
         public static final String UNABLE_TO_LIST_LIBERTY_LOGS_DIR = "Unable to list Liberty logs directory: %s";
         public static final String UNABLE_TO_READ_LIBERTY_LOG_FILE = "Unable to read Liberty log file: %s";
 
@@ -332,16 +326,6 @@ public final class McpConstants {
         public static final String INVOLVED_OBJECT_NAME_PREFIX = "involvedObject.name=";
         public static final String PARENTHESIS_FORMAT = " (%s)";
         public static final String VERSION = "version";
-    }
-
-    /**
-     * Cryostat-specific constants
-     */
-    public static final class Cryostat {
-        private Cryostat() {}
-
-        public static final String RECORDING_CREATED_STATUS = "RECORDING_CREATED";
-        public static final String STATUS_FIELD = "status";
     }
 
     /**

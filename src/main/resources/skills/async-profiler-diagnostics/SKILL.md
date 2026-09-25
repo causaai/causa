@@ -114,7 +114,7 @@ The root frame's `value` is the total sample count. A method's weight = `node.va
 ### Heap pressure
 
 **`heapUtilisationPct ≥ 85 %`**
-Heap is nearly exhausted. Combined with elevated `gcCollections` or a JFR SUMMARY showing frequent GC, this is a precursor to OOM. Corroborate with Cryostat MEMORY ANALYSIS and POD EVENTS for `OOMKilling`.
+Heap is nearly exhausted. Combined with elevated `gcCollections` or a JFR SUMMARY showing frequent GC, this is a precursor to OOM. Corroborate with CRYOSTAT_ANALYSIS `heap` rules that score above 0, and with POD EVENTS for `OOMKilling`.
 
 **`heapUsedMb > heapMaxMb × 0.95`**
 Imminent OOM. If `gcPauseTimeMs` is also elevated, the JVM is spending most time in GC with minimal throughput. Treat as equivalent evidence to `POSSIBLE_OOM_KILLED`.
@@ -136,10 +136,10 @@ High GC frequency indicates the heap is too small for the workload or that objec
 That method is a CPU hotspot. If it is in application code (non-JVM internals), flag it as a root cause candidate for CPU-related alerts.
 
 **GC-related frames (`G1CollectedHeap`, `ParallelScavengeHeap`) appear in top frames**
-The JVM is spending significant CPU time in garbage collection. Corroborate with `gcPauseTimeMs` and Cryostat GC ANALYSIS.
+The JVM is spending significant CPU time in garbage collection. Corroborate with `gcPauseTimeMs` and CRYOSTAT_ANALYSIS `garbage_collection` rules.
 
 **Lock frames (`ObjectMonitor::enter`, `AbstractQueuedSynchronizer`) dominate**
-Thread contention is causing CPU spin. Corroborate with Cryostat THREAD ANALYSIS for deadlock or blocked-thread evidence.
+Thread contention is causing CPU spin. Corroborate with CRYOSTAT_ANALYSIS `lock_instances` rules for deadlock or blocked-thread evidence.
 
 ### JFR Summary signals
 
@@ -155,12 +155,12 @@ Long-pause GC (e.g., SerialGC on G1-configured JVM, or humongous allocations tri
 
 ### 1. Establish heap headroom
 - Compute `heapUtilisationPct` from JVM STATISTICS
-- Compare `heapMaxMb` against the container memory limit from POD STATUS or Cryostat CONTAINER ANALYSIS
+- Compare `heapMaxMb` against the container memory limit from POD STATUS
 - Flag if JVM max heap > 75 % of container limit
 
 ### 2. Assess GC activity
 - Check `gcPauseTimeMs` from JVM STATISTICS — values > 100 ms warrant investigation
-- Cross-reference with Cryostat GC ANALYSIS for pause duration histograms
+- Cross-reference with CRYOSTAT_ANALYSIS `garbage_collection` rules (score, summary, and explanation)
 
 ### 3. Analyse flame graph for CPU root cause
 - Identify the top 3 frames by sample weight
@@ -173,7 +173,7 @@ Long-pause GC (e.g., SerialGC on G1-configured JVM, or humongous allocations tri
 
 ### 5. Correlate with other signals
 - **POD EVENTS `OOMKilling`** + `heapUtilisationPct ≥ 85 %` → confirms `OOM_KILLED`
-- **Cryostat GC ANALYSIS** long pauses + `gcPauseTimeMs > 100` → confirms `POSSIBLE_GC_PAUSE`
+- **CRYOSTAT_ANALYSIS** `garbage_collection` rule with an elevated score + `gcPauseTimeMs > 100` → confirms `POSSIBLE_GC_PAUSE`
 - **Kruize memory limit recommendation** below current `heapMaxMb` → confirms under-provisioning
 - **POD LOGS `OutOfMemoryError`** + high heap utilisation → confirms heap exhaustion path
 

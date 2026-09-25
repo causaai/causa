@@ -174,7 +174,7 @@ public interface McpConfig {
         int timeoutMs();
 
         /**
-         * Delay in milliseconds before retrying when Cryostat returns RECORDING_CREATED status.
+         * Unused by the mcp.json Cryostat collector. Kept so existing configuration still binds.
          *
          * @return the retry delay in ms
          */
@@ -183,7 +183,7 @@ public interface McpConfig {
         int retryDelayMs();
 
         /**
-         * Maximum number of retry attempts for Cryostat tool calls.
+         * Unused by the mcp.json Cryostat collector. Kept so existing configuration still binds.
          *
          * @return the max retries
          */

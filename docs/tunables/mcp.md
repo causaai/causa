@@ -34,23 +34,24 @@ Tools used: `getCostOptimizedRecommendations` · `getPerformanceOptimizedRecomme
 
 ---
 
-## Cryostat MCP _(Planned)_
+## Cryostat MCP
 
-Provides JFR (Java Flight Recorder) analysis: GC behaviour, memory pools, threads, exceptions,
-and container resource metrics. Cryostat runs its MCP listener on port **8000** and its own
-health API on port **8080** — both URLs must be set independently.
+The cluster diagnostic path calls the Cryostat Kubernetes mux through `mcp.json`
+(`deployment/kubernetes/base/mcp-config/mcp-cluster-default.json`). Both tools must already be
+exposed by that server (`toolLevel` `ALL`). Causa does not start a JFR recording.
 
-| Tunable | Env var | Default | Description |
+`getDiscoveryTree` is called first with the alert namespace and `mergeRealms=true`.
+`getAnalysisReport` runs only when that tree contains the alert namespace and pod. The report
+call passes the pod name plus an ISO-8601 window ending at the alert timestamp.
+
+| Tunable | Where | Default | Description |
 |---|---|---|---|
-| MCP endpoint | `CAUSA_MCP_CRYOSTAT_ENDPOINT` | `http://cryostat-mcp:8000` | MCP port (8000) |
-| Health endpoint | `CAUSA_MCP_CRYOSTAT_HEALTH_ENDPOINT` | `http://cryostat-mcp-api:8080` | Health API port (8080) |
-| Health check path | `CAUSA_MCP_CRYOSTAT_HEALTH_PATH` | `/healthz` | Path probed by the health checker |
-| Request timeout | `CAUSA_MCP_CRYOSTAT_TIMEOUT` | `15000` | Milliseconds — JFR recording takes time |
-| Retry delay | `CAUSA_MCP_CRYOSTAT_RETRY_DELAY` | `5000` | ms to wait after `RECORDING_CREATED` status before retry |
-| Max retries | `CAUSA_MCP_CRYOSTAT_MAX_RETRIES` | `3` | Maximum retry attempts per tool call |
+| MCP endpoint | `mcp.json` `url` | `http://cryostat-mcp:8000/mcp` | Mux MCP endpoint |
+| Health endpoint | `mcp.json` `healthCheck.url` | `http://cryostat-mcp-api:8080/healthz` | Health probe |
+| Request timeout | `mcp.json` `timeoutMs` | `60000` | Milliseconds — report generation can take about 30s |
+| Analysis lookback | `mcp.json` `metadata.analysisLookbackMinutes` | `15` | Minutes before the alert timestamp used as `fromTimestamp` |
 
-Tools used: `get_gc_analysis` · `get_memory_analysis` · `get_thread_analysis` ·
-`get_exception_analysis` · `get_container_analysis`
+Tools used: `getDiscoveryTree` · `getAnalysisReport`
 
 ---
 

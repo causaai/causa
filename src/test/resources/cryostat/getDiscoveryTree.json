@@ -1,0 +1,213 @@
+{
+    "id": 1,
+    "name": "Universe",
+    "nodeType": "Universe",
+    "labels": [],
+    "children": [
+      {
+        "id": 9223372036854776000,
+        "name": "Cryostat Discovery",
+        "nodeType": "Realm",
+        "labels": [],
+        "children": [
+          {
+            "id": 57,
+            "name": "openshift-tuning",
+            "nodeType": "Namespace",
+            "labels": [],
+            "children": [
+              {
+                "id": 61,
+                "name": "auth-cache",
+                "nodeType": "Deployment",
+                "labels": [
+                  {
+                    "key": "app",
+                    "value": "auth-cache"
+                  },
+                  {
+                    "key": "discovery.cryostat.io/namespace",
+                    "value": "openshift-tuning"
+                  }
+                ],
+                "children": [
+                  {
+                    "id": 60,
+                    "name": "auth-cache-5bb75466d8",
+                    "nodeType": "ReplicaSet",
+                    "labels": [
+                      {
+                        "key": "app",
+                        "value": "auth-cache"
+                      },
+                      {
+                        "key": "cryostat.io/log-level",
+                        "value": "debug"
+                      },
+                      {
+                        "key": "cryostat.io/name",
+                        "value": "cryostat-sample"
+                      },
+                      {
+                        "key": "cryostat.io/harvester-max-files",
+                        "value": "6"
+                      },
+                      {
+                        "key": "pod-template-hash",
+                        "value": "5bb75466d8"
+                      },
+                      {
+                        "key": "discovery.cryostat.io/namespace",
+                        "value": "openshift-tuning"
+                      },
+                      {
+                        "key": "cryostat.io/namespace",
+                        "value": "openshift-tuning"
+                      },
+                      {
+                        "key": "cryostat.io/harvester-template",
+                        "value": "Continuous"
+                      },
+                      {
+                        "key": "cryostat.io/harvester-period",
+                        "value": "5m"
+                      }
+                    ],
+                    "children": [
+                      {
+                        "id": 59,
+                        "name": "auth-cache-5bb75466d8-zbw2t",
+                        "nodeType": "Pod",
+                        "labels": [
+                          {
+                            "key": "discovery.cryostat.io/namespace",
+                            "value": "openshift-tuning"
+                          }
+                        ],
+                        "children": [
+                          {
+                            "id": 58,
+                            "name": "auth-cache-5bb75466d8-zbw2t-agent-46cce318-1ebf-4c71-8764-df912ebb67b8",
+                            "nodeType": "CryostatAgent",
+                            "labels": [
+                              {
+                                "key": "discovery.cryostat.io/plugin-id",
+                                "value": "46cce318-1ebf-4c71-8764-df912ebb67b8"
+                              }
+                            ],
+                            "children": [],
+                            "target": {
+                              "id": 1,
+                              "connectUrl": "https://10-128-2-49.cryostat-agent-8eee8912c315b329e29e86538092624e.openshift-tuning.svc:9977",
+                              "alias": "auth-cache-5bb75466d8-zbw2t",
+                              "jvmId": "E00HeZHT1_HtUdcJ7LDJxp7DB0qb-bwdoBqsoFpMKoA=",
+                              "labels": [
+                                {
+                                  "key": "app",
+                                  "value": "auth-cache"
+                                },
+                                {
+                                  "key": "cryostat.io/name",
+                                  "value": "cryostat-sample"
+                                },
+                                {
+                                  "key": "pod-template-hash",
+                                  "value": "5bb75466d8"
+                                },
+                                {
+                                  "key": "cryostat.io/log-level",
+                                  "value": "debug"
+                                },
+                                {
+                                  "key": "cryostat.io/namespace",
+                                  "value": "openshift-tuning"
+                                },
+                                {
+                                  "key": "topology.kubernetes.io/zone",
+                                  "value": "us-east-2a"
+                                },
+                                {
+                                  "key": "cryostat.io/harvester-period",
+                                  "value": "5m"
+                                },
+                                {
+                                  "key": "topology.kubernetes.io/region",
+                                  "value": "us-east-2"
+                                },
+                                {
+                                  "key": "cryostat.io/harvester-template",
+                                  "value": "Continuous"
+                                },
+                                {
+                                  "key": "cryostat.io/harvester-max-files",
+                                  "value": "6"
+                                }
+                              ],
+                              "annotations": {
+                                "platform": [
+                                  {
+                                    "key": "INSTANCE_ID",
+                                    "value": "d654a0f0-7ec3-4934-a138-1bb031b1ce15"
+                                  },
+                                  {
+                                    "key": "openshift.io/scc",
+                                    "value": "restricted-v2"
+                                  },
+                                  {
+                                    "key": "k8s.ovn.org/pod-networks",
+                                    "value": "{\"default\":{\"ip_addresses\":[\"10.128.2.49/23\"],\"mac_address\":\"0a:58:0a:80:02:31\",\"gateway_ips\":[\"10.128.2.1\"],\"routes\":[{\"dest\":\"10.128.0.0/14\",\"nextHop\":\"10.128.2.1\"},{\"dest\":\"172.30.0.0/16\",\"nextHop\":\"10.128.2.1\"},{\"dest\":\"169.254.0.5/32\",\"nextHop\":\"10.128.2.1\"},{\"dest\":\"100.64.0.0/16\",\"nextHop\":\"10.128.2.1\"}],\"ip_address\":\"10.128.2.49/23\",\"gateway_ip\":\"10.128.2.1\",\"role\":\"primary\"}}"
+                                  },
+                                  {
+                                    "key": "k8s.v1.cni.cncf.io/network-status",
+                                    "value": "[{\n    \"name\": \"ovn-kubernetes\",\n    \"interface\": \"eth0\",\n    \"ips\": [\n        \"10.128.2.49\"\n    ],\n    \"mac\": \"0a:58:0a:80:02:31\",\n    \"default\": true,\n    \"dns\": {}\n}]"
+                                  },
+                                  {
+                                    "key": "seccomp.security.alpha.kubernetes.io/pod",
+                                    "value": "runtime/default"
+                                  },
+                                  {
+                                    "key": "security.openshift.io/validated-scc-subject-type",
+                                    "value": "user"
+                                  }
+                                ],
+                                "cryostat": [
+                                  {
+                                    "key": "PID",
+                                    "value": "1"
+                                  },
+                                  {
+                                    "key": "HOST",
+                                    "value": "auth-cache-5bb75466d8-zbw2t"
+                                  },
+                                  {
+                                    "key": "PORT",
+                                    "value": "9977"
+                                  },
+                                  {
+                                    "key": "REALM",
+                                    "value": "auth-cache-5bb75466d8-zbw2t-5ea034"
+                                  },
+                                  {
+                                    "key": "JAVA_MAIN",
+                                    "value": "quarkus-app/quarkus-run.jar"
+                                  },
+                                  {
+                                    "key": "START_TIME",
+                                    "value": "1789501874"
+                                  }
+                                ]
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
