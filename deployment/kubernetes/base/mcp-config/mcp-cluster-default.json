@@ -62,11 +62,11 @@
     },
     "cryostat": {
       "type": "streamable-http",
-      "url": "http://cryostat-mcp:8000/mcp",
+      "url": "http://cryostat-mcp-cryostat-k8s-multi-mcp:8080/mcp",
       "headers": {},
       "optional": true,
       "alwaysAllow": ["getDiscoveryTree", "getAnalysisReport"],
-      "healthCheck": { "url": "http://cryostat-mcp-api:8080/healthz", "timeoutMs": 15000 },
+      "healthCheck": { "url": "http://cryostat-mcp-cryostat-k8s-multi-mcp:8080/q/health/ready", "timeoutMs": 15000 },
       "timeoutMs": 60000,
       "metadata": { "analysisLookbackMinutes": 15 },
       "description": "Cryostat MCP — confirm the pod in the discovery tree, then fetch automated JFR analysis for the alert time window",
