@@ -97,6 +97,30 @@
         { "name": "get_recording_report", "contextKey": "AP_RECORDING_REPORT", "arguments": { "pod": "${podName}", "container": "${containerName}", "namespace": "${namespace}", "last": "5m" } },
         { "name": "get_jfr_summary", "contextKey": "AP_JFR_SUMMARY", "arguments": { "pod": "${podName}", "container": "${containerName}", "namespace": "${namespace}", "last": "5m" } }
       ]
+    },
+    "prometheus": {
+      "type": "streamable-http",
+      "url": "http://prometheus-mcp-server:8080/mcp",
+      "headers": {},
+      "optional": true,
+      "alwaysAllow": ["query", "range_query", "healthy", "ready"],
+      "healthCheck": { "url": "http://prometheus-mcp-server:8080/mcp", "timeoutMs": 15000 },
+      "timeoutMs": 15000,
+      "description": "Prometheus MCP — PromQL instant and range queries against the in-cluster Prometheus instance",
+      "tools": [
+        {
+          "name": "query",
+          "contextKey": "PROMETHEUS_METRICS",
+          "description": "Instant PromQL query — current value of a metric expression at evaluation time.",
+          "arguments": { "query": "${promQuery}" }
+        },
+        {
+          "name": "range_query",
+          "contextKey": "PROMETHEUS_RANGE_METRICS",
+          "description": "Range PromQL query — metric values over a time window (default last 5 minutes, 60s step).",
+          "arguments": { "query": "${promQuery}", "start_time": "5m", "step": "60s" }
+        }
+      ]
     }
   }
 }
