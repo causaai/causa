@@ -6,22 +6,22 @@ Complete reference for configuring the LLM module in Causa Backend.
 
 ## Overview
 
-The LLM module uses **environment variables** mapped through `application.yml` to Quarkus `@ConfigMapping`. All configuration is externalized for 12-factor app compliance.
+LLM configuration is stored in the `llm_configs` database table and managed via the Configs API (`PUT /api/v1/configs/llm/{provider}`). One row per provider; only one row can be active at a time.
 
-**Configuration mapping chain:**
+Environment variables (`LLM_PROVIDER`, `LLM_API_KEY`, etc.) act as **startup defaults** — they seed the initial DB row if no row exists for a provider. Once a DB row exists, the DB value is authoritative and API updates take effect without a restart.
+
+**Runtime config chain:**
 ```
-Environment Variables (LLM_*)
+PUT /api/v1/configs/llm/{provider}  (DB-backed, live-reload via LISTEN/NOTIFY)
+    ↓ fallback if no DB row
+Environment Variables (LLM_*)  →  application.yml (causa.llm.*)
     ↓
-application.yml (causa.llm.*)
+LlmConfigCache.getActive()
     ↓
-LLMConfig.java (@ConfigMapping)
-    ↓
-Injected into ChatModelFactory, LangChainPromptSender & BobShellPromptSender
+ChatModelFactory → LangChainPromptSender / BobShellPromptSender
 ```
 
-> **Note — BOB Shell shares the same `LLMConfig` properties as other providers.**
-> `LLM_API_KEY`, `LLM_TIMEOUT_SECONDS`, and all standard inference parameters apply equally
-> to Claude (Anthropic / Vertex AI) and BOB Shell. There is no separate `BOB_*` config namespace.
+See [docs/tunables/llm.md](../tunables/llm.md) for the API-based workflow. The sections below document the equivalent environment variable names for deployment-time configuration.
 
 ---
 

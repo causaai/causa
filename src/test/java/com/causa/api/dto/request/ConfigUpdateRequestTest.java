@@ -23,8 +23,7 @@ class ConfigUpdateRequestTest {
         @Test
         @DisplayName("Should hold the configs map")
         void shouldHoldConfigsMap() {
-            Map<String, String> configs = Map.of("LLM_PROVIDER", "anthropic");
-            ConfigUpdateRequest request = new ConfigUpdateRequest(configs);
+            ConfigUpdateRequest request = new ConfigUpdateRequest(Map.of("LLM_PROVIDER", "anthropic"));
 
             assertNotNull(request.configs());
             assertEquals("anthropic", request.configs().get("LLM_PROVIDER"));
