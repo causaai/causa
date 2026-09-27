@@ -105,7 +105,7 @@ flowchart TB
 
 ## Module Overview
 
-> **💡 Note:** ALL MODULES AND FILE NAMES ARE BASED ON PLANNING PHASE. ACTUAL NAMES or MODULES CAN BE UPDATED AS PER FINAL IMPLEMENTATION PLAN.
+> **💡 Note:** Core modules (`api/`, `core/`, `infrastructure/`, `llm/`, `config/`, `common/`) are implemented. Other modules (`rag/`, `notification/`, `security/`) are planned.
 
 The application is organized into **10 core modules** following Hexagonal Architecture:
 
@@ -557,43 +557,23 @@ notification/
 
 <br/>
 
-**Purpose:** Centralized configuration from multiple sources.
+**Purpose:** In-memory caches backed by three DB tables; startup seeding from ENV/application.yml.
 
-**Singleton Pattern:** `CausaConfigService` (single source of truth)
-
-**Configuration Hierarchy:** K8s Secrets > ConfigMaps > Database > Environment Variables
+**Implementation:** `@ApplicationScoped` beans — one cache per config domain.
 
 ```
 config/
-├── CausaConfigService.java      # ⭐ SINGLETON (@ApplicationScoped)
-│                                 # Central config orchestrator
-│                                 # Aggregates: DB + K8s Secrets + ConfigMaps + Env
-│
-├── DatabaseConfig.java
-├── LLMConfig.java
-├── McpConfig.java
-├── AlertConfig.java
-├── SecurityConfig.java
-├── CacheConfig.java
-│
-├── properties/                  # ConfigMapping POJOs
-│   ├── LLMProperties.java       # Maps LLM_* environment variables
-│   ├── McpProperties.java       # Maps MCP_* environment variables
-│   ├── AlertProperties.java
-│   ├── DatabaseProperties.java
-│   └── CacheProperties.java
-│
-├── loaders/                     # Config source loaders
-│   ├── DatabaseConfigLoader.java    # Loads from causa_configs table
-│   ├── K8sSecretLoader.java         # Loads from K8s secrets
-│   ├── K8sConfigMapLoader.java      # Loads from ConfigMaps
-│   └── EnvironmentConfigLoader.java # Loads from env vars
-│
-└── validators/
-    ├── LLMConfigValidator.java
-    └── McpConfigValidator.java
+├── AppConfig.java           # Generic key-value cache (generic_configs table)
+├── LlmConfigCache.java      # LLM provider cache (llm_configs table)
+│                             # AtomicReference<List<LlmConfig>> + AtomicReference<LlmConfig> (active)
+├── ExternalConfigCache.java # Observability + Integration cache (external_configs table)
+│                             # AtomicReference<Map<PlatformCategory, List<ExternalConfig>>>
+└── ConfigStartup.java       # Startup bean — seeds all three caches at boot
 ```
 
+**Cache invalidation:** `ConfigCacheListener` subscribes to the PostgreSQL `config_cache_channel` via `LISTEN/NOTIFY`. Any write to `generic_configs`, `llm_configs`, or `external_configs` triggers a `pg_notify` (via DDL triggers), which causes all pods to call `cache.refresh()` without a restart.
+
+**API surface:** All writes go through `ConfigService`, `LlmConfigService`, and `ExternalConfigService`. Reads are served from cache — no DB queries on the read path.
 
 </details>
 
