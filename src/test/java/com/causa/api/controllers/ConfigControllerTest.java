@@ -1,9 +1,17 @@
 package com.causa.api.controllers;
 
 import com.causa.api.dto.request.ConfigUpdateRequest;
+import com.causa.api.dto.request.ExternalConfigRequest;
+import com.causa.api.dto.request.LlmConfigRequest;
 import com.causa.api.dto.response.ConfigResponse;
 import com.causa.api.dto.response.ConfigSettingsResponse;
 import com.causa.api.dto.response.ConfigUpdateResponse;
+import com.causa.common.constants.ConfigConstants.LlmProvider;
+import com.causa.common.constants.ConfigConstants.PlatformCategory;
+import com.causa.common.exceptions.ConfigException;
+import com.causa.core.domain.AuthConfig;
+import com.causa.core.domain.ExternalConfig;
+import com.causa.core.domain.LlmConfig;
 import com.causa.core.ports.ConfigurationRepository;
 import com.causa.core.services.ConfigService;
 import com.causa.core.services.ExternalConfigService;
@@ -17,10 +25,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
@@ -282,6 +292,284 @@ class ConfigControllerTest {
 
             assertEquals(400, response.getStatus());
             verifyNoInteractions(configService);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers for new sub-resource tests
+    // -------------------------------------------------------------------------
+
+    private ExternalConfig externalConfig(PlatformCategory category, String platform, String name) {
+        return ExternalConfig.builder()
+            .id("ext_cnf_test")
+            .category(category)
+            .platform(platform)
+            .name(name)
+            .url("https://example.com")
+            .isActive(true)
+            .authConfig(new AuthConfig("API_KEY", "********", null, null, null, null, null, null))
+            .build();
+    }
+
+    private LlmConfig llmConfig(LlmProvider provider, boolean active) {
+        return LlmConfig.builder()
+            .id("llm_cnf_test")
+            .provider(provider)
+            .url("https://api.example.com")
+            .models(List.of("model-1"))
+            .temperature(BigDecimal.valueOf(0.1))
+            .isActive(active)
+            .authConfig(new AuthConfig("API_KEY", "********", null, null, null, null, null, null))
+            .build();
+    }
+
+    private ExternalConfigRequest externalRequest(String name, String url) {
+        ExternalConfigRequest req = new ExternalConfigRequest();
+        req.setName(name);
+        req.setUrl(url);
+        req.setIsActive(true);
+        req.setAuthConfig(new AuthConfig("API_KEY", "key", "appkey", null, null, null, null, null));
+        return req;
+    }
+
+    private LlmConfigRequest llmRequest() {
+        LlmConfigRequest req = new LlmConfigRequest();
+        req.setUrl("https://api.anthropic.com");
+        req.setModels(List.of("claude-3"));
+        req.setIsActive(true);
+        req.setAuthConfig(new AuthConfig("API_KEY", "sk-key", null, null, null, null, null, null));
+        return req;
+    }
+
+    // -------------------------------------------------------------------------
+    // Observability  —  /configs/observability
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("GET /api/v1/configs/observability")
+    class ListObservabilityTests {
+
+        @Test
+        @DisplayName("Should return 200 with list from service")
+        void shouldReturn200WithObservabilityList() {
+            when(externalConfigService.listByCategory(PlatformCategory.OBSERVABILITY))
+                .thenReturn(List.of(externalConfig(PlatformCategory.OBSERVABILITY, "DATADOG", "dd-prod")));
+
+            Response response = controller.listObservability();
+
+            assertEquals(200, response.getStatus());
+            verify(externalConfigService).listByCategory(PlatformCategory.OBSERVABILITY);
+        }
+
+        @Test
+        @DisplayName("Should return 200 with empty list when no configs")
+        void shouldReturn200WithEmptyList() {
+            when(externalConfigService.listByCategory(PlatformCategory.OBSERVABILITY)).thenReturn(List.of());
+
+            Response response = controller.listObservability();
+
+            assertEquals(200, response.getStatus());
+        }
+    }
+
+    @Nested
+    @DisplayName("PUT /api/v1/configs/observability/{platform}")
+    class UpsertObservabilityTests {
+
+        @Test
+        @DisplayName("Should return 200 with saved config on success")
+        void shouldReturn200OnSuccess() {
+            ExternalConfig saved = externalConfig(PlatformCategory.OBSERVABILITY, "DATADOG", "dd-prod");
+            when(externalConfigService.upsert(eq(PlatformCategory.OBSERVABILITY), eq("DATADOG"), any()))
+                .thenReturn(saved);
+
+            Response response = controller.upsertObservability("DATADOG", externalRequest("dd-prod", "https://api.datadoghq.com"));
+
+            assertEquals(200, response.getStatus());
+        }
+
+        @Test
+        @DisplayName("Should propagate ConfigException from service")
+        void shouldPropagateConfigException() {
+            when(externalConfigService.upsert(any(), anyString(), any()))
+                .thenThrow(new ConfigException("url is required", "VALIDATION_ERROR"));
+
+            assertThrows(ConfigException.class,
+                () -> controller.upsertObservability("DATADOG", externalRequest("dd-prod", null)));
+        }
+    }
+
+    @Nested
+    @DisplayName("DELETE /api/v1/configs/observability/{platform}/{name}")
+    class DeleteObservabilityTests {
+
+        @Test
+        @DisplayName("Should return 204 on successful delete")
+        void shouldReturn204OnSuccess() {
+            doNothing().when(externalConfigService).delete("DATADOG", "dd-prod");
+
+            Response response = controller.deleteObservability("DATADOG", "dd-prod");
+
+            assertEquals(204, response.getStatus());
+            verify(externalConfigService).delete("DATADOG", "dd-prod");
+        }
+
+        @Test
+        @DisplayName("Should propagate ConfigException when config not found")
+        void shouldPropagateConfigException() {
+            doThrow(new ConfigException("Not found", "NOT_FOUND"))
+                .when(externalConfigService).delete("DATADOG", "missing");
+
+            assertThrows(ConfigException.class,
+                () -> controller.deleteObservability("DATADOG", "missing"));
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // LLM  —  /configs/llm
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("GET /api/v1/configs/llm")
+    class ListLlmTests {
+
+        @Test
+        @DisplayName("Should return 200 with all LLM configs")
+        void shouldReturn200WithLlmList() {
+            when(llmConfigService.listAll())
+                .thenReturn(List.of(llmConfig(LlmProvider.ANTHROPIC, true)));
+
+            Response response = controller.listLlm();
+
+            assertEquals(200, response.getStatus());
+            verify(llmConfigService).listAll();
+        }
+
+        @Test
+        @DisplayName("Should return 200 with empty list when no configs")
+        void shouldReturn200WithEmptyList() {
+            when(llmConfigService.listAll()).thenReturn(List.of());
+
+            Response response = controller.listLlm();
+
+            assertEquals(200, response.getStatus());
+        }
+    }
+
+    @Nested
+    @DisplayName("PUT /api/v1/configs/llm/{provider}")
+    class UpsertLlmTests {
+
+        @Test
+        @DisplayName("Should return 200 with saved config on success")
+        void shouldReturn200OnSuccess() {
+            when(llmConfigService.upsert(eq("ANTHROPIC"), any()))
+                .thenReturn(llmConfig(LlmProvider.ANTHROPIC, true));
+
+            Response response = controller.upsertLlm("ANTHROPIC", llmRequest());
+
+            assertEquals(200, response.getStatus());
+            verify(llmConfigService).upsert(eq("ANTHROPIC"), any());
+        }
+
+        @Test
+        @DisplayName("Should propagate ConfigException from service")
+        void shouldPropagateConfigException() {
+            when(llmConfigService.upsert(anyString(), any()))
+                .thenThrow(new ConfigException("Unknown provider", "UNKNOWN_PROVIDER"));
+
+            assertThrows(ConfigException.class,
+                () -> controller.upsertLlm("UNKNOWN", llmRequest()));
+        }
+    }
+
+    @Nested
+    @DisplayName("DELETE /api/v1/configs/llm/{provider}")
+    class DeleteLlmTests {
+
+        @Test
+        @DisplayName("Should return 204 on successful delete")
+        void shouldReturn204OnSuccess() {
+            doNothing().when(llmConfigService).delete("ANTHROPIC");
+
+            Response response = controller.deleteLlm("ANTHROPIC");
+
+            assertEquals(204, response.getStatus());
+            verify(llmConfigService).delete("ANTHROPIC");
+        }
+
+        @Test
+        @DisplayName("Should propagate ConfigException when deleting active provider")
+        void shouldPropagateConflictException() {
+            doThrow(new ConfigException("Cannot delete active provider", "CONFLICT"))
+                .when(llmConfigService).delete("ANTHROPIC");
+
+            assertThrows(ConfigException.class,
+                () -> controller.deleteLlm("ANTHROPIC"));
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Integrations  —  /configs/integrations
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("GET /api/v1/configs/integrations")
+    class ListIntegrationsTests {
+
+        @Test
+        @DisplayName("Should return 200 with integration configs from service")
+        void shouldReturn200WithIntegrationList() {
+            when(externalConfigService.listByCategory(PlatformCategory.INTEGRATION))
+                .thenReturn(List.of(externalConfig(PlatformCategory.INTEGRATION, "SLACK", "slack-alerts")));
+
+            Response response = controller.listIntegrations();
+
+            assertEquals(200, response.getStatus());
+            verify(externalConfigService).listByCategory(PlatformCategory.INTEGRATION);
+        }
+    }
+
+    @Nested
+    @DisplayName("PUT /api/v1/configs/integrations/{platform}")
+    class UpsertIntegrationsTests {
+
+        @Test
+        @DisplayName("Should return 200 with saved config on success")
+        void shouldReturn200OnSuccess() {
+            ExternalConfig saved = externalConfig(PlatformCategory.INTEGRATION, "SLACK", "slack-alerts");
+            when(externalConfigService.upsert(eq(PlatformCategory.INTEGRATION), eq("SLACK"), any()))
+                .thenReturn(saved);
+
+            Response response = controller.upsertIntegration("SLACK", externalRequest("slack-alerts", "https://hooks.slack.com/..."));
+
+            assertEquals(200, response.getStatus());
+        }
+    }
+
+    @Nested
+    @DisplayName("DELETE /api/v1/configs/integrations/{platform}/{name}")
+    class DeleteIntegrationsTests {
+
+        @Test
+        @DisplayName("Should return 204 on successful delete")
+        void shouldReturn204OnSuccess() {
+            doNothing().when(externalConfigService).delete("SLACK", "slack-alerts");
+
+            Response response = controller.deleteIntegration("SLACK", "slack-alerts");
+
+            assertEquals(204, response.getStatus());
+            verify(externalConfigService).delete("SLACK", "slack-alerts");
+        }
+
+        @Test
+        @DisplayName("Should propagate ConfigException when config not found")
+        void shouldPropagateConfigException() {
+            doThrow(new ConfigException("Not found", "NOT_FOUND"))
+                .when(externalConfigService).delete("SLACK", "missing");
+
+            assertThrows(ConfigException.class,
+                () -> controller.deleteIntegration("SLACK", "missing"));
         }
     }
 }
