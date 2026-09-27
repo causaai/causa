@@ -26,10 +26,16 @@ public class ConfigStartup {
     private static final CausaLogger log = CausaLogger.getLogger(ConfigStartup.class);
 
     private final ConfigService configService;
+    private final LlmConfigCache llmConfigCache;
+    private final ExternalConfigCache externalConfigCache;
 
     @Inject
-    public ConfigStartup(ConfigService configService) {
-        this.configService = configService;
+    public ConfigStartup(ConfigService configService,
+                         LlmConfigCache llmConfigCache,
+                         ExternalConfigCache externalConfigCache) {
+        this.configService       = configService;
+        this.llmConfigCache      = llmConfigCache;
+        this.externalConfigCache = externalConfigCache;
     }
 
     void onStartup(@Observes @Priority(AppConstants.StartupConstants.CONFIG_PRIORITY) StartupEvent event) {
@@ -37,9 +43,29 @@ public class ConfigStartup {
 
         try {
             configService.loadFromDbAndEnv();
-            log.info("Config startup: completed successfully").log();
+            log.info("Config startup: generic configs loaded successfully").log();
         } catch (Exception e) {
-            log.warn("Config startup: failed (non-fatal)")
+            log.warn("Config startup: generic config load failed (non-fatal)")
+                .field("error", e.getClass().getSimpleName())
+                .field("message", e.getMessage())
+                .log();
+        }
+
+        try {
+            llmConfigCache.refresh();
+            log.info("Config startup: LLM config cache loaded successfully").log();
+        } catch (Exception e) {
+            log.warn("Config startup: LLM config cache load failed (non-fatal)")
+                .field("error", e.getClass().getSimpleName())
+                .field("message", e.getMessage())
+                .log();
+        }
+
+        try {
+            externalConfigCache.refresh();
+            log.info("Config startup: external config cache loaded successfully").log();
+        } catch (Exception e) {
+            log.warn("Config startup: external config cache load failed (non-fatal)")
                 .field("error", e.getClass().getSimpleName())
                 .field("message", e.getMessage())
                 .log();

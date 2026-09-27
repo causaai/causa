@@ -11,18 +11,21 @@ import static java.util.Map.entry;
 /**
  * Configuration Constants Registry
  *
- * <p>Central source of truth for all runtime-configurable application settings.
- * Defines 22 known configuration keys with their metadata (category, type, sensitivity).
+ * <p>Central source of truth for all runtime-configurable application settings stored in the
+ * {@code generic_configs} table (formerly {@code configurations}).
  *
  * <p>Keys are seeded from DB at startup. Missing keys are resolved from MicroProfile Config
  * (ENV → system props → application.yml) and persisted to the DB for subsequent boots.
  *
  * <p>Categories:
  * <ul>
- *   <li><b>llm</b> — LLM provider configuration (15 keys)</li>
  *   <li><b>alerts</b> — Alert filtering and cooldown (4 keys)</li>
  *   <li><b>cluster</b> — Cluster identity (2 keys)</li>
  * </ul>
+ *
+ * <p>LLM configuration has been moved to the {@code llm_configs} table and is managed via
+ * {@link com.causa.config.LlmConfigCache}. Use {@code GET /api/v1/configs/llm} to read it
+ * and {@code PUT /api/v1/configs/llm/{provider}} to update it.
  *
  * @since 0.0.1
  */
@@ -58,24 +61,6 @@ public final class ConfigConstants {
      * Adding a new key = one line here.
      */
     private static final List<KeyDef> REGISTRY = List.of(
-        // LLM Configuration (16 keys)
-        key("LLM_PROVIDER",                    "llm", ValueType.STRING,  false, "causa.llm.provider"),
-        key("LLM_MODEL_NAME",                  "llm", ValueType.STRING,  false, "causa.llm.model-name"),
-        key("LLM_BASE_URL",                    "llm", ValueType.STRING,  false, "causa.llm.base-url"),
-        key("LLM_AUTH_TYPE",                   "llm", ValueType.STRING,  false, "causa.llm.auth-type"),
-        key("LLM_CUSTOM_HEADERS",              "llm", ValueType.STRING,  false, "causa.llm.custom-headers"),
-        key("LLM_TEMPERATURE",                 "llm", ValueType.DOUBLE,  false, "causa.llm.temperature"),
-        key("LLM_MAX_TOKENS",                  "llm", ValueType.INTEGER, false, "causa.llm.max-tokens"),
-        key("LLM_API_KEY",                     "llm", ValueType.STRING,  true,  "causa.llm.api-key"),
-        key("LLM_TIMEOUT_SECONDS",             "llm", ValueType.INTEGER, false, "causa.llm.timeout-seconds"),
-        key("LLM_CHAT_MEMORY_SIZE",            "llm", ValueType.INTEGER, false, "causa.llm.chat-memory-size"),
-        key("VERTEX_PROJECT_ID",               "llm", ValueType.STRING,  true,  "causa.llm.vertex.project-id"),
-        key("VERTEX_LOCATION",                 "llm", ValueType.STRING,  false, "causa.llm.vertex.location"),
-        key("BOB_SHELL_PATH",                  "llm", ValueType.STRING,  false, "causa.llm.bob.shell-path"),
-        key("GOOGLE_APPLICATION_CREDENTIALS",  "llm", ValueType.STRING,  true,  "causa.llm.google-application-credentials"),
-        key("LLM_SKILLS_ENABLED",              "llm", ValueType.BOOLEAN, false, "causa.llm.skills.enabled"),
-        key("LLM_SKILLS_DIR",                  "llm", ValueType.STRING,  false, "causa.llm.skills.skills-dir"),
-
         // Alert Configuration (4 keys)
         key("ALERT_FILTER_SEVERITY",           "alerts", ValueType.STRING,  false, "causa.alerts.filter-severity"),
         key("ALERT_COOLDOWN_MINUTES",          "alerts", ValueType.INTEGER, false, "causa.alerts.cooldown-minutes"),
@@ -227,10 +212,6 @@ public final class ConfigConstants {
     private static KeyDef key(String name, String category, ValueType type, boolean sensitive, String mpConfigPath) {
         return new KeyDef(name, category, type, sensitive, mpConfigPath);
     }
-
-    // TODO: [CLEANUP] The platform-config enums and SENSITIVE_AUTH_FIELDS below were added as part of the
-    // new Configuration Settings. Once the settings feature is fully shipped, evaluate and remove
-    //  what is no longer needed from this class.
 
     /** Discriminator for {@code external_configs} rows and settings tabs. */
     public enum PlatformCategory { OBSERVABILITY, INTEGRATION }

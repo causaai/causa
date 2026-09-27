@@ -123,87 +123,188 @@
       "name": "Configs",
       "item": [
         {
-          "name": "List Configs",
+          "name": "Get All Configs (Combined Snapshot)",
           "request": {
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/configs",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "configs"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs"]
             }
           }
         },
         {
-          "name": "List Alert Configs",
+          "name": "Generic — List All",
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/api/v1/configs?category=alerts",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "configs"
-              ],
-              "query": [
-                {
-                  "key": "category",
-                  "value": "alerts"
-                }
-              ]
+              "raw": "{{baseUrl}}/api/v1/configs/generic",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "generic"]
             }
           }
         },
         {
-          "name": "Get Config By Key",
+          "name": "Generic — List By Category (alerts)",
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/api/v1/configs/ALERT_FILTER_SEVERITY",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "configs",
-                "ALERT_FILTER_SEVERITY"
-              ]
+              "raw": "{{baseUrl}}/api/v1/configs/generic?category=alerts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "generic"],
+              "query": [{"key": "category", "value": "alerts"}]
             }
           }
         },
         {
-          "name": "Update Configs",
+          "name": "Generic — Get By Key",
           "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/generic/ALERT_FILTER_SEVERITY",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "generic", "ALERT_FILTER_SEVERITY"]
+            }
+          }
+        },
+        {
+          "name": "Generic — Upsert (one or many keys)",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"configs\": {\n    \"ALERT_FILTER_SEVERITY\": \"critical\",\n    \"VERTEX_PROJECT_ID\": \"test-project\",\n    \"UNKNOWN_KEY\": \"x\",\n    \"LLM_TIMEOUT_SECONDS\": \"abc\"\n  }\n}"
+              "raw": "{\n  \"configs\": {\n    \"ALERT_FILTER_SEVERITY\": \"critical\",\n    \"LLM_TEMPERATURE\": \"0.7\"\n  }\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/configs",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "configs"
-              ]
+              "raw": "{{baseUrl}}/api/v1/configs/generic",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "generic"]
+            }
+          }
+        },
+        {
+          "name": "Generic — Delete By Key",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/generic/ALERT_FILTER_SEVERITY",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "generic", "ALERT_FILTER_SEVERITY"]
+            }
+          }
+        },
+        {
+          "name": "Observability — List All",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/observability",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "observability"]
+            }
+          }
+        },
+        {
+          "name": "Observability — Upsert (DATADOG)",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"my-datadog\",\n  \"url\": \"https://api.datadoghq.com\",\n  \"is_active\": true,\n  \"auth_config\": {\n    \"authType\": \"API_KEY\",\n    \"apiKey\": \"my-api-key\",\n    \"appKey\": \"my-app-key\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/observability/DATADOG",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "observability", "DATADOG"]
+            }
+          }
+        },
+        {
+          "name": "Observability — Delete (DATADOG/my-datadog)",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/observability/DATADOG/my-datadog",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "observability", "DATADOG", "my-datadog"]
+            }
+          }
+        },
+        {
+          "name": "LLM — List All",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/llm",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "llm"]
+            }
+          }
+        },
+        {
+          "name": "LLM — Upsert (OPENAI)",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://api.openai.com/v1\",\n  \"models\": [\"gpt-4o\", \"gpt-4-turbo\"],\n  \"temperature\": 0.7,\n  \"max_tokens\": 4096,\n  \"timeout_ms\": 30000,\n  \"is_active\": true,\n  \"auth_config\": {\n    \"authType\": \"API_KEY\",\n    \"apiKey\": \"sk-...\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/llm/OPENAI",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "llm", "OPENAI"]
+            }
+          }
+        },
+        {
+          "name": "LLM — Delete (OPENAI)",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/llm/OPENAI",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "llm", "OPENAI"]
+            }
+          }
+        },
+        {
+          "name": "Integrations — List All",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/integrations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "integrations"]
+            }
+          }
+        },
+        {
+          "name": "Integrations — Upsert (SLACK)",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"my-slack\",\n  \"url\": \"https://hooks.slack.com/services/XXX/YYY/ZZZ\",\n  \"is_active\": true,\n  \"auth_config\": {\n    \"authType\": \"WEBHOOK\",\n    \"token\": \"my-token\"\n  },\n  \"additional_config\": {\n    \"channel\": \"#alerts\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/integrations/SLACK",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "integrations", "SLACK"]
+            }
+          }
+        },
+        {
+          "name": "Integrations — Delete (SLACK/my-slack)",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/integrations/SLACK/my-slack",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "integrations", "SLACK", "my-slack"]
             }
           }
         }

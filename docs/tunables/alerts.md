@@ -89,7 +89,7 @@ sudo systemctl restart causa-backend
 
 On startup the application resolves these keys in order:
 
-1. Checks the PostgreSQL `configurations` table (set via a previous Config API call).
+1. Checks the PostgreSQL `generic_configs` table (set via a previous Config API call).
 2. Falls back to the env var / ConfigMap value.
 3. Falls back to the hard-coded default.
 
