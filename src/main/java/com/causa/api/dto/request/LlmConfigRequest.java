@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Request body for {@code PUT /api/v1/settings/llm/{provider}}.
+ * Request body for {@code PUT /api/v1/configs/llm/{provider}}.
  *
  * <p>{@code provider} is taken from the URL path, not the body.
  * {@code authType} inside {@code authConfig} determines which credential fields are validated

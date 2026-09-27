@@ -5,6 +5,8 @@ import com.causa.api.dto.response.ConfigResponse;
 import com.causa.api.dto.response.ConfigUpdateResponse;
 import com.causa.core.ports.ConfigurationRepository;
 import com.causa.core.services.ConfigService;
+import com.causa.core.services.ExternalConfigService;
+import com.causa.core.services.LlmConfigService;
 import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -32,12 +34,16 @@ class ConfigControllerTest {
 
     @Mock
     private ConfigService configService;
+    @Mock
+    private ExternalConfigService externalConfigService;
+    @Mock
+    private LlmConfigService llmConfigService;
 
     private ConfigController controller;
 
     @BeforeEach
     void setUp() {
-        controller = new ConfigController(configService);
+        controller = new ConfigController(configService, externalConfigService, llmConfigService);
     }
 
     // -------------------------------------------------------------------------
