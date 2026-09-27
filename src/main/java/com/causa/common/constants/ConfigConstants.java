@@ -228,10 +228,6 @@ public final class ConfigConstants {
         return new KeyDef(name, category, type, sensitive, mpConfigPath);
     }
 
-    // TODO: [CLEANUP] The platform-config enums and SENSITIVE_AUTH_FIELDS below were added as part of the
-    // new Configuration Settings. Once the settings feature is fully shipped, evaluate and remove
-    //  what is no longer needed from this class.
-
     /** Discriminator for {@code external_configs} rows and settings tabs. */
     public enum PlatformCategory { OBSERVABILITY, INTEGRATION }
 
