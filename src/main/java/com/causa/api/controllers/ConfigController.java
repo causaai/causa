@@ -4,7 +4,6 @@ import com.causa.api.dto.request.ConfigUpdateRequest;
 import com.causa.api.dto.request.ExternalConfigRequest;
 import com.causa.api.dto.request.LlmConfigRequest;
 import com.causa.api.dto.response.ConfigResponse;
-import com.causa.api.dto.response.ConfigSettingsResponse;
 import com.causa.api.dto.response.ConfigUpdateResponse;
 import com.causa.api.dto.response.ExternalConfigResponse;
 import com.causa.api.dto.response.LlmConfigResponse;
@@ -72,6 +71,21 @@ public class ConfigController {
         this.configService         = configService;
         this.externalConfigService = externalConfigService;
         this.llmConfigService      = llmConfigService;
+    }
+
+    // -------------------------------------------------------------------------
+    // Combined snapshot  —  GET /configs/generic
+    // -------------------------------------------------------------------------
+
+    /**
+     * GET /api/v1/configs/generic
+     * Returns all generic (key-value) configuration entries as a flat list.
+     */
+    @GET
+    @Path(Configs.GENERIC_SEGMENT)
+    public Response listGeneric() {
+        log.info("GET /api/v1/configs/generic").log();
+        return Response.ok(toGenericResponses()).build();
     }
 
     // -------------------------------------------------------------------------
@@ -357,5 +371,11 @@ public class ConfigController {
 
     private List<LlmConfigResponse> toLlmResponses(List<LlmConfig> configs) {
         return configs.stream().map(LlmConfigResponse::from).toList();
+    }
+
+    private List<ConfigResponse> toGenericResponses() {
+        return configService.getAll().stream()
+            .map(e -> ConfigResponse.of(e.key(), e.value(), e.encrypted()))
+            .toList();
     }
 }
