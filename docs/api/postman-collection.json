@@ -516,7 +516,68 @@
           }
         },
         {
-          "name": "List Observability Configs",
+          "name": "Generic — List All",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/generic",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "generic"]
+            }
+          }
+        },
+        {
+          "name": "Generic — List By Category (alerts)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/generic?category=alerts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "generic"],
+              "query": [{"key": "category", "value": "alerts"}]
+            }
+          }
+        },
+        {
+          "name": "Generic — Get By Key",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/generic/ALERT_FILTER_SEVERITY",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "generic", "ALERT_FILTER_SEVERITY"]
+            }
+          }
+        },
+        {
+          "name": "Generic — Upsert (one or many keys)",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"configs\": {\n    \"ALERT_FILTER_SEVERITY\": \"critical\",\n    \"LLM_TEMPERATURE\": \"0.7\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/generic",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "generic"]
+            }
+          }
+        },
+        {
+          "name": "Generic — Delete By Key",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/generic/ALERT_FILTER_SEVERITY",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "generic", "ALERT_FILTER_SEVERITY"]
+            }
+          }
+        },
+        {
+          "name": "Observability — List All",
           "request": {
             "method": "GET",
             "url": {
@@ -527,7 +588,7 @@
           }
         },
         {
-          "name": "Upsert Observability Config (DATADOG)",
+          "name": "Observability — Upsert (DATADOG)",
           "request": {
             "method": "PUT",
             "header": [{"key": "Content-Type", "value": "application/json"}],
@@ -543,7 +604,7 @@
           }
         },
         {
-          "name": "Delete Observability Config (DATADOG)",
+          "name": "Observability — Delete (DATADOG/my-datadog)",
           "request": {
             "method": "DELETE",
             "url": {
@@ -554,7 +615,7 @@
           }
         },
         {
-          "name": "List LLM Configs",
+          "name": "LLM — List All",
           "request": {
             "method": "GET",
             "url": {
@@ -565,7 +626,7 @@
           }
         },
         {
-          "name": "Upsert LLM Config (OPENAI)",
+          "name": "LLM — Upsert (OPENAI)",
           "request": {
             "method": "PUT",
             "header": [{"key": "Content-Type", "value": "application/json"}],
@@ -581,7 +642,7 @@
           }
         },
         {
-          "name": "Delete LLM Config (OPENAI)",
+          "name": "LLM — Delete (OPENAI)",
           "request": {
             "method": "DELETE",
             "url": {
@@ -592,7 +653,7 @@
           }
         },
         {
-          "name": "List Integration Configs",
+          "name": "Integrations — List All",
           "request": {
             "method": "GET",
             "url": {
@@ -603,7 +664,7 @@
           }
         },
         {
-          "name": "Upsert Integration Config (SLACK)",
+          "name": "Integrations — Upsert (SLACK)",
           "request": {
             "method": "PUT",
             "header": [{"key": "Content-Type", "value": "application/json"}],
@@ -619,7 +680,7 @@
           }
         },
         {
-          "name": "Delete Integration Config (SLACK)",
+          "name": "Integrations — Delete (SLACK/my-slack)",
           "request": {
             "method": "DELETE",
             "url": {

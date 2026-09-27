@@ -4,6 +4,7 @@ import com.causa.api.dto.request.ConfigUpdateRequest;
 import com.causa.api.dto.request.ExternalConfigRequest;
 import com.causa.api.dto.request.LlmConfigRequest;
 import com.causa.api.dto.response.ConfigResponse;
+import com.causa.api.dto.response.ConfigSettingsResponse;
 import com.causa.api.dto.response.ConfigUpdateResponse;
 import com.causa.api.dto.response.ExternalConfigResponse;
 import com.causa.api.dto.response.LlmConfigResponse;
