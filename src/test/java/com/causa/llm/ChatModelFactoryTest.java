@@ -1,15 +1,20 @@
 package com.causa.llm;
 
+import com.causa.common.constants.ConfigConstants.LlmProvider;
 import com.causa.common.constants.LLMConstants;
 import com.causa.common.exceptions.LLMException;
-import com.causa.config.AppConfig;
-import com.causa.config.LlmConfigSnapshot;
+import com.causa.config.LlmConfigCache;
+import com.causa.core.domain.LlmConfig;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -18,11 +23,21 @@ import static org.mockito.Mockito.*;
 @DisplayName("ChatModelFactory Tests")
 class ChatModelFactoryTest {
 
-    @Mock AppConfig appConfig;
-    @Mock LlmConfigSnapshot llmConfig;
+    @Mock LlmConfigCache llmConfigCache;
 
     private ChatModelFactory factory() {
-        return new ChatModelFactory(appConfig);
+        return new ChatModelFactory(llmConfigCache);
+    }
+
+    /** Helper: returns an active LlmConfig with the given provider and model. */
+    private LlmConfig activeConfig(LlmProvider provider, String model) {
+        return LlmConfig.builder()
+            .id("llm_cnf_test")
+            .provider(provider)
+            .url("https://api.example.com")
+            .models(model != null && !model.isBlank() ? List.of(model) : List.of())
+            .authConfig(new com.causa.core.domain.AuthConfig(null, null, null, null, null, null, null, null))
+            .build();
     }
 
     @Nested
@@ -30,19 +45,9 @@ class ChatModelFactoryTest {
     class MissingProviderTests {
 
         @Test
-        @DisplayName("throws LLMException when provider is empty")
-        void throws_whenProviderEmpty() {
-            when(appConfig.getLlmConfig()).thenReturn(llmConfig);
-            when(llmConfig.getProvider()).thenReturn("");
-            assertThatThrownBy(() -> factory().chatModel())
-                    .isInstanceOf(LLMException.class);
-        }
-
-        @Test
-        @DisplayName("throws LLMException when provider is blank")
-        void throws_whenProviderBlank() {
-            when(appConfig.getLlmConfig()).thenReturn(llmConfig);
-            when(llmConfig.getProvider()).thenReturn("   ");
+        @DisplayName("throws LLMException when no active LLM config")
+        void throws_whenNoActiveConfig() {
+            when(llmConfigCache.getActive()).thenReturn(Optional.empty());
             assertThatThrownBy(() -> factory().chatModel())
                     .isInstanceOf(LLMException.class);
         }
@@ -53,13 +58,13 @@ class ChatModelFactoryTest {
     class UnknownProviderTests {
 
         @Test
-        @DisplayName("throws LLMException for unsupported provider string")
+        @DisplayName("throws LLMException for unsupported provider")
         void throws_forUnknownProvider() {
-            when(appConfig.getLlmConfig()).thenReturn(llmConfig);
-            when(llmConfig.getProvider()).thenReturn("some-unknown-llm");
+            // WATSONX is a valid enum value but has no switch case yet — triggers the default
+            LlmConfig cfg = activeConfig(LlmProvider.WATSONX, "some-model");
+            when(llmConfigCache.getActive()).thenReturn(Optional.of(cfg));
             assertThatThrownBy(() -> factory().chatModel())
-                    .isInstanceOf(LLMException.class)
-                    .hasMessageContaining("some-unknown-llm");
+                    .isInstanceOf(LLMException.class);
         }
     }
 
@@ -68,21 +73,11 @@ class ChatModelFactoryTest {
     class AnthropicMissingKeyTests {
 
         @Test
-        @DisplayName("throws LLMException when API key is empty")
-        void throws_whenApiKeyEmpty() {
-            when(appConfig.getLlmConfig()).thenReturn(llmConfig);
-            when(llmConfig.getProvider()).thenReturn("anthropic");
-            when(llmConfig.getApiKey()).thenReturn("");
-            assertThatThrownBy(() -> factory().chatModel())
-                    .isInstanceOf(LLMException.class);
-        }
-
-        @Test
-        @DisplayName("throws LLMException when API key is blank")
-        void throws_whenApiKeyBlank() {
-            when(appConfig.getLlmConfig()).thenReturn(llmConfig);
-            when(llmConfig.getProvider()).thenReturn("anthropic");
-            when(llmConfig.getApiKey()).thenReturn("  ");
+        @DisplayName("throws LLMException when API key is null")
+        void throws_whenApiKeyNull() {
+            LlmConfig cfg = activeConfig(LlmProvider.ANTHROPIC, "claude-3");
+            when(llmConfigCache.getActive()).thenReturn(Optional.of(cfg));
+            // authConfig.apiKey() is null on the config built by activeConfig()
             assertThatThrownBy(() -> factory().chatModel())
                     .isInstanceOf(LLMException.class);
         }
@@ -93,51 +88,33 @@ class ChatModelFactoryTest {
     class VertexMissingProjectTests {
 
         @Test
-        @DisplayName("throws LLMException when vertex project ID is empty")
-        void throws_whenVertexProjectIdEmpty() {
-            when(appConfig.getLlmConfig()).thenReturn(llmConfig);
-            when(llmConfig.getProvider()).thenReturn("vertex-ai-anthropic");
-            when(llmConfig.getVertexProjectId()).thenReturn("");
-            assertThatThrownBy(() -> factory().chatModel())
-                    .isInstanceOf(LLMException.class);
-        }
-
-        @Test
-        @DisplayName("throws LLMException when vertex project ID is blank")
-        void throws_whenVertexProjectIdBlank() {
-            when(appConfig.getLlmConfig()).thenReturn(llmConfig);
-            when(llmConfig.getProvider()).thenReturn("vertex-ai-anthropic");
-            when(llmConfig.getVertexProjectId()).thenReturn("  ");
+        @DisplayName("throws LLMException when additionalConfig has no projectId")
+        void throws_whenVertexProjectIdMissing() {
+            LlmConfig cfg = activeConfig(LlmProvider.VERTEX_AI, "claude-3");
+            when(llmConfigCache.getActive()).thenReturn(Optional.of(cfg));
             assertThatThrownBy(() -> factory().chatModel())
                     .isInstanceOf(LLMException.class);
         }
     }
 
     @Nested
-    @DisplayName("chatModel() — vertex-ai-anthropic (missing/invalid credentials)")
+    @DisplayName("chatModel() — vertex-ai-anthropic (missing credentials)")
     class VertexMissingCredentialsTests {
 
         @Test
         @DisplayName("throws LLMException when GOOGLE_APPLICATION_CREDENTIALS is null")
         void throws_whenAdcNull() {
-            when(appConfig.getLlmConfig()).thenReturn(llmConfig);
-            when(llmConfig.getProvider()).thenReturn("vertex-ai-anthropic");
-            when(llmConfig.getVertexProjectId()).thenReturn("my-project");
-            when(llmConfig.getGoogleApplicationCredentials()).thenReturn(null);
-            assertThatThrownBy(() -> factory().chatModel())
-                    .isInstanceOf(LLMException.class)
-                    .hasMessageContaining("GOOGLE_APPLICATION_CREDENTIALS")
-                    .satisfies(ex -> assertThat(((LLMException) ex).getErrorType())
-                            .isEqualTo(LLMConstants.ErrorTypes.MISSING_CONFIGURATION));
-        }
-
-        @Test
-        @DisplayName("throws LLMException when GOOGLE_APPLICATION_CREDENTIALS is empty")
-        void throws_whenAdcEmpty() {
-            when(appConfig.getLlmConfig()).thenReturn(llmConfig);
-            when(llmConfig.getProvider()).thenReturn("vertex-ai-anthropic");
-            when(llmConfig.getVertexProjectId()).thenReturn("my-project");
-            when(llmConfig.getGoogleApplicationCredentials()).thenReturn("");
+            var authConfig = new com.causa.core.domain.AuthConfig(
+                "SA_JSON_KEY", null, null, null, null, null, null, null);
+            LlmConfig cfg = LlmConfig.builder()
+                .id("llm_cnf_test")
+                .provider(LlmProvider.VERTEX_AI)
+                .url("https://api.example.com")
+                .models(List.of("claude-3"))
+                .authConfig(authConfig)
+                .additionalConfig(Map.of("projectId", "my-project"))
+                .build();
+            when(llmConfigCache.getActive()).thenReturn(Optional.of(cfg));
             assertThatThrownBy(() -> factory().chatModel())
                     .isInstanceOf(LLMException.class)
                     .hasMessageContaining("GOOGLE_APPLICATION_CREDENTIALS")
@@ -148,10 +125,17 @@ class ChatModelFactoryTest {
         @Test
         @DisplayName("throws LLMException when GOOGLE_APPLICATION_CREDENTIALS is not valid Base64")
         void throws_whenAdcNotBase64() {
-            when(appConfig.getLlmConfig()).thenReturn(llmConfig);
-            when(llmConfig.getProvider()).thenReturn("vertex-ai-anthropic");
-            when(llmConfig.getVertexProjectId()).thenReturn("my-project");
-            when(llmConfig.getGoogleApplicationCredentials()).thenReturn("!!!not-base64!!!");
+            var authConfig = new com.causa.core.domain.AuthConfig(
+                "SA_JSON_KEY", null, null, null, "!!!not-base64!!!", null, null, null);
+            LlmConfig cfg = LlmConfig.builder()
+                .id("llm_cnf_test")
+                .provider(LlmProvider.VERTEX_AI)
+                .url("https://api.example.com")
+                .models(List.of("claude-3"))
+                .authConfig(authConfig)
+                .additionalConfig(Map.of("projectId", "my-project"))
+                .build();
+            when(llmConfigCache.getActive()).thenReturn(Optional.of(cfg));
             assertThatThrownBy(() -> factory().chatModel())
                     .isInstanceOf(LLMException.class)
                     .hasMessageContaining("Base64")

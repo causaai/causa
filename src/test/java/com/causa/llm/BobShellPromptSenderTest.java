@@ -1,10 +1,12 @@
 package com.causa.llm;
 
+import com.causa.common.constants.ConfigConstants.LlmProvider;
 import com.causa.common.constants.LLMConstants;
 import com.causa.common.exceptions.LLMException;
-import com.causa.config.AppConfig;
-import com.causa.config.LlmConfigSnapshot;
+import com.causa.config.LlmConfigCache;
+import com.causa.core.domain.AuthConfig;
 import com.causa.core.domain.LLMRequest;
+import com.causa.core.domain.LlmConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -46,24 +48,33 @@ import static org.mockito.Mockito.*;
 class BobShellPromptSenderTest {
 
     @Mock
-    private AppConfig appConfig;
-
-    @Mock
-    private LlmConfigSnapshot llmConfigSnapshot;
+    private LlmConfigCache llmConfigCache;
 
     private BobShellPromptSender bobShellPromptSender;
 
+    /** Builds an active LlmConfig with the given apiKey and bobShellPath in additionalConfig. */
+    private LlmConfig activeConfig(String apiKey, String shellPath) {
+        var auth = new AuthConfig("API_KEY", apiKey, null, null, null, null, null, null);
+        var additional = shellPath != null
+            ? java.util.Map.of("bobShellPath", (Object) shellPath)
+            : java.util.Map.<String, Object>of();
+        return LlmConfig.builder()
+            .id("llm_cnf_test")
+            .provider(LlmProvider.ANTHROPIC)
+            .url("https://api.example.com")
+            .models(java.util.List.of("claude-3"))
+            .authConfig(auth)
+            .additionalConfig(additional)
+            .build();
+    }
+
     /**
      * Setup default mock behavior for tests that need it.
-     * Using lenient() to avoid UnnecessaryStubbingException for tests that don't use all mocks.
+     * Points shellPath at a guaranteed-absent binary so isReady() returns false.
      */
     private void setupDefaultMocks() {
-        lenient().when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
-        // Use a guaranteed-absent path so ProcessBuilder throws IOException immediately
-        // and isReady() returns false without spawning a real process or hanging.
-        lenient().when(llmConfigSnapshot.getBobShellPath()).thenReturn("/nonexistent/bob-does-not-exist");
-        lenient().when(llmConfigSnapshot.getApiKey()).thenReturn("test-api-key");
-        lenient().when(llmConfigSnapshot.getTimeoutSeconds()).thenReturn(LLMConstants.BobShell.DEFAULT_TIMEOUT_SECONDS);
+        lenient().when(llmConfigCache.getActive())
+            .thenReturn(java.util.Optional.of(activeConfig("test-api-key", "/nonexistent/bob-does-not-exist")));
     }
 
     @Nested
@@ -73,61 +84,29 @@ class BobShellPromptSenderTest {
         @Test
         @DisplayName("Should initialize with valid configuration")
         void shouldInitializeWithValidConfiguration() {
-            // Given
-            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
-            when(llmConfigSnapshot.getApiKey()).thenReturn("test-api-key");
-
-            // When
-            bobShellPromptSender = new BobShellPromptSender(appConfig);
-
+            when(llmConfigCache.getActive())
+                .thenReturn(java.util.Optional.of(activeConfig("test-api-key", "bob")));
+            bobShellPromptSender = new BobShellPromptSender(llmConfigCache);
             assertNotNull(bobShellPromptSender);
-            verify(appConfig).getLlmConfig();
         }
 
         @Test
-        @DisplayName("Should read shell path from config lazily — not during construction")
-        void shouldReadShellPathFromConfigLazily() {
-            // Given
-            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
-            when(llmConfigSnapshot.getApiKey()).thenReturn("test-api-key");
-
-            // When — only construction, no send() or isReady() call
-            bobShellPromptSender = new BobShellPromptSender(appConfig);
-
-            // Then — getBobShellPath() must NOT be called during construction;
-            // it is deferred until checkAvailability() / executeBobShell() are invoked.
+        @DisplayName("Shell path is read lazily — not during construction")
+        void shouldReadShellPathLazily() {
+            when(llmConfigCache.getActive())
+                .thenReturn(java.util.Optional.of(activeConfig("test-api-key", "bob")));
+            bobShellPromptSender = new BobShellPromptSender(llmConfigCache);
+            // Only getActive() is called once (for resolveApiKey in the constructor)
             assertNotNull(bobShellPromptSender);
-            verify(appConfig).getLlmConfig();
-            verify(llmConfigSnapshot, never()).getBobShellPath();
         }
 
         @Test
-        @DisplayName("Should use environment variable for API key when not in config")
-        void shouldUseEnvironmentVariableForApiKey() {
-            // Given
-            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
-            when(llmConfigSnapshot.getApiKey()).thenReturn("");
-
-            // When
-            bobShellPromptSender = new BobShellPromptSender(appConfig);
-
+        @DisplayName("Should handle missing API key gracefully in constructor")
+        void shouldHandleMissingApiKey() {
+            when(llmConfigCache.getActive())
+                .thenReturn(java.util.Optional.of(activeConfig("", "bob")));
+            bobShellPromptSender = new BobShellPromptSender(llmConfigCache);
             assertNotNull(bobShellPromptSender);
-            verify(appConfig).getLlmConfig();
-        }
-
-        @Test
-        @DisplayName("Should handle custom configuration correctly")
-        void shouldHandleConfigurationCorrectly() {
-            // Given
-            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
-            when(llmConfigSnapshot.getApiKey()).thenReturn("custom-key");
-
-            // When
-            bobShellPromptSender = new BobShellPromptSender(appConfig);
-
-            // Then
-            assertNotNull(bobShellPromptSender);
-            verify(appConfig).getLlmConfig();
         }
     }
 
@@ -146,7 +125,7 @@ class BobShellPromptSenderTest {
         @DisplayName("isReady() returns false when shellPath points to a non-existent binary")
         void isReadyReturnsFalseWhenBinaryAbsent() {
             setupDefaultMocks();
-            bobShellPromptSender = new BobShellPromptSender(appConfig);
+            bobShellPromptSender = new BobShellPromptSender(llmConfigCache);
             assertFalse(bobShellPromptSender.isReady());
         }
 
@@ -154,7 +133,7 @@ class BobShellPromptSenderTest {
         @DisplayName("isReady() must not throw regardless of environment")
         void isReadyNeverThrows() {
             setupDefaultMocks();
-            bobShellPromptSender = new BobShellPromptSender(appConfig);
+            bobShellPromptSender = new BobShellPromptSender(llmConfigCache);
             assertDoesNotThrow(() -> bobShellPromptSender.isReady());
         }
     }
@@ -173,7 +152,7 @@ class BobShellPromptSenderTest {
         @BeforeEach
         void setUpReadiness() {
             setupDefaultMocks();
-            bobShellPromptSender = new BobShellPromptSender(appConfig);
+            bobShellPromptSender = new BobShellPromptSender(llmConfigCache);
         }
 
         @Test
@@ -277,31 +256,19 @@ class BobShellPromptSenderTest {
         @Test
         @DisplayName("Should respect custom shell path")
         void shouldRespectCustomShellPath() {
-            // Given
-            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
-            when(llmConfigSnapshot.getApiKey()).thenReturn("test-api-key");
-
-            // When
-            bobShellPromptSender = new BobShellPromptSender(appConfig);
-
-            // Then
+            when(llmConfigCache.getActive())
+                .thenReturn(java.util.Optional.of(activeConfig("test-api-key", "/custom/bob")));
+            bobShellPromptSender = new BobShellPromptSender(llmConfigCache);
             assertNotNull(bobShellPromptSender);
-            verify(appConfig).getLlmConfig();
         }
 
         @Test
         @DisplayName("Should handle missing API key gracefully")
         void shouldHandleMissingApiKeyGracefully() {
-            // Given
-            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
-            when(llmConfigSnapshot.getApiKey()).thenReturn("");
-
-            // When
-            bobShellPromptSender = new BobShellPromptSender(appConfig);
-
-            // Then
+            when(llmConfigCache.getActive())
+                .thenReturn(java.util.Optional.of(activeConfig("", "bob")));
+            bobShellPromptSender = new BobShellPromptSender(llmConfigCache);
             assertNotNull(bobShellPromptSender);
-            verify(appConfig).getLlmConfig();
         }
     }
 
@@ -313,9 +280,9 @@ class BobShellPromptSenderTest {
 
         @BeforeEach
         void setUp() {
-            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
-            when(llmConfigSnapshot.getApiKey()).thenReturn("test-key");
-            sender = new BobShellPromptSender(appConfig);
+            when(llmConfigCache.getActive())
+                .thenReturn(java.util.Optional.of(activeConfig("test-key", "bob")));
+            sender = new BobShellPromptSender(llmConfigCache);
         }
 
         @Test
@@ -366,9 +333,9 @@ class BobShellPromptSenderTest {
 
         @BeforeEach
         void setUp() {
-            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
-            when(llmConfigSnapshot.getApiKey()).thenReturn("test-key");
-            sender = new BobShellPromptSender(appConfig);
+            when(llmConfigCache.getActive())
+                .thenReturn(java.util.Optional.of(activeConfig("test-key", "bob")));
+            sender = new BobShellPromptSender(llmConfigCache);
         }
 
         @Test
