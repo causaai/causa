@@ -97,31 +97,25 @@ class ConfigServiceImplTest {
         }
 
         @Test
-        @DisplayName("Should return LLM keys for llm category")
-        void shouldReturnLlmKeys() {
+        @DisplayName("Should return alerts keys for alerts category")
+        void shouldReturnAlertsKeys() {
             when(appConfig.get(anyString())).thenReturn(Optional.empty());
 
-            List<ConfigurationRepository.ConfigEntry> result = configService.getByCategory("llm");
+            List<ConfigurationRepository.ConfigEntry> result = configService.getByCategory("alerts");
 
             assertFalse(result.isEmpty());
-            result.forEach(e -> assertFalse(
-                    e.key().equals("CLUSTER_NAME") || e.key().startsWith("ALERT_"),
-                    "Unexpected non-LLM key: " + e.key()));
+            result.forEach(e -> assertTrue(
+                    e.key().startsWith("ALERT_"),
+                    "Unexpected non-alerts key: " + e.key()));
         }
 
         @Test
-        @DisplayName("Should mask sensitive keys in category listing")
-        void shouldMaskSensitiveKeysInCategoryListing() {
-            when(appConfig.get("LLM_API_KEY")).thenReturn(Optional.of("my-secret"));
-            when(appConfig.get(argThat(k -> !"LLM_API_KEY".equals(k)))).thenReturn(Optional.empty());
-
+        @DisplayName("Should return no entries for unknown category")
+        void shouldReturnEmptyForUnknownCategory() {
             List<ConfigurationRepository.ConfigEntry> result = configService.getByCategory("llm");
 
-            ConfigurationRepository.ConfigEntry apiKeyEntry = result.stream()
-                    .filter(e -> e.key().equals("LLM_API_KEY"))
-                    .findFirst()
-                    .orElseThrow();
-            assertTrue(apiKeyEntry.encrypted());
+            assertTrue(result.isEmpty(),
+                    "LLM keys have been removed from generic_configs — expected empty list");
         }
     }
 
@@ -141,8 +135,8 @@ class ConfigServiceImplTest {
             List<ConfigurationRepository.ConfigEntry> result = configService.getAll();
 
             assertFalse(result.isEmpty());
-            // All known keys (22) should be present
-            assertEquals(22, result.size());
+            // 4 alerts keys + 2 cluster keys = 6 total (LLM keys moved to llm_configs table)
+            assertEquals(6, result.size());
         }
 
         @Test
@@ -167,21 +161,19 @@ class ConfigServiceImplTest {
         @Test
         @DisplayName("Should persist to repository and update cache for non-sensitive key")
         void shouldPersistAndCacheNonSensitiveKey() {
-            configService.update("LLM_PROVIDER", "ollama");
+            configService.update("CLUSTER_NAME", "prod-cluster");
 
-            verify(repository).upsert(eq("LLM_PROVIDER"), eq("ollama"), eq(false));
-            verify(appConfig).put("LLM_PROVIDER", "ollama");
+            verify(repository).upsert(eq("CLUSTER_NAME"), eq("prod-cluster"), eq(false));
+            verify(appConfig).put("CLUSTER_NAME", "prod-cluster");
         }
 
         @Test
-        @DisplayName("Should encrypt and persist sensitive key")
-        void shouldEncryptAndPersistSensitiveKey() {
-            configService.update("LLM_API_KEY", "plaintext-secret");
+        @DisplayName("Should persist alert cooldown key without encryption")
+        void shouldPersistAlertCooldownKey() {
+            configService.update("ALERT_COOLDOWN_MINUTES", "15");
 
-            // Should store encrypted value in DB (not the plaintext)
-            verify(repository).upsert(eq("LLM_API_KEY"), argThat(v -> !"plaintext-secret".equals(v)), eq(true));
-            // Cache should hold the plaintext value for fast access
-            verify(appConfig).put("LLM_API_KEY", "plaintext-secret");
+            verify(repository).upsert(eq("ALERT_COOLDOWN_MINUTES"), eq("15"), eq(false));
+            verify(appConfig).put("ALERT_COOLDOWN_MINUTES", "15");
         }
 
         @Test
@@ -221,7 +213,7 @@ class ConfigServiceImplTest {
         @DisplayName("Should load entries from DB into cache")
         void shouldLoadEntriesFromDb() {
             List<ConfigurationRepository.ConfigEntry> dbEntries = List.of(
-                    new ConfigurationRepository.ConfigEntry("LLM_PROVIDER", "anthropic", false),
+                    new ConfigurationRepository.ConfigEntry("ALERT_FILTER_SEVERITY", "critical", false),
                     new ConfigurationRepository.ConfigEntry("CLUSTER_NAME", "prod-cluster", false)
             );
             when(repository.findAll()).thenReturn(dbEntries);
@@ -231,7 +223,7 @@ class ConfigServiceImplTest {
 
             verify(repository).findAll();
             verify(appConfig).clear();
-            verify(appConfig).put("LLM_PROVIDER", "anthropic");
+            verify(appConfig).put("ALERT_FILTER_SEVERITY", "critical");
             verify(appConfig).put("CLUSTER_NAME", "prod-cluster");
         }
 
@@ -240,17 +232,17 @@ class ConfigServiceImplTest {
         void shouldSeedMissingKeysFromMpConfig() {
             when(repository.findAll()).thenReturn(List.of());
             when(appConfig.get(anyString())).thenReturn(Optional.empty());
-            // Seed LLM_PROVIDER from env
-            when(mpConfig.getOptionalValue("causa.llm.provider", String.class))
-                    .thenReturn(Optional.of("ollama"));
-            when(mpConfig.getOptionalValue(argThat(k -> !"causa.llm.provider".equals(k)), eq(String.class)))
+            // Seed CLUSTER_NAME from env
+            when(mpConfig.getOptionalValue("causa.cluster.name", String.class))
+                    .thenReturn(Optional.of("my-cluster"));
+            when(mpConfig.getOptionalValue(argThat(k -> !"causa.cluster.name".equals(k)), eq(String.class)))
                     .thenReturn(Optional.empty());
 
             configService.loadFromDbAndEnv();
 
             // Should upsert the seeded key to DB
-            verify(repository).upsert(eq("LLM_PROVIDER"), eq("ollama"), eq(false));
-            verify(appConfig).put("LLM_PROVIDER", "ollama");
+            verify(repository).upsert(eq("CLUSTER_NAME"), eq("my-cluster"), eq(false));
+            verify(appConfig).put("CLUSTER_NAME", "my-cluster");
         }
 
         @Test
@@ -285,14 +277,14 @@ class ConfigServiceImplTest {
         @DisplayName("Should refresh cache from DB")
         void shouldRefreshCacheFromDb() {
             when(repository.findAll()).thenReturn(List.of(
-                    new ConfigurationRepository.ConfigEntry("LLM_PROVIDER", "anthropic", false)
+                    new ConfigurationRepository.ConfigEntry("CLUSTER_NAME", "prod-cluster", false)
             ));
             when(mpConfig.getOptionalValue(anyString(), eq(String.class))).thenReturn(Optional.empty());
 
             configService.refreshCache();
 
             verify(repository).findAll();
-            verify(appConfig).put("LLM_PROVIDER", "anthropic");
+            verify(appConfig).put("CLUSTER_NAME", "prod-cluster");
         }
     }
 }

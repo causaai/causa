@@ -9,7 +9,7 @@ import com.causa.common.constants.HealthCheckConstants;
 import com.causa.common.constants.LLMConstants;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
-import com.causa.config.AppConfig;
+import com.causa.config.LlmConfigCache;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
 import com.causa.core.ports.llm.PromptSender;
@@ -54,7 +54,7 @@ public class HealthCheckService {
     private final String applicationVersion;
     private final McpRegistry mcpRegistry;
     private final PromptSender llmPromptSender;
-    private final AppConfig appConfig;
+    private final LlmConfigCache llmConfigCache;
 
     @Inject
     public HealthCheckService(
@@ -63,13 +63,13 @@ public class HealthCheckService {
             @ConfigProperty(name = "quarkus.application.version") String applicationVersion,
             McpRegistry mcpRegistry,
             PromptSender llmPromptSender,
-            AppConfig appConfig) {
+            LlmConfigCache llmConfigCache) {
         this.databaseConnectionService = databaseConnectionService;
         this.dataSource = dataSource;
         this.applicationVersion = applicationVersion;
         this.mcpRegistry = mcpRegistry;
         this.llmPromptSender = llmPromptSender;
-        this.appConfig = appConfig;
+        this.llmConfigCache = llmConfigCache;
     }
 
     /**
@@ -250,8 +250,13 @@ public class HealthCheckService {
             }
 
             long latency = System.currentTimeMillis() - startTime;
-            String provider = appConfig.getLlmConfig().getProvider();
-            String modelName = appConfig.getLlmConfig().getModelName();
+            String provider = llmConfigCache.getActive()
+                .map(a -> a.getProvider().name().toLowerCase())
+                .orElse("unknown");
+            String modelName = llmConfigCache.getActive()
+                .filter(a -> a.getModels() != null && !a.getModels().isEmpty())
+                .map(a -> a.getModels().get(0))
+                .orElse(null);
             String displayName = (modelName != null && !modelName.isBlank()) ? modelName : "unknown";
             String message = String.format(LLMConstants.Messages.LLM_CONNECTED_FORMAT,
                     provider + " / " + displayName);
