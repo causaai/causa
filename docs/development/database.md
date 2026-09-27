@@ -1,10 +1,11 @@
 # Database Setup and Configuration
 
-This guide covers the PostgreSQL database connection pool setup for Causa Backend, including configuration, local development, and troubleshooting.
+This guide covers the PostgreSQL database setup for Causa Backend, including schema, migrations, connection pool configuration, and local development.
 
 ## Table of Contents
 
 - [Overview](#overview)
+- [Schema and migrations](#schema-and-migrations)
 - [Connection Pool (Agroal)](#connection-pool-agroal)
 - [ORM Layer (Hibernate + Panache)](#orm-layer-hibernate--panache)
 - [Configuration Reference](#configuration-reference)
@@ -41,6 +42,60 @@ Agroal is Quarkus's default connection pool implementation:
 - Simplifies repository pattern (aligns with hexagonal architecture)
 - Panache provides Active Record pattern for common CRUD operations
 - **Embedding operations bypass ORM** (see [Embedding Strategy](#embedding-strategy))
+
+---
+
+## Schema and migrations
+
+Schema is owned exclusively by Flyway — Hibernate never touches DDL. Migrations run on every pod startup (`migrate-at-start: true`).
+
+### V1 — baseline schema
+
+| Table | Purpose |
+|---|---|
+| `generic_configs` | Runtime key-value config (formerly `configurations`). Stores alert and cluster settings |
+| `alerts` | Inbound Prometheus alert records |
+| `diagnostics` | RCA diagnostic results |
+
+`V1` also creates the `notify_config_change()` function and the `trg_config_notify` trigger on `generic_configs`, which fires `pg_notify('config_cache_channel', 'reload')` on any write. `ConfigCacheListener` subscribes to this channel to refresh in-memory caches on all pods.
+
+### V2 — Settings API + diagnostics evidence
+
+`V2__settings_api_and_diagnostics_evidence.sql` adds:
+
+**`external_configs`** — observability and integration platform configs
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `VARCHAR(24)` | `ext_cnf_<16-char>` |
+| `category` | `VARCHAR(32)` | `OBSERVABILITY` or `INTEGRATION` |
+| `platform` | `VARCHAR(64)` | e.g. `DATADOG`, `SLACK` |
+| `name` | `VARCHAR(128)` | User-defined label; `UNIQUE(platform, name)` |
+| `url` | `TEXT` | |
+| `is_active` | `BOOLEAN` | Default `TRUE` |
+| `auth_config` | `JSONB` | Sensitive fields AES-256-GCM encrypted |
+| `additional_config` | `JSONB` | Platform-specific fields (e.g. `channel` for Slack) |
+
+**`llm_configs`** — LLM provider configs
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `VARCHAR(24)` | `llm_cnf_<16-char>` |
+| `provider` | `VARCHAR(64)` | `UNIQUE` — one row per provider |
+| `url` | `TEXT` | |
+| `models` | `TEXT[]` | |
+| `temperature` | `NUMERIC(4,2)` | |
+| `max_tokens` | `INTEGER` | |
+| `timeout_ms` | `INTEGER` | |
+| `is_active` | `BOOLEAN` | Partial unique index `WHERE is_active = TRUE` enforces single active provider at DB level |
+| `auth_config` | `JSONB` | Sensitive fields encrypted |
+| `additional_config` | `JSONB` | Provider-specific fields (e.g. `project`, `location` for Vertex AI) |
+
+Both tables extend the existing `LISTEN/NOTIFY` mechanism via new triggers (`trg_llm_config_notify`, `trg_external_config_notify`) that call the same `notify_config_change()` function, so `ConfigCacheListener` refreshes `LlmConfigCache` and `ExternalConfigCache` on writes to either table.
+
+**`diagnostics.all_evidence`** column — `JSONB`, nullable. Stores complete `EvidenceItem` instances (11-field model) from the validation pipeline for debugging and audit. Distinct from the existing `evidence` column (LLM-generated, 5-field model used in API responses).
+
+**Table rename** — `configurations` renamed to `generic_configs`. All constraints, indexes, and the `trg_config_notify` trigger follow the table by OID automatically.
 
 ---
 

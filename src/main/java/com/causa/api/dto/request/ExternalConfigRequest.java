@@ -7,8 +7,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Map;
 
 /**
- * Request body for {@code PUT /api/v1/settings/observability/{platform}}
- * and {@code PUT /api/v1/settings/integrations/{platform}}.
+ * Request body for {@code PUT /api/v1/configs/observability/{platform}}
+ * and {@code PUT /api/v1/configs/integrations/{platform}}.
  *
  * <p>{@code platform} is taken from the URL path, not the body.
  * {@code authConfig} carries credentials; sensitive fields are encrypted before storage.

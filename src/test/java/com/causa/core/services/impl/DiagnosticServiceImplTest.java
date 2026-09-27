@@ -59,7 +59,7 @@ class DiagnosticServiceImplTest {
     private com.causa.core.ports.llm.PromptSender promptSender;
 
     @Mock
-    private com.causa.config.AppConfig appConfig;
+    private com.causa.config.LlmConfigCache llmConfigCache;
 
     @Mock
     private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
@@ -81,7 +81,7 @@ class DiagnosticServiceImplTest {
                 mcpRegistry,
                 rcaPromptBuilder,
                 promptSender,
-                appConfig,
+                llmConfigCache,
                 objectMapper,
                 validator,
                 rcaValidatorInstance

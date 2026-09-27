@@ -2,6 +2,8 @@ package com.causa.infrastructure.persistence;
 
 import com.causa.common.constants.AppConstants;
 import com.causa.common.logging.CausaLogger;
+import com.causa.config.ExternalConfigCache;
+import com.causa.config.LlmConfigCache;
 import com.causa.core.services.ConfigService;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
@@ -53,6 +55,8 @@ public class ConfigCacheListener {
     private static final int RECONNECT_DELAY_MS = 5000;
 
     private final ConfigService configService;
+    private final LlmConfigCache llmConfigCache;
+    private final ExternalConfigCache externalConfigCache;
     private final String jdbcUrl;
     private final String jdbcUser;
     private final String jdbcPassword;
@@ -62,10 +66,15 @@ public class ConfigCacheListener {
     private volatile boolean running = false;
 
     @Inject
-    public ConfigCacheListener(ConfigService configService, Config mpConfig) {
-        this.configService = configService;
-        this.jdbcUrl = mpConfig.getValue("quarkus.datasource.jdbc.url", String.class);
-        this.jdbcUser = mpConfig.getValue("quarkus.datasource.username", String.class);
+    public ConfigCacheListener(ConfigService configService,
+                               LlmConfigCache llmConfigCache,
+                               ExternalConfigCache externalConfigCache,
+                               Config mpConfig) {
+        this.configService       = configService;
+        this.llmConfigCache      = llmConfigCache;
+        this.externalConfigCache = externalConfigCache;
+        this.jdbcUrl      = mpConfig.getValue("quarkus.datasource.jdbc.url", String.class);
+        this.jdbcUser     = mpConfig.getValue("quarkus.datasource.username", String.class);
         this.jdbcPassword = mpConfig.getValue("quarkus.datasource.password", String.class);
     }
 
@@ -135,11 +144,28 @@ public class ConfigCacheListener {
                                 .field("payload", notification.getParameter())
                                 .log();
 
-                            // Reload cache — errors here must NOT break the LISTEN connection
+                            // Reload all caches — each refresh is independent so one failure
+                            // does not prevent the others from running.
                             try {
                                 configService.refreshCache();
                             } catch (Exception refreshEx) {
-                                log.warn("Cache refresh failed after config notification")
+                                log.warn("Generic config cache refresh failed after notification")
+                                    .field("error", refreshEx.getClass().getSimpleName())
+                                    .field("message", refreshEx.getMessage())
+                                    .log();
+                            }
+                            try {
+                                llmConfigCache.refresh();
+                            } catch (Exception refreshEx) {
+                                log.warn("LLM config cache refresh failed after notification")
+                                    .field("error", refreshEx.getClass().getSimpleName())
+                                    .field("message", refreshEx.getMessage())
+                                    .log();
+                            }
+                            try {
+                                externalConfigCache.refresh();
+                            } catch (Exception refreshEx) {
+                                log.warn("External config cache refresh failed after notification")
                                     .field("error", refreshEx.getClass().getSimpleName())
                                     .field("message", refreshEx.getMessage())
                                     .log();
