@@ -217,9 +217,9 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/api/v1/settings",
+              "raw": "{{baseUrl}}/api/v1/configs",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "settings"]
+              "path": ["api", "v1", "configs"]
             }
           }
         },
@@ -228,9 +228,9 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/api/v1/settings/observability",
+              "raw": "{{baseUrl}}/api/v1/configs/observability",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "settings", "observability"]
+              "path": ["api", "v1", "configs", "observability"]
             }
           }
         },
@@ -244,9 +244,9 @@
               "raw": "{\n  \"name\": \"my-datadog\",\n  \"url\": \"https://api.datadoghq.com\",\n  \"is_active\": true,\n  \"auth_config\": {\n    \"authType\": \"API_KEY\",\n    \"apiKey\": \"my-api-key\",\n    \"appKey\": \"my-app-key\"\n  }\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/settings/observability/DATADOG",
+              "raw": "{{baseUrl}}/api/v1/configs/observability/DATADOG",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "settings", "observability", "DATADOG"]
+              "path": ["api", "v1", "configs", "observability", "DATADOG"]
             }
           }
         },
@@ -255,9 +255,9 @@
           "request": {
             "method": "DELETE",
             "url": {
-              "raw": "{{baseUrl}}/api/v1/settings/observability/DATADOG/my-datadog",
+              "raw": "{{baseUrl}}/api/v1/configs/observability/DATADOG/my-datadog",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "settings", "observability", "DATADOG", "my-datadog"]
+              "path": ["api", "v1", "configs", "observability", "DATADOG", "my-datadog"]
             }
           }
         },
@@ -266,9 +266,9 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/api/v1/settings/llm",
+              "raw": "{{baseUrl}}/api/v1/configs/llm",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "settings", "llm"]
+              "path": ["api", "v1", "configs", "llm"]
             }
           }
         },
@@ -282,9 +282,9 @@
               "raw": "{\n  \"url\": \"https://api.openai.com/v1\",\n  \"models\": [\"gpt-4o\", \"gpt-4-turbo\"],\n  \"temperature\": 0.7,\n  \"max_tokens\": 4096,\n  \"timeout_ms\": 30000,\n  \"is_active\": true,\n  \"auth_config\": {\n    \"authType\": \"API_KEY\",\n    \"apiKey\": \"sk-...\"\n  }\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/settings/llm/OPENAI",
+              "raw": "{{baseUrl}}/api/v1/configs/llm/OPENAI",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "settings", "llm", "OPENAI"]
+              "path": ["api", "v1", "configs", "llm", "OPENAI"]
             }
           }
         },
@@ -293,9 +293,9 @@
           "request": {
             "method": "DELETE",
             "url": {
-              "raw": "{{baseUrl}}/api/v1/settings/llm/OPENAI",
+              "raw": "{{baseUrl}}/api/v1/configs/llm/OPENAI",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "settings", "llm", "OPENAI"]
+              "path": ["api", "v1", "configs", "llm", "OPENAI"]
             }
           }
         },
@@ -304,9 +304,9 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/api/v1/settings/integrations",
+              "raw": "{{baseUrl}}/api/v1/configs/integrations",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "settings", "integrations"]
+              "path": ["api", "v1", "configs", "integrations"]
             }
           }
         },
@@ -320,9 +320,9 @@
               "raw": "{\n  \"name\": \"my-slack\",\n  \"url\": \"https://hooks.slack.com/services/XXX/YYY/ZZZ\",\n  \"is_active\": true,\n  \"auth_config\": {\n    \"authType\": \"WEBHOOK\",\n    \"token\": \"my-token\"\n  },\n  \"additional_config\": {\n    \"channel\": \"#alerts\"\n  }\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/api/v1/settings/integrations/SLACK",
+              "raw": "{{baseUrl}}/api/v1/configs/integrations/SLACK",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "settings", "integrations", "SLACK"]
+              "path": ["api", "v1", "configs", "integrations", "SLACK"]
             }
           }
         },
@@ -331,9 +331,9 @@
           "request": {
             "method": "DELETE",
             "url": {
-              "raw": "{{baseUrl}}/api/v1/settings/integrations/SLACK/my-slack",
+              "raw": "{{baseUrl}}/api/v1/configs/integrations/SLACK/my-slack",
               "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "settings", "integrations", "SLACK", "my-slack"]
+              "path": ["api", "v1", "configs", "integrations", "SLACK", "my-slack"]
             }
           }
         }
