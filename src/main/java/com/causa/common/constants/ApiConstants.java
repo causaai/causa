@@ -151,6 +151,7 @@ public final class ApiConstants {
             public static final String OBSERVABILITY_SEGMENT = "/observability";
             public static final String LLM_SEGMENT           = "/llm";
             public static final String INTEGRATIONS_SEGMENT  = "/integrations";
+            public static final String GENERIC_SEGMENT        = "/generic";
 
             // Path params for sub-resources
             public static final String PATH_PARAM_PLATFORM = "platform";

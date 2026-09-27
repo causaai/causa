@@ -1,5 +1,5 @@
 -- =============================================================================
--- Causa Backend - Settings API Schema + Diagnostics Evidence Column
+-- Causa Backend - Settings API Schema + Diagnostics Evidence Column + Table Rename
 -- Flyway Migration: V2
 -- PostgreSQL 14+
 -- =============================================================================
@@ -92,3 +92,11 @@ ALTER TABLE diagnostics
 COMMENT ON COLUMN diagnostics.all_evidence IS 'Complete evidence items from validation pipeline. Shape: [{"id": "...", "source": "...", "type": "...", "strength": "...", ...}, ...]. Stores all EvidenceItem instances for debugging and audit — see com.causa.core.domain.validation.EvidenceItem for the authoritative shape.';
 
 COMMENT ON COLUMN diagnostics.evidence IS 'User-facing evidence subset. Shape: [{"id": "...", "source": "...", "type": "...", "strength": "...", ...}, ...]. The EvidenceItems chosen from all_evidence for the API response, selected once when the diagnostic completes.';
+
+-- =============================================================================
+-- 5. RENAME configurations → generic_configs
+--    The trg_config_notify trigger follows the table by OID automatically —
+--    no DROP/CREATE needed. All constraints, indexes, and the trigger survive.
+-- =============================================================================
+
+ALTER TABLE configurations RENAME TO generic_configs;
