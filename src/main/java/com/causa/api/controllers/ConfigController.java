@@ -4,6 +4,7 @@ import com.causa.api.dto.request.ConfigUpdateRequest;
 import com.causa.api.dto.request.ExternalConfigRequest;
 import com.causa.api.dto.request.LlmConfigRequest;
 import com.causa.api.dto.response.ConfigResponse;
+import com.causa.api.dto.response.ConfigSettingsResponse;
 import com.causa.api.dto.response.ConfigUpdateResponse;
 import com.causa.api.dto.response.ExternalConfigResponse;
 import com.causa.api.dto.response.LlmConfigResponse;
@@ -14,7 +15,6 @@ import com.causa.common.logging.CausaLogger;
 import com.causa.common.utils.ValidationUtils;
 import com.causa.core.domain.ExternalConfig;
 import com.causa.core.domain.LlmConfig;
-import com.causa.core.ports.ConfigurationRepository;
 import com.causa.core.services.ConfigService;
 import com.causa.core.services.ExternalConfigService;
 import com.causa.core.services.LlmConfigService;
@@ -34,9 +34,11 @@ import java.util.List;
  *
  * <p>Endpoints:
  * <ul>
- *   <li>{@code GET    /api/v1/configs}                                    — list generic configs (optional ?category filter)</li>
- *   <li>{@code GET    /api/v1/configs/{key}}                              — single generic config by key</li>
- *   <li>{@code POST   /api/v1/configs}                                    — upsert generic config values</li>
+ *   <li>{@code GET    /api/v1/configs}                                    — combined snapshot (observability + llm + integrations + generic)</li>
+ *   <li>{@code GET    /api/v1/configs/generic}                            — list all generic key-value configs (optional ?category filter)</li>
+ *   <li>{@code GET    /api/v1/configs/generic/{key}}                      — single generic config by key</li>
+ *   <li>{@code PUT    /api/v1/configs/generic}                            — upsert one or multiple generic config values</li>
+ *   <li>{@code DELETE /api/v1/configs/generic/{key}}                      — delete a generic config entry</li>
  *   <li>{@code GET    /api/v1/configs/observability}                      — list observability platform configs</li>
  *   <li>{@code PUT    /api/v1/configs/observability/{platform}}           — upsert observability config</li>
  *   <li>{@code DELETE /api/v1/configs/observability/{platform}/{name}}    — delete observability config</li>
@@ -74,34 +76,42 @@ public class ConfigController {
     }
 
     // -------------------------------------------------------------------------
-    // Combined snapshot  —  GET /configs/generic
-    // -------------------------------------------------------------------------
-
-    /**
-     * GET /api/v1/configs/generic
-     * Returns all generic (key-value) configuration entries as a flat list.
-     */
-    @GET
-    @Path(Configs.GENERIC_SEGMENT)
-    public Response listGeneric() {
-        log.info("GET /api/v1/configs/generic").log();
-        return Response.ok(toGenericResponses()).build();
-    }
-
-    // -------------------------------------------------------------------------
-    // Generic key-value configs  —  GET /configs, GET /configs/{key}, POST /configs
+    // Combined snapshot  —  GET /configs
     // -------------------------------------------------------------------------
 
     /**
      * GET /api/v1/configs
-     * Lists all generic configuration entries, optionally filtered by category.
+     * Returns a combined snapshot of all configuration categories.
      *
-     * @param category optional category filter (llm, alerts, cluster)
-     * @return list of config entries (sensitive values masked), or 400 for an unknown category
+     * @return one object each for observability, integrations, llm, and generic
      */
     @GET
-    public Response listConfigs(@QueryParam(Configs.QUERY_CATEGORY) String category) {
-        log.info("GET /api/v1/configs")
+    public Response getAllConfigs() {
+        log.info("GET /api/v1/configs").log();
+        ConfigSettingsResponse snapshot = new ConfigSettingsResponse(
+            toExternalResponses(externalConfigService.listByCategory(PlatformCategory.OBSERVABILITY)),
+            toExternalResponses(externalConfigService.listByCategory(PlatformCategory.INTEGRATION)),
+            toLlmResponses(llmConfigService.listAll()),
+            toGenericResponses()
+        );
+        return Response.ok(snapshot).build();
+    }
+
+    // -------------------------------------------------------------------------
+    // Generic key-value configs  —  /configs/generic
+    // -------------------------------------------------------------------------
+
+    /**
+     * GET /api/v1/configs/generic
+     * Lists generic (key-value) configuration entries, optionally filtered by category.
+     *
+     * @param category optional category filter (llm, alerts, cluster)
+     * @return flat list of generic config entries (sensitive values masked), or 400 for unknown category
+     */
+    @GET
+    @Path(Configs.GENERIC_SEGMENT)
+    public Response listGeneric(@QueryParam(Configs.QUERY_CATEGORY) String category) {
+        log.info("GET /api/v1/configs/generic")
             .field(ConfigConstants.LogFields.CATEGORY, category)
             .log();
 
@@ -113,11 +123,10 @@ public class ConfigController {
                 .build();
         }
 
-        List<ConfigurationRepository.ConfigEntry> entries = category != null && !category.isBlank()
-            ? configService.getByCategory(category.toLowerCase())
-            : configService.getAll();
-
-        List<ConfigResponse> response = entries.stream()
+        List<ConfigResponse> response = (category != null && !category.isBlank()
+                ? configService.getByCategory(category.toLowerCase())
+                : configService.getAll())
+            .stream()
             .map(e -> ConfigResponse.of(e.key(), e.value(), e.encrypted()))
             .toList();
 
@@ -125,16 +134,16 @@ public class ConfigController {
     }
 
     /**
-     * GET /api/v1/configs/{key}
+     * GET /api/v1/configs/generic/{key}
      * Retrieves a single generic configuration value by key.
      *
      * @param key the configuration key
-     * @return the config entry (sensitive values masked)
+     * @return the config entry (sensitive values masked), or 400 for unknown key
      */
     @GET
-    @Path(Configs.BY_KEY)
-    public Response getConfig(@PathParam(Configs.PATH_PARAM_KEY) String key) {
-        log.info("GET /api/v1/configs/{key}")
+    @Path(Configs.GENERIC_BY_KEY)
+    public Response getGenericConfig(@PathParam(Configs.PATH_PARAM_KEY) String key) {
+        log.info("GET /api/v1/configs/generic/{key}")
             .field(ConfigConstants.LogFields.CONFIG_KEY, key)
             .log();
 
@@ -145,29 +154,28 @@ public class ConfigController {
         }
 
         String value = configService.get(key).orElse(null);
-        ConfigResponse response = ConfigResponse.of(key, value);
-
-        return Response.ok(response).build();
+        return Response.ok(ConfigResponse.of(key, value)).build();
     }
 
     /**
-     * POST /api/v1/configs
-     * Upserts generic configuration values.
-     * Valid entries are persisted and returned in {@code updated}; invalid entries are
-     * returned in {@code rejected} and skipped.
+     * PUT /api/v1/configs/generic
+     * Upserts one or multiple generic configuration values.
+     * Valid entries are persisted and returned in {@code updated}; invalid entries
+     * are returned in {@code rejected} and skipped.
      *
-     * @param request the config update request
+     * @param request map of config key-value pairs to upsert
      * @return updated keys that were applied and rejected keys that failed validation
      */
-    @POST
-    public Response updateConfigs(ConfigUpdateRequest request) {
+    @PUT
+    @Path(Configs.GENERIC_SEGMENT)
+    public Response upsertGenericConfigs(ConfigUpdateRequest request) {
         if (request.configs() == null || request.configs().isEmpty()) {
             return Response.status(Response.Status.BAD_REQUEST)
                 .entity("No configs provided")
                 .build();
         }
 
-        log.info("POST /api/v1/configs")
+        log.info("PUT /api/v1/configs/generic")
             .field("keys_count", request.configs().size())
             .log();
 
@@ -214,6 +222,36 @@ public class ConfigController {
         return Response.ok(new ConfigUpdateResponse(updated, rejected)).build();
     }
 
+    /**
+     * DELETE /api/v1/configs/generic/{key}
+     * Deletes a generic configuration entry.
+     *
+     * @param key the configuration key
+     * @return 204 No Content on success, 400 for unknown or env-only key
+     */
+    @DELETE
+    @Path(Configs.GENERIC_BY_KEY)
+    public Response deleteGenericConfig(@PathParam(Configs.PATH_PARAM_KEY) String key) {
+        log.info("DELETE /api/v1/configs/generic/{key}")
+            .field(ConfigConstants.LogFields.CONFIG_KEY, key)
+            .log();
+
+        if (!ConfigConstants.isValidKey(key)) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                .entity("Unknown config key: " + key)
+                .build();
+        }
+
+        if (ConfigConstants.isEnvOnly(key)) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                .entity(key + " cannot be deleted. It is managed via environment variable or configmap.")
+                .build();
+        }
+
+        configService.delete(key);
+        return Response.noContent().build();
+    }
+
     // -------------------------------------------------------------------------
     // Observability  —  /configs/observability
     // -------------------------------------------------------------------------
@@ -226,9 +264,9 @@ public class ConfigController {
     @Path(Configs.OBSERVABILITY_SEGMENT)
     public Response listObservability() {
         log.info("GET /api/v1/configs/observability").log();
-        List<ExternalConfigResponse> configs =
-            toExternalResponses(externalConfigService.listByCategory(PlatformCategory.OBSERVABILITY));
-        return Response.ok(configs).build();
+        return Response.ok(
+            toExternalResponses(externalConfigService.listByCategory(PlatformCategory.OBSERVABILITY))
+        ).build();
     }
 
     /**
@@ -322,9 +360,9 @@ public class ConfigController {
     @Path(Configs.INTEGRATIONS_SEGMENT)
     public Response listIntegrations() {
         log.info("GET /api/v1/configs/integrations").log();
-        List<ExternalConfigResponse> configs =
-            toExternalResponses(externalConfigService.listByCategory(PlatformCategory.INTEGRATION));
-        return Response.ok(configs).build();
+        return Response.ok(
+            toExternalResponses(externalConfigService.listByCategory(PlatformCategory.INTEGRATION))
+        ).build();
     }
 
     /**

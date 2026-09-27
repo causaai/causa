@@ -97,6 +97,15 @@ public class ConfigServiceImpl implements ConfigService {
     }
 
     @Override
+    public void delete(String key) {
+        repository.delete(key);
+        appConfig.put(key, null); // put(key, null) removes from cache
+        log.info("Config deleted")
+            .field(ConfigConstants.LogFields.CONFIG_KEY, key)
+            .log();
+    }
+
+    @Override
     public void loadFromDbAndEnv() {
         log.info("Loading configuration from DB and environment").log();
         CacheRefreshResult result = doLoad();
