@@ -6,8 +6,7 @@ import com.causa.common.constants.PromptConstants;
 import com.causa.common.constants.ValidationConstants;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
-import com.causa.config.AppConfig;
-import com.causa.config.LLMConfig;
+import com.causa.config.LlmConfigCache;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
 import com.causa.core.domain.validation.Assertion;
@@ -62,7 +61,7 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
     @Inject
     public LlmAssertionAnalyzer(
         PromptSender promptSender,
-        AppConfig appConfig,
+        LlmConfigCache llmConfigCache,
         ObjectMapper objectMapper,
         @ConfigProperty(name = "causa.validation.assertion-analyzer.parallel-threads")
         int parallelThreads
@@ -70,7 +69,14 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
         this.promptSender = promptSender;
         this.objectMapper = objectMapper;
         this.promptTemplateLoader = new PromptTemplateLoader(PromptConstants.TEMPLATE_PATH_ASSERTION_ANALYSIS);
-        this.provider = determineProvider(appConfig.getLlmConfig());
+        String providerName = llmConfigCache.getActive()
+            .map(a -> a.getProvider().name().toLowerCase())
+            .orElse("");
+        String modelName = llmConfigCache.getActive()
+            .filter(a -> a.getModels() != null && !a.getModels().isEmpty())
+            .map(a -> a.getModels().get(0))
+            .orElse("");
+        this.provider = determineProvider(providerName, modelName);
         this.executorService = Executors.newFixedThreadPool(parallelThreads);
     }
 
@@ -90,9 +96,7 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
     /**
      * Determines the model type for template selection based on LLM configuration.
      */
-    private String determineProvider(com.causa.config.LlmConfigSnapshot config) {
-        String provider = config.getProvider();
-        String modelName = config.getModelName();
+    private String determineProvider(String provider, String modelName) {
 
         // Check for BOB/Granite models
         if (!modelName.isEmpty() && (

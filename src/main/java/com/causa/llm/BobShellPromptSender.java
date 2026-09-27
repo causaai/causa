@@ -4,7 +4,7 @@ import com.causa.common.constants.LLMConstants;
 import com.causa.common.exceptions.LLMException;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
-import com.causa.config.AppConfig;
+import com.causa.config.LlmConfigCache;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
 import com.causa.core.ports.llm.PromptSender;
@@ -41,11 +41,11 @@ public class BobShellPromptSender implements PromptSender {
     private static final CausaLogger log = CausaLogger.getLogger(BobShellPromptSender.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
-    private final AppConfig appConfig;
+    private final LlmConfigCache llmConfigCache;
     private final AtomicBoolean ready = new AtomicBoolean(false);
 
-    public BobShellPromptSender(AppConfig appConfig) {
-        this.appConfig = appConfig;
+    public BobShellPromptSender(LlmConfigCache llmConfigCache) {
+        this.llmConfigCache = llmConfigCache;
         if (resolveApiKey().isBlank()) {
             log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
                 .field(LLMConstants.ConfigKeys.MISSING_CONFIG, LLMConstants.ConfigKeys.LLM_API_KEY)
@@ -141,7 +141,7 @@ public class BobShellPromptSender implements PromptSender {
      */
     private boolean checkAvailability() {
         try {
-            ProcessBuilder pb = new ProcessBuilder(appConfig.getLlmConfig().getBobShellPath(), LLMConstants.BobShell.VERSION_FLAG);
+            ProcessBuilder pb = new ProcessBuilder(resolveBobShellPath(), LLMConstants.BobShell.VERSION_FLAG);
             pb.environment().putAll(buildSubprocessEnv(resolveApiKey()));
             Process process = pb.start();
             boolean completed = process.waitFor(
@@ -158,7 +158,7 @@ public class BobShellPromptSender implements PromptSender {
             int exitCode = process.exitValue();
             if (exitCode == 0) {
                 log.info(LogMessages.LLM.BOB_SHELL_AVAILABLE)
-                    .field(LLMConstants.BobShell.LOG_FIELD_SHELL_PATH, appConfig.getLlmConfig().getBobShellPath())
+                    .field(LLMConstants.BobShell.LOG_FIELD_SHELL_PATH, resolveBobShellPath())
                     .log();
                 return true;
             } else {
@@ -218,7 +218,7 @@ public class BobShellPromptSender implements PromptSender {
 
             // Always use stdin mode for reliability and consistency
             ProcessBuilder pb = new ProcessBuilder(
-                appConfig.getLlmConfig().getBobShellPath(),
+                resolveBobShellPath(),
                 LLMConstants.BobShell.FLAG_ACCEPT_LICENSE,
                 LLMConstants.BobShell.SUBCMD_RUN,
                 LLMConstants.BobShell.FLAG_FORMAT,
@@ -239,7 +239,9 @@ public class BobShellPromptSender implements PromptSender {
             }
             
             // Wait for completion with timeout
-            int timeoutSeconds = appConfig.getLlmConfig().getTimeoutSeconds();
+            int timeoutSeconds = llmConfigCache.getActive()
+                .map(a -> a.getTimeoutMs() != null ? a.getTimeoutMs() / 1000 : 180)
+                .orElse(180);
             boolean completed = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
             
             if (!completed) {
@@ -358,8 +360,19 @@ public class BobShellPromptSender implements PromptSender {
      * Returns the API key, trimmed, never null.
      * Treats a null key (misconfigured provider) the same as blank.
      */
+    private String resolveBobShellPath() {
+        return llmConfigCache.getActive()
+            .map(a -> {
+                Object v = a.getAdditionalConfig() != null ? a.getAdditionalConfig().get("bobShellPath") : null;
+                return v != null && !v.toString().isBlank() ? v.toString() : "bob";
+            })
+            .orElse("bob");
+    }
+
     private String resolveApiKey() {
-        String key = appConfig.getLlmConfig().getApiKey();
+        String key = llmConfigCache.getActive()
+            .map(a -> a.getAuthConfig() != null ? a.getAuthConfig().apiKey() : null)
+            .orElse(null);
         return key != null ? key.trim() : "";
     }
 
