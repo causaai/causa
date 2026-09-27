@@ -80,8 +80,8 @@ class ConfigControllerTest {
         @DisplayName("Should return 200 with all generic configs when no category filter")
         void shouldReturn200WithAllGenericConfigs() {
             List<ConfigurationRepository.ConfigEntry> entries = List.of(
-                    new ConfigurationRepository.ConfigEntry("LLM_PROVIDER", "ollama", false),
-                    new ConfigurationRepository.ConfigEntry("LLM_API_KEY", "enc_secret", true)
+                    new ConfigurationRepository.ConfigEntry("ALERT_FILTER_SEVERITY", "critical", false),
+                    new ConfigurationRepository.ConfigEntry("ALERT_IGNORE_NAMESPACES", "kube-system", false)
             );
             when(configService.getAll()).thenReturn(entries);
 
@@ -97,14 +97,14 @@ class ConfigControllerTest {
         @Test
         @DisplayName("Should return 200 with filtered configs when category is provided")
         void shouldReturn200WithFilteredConfigs() {
-            when(configService.getByCategory("llm")).thenReturn(List.of(
-                    new ConfigurationRepository.ConfigEntry("LLM_PROVIDER", "ollama", false)
+            when(configService.getByCategory("alerts")).thenReturn(List.of(
+                    new ConfigurationRepository.ConfigEntry("ALERT_FILTER_SEVERITY", "critical", false)
             ));
 
-            Response response = controller.listGeneric("llm");
+            Response response = controller.listGeneric("alerts");
 
             assertEquals(200, response.getStatus());
-            verify(configService).getByCategory("llm");
+            verify(configService).getByCategory("alerts");
             verify(configService, never()).getAll();
         }
 
@@ -125,22 +125,22 @@ class ConfigControllerTest {
         @Test
         @DisplayName("Should return 200 with config value when key exists")
         void shouldReturn200WhenKeyExists() {
-            when(configService.get("LLM_PROVIDER")).thenReturn(java.util.Optional.of("ollama"));
+            when(configService.get("ALERT_FILTER_SEVERITY")).thenReturn(java.util.Optional.of("critical"));
 
-            Response response = controller.getGenericConfig("LLM_PROVIDER");
+            Response response = controller.getGenericConfig("ALERT_FILTER_SEVERITY");
 
             assertEquals(200, response.getStatus());
             ConfigResponse body = (ConfigResponse) response.getEntity();
-            assertEquals("LLM_PROVIDER", body.key());
-            assertEquals("ollama", body.value());
+            assertEquals("ALERT_FILTER_SEVERITY", body.key());
+            assertEquals("critical", body.value());
         }
 
         @Test
         @DisplayName("Should return 200 with null value when key known but not set")
         void shouldReturn200WhenKeyKnownButNotSet() {
-            when(configService.get("LLM_PROVIDER")).thenReturn(java.util.Optional.empty());
+            when(configService.get("ALERT_FILTER_SEVERITY")).thenReturn(java.util.Optional.empty());
 
-            Response response = controller.getGenericConfig("LLM_PROVIDER");
+            Response response = controller.getGenericConfig("ALERT_FILTER_SEVERITY");
 
             assertEquals(200, response.getStatus());
         }
@@ -183,8 +183,8 @@ class ConfigControllerTest {
         @Test
         @DisplayName("Should return 200 with updated keys on valid request")
         void shouldReturn200WithUpdatedKeys() {
-            ConfigUpdateRequest request = new ConfigUpdateRequest(Map.of("LLM_PROVIDER", "anthropic"));
-            doNothing().when(configService).update("LLM_PROVIDER", "anthropic");
+            ConfigUpdateRequest request = new ConfigUpdateRequest(Map.of("ALERT_FILTER_SEVERITY", "warning"));
+            doNothing().when(configService).update("ALERT_FILTER_SEVERITY", "warning");
 
             Response response = controller.upsertGenericConfigs(request);
 
@@ -192,7 +192,7 @@ class ConfigControllerTest {
             ConfigUpdateResponse body = (ConfigUpdateResponse) response.getEntity();
             assertEquals(1, body.updated().size());
             assertTrue(body.rejected().isEmpty());
-            verify(configService).update("LLM_PROVIDER", "anthropic");
+            verify(configService).update("ALERT_FILTER_SEVERITY", "warning");
         }
 
         @Test
@@ -213,73 +213,29 @@ class ConfigControllerTest {
         @DisplayName("Should reject blank values")
         void shouldRejectBlankValues() {
             ConfigUpdateResponse body = (ConfigUpdateResponse) controller.upsertGenericConfigs(
-                    new ConfigUpdateRequest(Map.of("LLM_PROVIDER", "   "))).getEntity();
+                    new ConfigUpdateRequest(Map.of("ALERT_FILTER_SEVERITY", "   "))).getEntity();
 
             assertEquals(1, body.rejected().size());
-            assertEquals("LLM_PROVIDER", body.rejected().get(0).key());
+            assertEquals("ALERT_FILTER_SEVERITY", body.rejected().get(0).key());
         }
 
         @Test
         @DisplayName("Should reject invalid integer values")
         void shouldRejectInvalidIntegerValues() {
             ConfigUpdateResponse body = (ConfigUpdateResponse) controller.upsertGenericConfigs(
-                    new ConfigUpdateRequest(Map.of("LLM_MAX_TOKENS", "not-a-number"))).getEntity();
+                    new ConfigUpdateRequest(Map.of("ALERT_COOLDOWN_MINUTES", "not-a-number"))).getEntity();
 
             assertEquals(1, body.rejected().size());
             assertTrue(body.rejected().get(0).reason().contains("integer"));
         }
 
         @Test
-        @DisplayName("Should reject invalid double values")
-        void shouldRejectInvalidDoubleValues() {
-            ConfigUpdateResponse body = (ConfigUpdateResponse) controller.upsertGenericConfigs(
-                    new ConfigUpdateRequest(Map.of("LLM_TEMPERATURE", "abc"))).getEntity();
-
-            assertEquals(1, body.rejected().size());
-            assertTrue(body.rejected().get(0).reason().toLowerCase().contains("numeric") ||
-                       body.rejected().get(0).reason().toLowerCase().contains("double"));
-        }
-
-        @Test
-        @DisplayName("Should reject invalid boolean values")
-        void shouldRejectInvalidBooleanValues() {
-            ConfigUpdateResponse body = (ConfigUpdateResponse) controller.upsertGenericConfigs(
-                    new ConfigUpdateRequest(Map.of("LLM_SKILLS_ENABLED", "yes"))).getEntity();
-
-            assertEquals(1, body.rejected().size());
-            assertTrue(body.rejected().get(0).reason().toLowerCase().contains("boolean"));
-        }
-
-        @Test
-        @DisplayName("Should accept valid boolean values")
-        void shouldAcceptValidBooleanValues() {
-            doNothing().when(configService).update("LLM_SKILLS_ENABLED", "true");
-
-            ConfigUpdateResponse body = (ConfigUpdateResponse) controller.upsertGenericConfigs(
-                    new ConfigUpdateRequest(Map.of("LLM_SKILLS_ENABLED", "true"))).getEntity();
-
-            assertEquals(1, body.updated().size());
-        }
-
-        @Test
-        @DisplayName("Should accept valid double values")
-        void shouldAcceptValidDoubleValues() {
-            doNothing().when(configService).update("LLM_TEMPERATURE", "0.7");
-
-            ConfigUpdateResponse body = (ConfigUpdateResponse) controller.upsertGenericConfigs(
-                    new ConfigUpdateRequest(Map.of("LLM_TEMPERATURE", "0.7"))).getEntity();
-
-            assertEquals(1, body.updated().size());
-            assertTrue(body.rejected().isEmpty());
-        }
-
-        @Test
         @DisplayName("Should accept valid integer values")
         void shouldAcceptValidIntegerValues() {
-            doNothing().when(configService).update("LLM_MAX_TOKENS", "4096");
+            doNothing().when(configService).update("ALERT_COOLDOWN_MINUTES", "4096");
 
             ConfigUpdateResponse body = (ConfigUpdateResponse) controller.upsertGenericConfigs(
-                    new ConfigUpdateRequest(Map.of("LLM_MAX_TOKENS", "4096"))).getEntity();
+                    new ConfigUpdateRequest(Map.of("ALERT_COOLDOWN_MINUTES", "4096"))).getEntity();
 
             assertEquals(1, body.updated().size());
         }
@@ -288,9 +244,9 @@ class ConfigControllerTest {
         @DisplayName("Should process valid and invalid keys independently")
         void shouldProcessValidAndInvalidKeysSeparately() {
             Map<String, String> configs = new java.util.LinkedHashMap<>();
-            configs.put("LLM_PROVIDER", "anthropic");
+            configs.put("ALERT_FILTER_SEVERITY", "warning");
             configs.put("UNKNOWN_KEY", "value");
-            doNothing().when(configService).update("LLM_PROVIDER", "anthropic");
+            doNothing().when(configService).update("ALERT_FILTER_SEVERITY", "warning");
 
             ConfigUpdateResponse body = (ConfigUpdateResponse) controller.upsertGenericConfigs(
                     new ConfigUpdateRequest(configs)).getEntity();
@@ -311,12 +267,12 @@ class ConfigControllerTest {
         @Test
         @DisplayName("Should return 204 on successful delete")
         void shouldReturn204OnSuccess() {
-            doNothing().when(configService).delete("LLM_PROVIDER");
+            doNothing().when(configService).delete("ALERT_FILTER_SEVERITY");
 
-            Response response = controller.deleteGenericConfig("LLM_PROVIDER");
+            Response response = controller.deleteGenericConfig("ALERT_FILTER_SEVERITY");
 
             assertEquals(204, response.getStatus());
-            verify(configService).delete("LLM_PROVIDER");
+            verify(configService).delete("ALERT_FILTER_SEVERITY");
         }
 
         @Test

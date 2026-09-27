@@ -55,7 +55,7 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
     private final PromptSender promptSender;
     private final ObjectMapper objectMapper;
     private final PromptTemplateLoader promptTemplateLoader;
-    private final String provider;
+    private final LlmConfigCache llmConfigCache;
     private final ExecutorService executorService;
 
     @Inject
@@ -69,14 +69,7 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
         this.promptSender = promptSender;
         this.objectMapper = objectMapper;
         this.promptTemplateLoader = new PromptTemplateLoader(PromptConstants.TEMPLATE_PATH_ASSERTION_ANALYSIS);
-        String providerName = llmConfigCache.getActive()
-            .map(a -> a.getProvider().name().toLowerCase())
-            .orElse("");
-        String modelName = llmConfigCache.getActive()
-            .filter(a -> a.getModels() != null && !a.getModels().isEmpty())
-            .map(a -> a.getModels().get(0))
-            .orElse("");
-        this.provider = determineProvider(providerName, modelName);
+        this.llmConfigCache = llmConfigCache;
         this.executorService = Executors.newFixedThreadPool(parallelThreads);
     }
 
@@ -91,6 +84,18 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
             executorService.shutdownNow();
             Thread.currentThread().interrupt();
         }
+    }
+
+    /** Resolves the current provider string from the live cache at call time. */
+    private String resolveProvider() {
+        String providerName = llmConfigCache.getActive()
+            .map(a -> a.getProvider().name().toLowerCase())
+            .orElse("");
+        String modelName = llmConfigCache.getActive()
+            .filter(a -> a.getModels() != null && !a.getModels().isEmpty())
+            .map(a -> a.getModels().get(0))
+            .orElse("");
+        return determineProvider(providerName, modelName);
     }
 
     /**
@@ -137,7 +142,7 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
 
         try {
             // Load template for the current model type
-            PromptTemplateLoader.PromptTemplate template = promptTemplateLoader.loadTemplate(provider, "");
+            PromptTemplateLoader.PromptTemplate template = promptTemplateLoader.loadTemplate(resolveProvider(), "");
 
             // Build analysis prompt using template
             String userPrompt = buildAnalysisPrompt(assertion, diagnosticContext, template);

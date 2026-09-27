@@ -41,7 +41,7 @@ public class LlmAssertionExtractor implements AssertionExtractor {
     private final PromptSender promptSender;
     private final ObjectMapper objectMapper;
     private final PromptTemplateLoader promptTemplateLoader;
-    private final String provider;
+    private final LlmConfigCache llmConfigCache;
 
     @Inject
     public LlmAssertionExtractor(
@@ -52,6 +52,11 @@ public class LlmAssertionExtractor implements AssertionExtractor {
         this.promptSender = promptSender;
         this.objectMapper = objectMapper;
         this.promptTemplateLoader = new PromptTemplateLoader(PromptConstants.TEMPLATE_PATH_ASSERTION_EXTRACTION);
+        this.llmConfigCache = llmConfigCache;
+    }
+
+    /** Resolves the current provider string from the live cache at call time. */
+    private String resolveProvider() {
         String providerName = llmConfigCache.getActive()
             .map(a -> a.getProvider().name().toLowerCase())
             .orElse("");
@@ -59,7 +64,7 @@ public class LlmAssertionExtractor implements AssertionExtractor {
             .filter(a -> a.getModels() != null && !a.getModels().isEmpty())
             .map(a -> a.getModels().get(0))
             .orElse("");
-        this.provider = determineProvider(providerName, modelName);
+        return determineProvider(providerName, modelName);
     }
 
     /**
@@ -155,7 +160,7 @@ public class LlmAssertionExtractor implements AssertionExtractor {
 
         try {
             // Load template for the current model type
-            PromptTemplateLoader.PromptTemplate template = promptTemplateLoader.loadTemplate(provider, "");
+            PromptTemplateLoader.PromptTemplate template = promptTemplateLoader.loadTemplate(resolveProvider(), "");
 
             // Build prompt using template
             String userPrompt = buildExtractionPrompt(text, source, template);
