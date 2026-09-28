@@ -13,7 +13,7 @@ import java.util.Map;
  * For the USER-FACING model, see DiagnosticDetailResponse.Evidence (5 fields).
  *
  * <p>The prose fields are deliberately distinct: {@link #rawSnippet} is the verbatim text the
- * source returned, {@link #statement} says what that text shows, and {@link #reasoning} argues
+ * source returned, {@link #statement} says what that text shows, and {@link #explanation} argues
  * why it settles the question. Collapsing any two makes an item look like corroboration of
  * itself. What the evidence was offered for is carried by the origin — PATH A's assertion id
  * and PATH B's rule id, both in {@link #metadata} — not restated on every sibling item.
@@ -33,7 +33,7 @@ public record EvidenceItem(
     // One line stating only what rawSnippet shows. Null for rule-derived evidence, which has no
     // narrator to write one.
     String statement,
-    String reasoning,
+    String explanation,
     double confidence,
     int priority,
     Instant collectedAt,
@@ -138,7 +138,7 @@ public record EvidenceItem(
         private EvidenceHypothesisAlignment evidenceHypothesisAlignment;
         private String rawSnippet;
         private String statement;
-        private String reasoning;
+        private String explanation;
         private double confidence;
         private int priority;
         private Instant collectedAt;
@@ -179,8 +179,8 @@ public record EvidenceItem(
             return this;
         }
 
-        public Builder reasoning(String reasoning) {
-            this.reasoning = reasoning;
+        public Builder explanation(String explanation) {
+            this.explanation = explanation;
             return this;
         }
 
@@ -213,7 +213,7 @@ public record EvidenceItem(
                 evidenceHypothesisAlignment,
                 rawSnippet,
                 statement,
-                reasoning,
+                explanation,
                 confidence,
                 priority,
                 collectedAt != null ? collectedAt : Instant.now(),

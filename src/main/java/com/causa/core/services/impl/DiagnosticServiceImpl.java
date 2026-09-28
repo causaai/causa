@@ -36,7 +36,7 @@ import com.causa.core.services.evidence.EvidenceSelector;
 import com.causa.core.services.evidence.RcaFinding;
 import com.causa.core.services.validation.RcaValidator;
 import com.causa.infrastructure.persistence.mappers.AlertEntityMapper;
-import com.causa.mcp.McpContextCollector;
+import com.causa.mcp.McpRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
@@ -72,7 +72,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
 
     private final DiagnosticRepository diagnosticRepository;
     private final AlertRepository alertRepository;
-    private final McpContextCollector mcpContextCollector;
+    private final McpRegistry mcpRegistry;
     private final RcaPromptBuilder rcaPromptBuilder;
     private final PromptSender promptSender;
     private final AppConfig appConfig;
@@ -86,7 +86,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     @Inject
     public DiagnosticServiceImpl(DiagnosticRepository diagnosticRepository,
                                   AlertRepository alertRepository,
-                                  McpContextCollector mcpContextCollector,
+                                  McpRegistry mcpRegistry,
                                   RcaPromptBuilder rcaPromptBuilder,
                                   PromptSender promptSender,
                                   AppConfig appConfig,
@@ -97,7 +97,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                                   Instance<EvidenceSelector> evidenceSelectorInstance) {
         this.diagnosticRepository = diagnosticRepository;
         this.alertRepository      = alertRepository;
-        this.mcpContextCollector  = mcpContextCollector;
+        this.mcpRegistry          = mcpRegistry;
         this.rcaPromptBuilder     = rcaPromptBuilder;
         this.promptSender         = promptSender;
         this.appConfig            = appConfig;
@@ -297,7 +297,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             .field("alertId", alert.getAlertId())
             .log();
 
-        return mcpContextCollector.collectContext(alert);
+        return mcpRegistry.collectContext(alert);
     }
 
     /**

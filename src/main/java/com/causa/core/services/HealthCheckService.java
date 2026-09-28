@@ -23,6 +23,8 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.Statement;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Health Check Service
@@ -110,9 +112,10 @@ public class HealthCheckService {
     }
 
     /**
-     * Checks every MCP server currently in the registry and adds a {@code mcp_<name>} component
-     * for each. If the registry itself failed to initialize (e.g. {@code mcp.json} was missing or
-     * invalid at startup), a single synthetic {@code mcp_config} component reports the exact
+     * Checks every MCP server currently in the registry and rolls them into one {@code mcp_config}
+     * component, keyed by plain server name under {@code servers} — not one {@code mcp_<name>}
+     * component per server. If the registry itself failed to initialize (e.g. {@code mcp.json} was
+     * missing or invalid at startup), the same {@code mcp_config} component reports the exact
      * failure reason instead.
      *
      * <p>An empty {@code mcpServers} map is rejected by {@code @NotEmpty} validation in
@@ -139,14 +142,23 @@ public class HealthCheckService {
         }
 
         boolean anyRequiredMcpDown = false;
+        Map<String, ComponentHealthDto> servers = new LinkedHashMap<>();
         for (McpClient client : mcpRegistry.allClients()) {
             ComponentHealthDto health = client.checkHealth();
-            responseBuilder.addComponent("mcp_" + client.getServerName(), health);
+            servers.put(client.getServerName(), health);
             if (!client.getConfig().optional()
                     && !AppConstants.HealthStatus.UP.getValue().equals(health.getStatus())) {
                 anyRequiredMcpDown = true;
             }
         }
+
+        responseBuilder.addComponent(HealthCheckConstants.ComponentNames.MCP_CONFIG,
+                ComponentHealthDto.builder()
+                        .status(anyRequiredMcpDown
+                                ? AppConstants.HealthStatus.DOWN.getValue()
+                                : AppConstants.HealthStatus.UP.getValue())
+                        .servers(servers)
+                        .build());
         return anyRequiredMcpDown;
     }
 

@@ -2,6 +2,8 @@ package com.causa.core.domain;
 
 import com.causa.common.constants.ContextConstants;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -68,6 +70,9 @@ public final class DiagnosticContext {
     private final String threadContentionAnalysis;
     private final String jvmRuntimeInfo;
 
+    // Generic map to store dynamically collected context from mcps (contextKey -> tool result) map
+    private final Map<String, String> contextData;
+
     private DiagnosticContext(Builder builder) {
         this.platform = builder.platform;
         this.workloadName = builder.workloadName;
@@ -101,6 +106,7 @@ public final class DiagnosticContext {
         this.memoryLeakIndicators = builder.memoryLeakIndicators;
         this.threadContentionAnalysis = builder.threadContentionAnalysis;
         this.jvmRuntimeInfo = builder.jvmRuntimeInfo;
+        this.contextData = Map.copyOf(builder.contextData);
     }
 
     // Getters
@@ -233,6 +239,11 @@ public final class DiagnosticContext {
         return libertyLogs;
     }
 
+    /** Looks up a value collected via the dynamic mcp.json path by its contextKey. */
+    public String get(String contextKey) {
+        return contextData.get(contextKey);
+    }
+
     /**
      * Checks if any Kubernetes context was collected.
      *
@@ -326,7 +337,8 @@ public final class DiagnosticContext {
     public boolean hasAnyContext() {
         return hasKubernetesContext() || hasKruizeContext() || hasCryostatContext()
             || hasQuarkusContext() || hasAsyncProfilerContext()
-            || hasFilesystemContext() || hasJmxContext();
+            || hasFilesystemContext() || hasJmxContext()
+            || !contextData.isEmpty();
     }
 
     /**
@@ -345,23 +357,18 @@ public final class DiagnosticContext {
         // Header
         sb.append(ContextConstants.HEADER).append(ContextConstants.NEWLINE);
         sb.append(ContextConstants.LABEL_PLATFORM).append(ContextConstants.FIELD_SEPARATOR)
-            .append(platform != null ? platform : ContextConstants.LABEL_NOT_APPLICABLE).append(ContextConstants.NEWLINE);
+            .append(platform != null ? platform : resolvePlatformFromConfig()).append(ContextConstants.NEWLINE);
         sb.append(ContextConstants.LABEL_WORKLOAD).append(ContextConstants.FIELD_SEPARATOR)
             .append(workloadName != null ? workloadName : ContextConstants.LABEL_NOT_APPLICABLE).append(ContextConstants.NEWLINE);
 
-        if (PLATFORM_VM.equals(platform)) {
-            sb.append(ContextConstants.NEWLINE);
-            appendVmSections(sb);
-        } else {
-            // Pod details (cluster only)
-            sb.append(ContextConstants.LABEL_POD).append(ContextConstants.FIELD_SEPARATOR)
-                .append(podName != null ? podName : ContextConstants.LABEL_NOT_APPLICABLE).append(ContextConstants.NEWLINE);
-            sb.append(ContextConstants.LABEL_CONTAINER).append(ContextConstants.FIELD_SEPARATOR)
-                .append(containerName != null ? containerName : ContextConstants.LABEL_NOT_APPLICABLE).append(ContextConstants.NEWLINE);
-            sb.append(ContextConstants.LABEL_NAMESPACE).append(ContextConstants.FIELD_SEPARATOR)
-                .append(namespace != null ? namespace : ContextConstants.LABEL_NOT_APPLICABLE).append(ContextConstants.NEWLINE).append(ContextConstants.NEWLINE);
-            appendClusterSections(sb);
-        }
+        sb.append(ContextConstants.LABEL_POD).append(ContextConstants.FIELD_SEPARATOR)
+            .append(podName != null ? podName : ContextConstants.LABEL_NOT_APPLICABLE).append(ContextConstants.NEWLINE);
+        sb.append(ContextConstants.LABEL_CONTAINER).append(ContextConstants.FIELD_SEPARATOR)
+            .append(containerName != null ? containerName : ContextConstants.LABEL_NOT_APPLICABLE).append(ContextConstants.NEWLINE);
+        sb.append(ContextConstants.LABEL_NAMESPACE).append(ContextConstants.FIELD_SEPARATOR)
+            .append(namespace != null ? namespace : ContextConstants.LABEL_NOT_APPLICABLE).append(ContextConstants.NEWLINE).append(ContextConstants.NEWLINE);
+
+        contextData.forEach((contextKey, value) -> appendSection(sb, contextKey, value));
 
         return sb.toString();
     }
@@ -439,6 +446,13 @@ public final class DiagnosticContext {
         return str != null && !str.trim().isEmpty();
     }
 
+    /** Falls back to causa.cluster.target-cluster-type when platform wasn't explicitly set. */
+    private static String resolvePlatformFromConfig() {
+        return org.eclipse.microprofile.config.ConfigProvider.getConfig()
+                .getOptionalValue("causa.cluster.target-cluster-type", String.class)
+                .orElse(PLATFORM_CLUSTER);
+    }
+
     /**
      * Creates a new builder for constructing DiagnosticContext instances.
      *
@@ -486,6 +500,8 @@ public final class DiagnosticContext {
         private String memoryLeakIndicators;
         private String threadContentionAnalysis;
         private String jvmRuntimeInfo;
+        // ConcurrentHashMap: MCP servers are now collected in parallel, so put() can race
+        private final Map<String, String> contextData = new java.util.concurrent.ConcurrentHashMap<>();
 
         private Builder() {}
 
@@ -654,6 +670,14 @@ public final class DiagnosticContext {
 
         public Builder jvmRuntimeInfo(String jvmRuntimeInfo) {
             this.jvmRuntimeInfo = jvmRuntimeInfo;
+            return this;
+        }
+
+        /** Sets a value collected via the dynamic mcp.json path. No-ops on a blank contextKey/value. */
+        public Builder put(String contextKey, String value) {
+            if (contextKey != null && value != null && !value.isBlank()) {
+                contextData.put(contextKey, value);
+            }
             return this;
         }
 

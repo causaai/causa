@@ -3,6 +3,8 @@ package com.causa.api.dto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.util.Map;
+
 /**
  * Component Health DTO
  *
@@ -28,6 +30,10 @@ public class ComponentHealthDto {
 
     @JsonProperty("optional")
     private Boolean optional;
+
+    /** Nested per-server breakdown — only populated for the aggregate mcp_config component. */
+    @JsonProperty("servers")
+    private Map<String, ComponentHealthDto> servers;
 
     /**
      * Default constructor for JSON deserialization
@@ -100,6 +106,14 @@ public class ComponentHealthDto {
         this.optional = optional;
     }
 
+    public Map<String, ComponentHealthDto> getServers() {
+        return servers;
+    }
+
+    public void setServers(Map<String, ComponentHealthDto> servers) {
+        this.servers = servers;
+    }
+
     /**
      * Builder for fluent construction
      */
@@ -108,6 +122,7 @@ public class ComponentHealthDto {
         private String message;
         private Long latencyMs;
         private Boolean optional;
+        private Map<String, ComponentHealthDto> servers;
 
         public Builder status(String status) {
             this.status = status;
@@ -129,9 +144,15 @@ public class ComponentHealthDto {
             return this;
         }
 
+        public Builder servers(Map<String, ComponentHealthDto> servers) {
+            this.servers = servers;
+            return this;
+        }
+
         public ComponentHealthDto build() {
             ComponentHealthDto dto = new ComponentHealthDto(status, message, latencyMs);
             dto.setOptional(optional);
+            dto.setServers(servers);
             return dto;
         }
     }

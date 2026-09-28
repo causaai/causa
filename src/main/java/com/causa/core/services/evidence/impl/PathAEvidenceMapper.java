@@ -33,8 +33,8 @@ import java.util.Map;
  *       echoed back, free text like {@code "POD LOGS (recent) - sequence 124"}. It is resolved
  *       to a canonical MCP server name, with the original kept in metadata.</li>
  *   <li><strong>Narration.</strong> {@link Evidence#statement()} says what the quote shows and
- *       {@link Evidence#reasoning()} why that bears on the assertion. Both are null when the
- *       validator wrote neither, and the per-evidence reasoning falls back to the
+ *       {@link Evidence#explanation()} why that bears on the assertion. Both are null when the
+ *       validator wrote neither, and the per-evidence explanation falls back to the
  *       assertion-level explanation.</li>
  *   <li><strong>Empty sections cited as proof.</strong> The LLM will happily quote
  *       {@code "No Data Available"} as supporting evidence at a high relevance score. Such an
@@ -99,7 +99,7 @@ public class PathAEvidenceMapper {
             .evidenceHypothesisAlignment(alignment)
             .rawSnippet(truncate(evidence.snippet()))
             .statement(evidence.statement())
-            .reasoning(reasoningOf(evidence, result))
+            .explanation(explanationOf(evidence, result))
             .confidence(evidence.relevanceScore())
             .priority(priorityOf(strength))
             .metadata(metadata)
@@ -129,7 +129,7 @@ public class PathAEvidenceMapper {
     }
 
     /**
-     * Per-evidence reasoning when the LLM wrote one, otherwise the assertion-level explanation.
+     * Per-evidence explanation when the LLM wrote one, otherwise the assertion-level explanation.
      *
      * <p>The fallback is shared across every sibling item of the same assertion, so it says why
      * the assertion landed where it did rather than what this particular quote contributed.
@@ -137,9 +137,9 @@ public class PathAEvidenceMapper {
      * fallback: it is the claim under test, and an item that restated the claim as its own
      * justification would read as though it had settled it.
      */
-    private String reasoningOf(Evidence evidence, ValidationResult result) {
-        if (evidence.reasoning() != null && !evidence.reasoning().isBlank()) {
-            return evidence.reasoning();
+    private String explanationOf(Evidence evidence, ValidationResult result) {
+        if (evidence.explanation() != null && !evidence.explanation().isBlank()) {
+            return evidence.explanation();
         }
         return result.explanation().orElse(null);
     }

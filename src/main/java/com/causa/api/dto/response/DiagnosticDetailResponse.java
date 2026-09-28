@@ -242,7 +242,7 @@ public record DiagnosticDetailResponse(
             : item.rawSnippet();
         return new Evidence(
             statement,
-            item.reasoning(),
+            item.explanation(),
             item.source(),
             item.rawSnippet(),
             reliabilityOf(item)

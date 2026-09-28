@@ -110,7 +110,7 @@ public class PathBEvidenceMapper {
             .evidenceHypothesisAlignment(alignment)
             .rawSnippet(snippetOf(signal))
             .statement(statementOf(result))
-            .reasoning(reasoningOf(rule, result))
+            .explanation(reasoningOf(rule, result))
             .confidence(confidence)
             .priority(priority)
             .metadata(metadataOf(finding, rule, result, signal))
