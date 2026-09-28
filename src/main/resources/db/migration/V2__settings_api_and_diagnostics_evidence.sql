@@ -60,16 +60,18 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_llm_configs_single_active ON llm_configs (i
 
 
 -- =============================================================================
--- 3. DIAGNOSTICS — all_evidence COLUMN
---    Stores complete EvidenceItem instances (11-field model) from the validation
---    pipeline for debugging and audit. The top 3-5 are transformed to Evidence
---    (5-field model) for API responses.
+-- 3: Add all_evidence column to diagnostics table
+--    Stores complete EvidenceItem instances from the validation pipeline for
+--    debugging and audit. The top 3-5 are selected into the evidence column and transformed
+--    to the Evidence UI model for the API response.
 --
 --    Existing evidence column: LLM-generated evidences from RCA (backward compatible)
 --    New all_evidence column:  Structured validation evidences from PATH A + PATH B
 -- =============================================================================
 
 ALTER TABLE diagnostics
-    ADD COLUMN all_evidence JSONB;
+    ADD COLUMN IF NOT EXISTS all_evidence JSONB;
 
-COMMENT ON COLUMN diagnostics.all_evidence IS 'Complete evidence items from validation pipeline. Shape: [{"id": "...", "source": "...", "type": "...", "strength": "...", ...}, ...]. Stores all EvidenceItem instances (11-field model) for debugging and audit.';
+COMMENT ON COLUMN diagnostics.all_evidence IS 'Complete evidence items from validation pipeline. Shape: [{"id": "...", "source": "...", "type": "...", "strength": "...", ...}, ...]. Stores all EvidenceItem instances for debugging and audit — see com.causa.core.domain.validation.EvidenceItem for the authoritative shape.';
+
+COMMENT ON COLUMN diagnostics.evidence IS 'User-facing evidence subset. Shape: [{"id": "...", "source": "...", "type": "...", "strength": "...", ...}, ...]. The EvidenceItems chosen from all_evidence for the API response, selected once when the diagnostic completes.';
