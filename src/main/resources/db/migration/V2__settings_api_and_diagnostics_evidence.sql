@@ -70,6 +70,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_llm_configs_single_active ON llm_configs (i
 -- =============================================================================
 
 ALTER TABLE diagnostics
-    ADD COLUMN IF NOT EXISTS all_evidence JSONB;
+    ADD COLUMN all_evidence JSONB;
 
 COMMENT ON COLUMN diagnostics.all_evidence IS 'Complete evidence items from validation pipeline. Shape: [{"id": "...", "source": "...", "type": "...", "strength": "...", ...}, ...]. Stores all EvidenceItem instances (11-field model) for debugging and audit.';
