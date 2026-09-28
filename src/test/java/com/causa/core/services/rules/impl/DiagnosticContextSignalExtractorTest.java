@@ -63,6 +63,53 @@ class DiagnosticContextSignalExtractorTest {
             .contains("POD STATUS");
     }
 
+    @Test
+    void quotesNoLineForAValueNoLineShows() {
+        // memory.usage.percent is used/max — a ratio written nowhere in the context.
+        Signal percent = signalIn(oneSection(), "memory.usage.percent");
+
+        assertThat(percent.getMetadata(Metadata.SIGNAL_SNIPPET)).isEmpty();
+        assertThat(percent.getMetadata(Metadata.SIGNAL_CONTEXT)).isEmpty();
+    }
+
+    @Test
+    void attributesADerivedValueWhenEveryInputCameFromOneSection() {
+        assertThat(signalIn(oneSection(), "memory.usage.percent").getMetadata(Metadata.SIGNAL_SECTION))
+            .contains("MEMORY ANALYSIS (Cryostat JFR)");
+    }
+
+    @Test
+    void claimsNoSectionWhenTheInputsStraddleTwo() {
+        // Repeated collection output puts used and max in different sections.
+        assertThat(signalIn(twoSections(), "memory.usage.percent").getMetadata(Metadata.SIGNAL_SECTION))
+            .isEmpty();
+    }
+
+    private static String oneSection() {
+        return """
+            --- MEMORY ANALYSIS (Cryostat JFR) ---
+            jvm_memory_used_bytes{area="heap",id="G1 Old Gen"} 9.0E8
+            jvm_memory_max_bytes{area="heap",id="G1 Old Gen"} 1.0E9
+            """;
+    }
+
+    private static String twoSections() {
+        return """
+            --- MEMORY ANALYSIS (Cryostat JFR) ---
+            jvm_memory_used_bytes{area="heap",id="G1 Old Gen"} 9.0E8
+
+            --- POD LOGS (recent) ---
+            jvm_memory_max_bytes{area="heap",id="G1 Old Gen"} 1.0E9
+            """;
+    }
+
+    private Signal signalIn(String context, String signalName) {
+        return extractor.extractSignals(context).stream()
+            .filter(s -> s.getName().equals(signalName))
+            .findFirst()
+            .orElseThrow();
+    }
+
     private String snippetOf(String signalName) {
         return metadataOf(signalName, Metadata.SIGNAL_SNIPPET).orElseThrow();
     }

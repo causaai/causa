@@ -34,10 +34,10 @@ import java.util.regex.Pattern;
  *   <li>Kruize recommendations</li>
  * </ul>
  *
- * <p>Every emitted signal carries the diagnostic context section it was read from, under
- * {@link Metadata#SIGNAL_SECTION}. Downstream evidence mapping uses that section to attribute
- * the signal to the MCP server that produced it, so a signal without a section cannot be
- * traced back to a source.
+ * <p>Signals carry the context section they were read from under
+ * {@link Metadata#SIGNAL_SECTION}, which is how evidence mapping attributes them to an MCP
+ * server. Absent when the section cannot be determined — see {@link #signal} and
+ * {@link #derived}.
  *
  * @since 0.0.1
  */
@@ -175,6 +175,32 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
         String window = sections.contextAt(offset);
         if (window != null && !window.equals(line)) {
             builder.metadata(Metadata.SIGNAL_CONTEXT, window);
+        }
+        return builder;
+    }
+
+    /**
+     * Starts a signal computed from several matches — a count, sum, maximum or ratio.
+     *
+     * <p>No line shows such a value, so none is quoted. The section is stamped only when every
+     * contributing offset lands in the same one; inputs that straddle sections have no single
+     * origin to name.
+     *
+     * @param offsets positions of every match that contributed to the value
+     */
+    private static Signal.Builder derived(Signal.SignalType type, String name,
+                                          DiagnosticContextIndex sections, int... offsets) {
+        Signal.Builder builder = Signal.builder(type, name);
+        String common = null;
+        for (int offset : offsets) {
+            String section = sections.labelAt(offset);
+            if (section == null || (common != null && !common.equals(section))) {
+                return builder;
+            }
+            common = section;
+        }
+        if (common != null) {
+            builder.metadata(Metadata.SIGNAL_SECTION, common);
         }
         return builder;
     }
@@ -327,43 +353,48 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
 
         Matcher remainingMatcher = REMAINING_PATTERN.matcher(context);
         long prevRemaining = -1;
+        int prevRemainingAt = -1;
         int increasingAt = -1;
+        int increasingFrom = -1;
         while (remainingMatcher.find()) {
             long remaining = Long.parseLong(remainingMatcher.group(1));
             if (prevRemaining > 0 && remaining < prevRemaining && increasingAt < 0) {
                 increasingAt = remainingMatcher.start();
+                increasingFrom = prevRemainingAt;
             }
             prevRemaining = remaining;
+            prevRemainingAt = remainingMatcher.start();
         }
         if (increasingAt >= 0) {
-            signals.add(signal(Signal.SignalType.METRIC, SignalNames.MEMORY_UTILIZATION_TREND, sections, increasingAt)
+            signals.add(derived(Signal.SignalType.METRIC, SignalNames.MEMORY_UTILIZATION_TREND, sections, increasingFrom, increasingAt)
                 .value(SignalValues.INCREASING)
                 .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_REMAINING_LOGS)
                 .build());
-            signals.add(signal(Signal.SignalType.METRIC, SignalNames.HEAP_USAGE_TREND, sections, increasingAt)
+            signals.add(derived(Signal.SignalType.METRIC, SignalNames.HEAP_USAGE_TREND, sections, increasingFrom, increasingAt)
                 .value(SignalValues.INCREASING)
                 .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_REMAINING_LOGS)
                 .build());
         }
 
-        boolean hasOomEvidence = context.toLowerCase().contains(ContextKeywords.OOM_KILLED.toLowerCase());
-        if (!hasOomEvidence) {
+        int oomEvidenceAt = context.toLowerCase().indexOf(ContextKeywords.OOM_KILLED.toLowerCase());
+        if (oomEvidenceAt < 0) {
             Matcher exitCheck = EXIT_CODE_PATTERN.matcher(context);
             while (exitCheck.find()) {
                 if (Integer.parseInt(exitCheck.group(1)) == SignalThresholds.EXIT_CODE_OOM_KILLED) {
-                    hasOomEvidence = true;
+                    oomEvidenceAt = exitCheck.start();
                     break;
                 }
             }
         }
-        if (hasOomEvidence) {
+        if (oomEvidenceAt >= 0) {
             Matcher restartCheck = RESTART_COUNT_PATTERN.matcher(context);
             if (restartCheck.find() && Integer.parseInt(restartCheck.group(1)) > 0) {
-                signals.add(signal(Signal.SignalType.METRIC, SignalNames.MEMORY_UTILIZATION_TREND, sections, restartCheck.start())
+                int restartAt = restartCheck.start();
+                signals.add(derived(Signal.SignalType.METRIC, SignalNames.MEMORY_UTILIZATION_TREND, sections, oomEvidenceAt, restartAt)
                     .value(SignalValues.INCREASING)
                     .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_OOMKILLED_RESTARTS)
                     .build());
-                signals.add(signal(Signal.SignalType.METRIC, SignalNames.HEAP_USAGE_TREND, sections, restartCheck.start())
+                signals.add(derived(Signal.SignalType.METRIC, SignalNames.HEAP_USAGE_TREND, sections, oomEvidenceAt, restartAt)
                     .value(SignalValues.INCREASING)
                     .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_OOMKILLED_RESTARTS)
                     .build());
@@ -388,7 +419,8 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
             double max = Double.parseDouble(maxMatcher.group(1));
             if (max > 0) {
                 double usagePercent = used / max;
-                signals.add(signal(Signal.SignalType.METRIC, SignalNames.MEMORY_USAGE_PERCENT, sections, usedMatcher.start())
+                signals.add(derived(Signal.SignalType.METRIC, SignalNames.MEMORY_USAGE_PERCENT, sections,
+                    usedMatcher.start(), maxMatcher.start())
                     .value(usagePercent)
                     .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_QUARKUS_MEMORY)
                     .build());
@@ -411,14 +443,17 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
         Matcher fullGcMatcher = FULL_GC_PATTERN.matcher(context);
         int fullGcCount = 0;
         int firstFullGcAt = -1;
+        int lastFullGcAt = -1;
         while (fullGcMatcher.find()) {
             if (firstFullGcAt < 0) {
                 firstFullGcAt = fullGcMatcher.start();
             }
+            lastFullGcAt = fullGcMatcher.start();
             fullGcCount++;
         }
         if (fullGcCount > 0) {
-            signals.add(signal(Signal.SignalType.LOG_PATTERN, SignalNames.FULL_GC_COUNT, sections, firstFullGcAt)
+            signals.add(derived(Signal.SignalType.LOG_PATTERN, SignalNames.FULL_GC_COUNT, sections,
+                    firstFullGcAt, lastFullGcAt)
                 .value(fullGcCount)
                 .metadata(SignalMetadata.FREQUENT, fullGcCount > SignalThresholds.FULL_GC_FREQUENT_THRESHOLD)
                 .build());
@@ -426,6 +461,7 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
 
         Matcher gcDetailMatcher = GC_PAUSE_DETAIL_PATTERN.matcher(context);
         int firstGcDetailAt = -1;
+        int lastGcDetailAt = -1;
         double maxPause = 0;
         double totalPause = 0;
         double maxHeapAfterGcRatio = 0;
@@ -435,6 +471,7 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
             if (firstGcDetailAt < 0) {
                 firstGcDetailAt = gcDetailMatcher.start();
             }
+            lastGcDetailAt = gcDetailMatcher.start();
             gcDetailCount++;
             // Parse values and units, then normalize to megabytes
             double beforeGc = convertToMegabytes(
@@ -463,15 +500,18 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
             }
         }
         if (gcDetailCount > 0) {
-            signals.add(signal(Signal.SignalType.METRIC, SignalNames.GC_PAUSE_MAX, sections, firstGcDetailAt)
+            signals.add(derived(Signal.SignalType.METRIC, SignalNames.GC_PAUSE_MAX, sections,
+                    firstGcDetailAt, lastGcDetailAt)
                 .value(maxPause)
                 .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_VERBOSE_GC)
                 .build());
-            signals.add(signal(Signal.SignalType.METRIC, SignalNames.GC_PAUSE_TOTAL, sections, firstGcDetailAt)
+            signals.add(derived(Signal.SignalType.METRIC, SignalNames.GC_PAUSE_TOTAL, sections,
+                    firstGcDetailAt, lastGcDetailAt)
                 .value(totalPause)
                 .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_VERBOSE_GC)
                 .build());
-            signals.add(signal(Signal.SignalType.METRIC, SignalNames.HEAP_AFTER_GC_RATIO, sections, firstGcDetailAt)
+            signals.add(derived(Signal.SignalType.METRIC, SignalNames.HEAP_AFTER_GC_RATIO, sections,
+                    firstGcDetailAt, lastGcDetailAt)
                 .value(maxHeapAfterGcRatio)
                 .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_VERBOSE_GC)
                 .build());
@@ -486,11 +526,13 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
             }
             double riseRatio = (double) rises / (beforeGcValues.size() - 1);
             if (riseRatio >= SignalThresholds.GC_RISE_RATIO_THRESHOLD) {
-                signals.add(signal(Signal.SignalType.METRIC, SignalNames.MEMORY_UTILIZATION_TREND, sections, firstGcDetailAt)
+                signals.add(derived(Signal.SignalType.METRIC, SignalNames.MEMORY_UTILIZATION_TREND, sections,
+                    firstGcDetailAt, lastGcDetailAt)
                     .value(SignalValues.INCREASING)
                     .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_GC_LOGS)
                     .build());
-                signals.add(signal(Signal.SignalType.METRIC, SignalNames.HEAP_USAGE_TREND, sections, firstGcDetailAt)
+                signals.add(derived(Signal.SignalType.METRIC, SignalNames.HEAP_USAGE_TREND, sections,
+                    firstGcDetailAt, lastGcDetailAt)
                     .value(SignalValues.INCREASING)
                     .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_GC_LOGS)
                     .build());
@@ -515,16 +557,19 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
         Matcher pauseSumMatcher = QUARKUS_GC_PAUSE_SUM_PATTERN.matcher(context);
         double totalPauseSeconds = 0;
         int firstPauseSumAt = -1;
+        int lastPauseSumAt = -1;
         while (pauseSumMatcher.find()) {
             if (firstPauseSumAt < 0) {
                 firstPauseSumAt = pauseSumMatcher.start();
             }
+            lastPauseSumAt = pauseSumMatcher.start();
             totalPauseSeconds += Double.parseDouble(pauseSumMatcher.group(1));
         }
 
         if (totalPauseSeconds > 0) {
             double pausePercent = totalPauseSeconds / uptimeSeconds;
-            signals.add(signal(Signal.SignalType.METRIC, SignalNames.GC_PAUSE_PERCENT, sections, firstPauseSumAt)
+            signals.add(derived(Signal.SignalType.METRIC, SignalNames.GC_PAUSE_PERCENT, sections,
+                uptimeMatcher.start(), firstPauseSumAt, lastPauseSumAt)
                 .value(pausePercent)
                 .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_QUARKUS_GC_PAUSE)
                 .build());

@@ -51,6 +51,10 @@ public class RuleEvaluationResult {
             .build();
     }
 
+    /**
+     * Creates a failed result with no record of what was inspected — for failures that are
+     * not evaluations, such as a rule that threw.
+     */
     public static RuleEvaluationResult failed(Rule rule, String reasoning) {
         return failed(rule, List.of(), reasoning);
     }
@@ -86,8 +90,9 @@ public class RuleEvaluationResult {
     /**
      * Signals of the expected type and name that the rule examined, regardless of outcome.
      *
-     * <p>Empty on a failed rule means the signal was never extracted — the fact could not be
-     * checked. Non-empty means it was checked and did not hold.
+     * <p>Non-empty on a failed rule means the fact was checked and did not hold. Empty means
+     * it was not checked — the signal was never extracted, or evaluation threw
+     * ({@link #failed(Rule, String)}). Either way the rule established nothing.
      */
     public List<Signal> getInspectedSignals() {
         return new ArrayList<>(inspectedSignals);
