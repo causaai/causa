@@ -18,7 +18,7 @@ public record Evidence(
     EvidenceType type,
     String snippet,
     String statement,
-    String reasoning,
+    String explanation,
     double relevanceScore,
     Optional<String> structuredData
 ) {
@@ -31,8 +31,8 @@ public record Evidence(
      * @param snippet the relevant text/data snippet
      * @param statement one line stating only what the snippet shows; null for rule-derived
      *                  evidence, which has no narrator to write one
-     * @param reasoning why this snippet bears on the assertion - what it proves or rules out;
-     *                  null for the same reason
+     * @param explanation why this snippet bears on the assertion - what it proves or rules out;
+     *                    null for the same reason
      * @param relevanceScore how relevant this evidence is (0.0 to 1.0)
      * @param structuredData optional structured representation (JSON)
      */
@@ -74,8 +74,8 @@ public record Evidence(
      * why that bears on the assertion.
      */
     public static Evidence of(String source, EvidenceType type, String snippet, String statement,
-                              String reasoning, double relevanceScore) {
-        return new Evidence(source, type, snippet, statement, reasoning, relevanceScore, Optional.empty());
+                              String explanation, double relevanceScore) {
+        return new Evidence(source, type, snippet, statement, explanation, relevanceScore, Optional.empty());
     }
 
     /**
@@ -121,7 +121,7 @@ public record Evidence(
         private EvidenceType type;
         private StringBuilder snippetBuilder = new StringBuilder();
         private String statement;
-        private String reasoning;
+        private String explanation;
         private double relevanceScore;
         private String structuredData;
 
@@ -153,8 +153,8 @@ public record Evidence(
             return this;
         }
 
-        public Builder reasoning(String reasoning) {
-            this.reasoning = reasoning;
+        public Builder explanation(String explanation) {
+            this.explanation = explanation;
             return this;
         }
 
@@ -174,7 +174,7 @@ public record Evidence(
                 type,
                 snippetBuilder.toString(),
                 statement,
-                reasoning,
+                explanation,
                 relevanceScore,
                 Optional.ofNullable(structuredData)
             );
