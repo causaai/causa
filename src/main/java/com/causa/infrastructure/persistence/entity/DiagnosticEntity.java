@@ -95,7 +95,7 @@ public class DiagnosticEntity extends BaseEntity {
     /**
      * Complete evidence items from validation pipeline stored as JSONB.
      * Shape: {@code [ { "id": "...", "source": "...", "type": "...", ... }, ... ]}.
-     * This stores all EvidenceItem instances (13-field model) for debugging and audit.
+     * This stores all EvidenceItem instances (12-field model) for debugging and audit.
      * The top 3-5 are selected into {@link #evidence} for the API response.
      */
     @JdbcTypeCode(SqlTypes.JSON)

@@ -199,6 +199,7 @@ public class PathAEvidenceMapper {
         if (snippet == null || snippet.length() <= Snippet.MAX_LENGTH) {
             return snippet;
         }
-        return snippet.substring(0, Snippet.MAX_LENGTH) + Snippet.TRUNCATION_SUFFIX;
+        return snippet.substring(0, Snippet.MAX_LENGTH - Snippet.TRUNCATION_SUFFIX.length())
+            + Snippet.TRUNCATION_SUFFIX;
     }
 }
