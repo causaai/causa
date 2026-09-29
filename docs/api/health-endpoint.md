@@ -72,6 +72,26 @@ curl http://localhost:8080/api/v1/healthz
 |---|---|
 | `database` | Backend database connectivity and latency |
 | `llm_provider` | LLM provider readiness |
-| `mcp_kubernetes` | Kubernetes MCP connectivity |
-| `mcp_kruize` | Kruize MCP connectivity |
-| `mcp_cryostat` | Cryostat MCP connectivity |
+| `mcp_<name>` | MCP server connectivity (one entry per server in `mcp.json`) |
+
+### Core components (always present)
+
+| Component | Meaning |
+|---|---|
+| `database` | Backend database connectivity and latency |
+| `llm_provider` | LLM provider readiness |
+
+### MCP components (dynamic)
+
+MCP health components are discovered dynamically from the `McpRegistry` at runtime. Each
+server declared in the active `mcp.json` profile generates an `mcp_<name>` component — for
+example, loading `mcp-cluster-default.json` produces `mcp_kubernetes`, `mcp_kruize`, and
+`mcp_cryostat`; loading `mcp-developer-default.json` adds `mcp_quarkus` and
+`mcp_async-profiler` instead of `mcp_cryostat`.
+
+Servers marked `"optional": true` in `mcp.json` (e.g. Cryostat) report `DOWN` without
+degrading the overall system status. Non-optional servers being `DOWN` causes the endpoint to
+return `DEGRADED` (HTTP 503).
+
+If `McpRegistry` fails to initialize (e.g. invalid `mcp.json`), a single
+`mcp_config` component appears with status `DOWN` and the initialization error message.

@@ -8,7 +8,7 @@
 Generate Root Cause Analysis (RCA) for Kubernetes pod issues using LLM-based analysis.
 
 **What it does**:
-- Collects diagnostic context from MCP servers (Kubernetes, Kruize, Cryostat)
+- Collects diagnostic context from MCP servers (Kubernetes, Kruize, Cryostat, Quarkus, Async Profiler on cluster; JMX, Filesystem on VM)
 - Builds provider-specific prompts from YAML templates
 - Calls LLM (Vertex AI, Direct Anthropic, Bob/Granite, Ollama) for analysis
 - Parses structured RCA with confidence scoring
@@ -72,6 +72,8 @@ Generate Root Cause Analysis (RCA) for Kubernetes pod issues using LLM-based ana
    ↓
 3. buildContextForLLM(alert)
    └─→ mcpContextCollector.collectContextAsString(alert)
+   └─→ Platform-aware: cluster path (K8s, Kruize, Cryostat, Quarkus, Async Profiler)
+       or VM path (Filesystem, JMX)
    └─→ Returns diagnostic signals (status, events, logs, metrics, JFR, recommendations)
    ↓
 4. RcaPromptBuilder.buildPrompt(alert, context)
