@@ -205,6 +205,8 @@ public class RcaValidatorImpl implements RcaValidator {
                     result.supportingEvidence().size()))
                 .field("assertionId", result.assertion().id())
                 .log();
+
+            logEvidenceDetail(result);
         }
 
         log.info("\n" + separator + "\n" +
@@ -301,6 +303,41 @@ public class RcaValidatorImpl implements RcaValidator {
             .log();
 
         return validatedRCA;
+    }
+
+    /**
+     * Dumps the evidence carried on one {@link ValidationResult}.
+     *
+     * <p>These objects are only persisted when {@code dualValidation} is non-null, so a run
+     * where PATH B found no ruleset writes nothing but {@code validatedAt} to
+     * {@code validation_data} and the assertion evidence is lost. Until that write is
+     * unconditional, the log is the only place it can be read.
+     */
+    private void logEvidenceDetail(ValidationResult result) {
+        logEvidenceList("SUPPORTING", result.supportingEvidence());
+        logEvidenceList("REFUTING", result.refutingEvidence());
+
+        if (result.supportingEvidence().isEmpty() && result.refutingEvidence().isEmpty()) {
+            log.info("        (no evidence returned)").log();
+        }
+        result.explanation().ifPresent(explanation ->
+            log.info("        reasoning: " + explanation).log());
+    }
+
+    private void logEvidenceList(String label, List<Evidence> evidence) {
+        for (int i = 0; i < evidence.size(); i++) {
+            Evidence e = evidence.get(i);
+            log.info(String.format(
+                    "        %s[%d] source=%s type=%s relevance=%.2f%n"
+                        + "            snippet: %s",
+                    label, i + 1, e.source(), e.type(), e.relevanceScore(), flatten(e.snippet())))
+                .log();
+        }
+    }
+
+    /** Collapses a multi-line snippet so one evidence piece stays one log entry. */
+    private String flatten(String snippet) {
+        return snippet == null ? "null" : snippet.replaceAll("\\s+", " ").trim();
     }
 
     /**

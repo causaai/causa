@@ -17,6 +17,8 @@ public record Evidence(
     String source,
     EvidenceType type,
     String snippet,
+    String statement,
+    String reasoning,
     double relevanceScore,
     Optional<String> structuredData
 ) {
@@ -27,6 +29,10 @@ public record Evidence(
      * @param source the data source (e.g., "kubernetes-events", "prometheus-metrics")
      * @param type the type of evidence
      * @param snippet the relevant text/data snippet
+     * @param statement one line stating only what the snippet shows; null for rule-derived
+     *                  evidence, which has no narrator to write one
+     * @param reasoning why this snippet bears on the assertion - what it proves or rules out;
+     *                  null for the same reason
      * @param relevanceScore how relevant this evidence is (0.0 to 1.0)
      * @param structuredData optional structured representation (JSON)
      */
@@ -53,14 +59,23 @@ public record Evidence(
      * Creates simple evidence without structured data.
      */
     public static Evidence of(String source, EvidenceType type, String snippet, double relevanceScore) {
-        return new Evidence(source, type, snippet, relevanceScore, Optional.empty());
+        return new Evidence(source, type, snippet, null, null, relevanceScore, Optional.empty());
     }
 
     /**
      * Creates evidence with structured data.
      */
     public static Evidence of(String source, EvidenceType type, String snippet, double relevanceScore, String structuredData) {
-        return new Evidence(source, type, snippet, relevanceScore, Optional.of(structuredData));
+        return new Evidence(source, type, snippet, null, null, relevanceScore, Optional.of(structuredData));
+    }
+
+    /**
+     * Creates narrated evidence - the LLM quoted the snippet and said both what it shows and
+     * why that bears on the assertion.
+     */
+    public static Evidence of(String source, EvidenceType type, String snippet, String statement,
+                              String reasoning, double relevanceScore) {
+        return new Evidence(source, type, snippet, statement, reasoning, relevanceScore, Optional.empty());
     }
 
     /**
@@ -105,6 +120,8 @@ public record Evidence(
         private String source;
         private EvidenceType type;
         private StringBuilder snippetBuilder = new StringBuilder();
+        private String statement;
+        private String reasoning;
         private double relevanceScore;
         private String structuredData;
 
@@ -131,6 +148,16 @@ public record Evidence(
             return this;
         }
 
+        public Builder statement(String statement) {
+            this.statement = statement;
+            return this;
+        }
+
+        public Builder reasoning(String reasoning) {
+            this.reasoning = reasoning;
+            return this;
+        }
+
         public Builder relevanceScore(double score) {
             this.relevanceScore = score;
             return this;
@@ -146,6 +173,8 @@ public record Evidence(
                 source,
                 type,
                 snippetBuilder.toString(),
+                statement,
+                reasoning,
                 relevanceScore,
                 Optional.ofNullable(structuredData)
             );
