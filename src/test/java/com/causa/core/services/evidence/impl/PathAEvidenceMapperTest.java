@@ -160,7 +160,7 @@ class PathAEvidenceMapperTest {
         String stored = onlyItem(supported(Evidence.of(
             "POD LOGS (recent)", Evidence.EvidenceType.POD_LOG, huge, 0.9))).rawSnippet();
 
-        assertThat(stored).hasSize(Snippet.MAX_LENGTH + Snippet.TRUNCATION_SUFFIX.length())
+        assertThat(stored).hasSize(Snippet.MAX_LENGTH)
             .endsWith(Snippet.TRUNCATION_SUFFIX);
     }
 
