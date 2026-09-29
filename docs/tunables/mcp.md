@@ -4,7 +4,7 @@ Causa Backend calls MCP (Model Context Protocol) servers to gather diagnostic co
 passing it to the LLM. Each server is independently configurable and fails gracefully — a
 down server never blocks the others.
 
-## MCP Configuration (`mcp.json`) (Supported Version 0.0.5+)
+## MCP Configuration (`mcp.json`) (Supported Version 0.0.4+)
 
 MCP servers are configured via a JSON file that is loaded and validated at startup. Three
 deployment profiles ship out of the box:
