@@ -12,7 +12,7 @@ import com.causa.common.constants.ValidationConstants;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
 import com.causa.common.utils.IdUtils;
-import com.causa.config.AppConfig;
+import com.causa.config.LlmConfigCache;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
 import com.causa.core.domain.DiagnosticContext;
@@ -69,7 +69,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     private final McpRegistry mcpRegistry;
     private final RcaPromptBuilder rcaPromptBuilder;
     private final PromptSender promptSender;
-    private final AppConfig appConfig;
+    private final LlmConfigCache llmConfigCache;
     private final ObjectMapper objectMapper;
     private final Validator validator;
     private final ExecutorService pipelineExecutor;
@@ -81,7 +81,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                                   McpRegistry mcpRegistry,
                                   RcaPromptBuilder rcaPromptBuilder,
                                   PromptSender promptSender,
-                                  AppConfig appConfig,
+                                  LlmConfigCache llmConfigCache,
                                   ObjectMapper objectMapper,
                                   Validator validator,
                                   Instance<RcaValidator> rcaValidatorInstance) {
@@ -90,7 +90,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
         this.mcpRegistry          = mcpRegistry;
         this.rcaPromptBuilder     = rcaPromptBuilder;
         this.promptSender         = promptSender;
-        this.appConfig            = appConfig;
+        this.llmConfigCache       = llmConfigCache;
         this.objectMapper         = objectMapper;
         this.validator            = validator;
         this.pipelineExecutor     = Executors.newCachedThreadPool();
@@ -321,10 +321,17 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                 .log();
 
             // Build LLM request
+            double temperature = llmConfigCache.getActive()
+                .map(a -> a.getTemperature() != null ? a.getTemperature().doubleValue() : 0.1)
+                .orElse(0.1);
+            int maxTokens = llmConfigCache.getActive()
+                .map(a -> a.getMaxTokens() != null ? a.getMaxTokens() : 8192)
+                .orElse(8192);
+
             LLMRequest llmRequest = LLMRequest.builder(userPrompt)
                 .systemPrompt(systemPrompt)
-                .temperature(appConfig.getLlmConfig().getTemperature())
-                .maxTokens(appConfig.getLlmConfig().getMaxTokens())
+                .temperature(temperature)
+                .maxTokens(maxTokens)
                 .build();
 
             // Call the LLM (works with both LangChain and BobShell)
