@@ -1,6 +1,8 @@
 package com.causa.config;
 
 import com.causa.common.logging.CausaLogger;
+import com.causa.common.utils.EncryptionUtils;
+import com.causa.core.domain.AuthConfig;
 import com.causa.core.domain.LlmConfig;
 import com.causa.core.ports.LlmConfigRepository;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -8,6 +10,7 @@ import jakarta.enterprise.context.control.ActivateRequestContext;
 import jakarta.inject.Inject;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -81,7 +84,11 @@ public class LlmConfigCache {
     @ActivateRequestContext
     public void refresh() {
         try {
-            List<LlmConfig> fresh = List.copyOf(repository.findAll());
+            List<LlmConfig> fresh = List.copyOf(
+                repository.findAll().stream()
+                    .map(LlmConfigCache::decryptSensitiveFields)
+                    .toList()
+            );
             LlmConfig active = fresh.stream()
                     .filter(LlmConfig::isActive)
                     .findFirst()
@@ -98,6 +105,61 @@ public class LlmConfigCache {
             log.warn("LlmConfigCache refresh failed — stale cache preserved")
                     .field("error", e.getMessage())
                     .log();
+        }
+    }
+
+    /**
+     * Decrypts sensitive {@link AuthConfig} fields so the cache holds plaintext values
+     * ready for use by {@link com.causa.llm.ChatModelFactory} and other internal consumers.
+     *
+     * <p>The repository stores AES-256-GCM ciphertext; only the cache-internal copy is
+     * decrypted — the encrypted values remain in the database unchanged.
+     */
+    private static LlmConfig decryptSensitiveFields(LlmConfig config) {
+        AuthConfig auth = config.getAuthConfig();
+        if (auth == null) return config;
+
+        AuthConfig decrypted = new AuthConfig(
+            auth.authType(),
+            tryDecrypt(auth.apiKey()),
+            tryDecrypt(auth.appKey()),
+            tryDecrypt(auth.token()),
+            tryDecrypt(auth.credentialsJson()),
+            auth.headers() != null
+                ? auth.headers().entrySet().stream().collect(
+                    java.util.stream.Collectors.toMap(
+                        java.util.Map.Entry::getKey,
+                        e -> { try { return EncryptionUtils.decrypt(e.getValue()); } catch (Exception ex) { return e.getValue(); } }
+                    ))
+                : auth.headers(),
+            auth.username(),
+            tryDecrypt(auth.password())
+        );
+
+        return LlmConfig.builder()
+            .id(config.getId())
+            .provider(config.getProvider())
+            .url(config.getUrl())
+            .models(config.getModels())
+            .temperature(config.getTemperature())
+            .maxTokens(config.getMaxTokens())
+            .timeoutMs(config.getTimeoutMs())
+            .isActive(config.isActive())
+            .authConfig(decrypted)
+            .additionalConfig(config.getAdditionalConfig())
+            .createdAt(config.getCreatedAt())
+            .updatedAt(config.getUpdatedAt())
+            .build();
+    }
+
+    /** Decrypts a single field value; returns the original value unchanged if it is null or decryption fails. */
+    private static String tryDecrypt(String value) {
+        if (value == null || value.isBlank()) return value;
+        try {
+            return EncryptionUtils.decrypt(value);
+        } catch (Exception e) {
+            // Value was not encrypted (e.g. already plaintext) — return as-is
+            return value;
         }
     }
 }
