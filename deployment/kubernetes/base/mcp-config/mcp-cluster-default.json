@@ -62,20 +62,32 @@
     },
     "cryostat": {
       "type": "streamable-http",
-      "url": "http://cryostat-mcp:8000/mcp",
+      "url": "http://cryostat-mcp-cryostat-k8s-multi-mcp:8080/mcp",
       "headers": {},
       "optional": true,
-      "alwaysAllow": ["get_gc_analysis", "get_memory_analysis", "get_thread_analysis", "get_exception_analysis", "get_container_analysis"],
-      "healthCheck": { "url": "http://cryostat-mcp-api:8080/healthz", "timeoutMs": 15000 },
-      "timeoutMs": 15000,
-      "metadata": { "retryDelayMs": 5000, "maxRetries": 3 },
-      "description": "Cryostat MCP — JFR-based GC, memory, thread, exception, and container analysis",
+      "alwaysAllow": ["getDiscoveryTree", "getAnalysisReport"],
+      "healthCheck": { "url": "http://cryostat-mcp-cryostat-k8s-multi-mcp:8080/q/health/ready", "timeoutMs": 15000 },
+      "timeoutMs": 60000,
+      "metadata": { "analysisLookbackMinutes": 15 },
+      "description": "Cryostat MCP — confirm the pod in the discovery tree, then fetch automated JFR analysis for the alert time window",
       "tools": [
-        { "name": "get_gc_analysis", "contextKey": "GC_ANALYSIS", "description": "GC behaviour analysis from JFR.", "arguments": { "pod_name": "${podName}" } },
-        { "name": "get_memory_analysis", "contextKey": "MEMORY_ANALYSIS", "description": "Memory pool analysis from JFR.", "arguments": { "pod_name": "${podName}" } },
-        { "name": "get_thread_analysis", "contextKey": "THREAD_ANALYSIS", "description": "Thread analysis from JFR.", "arguments": { "pod_name": "${podName}" } },
-        { "name": "get_exception_analysis", "contextKey": "EXCEPTION_ANALYSIS", "description": "Exception analysis from JFR.", "arguments": { "pod_name": "${podName}" } },
-        { "name": "get_container_analysis", "contextKey": "CONTAINER_ANALYSIS", "description": "Container resource analysis from JFR.", "arguments": { "pod_name": "${podName}" } }
+        {
+          "name": "getDiscoveryTree",
+          "contextKey": "CRYOSTAT_DISCOVERY",
+          "description": "Discovery tree for the application namespace. The report is called only when this tree contains the alert namespace and pod.",
+          "arguments": { "namespace": "${namespace}", "mergeRealms": "true" }
+        },
+        {
+          "name": "getAnalysisReport",
+          "contextKey": "CRYOSTAT_ANALYSIS",
+          "description": "Automated analysis rules for archived JFR recordings that intersect the alert time window.",
+          "arguments": {
+            "namespace": "${namespace}",
+            "podName": "${podName}",
+            "fromTimestamp": "${fromTimestamp}",
+            "toTimestamp": "${toTimestamp}"
+          }
+        }
       ]
     }
   }

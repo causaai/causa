@@ -62,7 +62,7 @@ public class McpContextCollector {
      * Collects diagnostic context from MCP servers appropriate for the configured platform.
      *
      * <ul>
-     *   <li>{@code cluster} — calls Kubernetes, Kruize, and Cryostat MCP servers.</li>
+     *   <li>{@code cluster} — calls Kubernetes and Kruize MCP servers.</li>
      *   <li>{@code vm} — calls Filesystem MCP and JMX MCP servers.</li>
      * </ul>
      *
@@ -88,7 +88,7 @@ public class McpContextCollector {
 
     /**
      * Collects diagnostic context when running on a Kubernetes cluster.
-     * Calls Kubernetes, Kruize, and Cryostat MCP servers.
+     * Calls Kubernetes and Kruize MCP servers. Cryostat is collected by {@link com.causa.mcp.util.CryostatContextCollector}.
      */
     private DiagnosticContext collectContextFromCluster(Alert alert) {
         log.info(LogMessages.Mcp.MCP_CONTEXT_COLLECTION_START)
@@ -134,11 +134,6 @@ public class McpContextCollector {
             log.info(LogMessages.Mcp.MCP_KRUIZE_SKIPPED_NO_CONTAINER)
                 .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
                 .log();
-        }
-
-        // Cryostat context collection (requires pod name)
-        if (alert.getWorkloadInfo().podName() != null && !alert.getWorkloadInfo().podName().isBlank()) {
-            collectCryostatContext(contextBuilder, alert);
         }
 
         // Quarkus context collection (requires pod name)
@@ -1152,150 +1147,6 @@ public class McpContextCollector {
                 .log();
             return null;
         }
-    }
-
-    /**
-     * Collects Cryostat MCP context (JFR analysis from 5 tools).
-     *
-     * @param builder the context builder to populate
-     * @param alert the alert
-     */
-    private void collectCryostatContext(DiagnosticContext.Builder builder, Alert alert) {
-        String podName = alert.getWorkloadInfo().podName();
-
-        // GC analysis
-        String gcResult = callCryostatToolWithRetry(
-            McpConstants.Tools.CRYOSTAT_GET_GC_ANALYSIS,
-            podName,
-            alert.getAlertId()
-        );
-        builder.gcAnalysis(gcResult);
-        if (gcResult != null) {
-            log.info(LogMessages.Mcp.MCP_CRYOSTAT_GC_ANALYSIS)
-                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
-                .log();
-        }
-
-        // Memory analysis
-        String memResult = callCryostatToolWithRetry(
-            McpConstants.Tools.CRYOSTAT_GET_MEMORY_ANALYSIS,
-            podName,
-            alert.getAlertId()
-        );
-        builder.memoryAnalysis(memResult);
-        if (memResult != null) {
-            log.info(LogMessages.Mcp.MCP_CRYOSTAT_MEMORY_ANALYSIS)
-                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
-                .log();
-        }
-
-        // Thread analysis
-        String threadResult = callCryostatToolWithRetry(
-            McpConstants.Tools.CRYOSTAT_GET_THREAD_ANALYSIS,
-            podName,
-            alert.getAlertId()
-        );
-        builder.threadAnalysis(threadResult);
-        if (threadResult != null) {
-            log.info(LogMessages.Mcp.MCP_CRYOSTAT_THREAD_ANALYSIS)
-                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
-                .log();
-        }
-
-        // Exception analysis
-        String exceptionResult = callCryostatToolWithRetry(
-            McpConstants.Tools.CRYOSTAT_GET_EXCEPTION_ANALYSIS,
-            podName,
-            alert.getAlertId()
-        );
-        builder.exceptionAnalysis(exceptionResult);
-        if (exceptionResult != null) {
-            log.info(LogMessages.Mcp.MCP_CRYOSTAT_EXCEPTION_ANALYSIS)
-                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
-                .log();
-        }
-
-        // Container analysis
-        String containerResult = callCryostatToolWithRetry(
-            McpConstants.Tools.CRYOSTAT_GET_CONTAINER_ANALYSIS,
-            podName,
-            alert.getAlertId()
-        );
-        builder.containerAnalysis(containerResult);
-        if (containerResult != null) {
-            log.info(LogMessages.Mcp.MCP_CRYOSTAT_CONTAINER_ANALYSIS)
-                .field(McpConstants.LogFields.ALERT_ID, alert.getAlertId())
-                .log();
-        }
-    }
-
-    /**
-     * Calls a Cryostat MCP tool with retry logic for RECORDING_CREATED responses.
-     *
-     * @param toolName the Cryostat tool name
-     * @param podName the pod name argument
-     * @param alertId the alert ID (for logging)
-     * @return the tool response text, or null on failure
-     */
-    private String callCryostatToolWithRetry(String toolName, String podName, String alertId) {
-        int maxRetries = mcpConfig.cryostat().maxRetries();
-        long retryDelay = mcpConfig.cryostat().retryDelayMs();
-
-        for (int attempt = 0; attempt <= maxRetries; attempt++) {
-            try {
-                String sessionId = initializeMcpSession(
-                    mcpConfig.cryostat().endpoint() + McpConstants.Paths.MCP_ENDPOINT,
-                    mcpConfig.cryostat().timeoutMs()
-                );
-
-                ObjectNode arguments = objectMapper.createObjectNode();
-                arguments.put(McpConstants.Arguments.POD_NAME, podName);
-
-                JsonNode result = callMcpTool(
-                    mcpConfig.cryostat().endpoint() + McpConstants.Paths.MCP_ENDPOINT,
-                    sessionId,
-                    toolName,
-                    arguments,
-                    mcpConfig.cryostat().timeoutMs()
-                );
-
-                String text = extractTextFromContent(result);
-
-                // Check for RECORDING_CREATED status
-                if (text != null && text.contains(McpConstants.Cryostat.RECORDING_CREATED_STATUS)) {
-                    if (attempt < maxRetries) {
-                        log.info(LogMessages.Mcp.MCP_CRYOSTAT_RECORDING_CREATED)
-                            .field(McpConstants.LogFields.TOOL, toolName)
-                            .field("attempt", attempt + 1)
-                            .field("retryDelayMs", retryDelay)
-                            .log();
-                        Thread.sleep(retryDelay);
-                        continue;
-                    } else {
-                        log.warn(LogMessages.Mcp.MCP_CRYOSTAT_MAX_RETRIES)
-                            .field(McpConstants.LogFields.TOOL, toolName)
-                            .field(McpConstants.LogFields.ALERT_ID, alertId)
-                            .log();
-                        return null;
-                    }
-                }
-
-                return text;
-
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return null;
-            } catch (Exception e) {
-                log.warn(LogMessages.Mcp.MCP_CALL_FAILED)
-                    .field(McpConstants.LogFields.TOOL, toolName)
-                    .field(McpConstants.LogFields.ALERT_ID, alertId)
-                    .field("attempt", attempt + 1)
-                    .field(McpConstants.LogFields.ERROR, e.getMessage())
-                    .log();
-                return null;
-            }
-        }
-        return null;
     }
 
     // =========================================================================

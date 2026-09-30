@@ -6,6 +6,7 @@ import com.causa.core.domain.Alert;
 import com.causa.core.domain.DiagnosticContext;
 import com.causa.mcp.config.McpSettings;
 import com.causa.mcp.util.AsyncProfilerContextCollector;
+import com.causa.mcp.util.CryostatContextCollector;
 import com.causa.mcp.util.LibertyLogsContextCollector;
 import com.causa.mcp.util.McpResponseFormatter;
 import com.causa.common.logging.CausaLogger;
@@ -103,6 +104,7 @@ public class McpRegistry {
             case "filesystem" -> builder.put("LIBERTY_LOGS",
                     libertyLogsContextCollector.collectLibertyLogs(alert.getAlertId(), alert.getAlertTimestamp()));
             case "async-profiler" -> AsyncProfilerContextCollector.collect(client, alert, builder);
+            case "cryostat" -> CryostatContextCollector.collect(client, alert, builder);
             default -> {
                 for (McpSettings.ToolConfig tool : client.getConfig().tools()) {
                     processTool(client, tool, alert, Map.of(), builder);
