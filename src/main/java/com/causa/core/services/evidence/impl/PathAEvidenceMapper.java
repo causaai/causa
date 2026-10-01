@@ -14,6 +14,7 @@ import com.causa.core.domain.validation.ValidationResult;
 import com.causa.core.services.evidence.McpSourceResolver;
 import com.causa.core.services.evidence.RcaFinding;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -30,7 +31,7 @@ import java.util.Map;
  *
  * <ul>
  *   <li><strong>Source.</strong> {@link Evidence#source()} is whatever section label the LLM
- *       echoed back, free text like {@code "POD LOGS (recent) - sequence 124"}. It is resolved
+ *       echoed back, free text like {@code "POD_LOGS - sequence 124"}. It is resolved
  *       to a canonical MCP server name, with the original kept in metadata.</li>
  *   <li><strong>Narration.</strong> {@link Evidence#statement()} says what the quote shows and
  *       {@link Evidence#explanation()} why that bears on the assertion. Both are null when the
@@ -46,6 +47,13 @@ import java.util.Map;
  */
 @ApplicationScoped
 public class PathAEvidenceMapper {
+
+    private final McpSourceResolver sourceResolver;
+
+    @Inject
+    public PathAEvidenceMapper(McpSourceResolver sourceResolver) {
+        this.sourceResolver = sourceResolver;
+    }
 
     /**
      * Maps a single assertion's validation result into evidence items.
@@ -93,7 +101,7 @@ public class PathAEvidenceMapper {
 
         return EvidenceItem.builder()
             .id(evidenceId(result, index))
-            .source(McpSourceResolver.resolve(evidence.source()))
+            .source(sourceResolver.resolve(evidence.source()))
             .type(typeOf(evidence.type()))
             .strength(strength)
             .evidenceHypothesisAlignment(alignment)
@@ -148,7 +156,7 @@ public class PathAEvidenceMapper {
      * Detects a snippet that quotes an empty diagnostic section.
      *
      * <p>Containment rather than equality: the marker appears both bare and prefixed with the
-     * section that produced it, as in {@code "GC ANALYSIS (Cryostat JFR): No Data Available"}.
+     * section that produced it, as in {@code "GC_ANALYSIS: No Data Available"}.
      */
     private boolean carriesNoData(String snippet) {
         return snippet != null && snippet.contains(ContextConstants.NOT_AVAILABLE);

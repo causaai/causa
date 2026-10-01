@@ -1,8 +1,13 @@
 package com.causa.core.services.evidence;
 
-import com.causa.common.constants.ContextConstants;
 import com.causa.common.constants.EvidenceConstants.Sources;
+import com.causa.mcp.McpClient;
+import com.causa.mcp.McpRegistry;
+import com.causa.mcp.config.McpSettings;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -20,35 +25,41 @@ import java.util.Map;
  * single server identifier so evidence can be attributed to the source that actually
  * produced it.
  *
- * <p>Matching is deterministic and needs no LLM call, because the section headers in
- * {@link ContextConstants} already name their server — {@code (Cryostat JFR)},
- * {@code (Kruize)}, {@code (JMX MCP)} — and the Kubernetes sections are the unsuffixed
- * remainder. Labels are matched exact-first, then by longest prefix, then by containment,
- * which absorbs the decorations the LLM adds in practice:
+ * <p>The table is derived from {@code mcp.json}, which already states the mapping: a server's
+ * {@code tools[].contextKey} is the section header rendered for that tool's output, under the
+ * server name it is declared beneath. A new MCP server therefore needs no change here.
+ *
+ * <p>Labels are matched exact-first, then by longest prefix, then by containment, which absorbs
+ * the decorations the LLM adds in practice:
  *
  * <pre>
- *   "POD LOGS (recent) - sequence 124"                            → kubernetes
- *   "POD LOGS (recent) — sequence 125"                            → kubernetes  (em-dash)
- *   "POD LOGS (recent) and PREVIOUS CONTAINER LOGS (pre-crash)"   → kubernetes
- *   "GC ANALYSIS (Cryostat JFR): No Data Available"               → cryostat
+ *   "POD_LOGS - sequence 124"                  → kubernetes
+ *   "POD_LOGS — sequence 125"                  → kubernetes  (em-dash)
+ *   "POD_LOGS and POD_LOGS_PREVIOUS"           → kubernetes
+ *   "GC_ANALYSIS: No Data Available"           → cryostat
  * </pre>
  *
  * <p>An unrecognised label resolves to {@link Sources#UNKNOWN} rather than throwing; the
- * original string is retained in evidence metadata so gaps in this table surface in the data
- * instead of failing the pipeline.
+ * original string is retained in evidence metadata so gaps surface in the data instead of
+ * failing the pipeline.
  *
  * @since 0.0.1
  */
-public final class McpSourceResolver {
+@ApplicationScoped
+public class McpSourceResolver {
+
+    private final McpRegistry registry;
 
     /**
-     * Section label → canonical MCP server, ordered longest-label-first so that prefix
-     * matching always picks the most specific section.
+     * Section label → canonical MCP server. Built on first use, not at construction: CDI may
+     * instantiate this bean before {@link McpRegistry#init} has run. A benign race just rebuilds
+     * it — the table is a pure function of the registry.
      */
-    private static final Map<String, String> SECTION_TO_SOURCE = buildSectionMap();
+    private volatile Map<String, String> sectionToSource;
 
-    private McpSourceResolver() {
-        // Prevent instantiation
+    @Inject
+    public McpSourceResolver(McpRegistry registry) {
+        this.registry = registry;
     }
 
     /**
@@ -58,30 +69,45 @@ public final class McpSourceResolver {
      *                    extractor; may be null or blank
      * @return the canonical MCP server name, or {@link Sources#UNKNOWN} if unrecognised
      */
-    public static String resolve(String sourceLabel) {
+    public String resolve(String sourceLabel) {
         String normalized = normalize(sourceLabel);
         if (normalized.isEmpty()) {
             return Sources.UNKNOWN;
         }
 
-        String exact = SECTION_TO_SOURCE.get(normalized);
+        Map<String, String> table = table();
+
+        String exact = table.get(normalized);
         if (exact != null) {
             return exact;
         }
 
-        for (Map.Entry<String, String> entry : SECTION_TO_SOURCE.entrySet()) {
+        for (Map.Entry<String, String> entry : table.entrySet()) {
             if (normalized.startsWith(entry.getKey())) {
                 return entry.getValue();
             }
         }
 
-        for (Map.Entry<String, String> entry : SECTION_TO_SOURCE.entrySet()) {
+        for (Map.Entry<String, String> entry : table.entrySet()) {
             if (normalized.contains(entry.getKey())) {
                 return entry.getValue();
             }
         }
 
         return Sources.UNKNOWN;
+    }
+
+    private Map<String, String> table() {
+        Map<String, String> table = sectionToSource;
+        if (table == null) {
+            table = buildSectionMap(registry.allClients());
+            // An empty table means the registry has not been init'd (or failed to) — don't cache
+            // that, or an early call would pin every later resolution to unknown.
+            if (!table.isEmpty()) {
+                sectionToSource = table;
+            }
+        }
+        return table;
     }
 
     /**
@@ -97,55 +123,16 @@ public final class McpSourceResolver {
         return value.trim().replaceAll("\\s+", " ").toUpperCase();
     }
 
-    /**
-     * Builds the section → server table from {@link ContextConstants}, sorted by descending
-     * label length so the longest (most specific) section wins a prefix match.
-     */
-    private static Map<String, String> buildSectionMap() {
+    /** Declared {@code contextKey}s → server name, longest label first so the most specific wins. */
+    static Map<String, String> buildSectionMap(Collection<McpClient> clients) {
         Map<String, String> raw = new LinkedHashMap<>();
-
-        // Kubernetes MCP — pods_get, events_list, pods_log
-        raw.put(ContextConstants.SECTION_POD_STATUS, Sources.KUBERNETES);
-        raw.put(ContextConstants.SECTION_POD_EVENTS, Sources.KUBERNETES);
-        raw.put(ContextConstants.SECTION_POD_LOGS, Sources.KUBERNETES);
-        raw.put(ContextConstants.SECTION_PREVIOUS_POD_LOGS, Sources.KUBERNETES);
-
-        // Kruize MCP — resource recommendations
-        raw.put(ContextConstants.SECTION_COST_RECOMMENDATIONS, Sources.KRUIZE);
-        raw.put(ContextConstants.SECTION_PERF_RECOMMENDATIONS, Sources.KRUIZE);
-
-        // Cryostat MCP — JFR analyses
-        raw.put(ContextConstants.SECTION_GC_ANALYSIS, Sources.CRYOSTAT);
-        raw.put(ContextConstants.SECTION_MEMORY_ANALYSIS, Sources.CRYOSTAT);
-        raw.put(ContextConstants.SECTION_THREAD_ANALYSIS, Sources.CRYOSTAT);
-        raw.put(ContextConstants.SECTION_EXCEPTION_ANALYSIS, Sources.CRYOSTAT);
-        raw.put(ContextConstants.SECTION_CONTAINER_ANALYSIS, Sources.CRYOSTAT);
-
-        // Quarkus MCP — raw metrics
-        raw.put(ContextConstants.SECTION_QUARKUS_RAW_METRICS, Sources.QUARKUS);
-
-        // Async Profiler MCP
-        raw.put(ContextConstants.SECTION_ASYNC_PROFILER_POD_LIST, Sources.ASYNC_PROFILER);
-        raw.put(ContextConstants.SECTION_ASYNC_PROFILER_JVM_STATUS, Sources.ASYNC_PROFILER);
-        raw.put(ContextConstants.SECTION_ASYNC_PROFILER_JVM_STATS, Sources.ASYNC_PROFILER);
-        raw.put(ContextConstants.SECTION_ASYNC_PROFILER_RECORDING, Sources.ASYNC_PROFILER);
-        raw.put(ContextConstants.SECTION_ASYNC_PROFILER_REPORT, Sources.ASYNC_PROFILER);
-        raw.put(ContextConstants.SECTION_ASYNC_PROFILER_JFR_SUMMARY, Sources.ASYNC_PROFILER);
-        raw.put(ContextConstants.SECTION_ASYNC_PROFILER_FLAME_GRAPH, Sources.ASYNC_PROFILER);
-
-        // Filesystem MCP — log files on VM / Liberty
-        raw.put(ContextConstants.SECTION_LIBERTY_LOGS, Sources.FILESYSTEM);
-        raw.put(ContextConstants.SECTION_VM_LOG_DIR_LISTING, Sources.FILESYSTEM);
-        raw.put(ContextConstants.SECTION_VM_GC_LOG_CONTENT, Sources.FILESYSTEM);
-
-        // JMX MCP — live JVM state on VM
-        raw.put(ContextConstants.SECTION_VM_HEAP_STATUS, Sources.JMX);
-        raw.put(ContextConstants.SECTION_VM_GC_ACTIVITY, Sources.JMX);
-        raw.put(ContextConstants.SECTION_VM_THREAD_STATE, Sources.JMX);
-        raw.put(ContextConstants.SECTION_VM_GC_PRESSURE, Sources.JMX);
-        raw.put(ContextConstants.SECTION_VM_MEMORY_LEAK, Sources.JMX);
-        raw.put(ContextConstants.SECTION_VM_THREAD_CONTENTION, Sources.JMX);
-        raw.put(ContextConstants.SECTION_VM_JVM_RUNTIME_INFO, Sources.JMX);
+        for (McpClient client : clients) {
+            for (McpSettings.ToolConfig tool : client.getConfig().tools()) {
+                if (tool.contextKey() != null && !tool.contextKey().isBlank()) {
+                    raw.put(tool.contextKey(), client.getServerName());
+                }
+            }
+        }
 
         List<Map.Entry<String, String>> sorted = raw.entrySet().stream()
             .sorted(Comparator.comparingInt((Map.Entry<String, String> e) -> e.getKey().length()).reversed())

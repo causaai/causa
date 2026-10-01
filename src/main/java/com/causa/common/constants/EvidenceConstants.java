@@ -18,23 +18,15 @@ public final class EvidenceConstants {
     /**
      * Canonical MCP server names.
      *
-     * <p>These match the {@code @WithName} keys in {@code McpConfig} and the server names
-     * {@code McpResponseFormatter} keys on, so evidence attribution lines up with the
-     * server that actually produced the data.
+     * <p>The names themselves are not listed here: evidence is attributed using the server names
+     * declared in {@code mcp.json}, read at runtime by {@code McpSourceResolver}. Only the
+     * fallback needs a constant, because no config file can supply it.
      */
     public static final class Sources {
         private Sources() {}
 
-        public static final String KUBERNETES     = "kubernetes";
-        public static final String KRUIZE         = "kruize";
-        public static final String CRYOSTAT       = "cryostat";
-        public static final String QUARKUS        = "quarkus";
-        public static final String ASYNC_PROFILER = "async-profiler";
-        public static final String FILESYSTEM     = "filesystem";
-        public static final String JMX            = "jmx";
-
-        /** Fallback when a source label cannot be matched to any known section. */
-        public static final String UNKNOWN        = "unknown";
+        /** Fallback when a source label cannot be matched to any declared section. */
+        public static final String UNKNOWN = "unknown";
     }
 
     /**

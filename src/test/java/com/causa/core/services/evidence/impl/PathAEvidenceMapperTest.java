@@ -11,10 +11,14 @@ import com.causa.core.domain.validation.EvidenceItem;
 import com.causa.core.domain.validation.EvidenceItem.EvidenceHypothesisAlignment;
 import com.causa.core.domain.validation.EvidenceItem.EvidenceStrength;
 import com.causa.core.domain.validation.ValidationResult;
+import com.causa.core.services.evidence.McpSourceResolver;
 import com.causa.core.services.evidence.RcaFinding;
+import com.causa.mcp.McpRegistry;
+import com.causa.mcp.config.McpSettings;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -28,12 +32,12 @@ class PathAEvidenceMapperTest {
     private static final RcaFinding FINDING =
         new RcaFinding("diag_123", AnomalyType.OOM_KILLED, "Container OOMKilled");
 
-    private final PathAEvidenceMapper mapper = new PathAEvidenceMapper();
+    private final PathAEvidenceMapper mapper = new PathAEvidenceMapper(sourceResolver());
 
     @Test
     void carriesTheQuoteItsSourceAndItsNarrationThrough() {
         Evidence evidence = Evidence.of(
-            "POD STATUS",
+            "POD_STATUS",
             Evidence.EvidenceType.KUBERNETES_EVENT,
             "Exit Code: 137",
             "The container exited with 137.",
@@ -56,15 +60,15 @@ class PathAEvidenceMapperTest {
      */
     @Test
     void resolvesTheEchoedSectionLabelToAnMcpServer() {
-        EvidenceItem item = onlyItem(supported(quoting("POD LOGS (recent) - sequence 124")));
+        EvidenceItem item = onlyItem(supported(quoting("POD_LOGS - sequence 124")));
 
         assertThat(item.source()).isEqualTo("kubernetes");
-        assertThat(item.metadata()).containsEntry(Metadata.RAW_SOURCE_LABEL, "POD LOGS (recent) - sequence 124");
+        assertThat(item.metadata()).containsEntry(Metadata.RAW_SOURCE_LABEL, "POD_LOGS - sequence 124");
     }
 
     @Test
     void attributesTheItemToItsFindingAndAssertion() {
-        EvidenceItem item = onlyItem(supported(quoting("POD STATUS")));
+        EvidenceItem item = onlyItem(supported(quoting("POD_STATUS")));
 
         assertThat(item.id()).isEqualTo("pathA.a1.ev-01");
         assertThat(item.metadata())
@@ -83,8 +87,8 @@ class PathAEvidenceMapperTest {
     void keepsRefutingEvidenceAndNumbersItAfterTheSupporting() {
         ValidationResult result = ValidationResult.partiallySupported(
             assertion(), 0.5,
-            List.of(quoting("POD STATUS")),
-            List.of(quoting("POD EVENTS")),
+            List.of(quoting("POD_STATUS")),
+            List.of(quoting("POD_EVENTS")),
             "mixed"
         );
 
@@ -103,9 +107,9 @@ class PathAEvidenceMapperTest {
     @Test
     void dropsEvidenceThatQuotesAnEmptySection() {
         Evidence empty = Evidence.of(
-            "GC ANALYSIS (Cryostat JFR)",
+            "GC_ANALYSIS",
             Evidence.EvidenceType.GC_ANALYSIS,
-            "GC ANALYSIS (Cryostat JFR): No Data Available",
+            "GC_ANALYSIS: No Data Available",
             0.9
         );
 
@@ -144,7 +148,7 @@ class PathAEvidenceMapperTest {
     @Test
     void fallsBackToTheAssertionExplanationButNeverTheAssertionText() {
         Evidence unnarrated = Evidence.of(
-            "POD STATUS", Evidence.EvidenceType.KUBERNETES_EVENT, "Exit Code: 137", 0.9);
+            "POD_STATUS", Evidence.EvidenceType.KUBERNETES_EVENT, "Exit Code: 137", 0.9);
 
         EvidenceItem item = onlyItem(
             ValidationResult.supported(assertion(), 0.9, List.of(unnarrated), "every signal agrees"));
@@ -176,6 +180,25 @@ class PathAEvidenceMapperTest {
             AssertionType.OBSERVATION, AssertionSource.ROOT_CAUSE);
     }
 
+    /** A registry declaring just the sections these tests quote. */
+    private static McpSourceResolver sourceResolver() {
+        McpRegistry registry = new McpRegistry(null);
+        registry.init(new McpSettings(Map.of(
+            "kubernetes", serverDeclaring("POD_STATUS", "POD_EVENTS", "POD_LOGS"),
+            "cryostat", serverDeclaring("GC_ANALYSIS"))));
+        return new McpSourceResolver(registry);
+    }
+
+    private static McpSettings.ServerConfig serverDeclaring(String... contextKeys) {
+        return new McpSettings.ServerConfig(
+            "streamable-http", "http://example:8080/mcp", Map.of(), false,
+            new McpSettings.HealthCheckConfig("http://example:8080/healthz", 5000),
+            5000, Map.of(), null,
+            List.of(contextKeys).stream()
+                .map(key -> new McpSettings.ToolConfig("a_tool", key, null, Map.of()))
+                .toList());
+    }
+
     private static ValidationResult supported(Evidence evidence) {
         return ValidationResult.supported(assertion(), 0.9, List.of(evidence), "because");
     }
@@ -186,7 +209,7 @@ class PathAEvidenceMapperTest {
     }
 
     private static Evidence scoring(double relevance) {
-        return Evidence.of("POD STATUS", Evidence.EvidenceType.KUBERNETES_EVENT,
+        return Evidence.of("POD_STATUS", Evidence.EvidenceType.KUBERNETES_EVENT,
             "Exit Code: 137", "exited 137", "SIGKILL", relevance);
     }
 
