@@ -123,7 +123,7 @@ public class AlertRepositoryImpl implements AlertRepository {
         int    offset = Math.multiplyExact(pageRequest.panachePage(), pageRequest.size());
 
         // Data query — fixed ORDER BY, LIMIT/OFFSET for pagination
-        String dataSql = "SELECT * FROM alerts" + where
+        String dataSql = "SELECT *, workload_info->>'namespace' AS namespace FROM alerts" + where
             + " ORDER BY created_at DESC"
             + " LIMIT ?"  + (params.size() + 1)
             + " OFFSET ?" + (params.size() + 2);
