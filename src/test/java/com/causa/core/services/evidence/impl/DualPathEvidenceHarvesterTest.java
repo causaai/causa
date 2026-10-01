@@ -21,11 +21,9 @@ import com.causa.core.services.rules.RuleEvaluationResult;
 import com.causa.core.services.rules.RuleType;
 import com.causa.core.services.rules.Signal;
 import com.causa.mcp.McpRegistry;
-import com.causa.mcp.config.McpSettings;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
