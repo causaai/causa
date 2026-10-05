@@ -41,30 +41,17 @@ class ChatModelFactoryTest {
     }
 
     @Nested
-    @DisplayName("chatModel() — missing/blank provider")
-    class MissingProviderTests {
+    @DisplayName("chatModel() — no active config")
+    class NoActiveConfigTests {
 
         @Test
-        @DisplayName("throws LLMException when no active LLM config")
-        void throws_whenNoActiveConfig() {
+        @DisplayName("throws LLMException with MISSING_CONFIGURATION when cache is empty")
+        void throws_whenCacheEmpty() {
             when(llmConfigCache.getActive()).thenReturn(Optional.empty());
             assertThatThrownBy(() -> factory().chatModel())
-                    .isInstanceOf(LLMException.class);
-        }
-    }
-
-    @Nested
-    @DisplayName("chatModel() — unknown provider")
-    class UnknownProviderTests {
-
-        @Test
-        @DisplayName("throws LLMException for unsupported provider")
-        void throws_forUnknownProvider() {
-            // WATSONX is a valid enum value but has no switch case yet — triggers the default
-            LlmConfig cfg = activeConfig(LlmProvider.WATSONX, "some-model");
-            when(llmConfigCache.getActive()).thenReturn(Optional.of(cfg));
-            assertThatThrownBy(() -> factory().chatModel())
-                    .isInstanceOf(LLMException.class);
+                    .isInstanceOf(LLMException.class)
+                    .satisfies(ex -> assertThat(((LLMException) ex).getErrorType())
+                            .isEqualTo(LLMConstants.ErrorTypes.MISSING_CONFIGURATION));
         }
     }
 

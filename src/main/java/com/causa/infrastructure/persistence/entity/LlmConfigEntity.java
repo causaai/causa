@@ -34,7 +34,7 @@ public class LlmConfigEntity extends BaseEntity {
     @Column(nullable = false, length = 24)
     private String id;
 
-    /** OPENAI | ANTHROPIC | AZURE_OPENAI | WATSONX. */
+    /** ANTHROPIC | BOB | VERTEX_AI. */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 64)
     private LlmProvider provider;

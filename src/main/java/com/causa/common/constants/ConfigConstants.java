@@ -223,7 +223,7 @@ public final class ConfigConstants {
     public enum IntegrationPlatform { SLACK, JIRA, GITHUB }
 
     /** LLM providers stored in {@code llm_configs.provider}. */
-    public enum LlmProvider { OPENAI, ANTHROPIC, AZURE_OPENAI, WATSONX, VERTEX_AI }
+    public enum LlmProvider { BOB, ANTHROPIC, VERTEX_AI }
 
     /** LLM authentication strategies — determines which AuthConfig fields are required. */
     public enum LlmAuthType { API_KEY, SA_JSON_KEY, CUSTOM_HEADERS }

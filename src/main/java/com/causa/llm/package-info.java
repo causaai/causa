@@ -15,9 +15,8 @@
  * <h2>Supported Providers</h2>
  * <ul>
  *   <li>{@code anthropic} - Claude via direct Anthropic API (requires LLM_API_KEY)</li>
- *   <li>{@code vertex-ai-anthropic} - Claude via Google Cloud Vertex AI (requires VERTEX_PROJECT_ID, uses ADC)</li>
- *   <li>{@code ibm-bob} - IBM Bob via OpenAI-compatible API (planned)</li>
- *   <li>{@code ollama} - Ollama local models (planned)</li>
+ *   <li>{@code vertex_ai} - Claude via Google Cloud Vertex AI (requires VERTEX_PROJECT_ID, uses ADC)</li>
+ *   <li>{@code bob} - IBM BOB Shell CLI (requires LLM_API_KEY)</li>
  * </ul>
  *
  * <h2>Key Classes</h2>
