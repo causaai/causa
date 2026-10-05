@@ -102,16 +102,9 @@ Tools used: `getCostOptimizedRecommendations` · `getPerformanceOptimizedRecomme
 
 ## Cryostat MCP
 
-<<<<<<< HEAD
-Provides JFR (Java Flight Recorder) analysis: GC behaviour, memory pools, threads, exceptions,
-and container resource metrics. Cryostat runs its MCP listener on port **8000** and its own
-health API on port **8080** — both URLs must be set independently. Marked `optional: true` in
-the default cluster profile so that a missing Cryostat deployment does not degrade the system.
-=======
 The cluster diagnostic path calls the Cryostat Kubernetes mux through `mcp.json`
 (`deployment/kubernetes/base/mcp-config/mcp-cluster-default.json`). Both tools must already be
 exposed by that server (`toolLevel` `ALL`). Causa does not start a JFR recording.
->>>>>>> ed41cc1 (Use Cryostat discovery and automated analysis in cluster RCA.)
 
 `getDiscoveryTree` is called first with the alert namespace and `mergeRealms=true`.
 `getAnalysisReport` runs only when that tree contains the alert namespace and pod. The report
