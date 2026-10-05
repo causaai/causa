@@ -97,7 +97,7 @@ public record DiagnosticDetailResponse(
         @JsonProperty("explanation")        String explanation,
         @JsonProperty("source")             String source,
         @JsonProperty("rawSnippet")         String rawSnippet,
-        @JsonProperty("reliability")        String reliability
+        @JsonProperty("evidenceStrength")   String evidenceStrength
     ) {}
 
     public record DiagnosisInfo(
@@ -243,9 +243,9 @@ public record DiagnosticDetailResponse(
         return new Evidence(
             statement,
             item.explanation(),
-            item.source(),
+            item.type() != null ? item.type().name() : "OTHER",
             item.rawSnippet(),
-            reliabilityOf(item)
+            evidenceStrengthOf(item)
         );
     }
 
@@ -255,17 +255,12 @@ public record DiagnosticDetailResponse(
      * <p>A contradiction keeps its strength — a decisive fact that refutes the finding is still
      * decisive — and is suffixed so the reader is not left thinking it backs the diagnosis.
      */
-    private static String reliabilityOf(EvidenceItem item) {
-
+    private static String evidenceStrengthOf(EvidenceItem item) {
         if (item.strength() == null) {
-            return Reliability.LOW;
+            return "WEAK";
         }
 
-        String base = switch (item.strength()) {
-            case DEFINITIVE, STRONG -> Reliability.HIGH;
-            case MODERATE -> Reliability.MEDIUM;
-            case WEAK, CIRCUMSTANTIAL -> Reliability.LOW;
-        };
+        String base = item.strength().name();
 
         return item.evidenceHypothesisAlignment() == EvidenceHypothesisAlignment.REFUTES
             ? base + Reliability.REFUTES_SUFFIX

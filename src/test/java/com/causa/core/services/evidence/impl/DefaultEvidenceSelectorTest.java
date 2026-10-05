@@ -48,8 +48,31 @@ class DefaultEvidenceSelectorTest {
         assertThat(selected).extracting(EvidenceItem::id).contains("r1");
     }
 
+    /**
+     * The case the reservation exists for: enough decisive evidence to fill the panel twice
+     * over. Without held-back slots the weaker items never appear at all.
+     */
     @Test
-    void stopsShortOfTheBudgetRatherThanPaddingWithWeakerEvidence() {
+    void weakerEvidenceAppearsEvenWhenDecisiveItemsCouldFillTheWholePanel() {
+        List<EvidenceItem> items = new ArrayList<>();
+        for (int i = 0; i < Selection.MAX_UI_EVIDENCE * 2; i++) {
+            items.add(supporting("definitive" + i, EvidenceStrength.DEFINITIVE, 0.99));
+        }
+        for (int i = 0; i < 5; i++) {
+            items.add(supporting("moderate" + i, EvidenceStrength.MODERATE, 0.7));
+        }
+
+        List<EvidenceItem> selected = selector.select(items);
+
+        assertThat(selected).hasSize(Selection.MAX_UI_EVIDENCE);
+        assertThat(selected).extracting(EvidenceItem::id)
+            .filteredOn(id -> id.startsWith("moderate"))
+            .hasSize(Selection.WEAKER_SUPPORTING);
+    }
+
+    /** Held back, not handed over: weaker items take their slots and no more. */
+    @Test
+    void weakerEvidenceNeverClaimsMoreThanItsReservedSlots() {
         List<EvidenceItem> items = new ArrayList<>();
         for (int i = 0; i < 5; i++) {
             items.add(supporting("strong" + i, EvidenceStrength.STRONG, 0.9));
@@ -60,8 +83,21 @@ class DefaultEvidenceSelectorTest {
 
         List<EvidenceItem> selected = selector.select(items);
 
-        assertThat(selected).hasSize(5);
-        assertThat(selected).extracting(EvidenceItem::id).noneMatch(id -> id.startsWith("moderate"));
+        assertThat(selected).hasSize(5 + Selection.WEAKER_SUPPORTING);
+        assertThat(selected).extracting(EvidenceItem::id)
+            .filteredOn(id -> id.startsWith("moderate"))
+            .hasSize(Selection.WEAKER_SUPPORTING);
+    }
+
+    /** An empty weaker pool costs the panel nothing — the slots go back to decisive items. */
+    @Test
+    void unusedWeakerSlotsReturnToDecisiveEvidence() {
+        List<EvidenceItem> items = new ArrayList<>();
+        for (int i = 0; i < Selection.MAX_UI_EVIDENCE * 2; i++) {
+            items.add(supporting("definitive" + i, EvidenceStrength.DEFINITIVE, 0.99));
+        }
+
+        assertThat(selector.select(items)).hasSize(Selection.MAX_UI_EVIDENCE);
     }
 
     @Test
@@ -74,16 +110,16 @@ class DefaultEvidenceSelectorTest {
 
         List<EvidenceItem> selected = selector.select(items);
 
-        assertThat(selected).hasSize(Selection.MIN_SUPPORTING);
+        assertThat(selected).hasSize(1 + Selection.WEAKER_SUPPORTING);
         assertThat(selected).extracting(EvidenceItem::id).contains("strong0");
     }
 
     /**
-     * Reserved slots are not backing for the finding. A panel of contradictions with no
-     * supporting entries reads as a refuted diagnosis, so the floor counts only support.
+     * Contradictions have their own reservation. Spending it must not come out of the slots
+     * held for weaker supporting evidence — the two are counted separately.
      */
     @Test
-    void reservedContradictionSlotsDoNotSatisfyTheSupportingFloor() {
+    void reservedContradictionSlotsDoNotEatTheWeakerSupportingSlots() {
         List<EvidenceItem> items = new ArrayList<>();
         for (int i = 0; i < Selection.MAX_REFUTING; i++) {
             items.add(refuting("r" + i));
@@ -96,7 +132,7 @@ class DefaultEvidenceSelectorTest {
 
         assertThat(selected).extracting(EvidenceItem::id)
             .filteredOn(id -> id.startsWith("moderate"))
-            .hasSize(Selection.MIN_SUPPORTING);
+            .hasSize(Selection.WEAKER_SUPPORTING);
         assertThat(selected).extracting(EvidenceItem::id).contains("r0");
     }
 

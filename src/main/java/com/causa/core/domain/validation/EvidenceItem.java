@@ -53,11 +53,14 @@ public record EvidenceItem(
         /** Pod status (phase, conditions) */
         POD_STATUS,
 
-        /** Metric value (gauge, counter) */
+        /** Metric value (gauge, counter) from Prometheus/cAdvisor */
         METRIC,
 
         /** Time series data */
         TIME_SERIES,
+
+        /** Pod log entry */
+        POD_LOG,
 
         /** Log pattern match */
         LOG_PATTERN,

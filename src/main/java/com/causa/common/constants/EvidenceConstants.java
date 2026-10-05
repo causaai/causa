@@ -191,16 +191,19 @@ public final class EvidenceConstants {
          */
         public static final int MAX_UI_EVIDENCE   = 15;
         /**
-         * Supporting entries below which weaker evidence is allowed to fill in.
+         * Slots held back from decisive evidence for MODERATE and weaker supporting entries.
          *
-         * <p>Above it the panel shows only DEFINITIVE and STRONG items and ends short of the
-         * budget. Nothing upstream checks that an LLM-supplied snippet actually speaks to the
-         * claim it is attached to, so padding the remaining slots surfaces things like a
-         * startup banner cited as proof of allocation retention — which discredits the solid
-         * entries beside it. Below the floor the finding has too little backing to stand on
-         * its own, and weak evidence beats a panel that reads as though nothing was checked.
+         * <p>A panel of nothing but DEFINITIVE facts reads as though the diagnosis were
+         * assembled from certainties alone, hiding the softer observations it also rests on.
+         * These slots keep a few of them visible.
+         *
+         * <p>Deliberately a small reservation rather than a free fill: nothing upstream checks
+         * that an LLM-supplied snippet actually speaks to the claim it is attached to, so
+         * handing weak items every spare slot surfaces things like a startup banner cited as
+         * proof of allocation retention — which discredits the solid entries beside it.
+         * Whatever these slots do not use goes back to the decisive items.
          */
-        public static final int MIN_SUPPORTING    = 3;
+        public static final int WEAKER_SUPPORTING = 3;
         /** Maximum REFUTES entries — contradictions matter, but must not crowd out the finding. */
         public static final int MAX_REFUTING      = 3;
     }

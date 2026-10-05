@@ -178,13 +178,23 @@ public class PathAEvidenceMapper {
         };
     }
 
+    /**
+     * Maps LLM evidence type to internal evidence type.
+     *
+     * <p>Type says what kind of observation this is, never which MCP server produced it —
+     * that is {@link EvidenceItem#source()}, resolved separately. Keeping the two apart is what
+     * lets a deployment swap Cryostat for Async Profiler, or run without Kruize, without the
+     * type of any evidence changing.
+     */
     private EvidenceItem.EvidenceType typeOf(Evidence.EvidenceType type) {
         if (type == null) {
             return EvidenceItem.EvidenceType.OTHER;
         }
         return switch (type) {
             case KUBERNETES_EVENT -> EvidenceItem.EvidenceType.KUBERNETES_EVENT;
-            case POD_LOG -> EvidenceItem.EvidenceType.LOG_PATTERN;
+            case POD_STATUS -> EvidenceItem.EvidenceType.POD_STATUS;
+            case CONTAINER_STATUS -> EvidenceItem.EvidenceType.CONTAINER_STATUS;
+            case POD_LOG -> EvidenceItem.EvidenceType.POD_LOG;
             case METRIC -> EvidenceItem.EvidenceType.METRIC;
             case KRUIZE_RECOMMENDATION -> EvidenceItem.EvidenceType.RECOMMENDATION;
             case GC_ANALYSIS -> EvidenceItem.EvidenceType.GC_ANALYSIS;

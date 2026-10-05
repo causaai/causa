@@ -21,10 +21,12 @@ import java.util.Set;
  * <ol>
  *   <li>Slots reserved for the strongest contradicting items, if any exist. A diagnosis
  *       that the data partly argues against should say so on its face.</li>
- *   <li>The remainder goes to supporting evidence that is DEFINITIVE or STRONG, and stops
- *       there — an unfilled slot is not a problem to solve. Weaker items are admitted only
- *       to reach {@link Selection#MIN_SUPPORTING}, so a thin diagnosis still shows what it
- *       was decided on rather than reading as though it had been refuted.</li>
+ *   <li>{@link Selection#WEAKER_SUPPORTING} further slots held back for MODERATE and weaker
+ *       supporting items, so the panel shows some of the softer observations behind the
+ *       finding and not only the facts that settle it.</li>
+ *   <li>Everything else goes to supporting evidence that is DEFINITIVE or STRONG. Slots the
+ *       weaker items leave unused come back here, so holding them back never costs the panel
+ *       a solid entry — but an unfilled slot is still not a problem to solve.</li>
  * </ol>
  *
  * @since 0.0.1
@@ -49,14 +51,13 @@ public class DefaultEvidenceSelector implements EvidenceSelector {
         take(selected, refuting(items), Selection.MAX_REFUTING);
 
         int reserved = selected.size();
-        take(selected, strongSupporting(items), Selection.MAX_UI_EVIDENCE - reserved);
+        take(selected, strongSupporting(items),
+            Selection.MAX_UI_EVIDENCE - reserved - Selection.WEAKER_SUPPORTING);
 
-        // Measured against the supporting entries alone: reserved contradictions filling the
-        // panel is not the same as the finding being backed up.
-        int shortfall = Selection.MIN_SUPPORTING - (selected.size() - reserved);
-        if (shortfall > 0) {
-            take(selected, supporting(items), shortfall);
-        }
+        take(selected, weakerSupporting(items), Selection.WEAKER_SUPPORTING);
+
+        // Slots the weaker items did not use are not left empty.
+        take(selected, strongSupporting(items), Selection.MAX_UI_EVIDENCE - selected.size());
 
         List<EvidenceItem> ordered = new ArrayList<>(selected);
         ordered.sort(DISPLAY_ORDER);
@@ -92,9 +93,10 @@ public class DefaultEvidenceSelector implements EvidenceSelector {
                 && decisive(item));
     }
 
-    private List<EvidenceItem> supporting(List<EvidenceItem> items) {
+    private List<EvidenceItem> weakerSupporting(List<EvidenceItem> items) {
         return sorted(items, item ->
-            item.evidenceHypothesisAlignment() == EvidenceHypothesisAlignment.SUPPORTS);
+            item.evidenceHypothesisAlignment() == EvidenceHypothesisAlignment.SUPPORTS
+                && !decisive(item));
     }
 
     private List<EvidenceItem> sorted(List<EvidenceItem> items, java.util.function.Predicate<EvidenceItem> filter) {
