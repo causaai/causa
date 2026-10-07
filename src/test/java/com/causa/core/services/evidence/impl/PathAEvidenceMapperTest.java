@@ -1,6 +1,6 @@
 package com.causa.core.services.evidence.impl;
 
-import com.causa.common.constants.EvidenceConstants.Metadata;
+import com.causa.common.constants.EvidenceConstants;
 import com.causa.common.constants.EvidenceConstants.Snippet;
 import com.causa.core.domain.RootCauseAnalysis.AnomalyType;
 import com.causa.core.domain.validation.Assertion;
@@ -8,7 +8,6 @@ import com.causa.core.domain.validation.Assertion.AssertionSource;
 import com.causa.core.domain.validation.Assertion.AssertionType;
 import com.causa.core.domain.validation.Evidence;
 import com.causa.core.domain.validation.EvidenceItem;
-import com.causa.core.domain.validation.EvidenceItem.EvidenceHypothesisAlignment;
 import com.causa.core.domain.validation.EvidenceItem.EvidenceStrength;
 import com.causa.core.domain.validation.ValidationResult;
 import com.causa.core.services.evidence.McpSourceResolver;
@@ -50,7 +49,6 @@ class PathAEvidenceMapperTest {
         assertThat(item.rawSnippet()).isEqualTo("Exit Code: 137");
         assertThat(item.statement()).isEqualTo("The container exited with 137.");
         assertThat(item.explanation()).isEqualTo("137 is SIGKILL, which the kernel sends on an OOM kill.");
-        assertThat(item.evidenceHypothesisAlignment()).isEqualTo(EvidenceHypothesisAlignment.SUPPORTS);
         assertThat(item.confidence()).isEqualTo(0.97);
     }
 
@@ -63,20 +61,23 @@ class PathAEvidenceMapperTest {
         EvidenceItem item = onlyItem(supported(quoting("POD_LOGS - sequence 124")));
 
         assertThat(item.source()).isEqualTo("kubernetes");
-        assertThat(item.metadata()).containsEntry(Metadata.RAW_SOURCE_LABEL, "POD_LOGS - sequence 124");
     }
 
+    /** The id is the only thing tying an item back to the assertion it was quoted for. */
     @Test
-    void attributesTheItemToItsFindingAndAssertion() {
-        EvidenceItem item = onlyItem(supported(quoting("POD_STATUS")));
+    void namesTheItemAfterTheAssertionItWasQuotedFor() {
+        assertThat(onlyItem(supported(quoting("POD_STATUS"))).id()).isEqualTo("pathA.a1.ev-01");
+    }
 
-        assertThat(item.id()).isEqualTo("pathA.a1.ev-01");
-        assertThat(item.metadata())
-            .containsEntry(Metadata.PATH, Metadata.PATH_A)
-            .containsEntry(Metadata.FINDING_ID, "diag_123")
-            .containsEntry(Metadata.ANOMALY_TYPE, "OOM_KILLED")
-            .containsEntry(Metadata.ASSERTION_ID, "a1")
-            .containsEntry(Metadata.ASSERTION_STATUS, "SUPPORTED");
+    /**
+     * The mapper sets no priority, so every item must carry the flat default rather than the
+     * 0 an uninitialised int would give it — ranking is not designed yet, and 0 would read as
+     * a decision that these items sort above everything.
+     */
+    @Test
+    void leavesEveryItemAtTheFlatDefaultPriority() {
+        assertThat(onlyItem(supported(quoting("POD_STATUS"))).priority())
+            .isEqualTo(EvidenceConstants.DEFAULT_PRIORITY);
     }
 
     /**
@@ -94,10 +95,10 @@ class PathAEvidenceMapperTest {
 
         List<EvidenceItem> items = mapper.map(FINDING, result);
 
-        assertThat(items).extracting(EvidenceItem::evidenceHypothesisAlignment)
-            .containsExactly(EvidenceHypothesisAlignment.SUPPORTS, EvidenceHypothesisAlignment.REFUTES);
         assertThat(items).extracting(EvidenceItem::id)
             .containsExactly("pathA.a1.ev-01", "pathA.a1.ev-02");
+        assertThat(items).extracting(EvidenceItem::source)
+            .containsExactly("kubernetes", "kubernetes");
     }
 
     /**
@@ -117,20 +118,16 @@ class PathAEvidenceMapperTest {
     }
 
     /**
-     * Relevance drives both strength and display order, so the band edges are the contract
-     * between what the LLM scored and where the item lands in the panel.
+     * Relevance is the only thing deciding strength, so the band edges are the contract between
+     * what the LLM scored and how strongly the item reads.
      */
     @Test
-    void banksRelevanceIntoStrengthAndPriority() {
+    void banksRelevanceIntoStrength() {
         assertThat(strengthAt(0.95)).isEqualTo(EvidenceStrength.DEFINITIVE);
         assertThat(strengthAt(0.85)).isEqualTo(EvidenceStrength.STRONG);
         assertThat(strengthAt(0.65)).isEqualTo(EvidenceStrength.MODERATE);
         assertThat(strengthAt(0.40)).isEqualTo(EvidenceStrength.WEAK);
         assertThat(strengthAt(0.39)).isEqualTo(EvidenceStrength.CIRCUMSTANTIAL);
-
-        assertThat(onlyItem(supported(scoring(0.95))).priority()).isEqualTo(1);
-        assertThat(onlyItem(supported(scoring(0.85))).priority()).isEqualTo(2);
-        assertThat(onlyItem(supported(scoring(0.65))).priority()).isEqualTo(3);
     }
 
     /** An unrecognised label is attributed to nothing rather than guessed at. */

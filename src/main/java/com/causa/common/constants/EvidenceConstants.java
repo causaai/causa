@@ -3,9 +3,9 @@ package com.causa.common.constants;
 /**
  * Evidence Constants
  *
- * <p>Constants for the evidence collection pipeline — canonical MCP source names,
- * metadata keys, identifier prefixes, and the relevance bands that derive evidence
- * strength and priority. Rule-derived evidence and selection add their own blocks.
+ * <p>Constants for the evidence collection pipeline — the MCP source fallback, identifier
+ * prefixes, and the relevance bands that derive evidence strength. Rule-derived evidence
+ * adds its own blocks.
  *
  * @since 0.0.1
  */
@@ -30,26 +30,6 @@ public final class EvidenceConstants {
     }
 
     /**
-     * Keys used in {@code EvidenceItem.metadata}.
-     */
-    public static final class Metadata {
-        private Metadata() {}
-
-        public static final String PATH                 = "path";
-        public static final String PATH_A               = "A";
-        public static final String FINDING_ID           = "findingId";
-        public static final String ANOMALY_TYPE         = "anomalyType";
-
-        // PATH A
-        public static final String ASSERTION_ID         = "assertionId";
-        public static final String ASSERTION_TYPE       = "assertionType";
-        public static final String ASSERTION_STATUS     = "assertionStatus";
-        /** The evidence source string exactly as the LLM emitted it, before normalisation. */
-        public static final String RAW_SOURCE_LABEL     = "rawSourceLabel";
-
-    }
-
-    /**
      * Identifier prefixes for generated evidence item IDs.
      */
     public static final class Ids {
@@ -61,29 +41,23 @@ public final class EvidenceConstants {
     }
 
     /**
-     * Display priority — lower sorts first when selecting evidence for the UI.
+     * Display priority carried by every evidence item until the ranking design is finalised.
+     * Lower sorts first, so a flat value leaves ordering to confidence and strength.
      */
-    public static final class Priority {
-        private Priority() {}
-
-        /** Definitive facts that directly settle the hypothesis. */
-        public static final int PRIMARY      = 1;
-        /** Strong corroborating facts. */
-        public static final int SECONDARY    = 2;
-        /** Supporting context (limits, counts, configuration). */
-        public static final int CONTEXTUAL   = 3;
-    }
+    public static final int DEFAULT_PRIORITY = 1;
 
     /**
      * Relevance-score bands used to derive {@code EvidenceStrength} from PATH A evidence.
+     * One band per {@code EvidenceStrength}, each the inclusive floor of its band.
      */
     public static final class StrengthBands {
         private StrengthBands() {}
 
-        public static final double DEFINITIVE = 0.95;
-        public static final double STRONG     = 0.85;
-        public static final double MODERATE   = 0.65;
-        public static final double WEAK       = 0.40;
+        public static final double DEFINITIVE     = 0.95;
+        public static final double STRONG         = 0.85;
+        public static final double MODERATE       = 0.65;
+        public static final double WEAK           = 0.40;
+        public static final double CIRCUMSTANTIAL = 0.0;
     }
 
     /**
