@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 
 /**
- * Combined response for {@code GET /api/v1/settings} — one object per settings category.
+ * Combined response for {@code GET /api/v1/configs} — one object per settings category.
  *
  * <p>Reuses the typed per-resource response records directly — no duplication.
  * The {@code general} field is reserved for the Tooling tab and will be added

@@ -38,7 +38,7 @@ Kruize had no data for this container. Do not cite this section as evidence.
 Container is under-provisioned for observed peak usage. If POD EVENTS also show `OOMKilling`, this gap is the direct cause of the kill. Since requests and limits are unified, both values move together when sizing is corrected.
 
 **`current` memory limit at or above recommended**
-Memory sizing is not the problem. A code-level cause is more likely — look at POD LOGS for `OutOfMemoryError` and Cryostat JFR sections for heap or GC evidence.
+Memory sizing is not the problem. A code-level cause is more likely — look at POD LOGS for `OutOfMemoryError` and CRYOSTAT_ANALYSIS rules with topic `heap` or `garbage_collection`.
 
 **`current` CPU limit below recommended**
 CPU throttling is likely. Corroborate with `Unhealthy` probe events in POD EVENTS — throttling slows GC threads and can cause probe timeouts even when the application is otherwise healthy.

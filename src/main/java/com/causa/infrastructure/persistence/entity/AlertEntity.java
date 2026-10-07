@@ -90,6 +90,7 @@ public class AlertEntity extends BaseEntity {
         public static final String ALERT_NAME    = "alertName";
         public static final String STATUS        = "status";
         public static final String WORKLOAD_NAME = "workloadName";
+        public static final String NAMESPACE     = "namespace";
     }
 
     // -------------------------------------------------------------------------

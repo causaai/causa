@@ -210,6 +210,136 @@
       ]
     },
     {
+      "name": "Settings",
+      "item": [
+        {
+          "name": "Get All Settings",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs"]
+            }
+          }
+        },
+        {
+          "name": "List Observability Configs",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/observability",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "observability"]
+            }
+          }
+        },
+        {
+          "name": "Upsert Observability Config (DATADOG)",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"my-datadog\",\n  \"url\": \"https://api.datadoghq.com\",\n  \"is_active\": true,\n  \"auth_config\": {\n    \"authType\": \"API_KEY\",\n    \"apiKey\": \"my-api-key\",\n    \"appKey\": \"my-app-key\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/observability/DATADOG",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "observability", "DATADOG"]
+            }
+          }
+        },
+        {
+          "name": "Delete Observability Config (DATADOG)",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/observability/DATADOG/my-datadog",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "observability", "DATADOG", "my-datadog"]
+            }
+          }
+        },
+        {
+          "name": "List LLM Configs",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/llm",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "llm"]
+            }
+          }
+        },
+        {
+          "name": "Upsert LLM Config (OPENAI)",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://api.openai.com/v1\",\n  \"models\": [\"gpt-4o\", \"gpt-4-turbo\"],\n  \"temperature\": 0.7,\n  \"max_tokens\": 4096,\n  \"timeout_ms\": 30000,\n  \"is_active\": true,\n  \"auth_config\": {\n    \"authType\": \"API_KEY\",\n    \"apiKey\": \"sk-...\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/llm/OPENAI",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "llm", "OPENAI"]
+            }
+          }
+        },
+        {
+          "name": "Delete LLM Config (OPENAI)",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/llm/OPENAI",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "llm", "OPENAI"]
+            }
+          }
+        },
+        {
+          "name": "List Integration Configs",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/integrations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "integrations"]
+            }
+          }
+        },
+        {
+          "name": "Upsert Integration Config (SLACK)",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"my-slack\",\n  \"url\": \"https://hooks.slack.com/services/XXX/YYY/ZZZ\",\n  \"is_active\": true,\n  \"auth_config\": {\n    \"authType\": \"WEBHOOK\",\n    \"token\": \"my-token\"\n  },\n  \"additional_config\": {\n    \"channel\": \"#alerts\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/integrations/SLACK",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "integrations", "SLACK"]
+            }
+          }
+        },
+        {
+          "name": "Delete Integration Config (SLACK)",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/integrations/SLACK/my-slack",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "integrations", "SLACK", "my-slack"]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Health",
       "item": [
         {

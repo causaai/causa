@@ -8,13 +8,16 @@ import com.causa.core.domain.PageResult;
 import com.causa.core.ports.AlertRepository;
 import com.causa.infrastructure.persistence.entity.AlertEntity;
 import com.causa.infrastructure.persistence.mappers.AlertEntityMapper;
+import io.quarkus.hibernate.orm.panache.PanacheQuery;
+import io.quarkus.panache.common.Page;
+import io.quarkus.panache.common.Sort;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.Query;
 import jakarta.transaction.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -22,16 +25,10 @@ import java.util.Optional;
  *
  * <p>Panache-based implementation of {@link AlertRepository}.
  *
- * <p>All list queries use native SQL because the {@code workload_info->>'namespace'} JSONB
- * operator is not valid in JPQL — Panache's {@code find()} would throw at parse time.
- *
  * @since 0.0.1
  */
 @ApplicationScoped
 public class AlertRepositoryImpl implements AlertRepository {
-
-    @jakarta.inject.Inject
-    EntityManager em;
 
     @Override
     @Transactional
@@ -90,63 +87,40 @@ public class AlertRepositoryImpl implements AlertRepository {
     /**
      * Paginated search with optional AND-logic filters.
      *
-     * <p>Uses native SQL throughout because the {@code workload_info->>'namespace'} JSONB
-     * operator is illegal in JPQL. Parameters are positional to prevent SQL injection.
-     * The ORDER BY clause is fixed to {@code created_at DESC} — sorting is not exposed
-     * as a user-controlled parameter.
+     * <p>Uses JPQL via Panache. The {@code namespace} field is a Hibernate
+     * {@code @Formula} that expands to {@code workload_info->>'namespace'} at
+     * query time, so no native SQL or {@code EntityManager} injection is needed.
      */
     @Override
-    @SuppressWarnings("unchecked")
     public PageResult<Alert> search(Alert.Filter filter, PageRequest pageRequest) {
-        boolean hasWorkload  = !isBlank(filter.workloadName());
-        boolean hasNamespace = !isBlank(filter.namespace());
-        boolean hasStatus    = !isBlank(filter.status());
-
         List<String> clauses = new ArrayList<>();
-        List<Object> params  = new ArrayList<>();
+        Map<String, Object> args = new HashMap<>();
 
-        if (hasWorkload) {
-            clauses.add("workload_name = ?" + (params.size() + 1));
-            params.add(filter.workloadName());
+        if (!isBlank(filter.workloadName())) {
+            clauses.add(AlertEntity.Fields.WORKLOAD_NAME + " = :workloadName");
+            args.put("workloadName", filter.workloadName());
         }
-        if (hasNamespace) {
-            // ->> is a PostgreSQL JSONB operator — only valid in native SQL, not JPQL
-            clauses.add("workload_info->>'namespace' = ?" + (params.size() + 1));
-            params.add(filter.namespace());
+        if (!isBlank(filter.namespace())) {
+            clauses.add(AlertEntity.Fields.NAMESPACE + " = :namespace");
+            args.put("namespace", filter.namespace());
         }
-        if (hasStatus) {
-            clauses.add("status = ?" + (params.size() + 1));
-            params.add(filter.status());
-        }
-
-        String where  = clauses.isEmpty() ? "" : " WHERE " + String.join(" AND ", clauses);
-        int    offset = Math.multiplyExact(pageRequest.panachePage(), pageRequest.size());
-
-        // Data query — fixed ORDER BY, LIMIT/OFFSET for pagination
-        String dataSql = "SELECT * FROM alerts" + where
-            + " ORDER BY created_at DESC"
-            + " LIMIT ?"  + (params.size() + 1)
-            + " OFFSET ?" + (params.size() + 2);
-
-        Query dataQ = em.createNativeQuery(dataSql, AlertEntity.class);
-        for (int i = 0; i < params.size(); i++) {
-            dataQ.setParameter(i + 1, params.get(i));
-        }
-        dataQ.setParameter(params.size() + 1, pageRequest.size());
-        dataQ.setParameter(params.size() + 2, offset);
-
-        // Count query — same WHERE, no ORDER BY / LIMIT
-        String countSql = "SELECT COUNT(*) FROM alerts" + where;
-        Query countQ = em.createNativeQuery(countSql);
-        for (int i = 0; i < params.size(); i++) {
-            countQ.setParameter(i + 1, params.get(i));
+        if (!isBlank(filter.status())) {
+            clauses.add(AlertEntity.Fields.STATUS + " = :status");
+            args.put("status", filter.status());
         }
 
-        List<Alert> items = ((List<AlertEntity>) dataQ.getResultList())
+        Sort sort = Sort.by("createdAt").descending();
+        PanacheQuery<AlertEntity> query = clauses.isEmpty()
+            ? AlertEntity.findAll(sort)
+            : AlertEntity.find(String.join(" AND ", clauses), sort, args);
+
+        long total = query.count();
+        List<Alert> items = query
+            .page(Page.of(pageRequest.panachePage(), pageRequest.size()))
+            .list()
             .stream()
             .map(AlertEntityMapper::toDomain)
             .toList();
-        long total = ((Number) countQ.getSingleResult()).longValue();
 
         return PageResult.of(items, total, pageRequest);
     }

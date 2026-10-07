@@ -141,6 +141,16 @@ Quarkus Dev Mode provides hot reload, continuous testing, and Dev UI.
 
 **Dev Services (zero config database):** Running `./mvnw quarkus:dev` automatically starts a PostgreSQL 17 container with pgvector via Quarkus Dev Services — no local database setup needed. See [Database Setup Guide](./database.md) for details.
 
+**MCP Configuration:** MCP servers are configured via a JSON file. The path is set by the
+`causa.mcp.config-file` property (env var `MCP_CONFIG_FILE`). Three default profiles are
+provided in `deployment/kubernetes/base/mcp-config/`:
+- `mcp-cluster-default.json` — Kubernetes, Kruize, Cryostat
+- `mcp-developer-default.json` — Kubernetes, Kruize, Quarkus, Async Profiler
+- `mcp-vm-default.json` — JMX, Filesystem
+
+For local dev, the MCP servers may not be available — startup is non-fatal and health checks
+will report `DOWN` for unreachable servers. See [MCP Tunables](../tunables/mcp.md) for details.
+
 **Dev Mode Features:**
 - 🔥 **Hot Reload**: Code changes are automatically detected and reloaded
 - 🧪 **Continuous Testing**: Tests run automatically on code changes

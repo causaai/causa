@@ -97,6 +97,40 @@
         { "name": "get_recording_report", "contextKey": "AP_RECORDING_REPORT", "arguments": { "pod": "${podName}", "container": "${containerName}", "namespace": "${namespace}", "last": "5m" } },
         { "name": "get_jfr_summary", "contextKey": "AP_JFR_SUMMARY", "arguments": { "pod": "${podName}", "container": "${containerName}", "namespace": "${namespace}", "last": "5m" } }
       ]
+    },
+    "prometheus": {
+      "type": "streamable-http",
+      "url": "http://prometheus-mcp-server:8080/mcp",
+      "headers": {
+        "_comment": "No auth required for in-cluster Kind/plain-Kubernetes deployments. For OpenShift (Thanos Querier), the installer must inject a bearer token: Authorization: Bearer <token>"
+      },
+      "optional": true,
+      "alwaysAllow": ["query", "range_query", "healthy", "ready"],
+      "healthCheck": { "url": "http://prometheus-mcp-server:8080/metrics", "timeoutMs": 15000 },
+      "timeoutMs": 15000,
+      "description": "Prometheus MCP — PromQL instant and range queries against the in-cluster Prometheus instance",
+      "tools": [
+        {
+          "name": "query",
+          "contextKey": "PROMETHEUS_MEMORY_INSTANT",
+          "description": "Instant memory working set for the alerting container at the exact moment the alert fired (bytes).",
+          "arguments": {
+            "query": "container_memory_working_set_bytes{namespace=\"${namespace}\",pod=\"${podName}\",container=\"${containerName}\"}",
+            "timestamp": "${alertTimestamp}"
+          }
+        },
+        {
+          "name": "range_query",
+          "contextKey": "PROMETHEUS_MEMORY_RANGE",
+          "description": "Memory working set trend in the 15 minutes leading up to the alert, 60-second resolution. Rising trend indicates a memory leak.",
+          "arguments": {
+            "query": "container_memory_working_set_bytes{namespace=\"${namespace}\",pod=\"${podName}\",container=\"${containerName}\"}",
+            "start_time": "${alertTimestampMinus15m}",
+            "end_time": "${alertTimestamp}",
+            "step": "60s"
+          }
+        }
+      ]
     }
   }
 }

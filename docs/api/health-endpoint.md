@@ -28,34 +28,43 @@ curl http://localhost:8080/api/v1/healthz
 
 ```json
 {
-  "status": "DEGRADED",
-  "timestamp": "2026-08-06T07:40:55.917237785Z",
-  "version": "0.0.1-SNAPSHOT",
+  "status": "DOWN",
+  "timestamp": "2026-09-23T20:35:38.762528Z",
+  "version": "0.0.4-SNAPSHOT",
   "components": {
-  "database": {
-    "status": "UP",
-    "message": "Connected to PostgreSQL",
-    "latency_ms": 1
-  },
-  "mcp_kubernetes": {
-    "status": "UP",
-    "message": "Connected successfully",
-    "latency_ms": 11
-  },
-  "llm_provider": {
-    "status": "UP",
-    "message": "Connected to LangChain4J with vertex-ai-anthropic / claude-sonnet-4-6",
-    "latency_ms": 1087
-  },
-  "mcp_kruize": {
-    "status": "UP",
-    "message": "Connected successfully",
-    "latency_ms": 96
-  },
-  "mcp_cryostat": {
-    "status": "DOWN",
-    "message": "MCP server not available",
-    "latency_ms": 35
+    "database": {
+      "status": "UP",
+      "message": "Connected to PostgreSQL",
+      "latency_ms": 2
+    },
+    "llm_provider": {
+      "status": "DOWN",
+      "message": "LLM health check failed: LLM request failed: VERTEX_PROJECT_ID is required for provider: vertex-ai-anthropic",
+      "latency_ms": 35
+    },
+    "mcp_config": {
+      "status": "UP",
+      "servers": {
+        "kubernetes": {
+          "status": "UP",
+          "message": "Connected successfully",
+          "latency_ms": 245,
+          "optional": false
+        },
+        "kruize": {
+          "status": "UP",
+          "message": "Connected successfully",
+          "latency_ms": 1247,
+          "optional": false
+        },
+        "cryostat": {
+          "status": "DOWN",
+          "message": "MCP server not available",
+          "latency_ms": 504,
+          "optional": true
+        }
+      }
+    }
   }
 }
 ```
@@ -72,6 +81,27 @@ curl http://localhost:8080/api/v1/healthz
 |---|---|
 | `database` | Backend database connectivity and latency |
 | `llm_provider` | LLM provider readiness |
-| `mcp_kubernetes` | Kubernetes MCP connectivity |
-| `mcp_kruize` | Kruize MCP connectivity |
-| `mcp_cryostat` | Cryostat MCP connectivity |
+| `mcp_config` | MCP server connectivity (one entry per server in `mcp.json`) |
+
+### Core components (always present)
+
+| Component | Meaning |
+|---|---|
+| `database` | Backend database connectivity and latency |
+| `llm_provider` | LLM provider readiness |
+| `mcp_config` | MCP server readiness |
+
+### MCP components (dynamic)
+
+MCP health components are discovered dynamically from the `McpRegistry` at runtime. Each
+server declared in the active `mcp.json` profile generates an `mcp_<name>` component — for
+example, loading `mcp-cluster-default.json` produces `mcp_kubernetes`, `mcp_kruize`, and
+`mcp_cryostat`; loading `mcp-developer-default.json` adds `mcp_quarkus` and
+`mcp_async-profiler` instead of `mcp_cryostat`.
+
+Servers marked `"optional": true` in `mcp.json` (e.g. Cryostat) report `DOWN` without
+degrading the overall system status. Non-optional servers being `DOWN` causes the endpoint to
+return `DEGRADED` (HTTP 503).
+
+If `McpRegistry` fails to initialize (e.g. invalid `mcp.json`), a single
+`mcp_config` component appears with status `DOWN` and the initialization error message.

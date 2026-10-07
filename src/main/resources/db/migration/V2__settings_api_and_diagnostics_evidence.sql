@@ -60,10 +60,27 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_llm_configs_single_active ON llm_configs (i
 
 
 -- =============================================================================
--- 3: Add all_evidence column to diagnostics table
+-- 3. PG LISTEN/NOTIFY — extend cache invalidation to new config tables
+--    Reuses the existing notify_config_change() function from V1 which fires
+--    pg_notify('config_cache_channel', 'reload').
+--    ConfigCacheListener already listens on this channel and will now trigger
+--    a refresh of LlmConfigCache and ExternalConfigCache as well.
+-- =============================================================================
+
+CREATE TRIGGER trg_llm_config_notify
+    AFTER INSERT OR UPDATE OR DELETE ON llm_configs
+    FOR EACH STATEMENT EXECUTE FUNCTION notify_config_change();
+
+CREATE TRIGGER trg_external_config_notify
+    AFTER INSERT OR UPDATE OR DELETE ON external_configs
+    FOR EACH STATEMENT EXECUTE FUNCTION notify_config_change();
+
+
+-- =============================================================================
+-- 4. DIAGNOSTICS — all_evidence COLUMN
 --    Stores complete EvidenceItem instances from the validation pipeline for
---    debugging and audit. The top 3-5 are selected into the evidence column and transformed
---    to the Evidence UI model for the API response.
+--    debugging and audit. The top 3-5 are selected into the evidence column and
+--    transformed to the Evidence UI model for the API response.
 --
 --    Existing evidence column: LLM-generated evidences from RCA (backward compatible)
 --    New all_evidence column:  Structured validation evidences from PATH A + PATH B

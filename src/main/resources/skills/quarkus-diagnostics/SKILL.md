@@ -100,7 +100,7 @@ If `jvm_memory_max_bytes` is `−1`, use `jvm_gc_max_data_size_bytes` as the cei
 ### Heap pressure
 
 **Old-gen utilisation ≥ 85%**
-The heap is nearly full. Combined with `jvm_gc_overhead > 0.05`, this indicates a GC spiral — GC is running frequently but reclaiming little, which is a precursor to OOM. Corroborate with Cryostat JFR MEMORY ANALYSIS and POD EVENTS for `OOMKilling`.
+The heap is nearly full. Combined with `jvm_gc_overhead > 0.05`, this indicates a GC spiral — GC is running frequently but reclaiming little, which is a precursor to OOM. Corroborate with CRYOSTAT_ANALYSIS rules whose topic is `heap` and whose score is above 0, and with POD EVENTS for `OOMKilling`.
 
 **Old-gen utilisation ≥ 95%**
 Imminent OOM. If `jvm_gc_overhead` is also elevated, the JVM is spending most of its time in GC with almost no application throughput. Treat as equivalent evidence to `OOM_KILLED` category.
@@ -131,7 +131,7 @@ One or more threads are blocked on a monitor lock. Combined with `worker_pool_ac
 The worker pool is saturated. Requests are queuing faster than they are being processed. Causes: slow downstream I/O, long GC pauses, or CPU throttling.
 
 **`jvm_threads_live_threads` >> `jvm_threads_peak_threads` at time of alert**
-Thread count has grown since start — possible thread leak. Corroborate with Cryostat THREAD ANALYSIS.
+Thread count has grown since start — possible thread leak. Corroborate with CRYOSTAT_ANALYSIS rules whose topic is `lock_instances`.
 
 ### CPU
 
@@ -148,20 +148,20 @@ Unusual — the process is using a disproportionate share of total CPU. Combined
 ### 1. Compute heap utilisation first
 - Calculate `jvm_memory_used_bytes{id="G1 Old Gen"}` / `jvm_memory_max_bytes{id="G1 Old Gen"}`
 - If max is −1, use `jvm_gc_max_data_size_bytes` as the denominator
-- Corroborate elevated utilisation with `jvm_gc_overhead`, Cryostat JFR MEMORY ANALYSIS, and POD EVENTS for `OOMKilling`
+- Corroborate elevated utilisation with `jvm_gc_overhead`, CRYOSTAT_ANALYSIS `heap` rules with score above 0, and POD EVENTS for `OOMKilling`
 
 ### 2. Check GC overhead
 - `jvm_gc_overhead = 0.0` — no current GC pressure (may have recovered before snapshot)
 - `0.01–0.10` — moderate, monitor
-- `> 0.10` — significant; corroborate with Cryostat JFR GC ANALYSIS for pause durations
+- `> 0.10` — significant; corroborate with CRYOSTAT_ANALYSIS `garbage_collection` rules and their scores
 
 ### 3. Inspect thread states
-- Non-zero `blocked` threads → lock contention → check Cryostat THREAD ANALYSIS for deadlocks
+- Non-zero `blocked` threads → lock contention → check CRYOSTAT_ANALYSIS `lock_instances` rules for blocked-thread or deadlock findings
 - High `worker_pool_queue_size` → saturation → determine if the cause is I/O latency, GC pauses, or CPU throttling
 
 ### 4. Correlate with other signals
 - **POD EVENTS `OOMKilling`** + high old-gen utilisation → confirms OOM_KILLED
-- **Cryostat GC ANALYSIS** long pauses + `jvm_gc_overhead > 0.10` → confirms POSSIBLE_GC_PAUSE
+- **CRYOSTAT_ANALYSIS** `garbage_collection` rule with an elevated score + `jvm_gc_overhead > 0.10` → confirms POSSIBLE_GC_PAUSE
 - **Kruize recommendations** memory limit below current old-gen committed → confirms under-provisioning
 - **POD LOGS `OutOfMemoryError`** + high old-gen → confirms heap exhaustion path
 

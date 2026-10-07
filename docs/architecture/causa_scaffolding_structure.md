@@ -115,7 +115,7 @@ The application is organized into **10 core modules** following Hexagonal Archit
 | 📁 **`core/`** | Business logic, domain models, ports | Core Domain | 
 | 📁 **`infrastructure/`** | Database, caching, persistence | Secondary Adapter | 
 | 📁 **`llm/`** | LangChain4J orchestration, providers | Secondary Adapter | 
-| 📁 **`mcp/`** | MCP server clients (K8s, Cryostat, Kruize) | Secondary Adapter |
+| 📁 **`mcp/`** | MCP server integration (dynamic config, health, context collection) | Secondary Adapter |
 | 📁 **`validation/`** | Hybrid validation engine | Business Logic | 
 | 📁 **`rag/`** | RAG pipeline, chunking, retrieval | Business Logic |
 | 📁 **`notification/`** | Multi-channel notifications | Secondary Adapter | 
@@ -417,41 +417,56 @@ public class OpenAiProvider implements LLMProvider {
 
 <br/>
 
-**Purpose:** MCP server clients for Kubernetes, Cryostat, Kruize.
+**Purpose:** Dynamic MCP server integration — health checks, context collection, and response formatting for all configured MCP servers (Kubernetes, Kruize, Cryostat, Quarkus, Async Profiler, JMX, Filesystem).
 
 **Architecture Layer:** Secondary Adapter (Outbound)
 
-**Singleton Pattern:** MCP clients (connection pooling, circuit breaker state)
+**Key Design:** Servers are configured via `mcp.json` (not hardcoded). At startup, `McpStartup` loads the JSON, and `McpRegistry` creates one `McpClient` per server entry. Health checks, server discovery, and tool metadata are all driven by the JSON config.
 
 ```
 mcp/
-├── clients/                     # Implements core.ports.mcp.McpClient
-│   ├── AbstractMcpClient.java   # Base HTTP client with retry/circuit breaker
-│   ├── KubernetesMcpClient.java # @ApplicationScoped (SINGLETON)
-│   ├── CryostatMcpClient.java   # @ApplicationScoped (SINGLETON)
-│   └── KruizeMcpClient.java     # @ApplicationScoped (SINGLETON)
+├── McpRegistry.java             # @ApplicationScoped — ConcurrentHashMap<String, McpClient>
+│                                 # Populated at startup from mcp.json via init(McpSettings)
 │
-├── models/                      # MCP request/response models
-│   ├── kubernetes/
-│   │   ├── PodContextRequest.java
-│   │   ├── PodContextResponse.java
-│   │   └── K8sEventModel.java
-│   ├── cryostat/
-│   │   ├── JfrSummaryRequest.java
-│   │   ├── JfrSummaryResponse.java
-│   │   └── MemoryProfileModel.java
-│   └── kruize/
-│       ├── RecommendationRequest.java
-│       ├── RecommendationResponse.java
-│       ├── K8sResourceModel.java
-│       └── JvmTuningModel.java
+├── McpClient.java               # Plain (non-CDI) per-server client, built by McpRegistry
+│                                 # checkHealth() → HTTP GET to healthCheck.url → ComponentHealthDto
 │
-├── health/
-│   └── McpHealthCheckerImpl.java
+├── McpStartup.java              # @ApplicationScoped — observes StartupEvent (priority 25)
+│                                 # Loads mcp.json → validates → populates McpRegistry
+│                                 # Failure is non-fatal (logs warning, marks registry failed)
 │
-└── factory/
-    └── McpClientFactory.java
+├── McpContextCollector.java     # @ApplicationScoped — collects diagnostic context from MCP servers
+│                                 # Platform-aware: cluster path vs VM path
+│                                 # Uses JSON-RPC 2.0 over HTTP with SSE response parsing
+│
+├── config/
+│   ├── McpSettings.java         # Jackson-deserialized record model of mcp.json
+│   │                             # Nested records: ServerConfig, ToolConfig, HealthCheckConfig
+│   │                             # Bean Validation annotations for startup validation
+│   │
+│   └── McpSettingsLoader.java   # @ApplicationScoped — reads mcp.json file path from
+│                                 # causa.mcp.config-file property, deserializes + validates
+│
+├── package-info.java            # Package javadoc
+│
+└── util/
+    ├── McpResponseFormatter.java # Static formatter registry keyed by serverName:toolName
+    │                             # Post-processes known tool responses (e.g. pod status summary)
+    │                             # Unknown tools pass through unchanged
+    │
+    └── LibertyLogsContextCollector.java
+                                  # VM platform helper — discovers and reads Liberty log files
+                                  # (messages.log, verbosegc, FFDC) via Filesystem MCP
+                                  # Applies time-window and severity filtering
 ```
+
+**MCP Config JSON files** (`deployment/kubernetes/base/mcp-config/`):
+
+| Profile | File | Servers |
+|---|---|---|
+| Cluster | `mcp-cluster-default.json` | Kubernetes, Kruize, Cryostat |
+| Developer | `mcp-developer-default.json` | Kubernetes, Kruize, Quarkus, Async Profiler |
+| VM | `mcp-vm-default.json` | JMX, Filesystem |
 
 </details>
 
@@ -716,6 +731,10 @@ src/main/resources/db/migration/
 deployment/
 ├── kubernetes/
 │   ├── base/                    # Kustomize base
+│   │   └── mcp-config/          # MCP server configuration (JSON profiles)
+│   │       ├── mcp-cluster-default.json
+│   │       ├── mcp-developer-default.json
+│   │       └── mcp-vm-default.json
 │   └── overlays/                # Environment overlays (dev/staging/prod)
 ├── helm/                        # Helm charts
 └── prometheus/                  # Alert configurations

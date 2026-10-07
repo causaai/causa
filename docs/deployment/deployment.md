@@ -12,7 +12,11 @@ deployment/kubernetes/
 │   ├── configmap.yaml       # Configuration
 │   ├── serviceaccount.yaml  # Service account
 │   ├── namespace.yaml       # Base namespace
-│   └── kustomization.yaml   # Base kustomization
+│   ├── kustomization.yaml   # Base kustomization
+│   └── mcp-config/          # MCP server configuration (JSON)
+│       ├── mcp-cluster-default.json    # Cluster profile (K8s, Kruize, Cryostat)
+│       ├── mcp-developer-default.json  # Developer profile (K8s, Kruize, Quarkus, Async Profiler)
+│       └── mcp-vm-default.json         # VM profile (JMX, Filesystem)
 │
 └── overlays/
     ├── kind/                # Kind (local) environment
@@ -305,6 +309,7 @@ data:
 | `CAUSA_LOG_LEVEL` | Log level | `INFO` | `DEBUG` | `INFO` |
 | `CAUSA_SWAGGER_UI_PATH` | Swagger UI path | `/swagger-ui` | `/swagger-ui` | `/swagger-ui` |
 | `CLUSTER_TYPE` | Cluster type | - | `kind` | `openshift` |
+| `MCP_CONFIG_FILE` | Path to `mcp.json` config file | `mcp-cluster-default.json` | Profile-dependent | Profile-dependent |
 
 ## Customization
 

@@ -225,16 +225,6 @@ public final class LogMessages {
         public static final String MCP_ASYNC_PROFILER_FLAME_GRAPH  = "Async Profiler flame graph retrieved";
         public static final String MCP_ASYNC_PROFILER_NO_RECORDING = "Async Profiler: no latestRecordingId — skipping recording tools";
 
-        // Cryostat MCP
-        public static final String MCP_CRYOSTAT_GC_ANALYSIS = "Cryostat GC analysis retrieved";
-        public static final String MCP_CRYOSTAT_MEMORY_ANALYSIS = "Cryostat memory analysis retrieved";
-        public static final String MCP_CRYOSTAT_THREAD_ANALYSIS = "Cryostat thread analysis retrieved";
-        public static final String MCP_CRYOSTAT_EXCEPTION_ANALYSIS = "Cryostat exception analysis retrieved";
-        public static final String MCP_CRYOSTAT_CONTAINER_ANALYSIS = "Cryostat container analysis retrieved";
-        public static final String MCP_CRYOSTAT_RECORDING_CREATED = "Cryostat recording created, waiting for retry";
-        public static final String MCP_CRYOSTAT_RETRY = "Retrying Cryostat tool call";
-        public static final String MCP_CRYOSTAT_MAX_RETRIES = "Cryostat max retries exceeded";
-
         // Context collection completion
         public static final String MCP_CONTEXT_COLLECTION_COMPLETE = "MCP context collection completed";
 
