@@ -17,6 +17,7 @@ import com.causa.core.services.rules.RuleEvaluationResult;
 import com.causa.core.services.rules.RuleType;
 import com.causa.core.services.rules.Signal;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -44,6 +45,13 @@ import java.util.Optional;
  */
 @ApplicationScoped
 public class PathBEvidenceMapper {
+
+    private final McpSourceResolver sourceResolver;
+
+    @Inject
+    public PathBEvidenceMapper(McpSourceResolver sourceResolver) {
+        this.sourceResolver = sourceResolver;
+    }
 
     /**
      * Maps one rule evaluation into an evidence item.
@@ -127,7 +135,7 @@ public class PathBEvidenceMapper {
      * attribute the fact to a server that may not even be in the deployment.
      */
     private String resolveSource(Signal signal) {
-        return McpSourceResolver.resolve(
+        return sourceResolver.resolve(
             signal.getMetadata(Metadata.SIGNAL_SECTION).map(Object::toString).orElse(null)
         );
     }

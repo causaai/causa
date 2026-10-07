@@ -14,6 +14,7 @@ import com.causa.core.domain.validation.ValidationResult;
 import com.causa.core.services.evidence.McpSourceResolver;
 import com.causa.core.services.evidence.RcaFinding;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -46,6 +47,13 @@ import java.util.Map;
  */
 @ApplicationScoped
 public class PathAEvidenceMapper {
+
+    private final McpSourceResolver sourceResolver;
+
+    @Inject
+    public PathAEvidenceMapper(McpSourceResolver sourceResolver) {
+        this.sourceResolver = sourceResolver;
+    }
 
     /**
      * Maps a single assertion's validation result into evidence items.
@@ -93,7 +101,7 @@ public class PathAEvidenceMapper {
 
         return EvidenceItem.builder()
             .id(evidenceId(result, index))
-            .source(McpSourceResolver.resolve(evidence.source()))
+            .source(sourceResolver.resolve(evidence.source()))
             .type(typeOf(evidence.type()))
             .strength(strength)
             .evidenceHypothesisAlignment(alignment)

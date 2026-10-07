@@ -1,18 +1,21 @@
 package com.causa.core.services.evidence;
 
-import com.causa.common.constants.ContextConstants;
 import com.causa.common.constants.EvidenceConstants.Sources;
+import com.causa.mcp.McpClient;
+import com.causa.mcp.McpRegistry;
+import com.causa.mcp.config.McpSettings;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * MCP Source Resolver
  *
- * <p>Maps a diagnostic context section label onto the canonical MCP server that produced it.
+ * <p>Maps a diagnostic context section label onto the MCP server that produced it.
  *
  * <p>Evidence reaches us labelled with a section name rather than a server name — PATH A
  * evidence carries whatever string the LLM echoed from the context it was shown, and PATH B
@@ -20,62 +23,70 @@ import java.util.Map;
  * single server identifier so evidence can be attributed to the source that actually
  * produced it.
  *
- * <p>Matching is deterministic and needs no LLM call, because the section headers in
- * {@link ContextConstants} already name their server — {@code (Cryostat JFR)},
- * {@code (Kruize)}, {@code (JMX MCP)} — and the Kubernetes sections are the unsuffixed
- * remainder. Labels are matched exact-first, then by longest prefix, then by containment,
- * which absorbs the decorations the LLM adds in practice:
+ * <p>The table is read from {@code mcp.json} via {@link McpRegistry}, not hardcoded: every
+ * section the LLM ever sees is rendered from a tool's {@code contextKey} under its server
+ * entry, so the config already states which server owns which label. A server added to
+ * {@code mcp.json} is resolvable with no code change, and a server absent from the deployment
+ * never attributes evidence to itself.
+ *
+ * <p>Labels are matched exact-first, then by prefix in either direction, then by containment,
+ * which absorbs the decorations the LLM adds and the shortenings collectors apply:
  *
  * <pre>
- *   "POD LOGS (recent) - sequence 124"                            → kubernetes
- *   "POD LOGS (recent) — sequence 125"                            → kubernetes  (em-dash)
- *   "POD LOGS (recent) and PREVIOUS CONTAINER LOGS (pre-crash)"   → kubernetes
- *   "GC ANALYSIS (Cryostat JFR): No Data Available"               → cryostat
+ *   "POD_LOGS - sequence 124"      → kubernetes  (label decorated)
+ *   "LIBERTY_LOGS"                 → filesystem  (LIBERTY_LOGS_DIRECTORY_LISTING shortened)
+ *   "GC ANALYSIS (Cryostat JFR)"   → unknown     (not a contextKey any configured server emits)
  * </pre>
  *
  * <p>An unrecognised label resolves to {@link Sources#UNKNOWN} rather than throwing; the
- * original string is retained in evidence metadata so gaps in this table surface in the data
- * instead of failing the pipeline.
+ * original string is retained in evidence metadata so gaps surface in the data instead of
+ * failing the pipeline.
  *
  * @since 0.0.1
  */
-public final class McpSourceResolver {
+@ApplicationScoped
+public class McpSourceResolver {
 
-    /**
-     * Section label → canonical MCP server, ordered longest-label-first so that prefix
-     * matching always picks the most specific section.
-     */
-    private static final Map<String, String> SECTION_TO_SOURCE = buildSectionMap();
+    private final McpRegistry registry;
 
-    private McpSourceResolver() {
-        // Prevent instantiation
+    @Inject
+    public McpSourceResolver(McpRegistry registry) {
+        this.registry = registry;
     }
 
     /**
-     * Resolves a source label to a canonical MCP server name.
+     * Resolves a source label to the MCP server name that produced it.
      *
      * @param sourceLabel the section label, as emitted by the LLM or stamped by the signal
      *                    extractor; may be null or blank
-     * @return the canonical MCP server name, or {@link Sources#UNKNOWN} if unrecognised
+     * @return the MCP server name as declared in {@code mcp.json}, or {@link Sources#UNKNOWN}
+     *         if unrecognised
      */
-    public static String resolve(String sourceLabel) {
+    public String resolve(String sourceLabel) {
         String normalized = normalize(sourceLabel);
         if (normalized.isEmpty()) {
             return Sources.UNKNOWN;
         }
 
-        String exact = SECTION_TO_SOURCE.get(normalized);
-        if (exact != null) {
-            return exact;
-        }
+        // Longest contextKey first, so the most specific section wins a prefix match.
+        List<Map.Entry<String, String>> table = contextKeyToServer();
 
-        for (Map.Entry<String, String> entry : SECTION_TO_SOURCE.entrySet()) {
-            if (normalized.startsWith(entry.getKey())) {
+        for (Map.Entry<String, String> entry : table) {
+            if (normalized.equals(entry.getKey())) {
                 return entry.getValue();
             }
         }
 
-        for (Map.Entry<String, String> entry : SECTION_TO_SOURCE.entrySet()) {
+        for (Map.Entry<String, String> entry : table) {
+            // Second direction covers a collector that puts a shortened key (LIBERTY_LOGS for
+            // LIBERTY_LOGS_DIRECTORY_LISTING); the "_" boundary keeps it from matching a
+            // fragment that merely happens to start the same way.
+            if (normalized.startsWith(entry.getKey()) || entry.getKey().startsWith(normalized + "_")) {
+                return entry.getValue();
+            }
+        }
+
+        for (Map.Entry<String, String> entry : table) {
             if (normalized.contains(entry.getKey())) {
                 return entry.getValue();
             }
@@ -98,64 +109,22 @@ public final class McpSourceResolver {
     }
 
     /**
-     * Builds the section → server table from {@link ContextConstants}, sorted by descending
-     * label length so the longest (most specific) section wins a prefix match.
+     * Every {@code contextKey} declared in {@code mcp.json}, paired with its server and sorted
+     * longest-key-first. Rebuilt per call — the registry holds a handful of servers with a
+     * handful of tools each, and reading it live means a registry re-init is picked up with no
+     * invalidation logic.
      */
-    private static Map<String, String> buildSectionMap() {
-        Map<String, String> raw = new LinkedHashMap<>();
-
-        // Kubernetes MCP — pods_get, events_list, pods_log
-        raw.put(ContextConstants.SECTION_POD_STATUS, Sources.KUBERNETES);
-        raw.put(ContextConstants.SECTION_POD_EVENTS, Sources.KUBERNETES);
-        raw.put(ContextConstants.SECTION_POD_LOGS, Sources.KUBERNETES);
-        raw.put(ContextConstants.SECTION_PREVIOUS_POD_LOGS, Sources.KUBERNETES);
-
-        // Kruize MCP — resource recommendations
-        raw.put(ContextConstants.SECTION_COST_RECOMMENDATIONS, Sources.KRUIZE);
-        raw.put(ContextConstants.SECTION_PERF_RECOMMENDATIONS, Sources.KRUIZE);
-
-        // Cryostat MCP — JFR analyses
-        raw.put(ContextConstants.SECTION_GC_ANALYSIS, Sources.CRYOSTAT);
-        raw.put(ContextConstants.SECTION_MEMORY_ANALYSIS, Sources.CRYOSTAT);
-        raw.put(ContextConstants.SECTION_THREAD_ANALYSIS, Sources.CRYOSTAT);
-        raw.put(ContextConstants.SECTION_EXCEPTION_ANALYSIS, Sources.CRYOSTAT);
-        raw.put(ContextConstants.SECTION_CONTAINER_ANALYSIS, Sources.CRYOSTAT);
-
-        // Quarkus MCP — raw metrics
-        raw.put(ContextConstants.SECTION_QUARKUS_RAW_METRICS, Sources.QUARKUS);
-
-        // Async Profiler MCP
-        raw.put(ContextConstants.SECTION_ASYNC_PROFILER_POD_LIST, Sources.ASYNC_PROFILER);
-        raw.put(ContextConstants.SECTION_ASYNC_PROFILER_JVM_STATUS, Sources.ASYNC_PROFILER);
-        raw.put(ContextConstants.SECTION_ASYNC_PROFILER_JVM_STATS, Sources.ASYNC_PROFILER);
-        raw.put(ContextConstants.SECTION_ASYNC_PROFILER_RECORDING, Sources.ASYNC_PROFILER);
-        raw.put(ContextConstants.SECTION_ASYNC_PROFILER_REPORT, Sources.ASYNC_PROFILER);
-        raw.put(ContextConstants.SECTION_ASYNC_PROFILER_JFR_SUMMARY, Sources.ASYNC_PROFILER);
-        raw.put(ContextConstants.SECTION_ASYNC_PROFILER_FLAME_GRAPH, Sources.ASYNC_PROFILER);
-
-        // Filesystem MCP — log files on VM / Liberty
-        raw.put(ContextConstants.SECTION_LIBERTY_LOGS, Sources.FILESYSTEM);
-        raw.put(ContextConstants.SECTION_VM_LOG_DIR_LISTING, Sources.FILESYSTEM);
-        raw.put(ContextConstants.SECTION_VM_GC_LOG_CONTENT, Sources.FILESYSTEM);
-
-        // JMX MCP — live JVM state on VM
-        raw.put(ContextConstants.SECTION_VM_HEAP_STATUS, Sources.JMX);
-        raw.put(ContextConstants.SECTION_VM_GC_ACTIVITY, Sources.JMX);
-        raw.put(ContextConstants.SECTION_VM_THREAD_STATE, Sources.JMX);
-        raw.put(ContextConstants.SECTION_VM_GC_PRESSURE, Sources.JMX);
-        raw.put(ContextConstants.SECTION_VM_MEMORY_LEAK, Sources.JMX);
-        raw.put(ContextConstants.SECTION_VM_THREAD_CONTENTION, Sources.JMX);
-        raw.put(ContextConstants.SECTION_VM_JVM_RUNTIME_INFO, Sources.JMX);
-
-        List<Map.Entry<String, String>> sorted = raw.entrySet().stream()
-            .sorted(Comparator.comparingInt((Map.Entry<String, String> e) -> e.getKey().length()).reversed())
-            .toList();
-
-        // LinkedHashMap, not Map.copyOf — iteration order *is* the longest-prefix-wins rule.
-        Map<String, String> ordered = new LinkedHashMap<>();
-        for (Map.Entry<String, String> entry : sorted) {
-            ordered.put(normalize(entry.getKey()), entry.getValue());
+    private List<Map.Entry<String, String>> contextKeyToServer() {
+        List<Map.Entry<String, String>> entries = new ArrayList<>();
+        for (McpClient client : registry.allClients()) {
+            for (McpSettings.ToolConfig tool : client.getConfig().tools()) {
+                String key = normalize(tool.contextKey());
+                if (!key.isEmpty()) {
+                    entries.add(Map.entry(key, client.getServerName()));
+                }
+            }
         }
-        return Collections.unmodifiableMap(ordered);
+        entries.sort(Comparator.comparingInt((Map.Entry<String, String> e) -> e.getKey().length()).reversed());
+        return entries;
     }
 }

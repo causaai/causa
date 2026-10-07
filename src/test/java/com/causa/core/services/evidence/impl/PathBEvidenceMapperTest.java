@@ -1,16 +1,19 @@
 package com.causa.core.services.evidence.impl;
 
-import com.causa.common.constants.ContextConstants;
 import com.causa.common.constants.EvidenceConstants.Metadata;
 import com.causa.common.constants.EvidenceConstants.Sources;
 import com.causa.core.domain.validation.EvidenceItem;
+import com.causa.core.services.evidence.McpSourceResolver;
 import com.causa.core.services.rules.Rule;
 import com.causa.core.services.rules.RuleEvaluationResult;
 import com.causa.core.services.rules.RuleType;
 import com.causa.core.services.rules.Signal;
+import com.causa.mcp.McpRegistry;
+import com.causa.mcp.config.McpSettings;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -21,13 +24,35 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class PathBEvidenceMapperTest {
 
-    private final PathBEvidenceMapper mapper = new PathBEvidenceMapper();
+    /** Section labels are {@code contextKey}s from mcp.json — the resolver reads that, not a table. */
+    private static final String POD_STATUS = "POD_STATUS";
+    private static final String CRYOSTAT_ANALYSIS = "CRYOSTAT_ANALYSIS";
+    private static final String QUARKUS_RAW_METRICS = "QUARKUS_RAW_METRICS";
+
+    private final PathBEvidenceMapper mapper = new PathBEvidenceMapper(new McpSourceResolver(registry()));
+
+    private static McpRegistry registry() {
+        McpRegistry registry = new McpRegistry(null);
+        registry.init(new McpSettings(Map.of(
+            Sources.KUBERNETES, server(POD_STATUS),
+            Sources.CRYOSTAT, server(CRYOSTAT_ANALYSIS),
+            Sources.QUARKUS, server(QUARKUS_RAW_METRICS))));
+        return registry;
+    }
+
+    private static McpSettings.ServerConfig server(String contextKey) {
+        return new McpSettings.ServerConfig(
+            "streamable-http", "http://localhost/mcp", Map.of(), false,
+            new McpSettings.HealthCheckConfig("http://localhost/healthz", 1000), 1000,
+            Map.of(), null,
+            List.of(new McpSettings.ToolConfig("tool", contextKey, null, Map.of())));
+    }
 
     @Test
     void attributesEvidenceToTheSectionTheSignalWasReadFrom() {
         Signal signal = Signal.builder(Signal.SignalType.CONTAINER_STATUS, "exitCode")
             .value(137)
-            .metadata(Metadata.SIGNAL_SECTION, ContextConstants.SECTION_POD_STATUS)
+            .metadata(Metadata.SIGNAL_SECTION, POD_STATUS)
             .build();
 
         EvidenceItem item = mapper.map(null,
@@ -35,7 +60,7 @@ class PathBEvidenceMapperTest {
 
         assertThat(item.source()).isEqualTo(Sources.KUBERNETES);
         assertThat(item.metadata()).containsEntry(
-            Metadata.RAW_SOURCE_LABEL, ContextConstants.SECTION_POD_STATUS);
+            Metadata.RAW_SOURCE_LABEL, POD_STATUS);
     }
 
     /**
@@ -59,8 +84,8 @@ class PathBEvidenceMapperTest {
 
     @Test
     void followsTheSignalWhenTheSameRuleIsAnsweredByADifferentServer() {
-        Signal fromCryostat = signalFrom(ContextConstants.SECTION_MEMORY_ANALYSIS);
-        Signal fromQuarkus = signalFrom(ContextConstants.SECTION_QUARKUS_RAW_METRICS);
+        Signal fromCryostat = signalFrom(CRYOSTAT_ANALYSIS);
+        Signal fromQuarkus = signalFrom(QUARKUS_RAW_METRICS);
         Rule rule = rule(RuleType.SUPPORTING);
 
         assertThat(mapper.map(null, RuleEvaluationResult.passed(rule, List.of(fromCryostat), "ok")).source())
@@ -96,7 +121,7 @@ class PathBEvidenceMapperTest {
     void fallsBackToTheNormalisedPairWhenTheSignalCarriesNoContextLine() {
         EvidenceItem item = mapper.map(null, RuleEvaluationResult.passed(
             rule(RuleType.REQUIRED),
-            List.of(signalFrom(ContextConstants.SECTION_MEMORY_ANALYSIS)),
+            List.of(signalFrom(CRYOSTAT_ANALYSIS)),
             "matched"));
 
         assertThat(item.rawSnippet()).isEqualTo("heap.usage.trend: INCREASING");
