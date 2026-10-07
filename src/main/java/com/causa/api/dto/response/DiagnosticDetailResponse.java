@@ -1,13 +1,11 @@
 package com.causa.api.dto.response;
 
-import com.causa.common.constants.EvidenceConstants.Reliability;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
 import com.causa.core.domain.RootCauseAnalysis;
 import com.causa.core.domain.validation.EvidenceItem;
-import com.causa.core.domain.validation.EvidenceItem.EvidenceHypothesisAlignment;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -87,8 +85,8 @@ public record DiagnosticDetailResponse(
     /**
      * Evidence - UI Model (5 fields).
      *
-     * <p>User-friendly evidence for API response. Selected from top 3-5
-     * EvidenceItems by priority and transformed for display.
+     * <p>User-friendly evidence for API response: every collected EvidenceItem,
+     * transformed for display.
      *
      * @since 0.0.1
      */
@@ -249,21 +247,8 @@ public record DiagnosticDetailResponse(
         );
     }
 
-    /**
-     * Turns strength and alignment into a label a reader can act on.
-     *
-     * <p>A contradiction keeps its strength — a decisive fact that refutes the finding is still
-     * decisive — and is suffixed so the reader is not left thinking it backs the diagnosis.
-     */
+    /** Strength label for the reader; WEAK when the item carries none. */
     private static String evidenceStrengthOf(EvidenceItem item) {
-        if (item.strength() == null) {
-            return "WEAK";
-        }
-
-        String base = item.strength().name();
-
-        return item.evidenceHypothesisAlignment() == EvidenceHypothesisAlignment.REFUTES
-            ? base + Reliability.REFUTES_SUFFIX
-            : base;
+        return item.strength() == null ? "WEAK" : item.strength().name();
     }
 }

@@ -16,9 +16,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Dual-Path Evidence Harvester
@@ -78,13 +76,11 @@ public class DualPathEvidenceHarvester implements EvidenceHarvester {
         items.addAll(harvestPathA(finding, validatedRca));
         items.addAll(harvestPathB(finding, validatedRca));
 
-        EvidenceCollectionResult result =
-            new EvidenceCollectionResult(findingId, deduplicate(items));
+        EvidenceCollectionResult result = new EvidenceCollectionResult(findingId, items);
 
         log.info(LogMessages.Evidence.COLLECTION_COMPLETED)
             .field("findingId", findingId)
             .field("total", result.totalCount())
-            .field("refuting", result.refutingCount())
             .field("sources", String.join(",", result.contributingSources()))
             .log();
 
@@ -123,33 +119,5 @@ public class DualPathEvidenceHarvester implements EvidenceHarvester {
             }
         }
         return items;
-    }
-
-    /**
-     * Drops exact repeats, keeping the first occurrence.
-     *
-     * <p>The LLM cites the same log line under several assertions, so the raw harvest carries
-     * substantial repetition. Identity here is the quoted text together with its source and
-     * stance — the same snippet offered once in support and once against is a genuine conflict,
-     * not a duplicate, and must survive.
-     *
-     * <p>An item that obtained nothing has no quoted text and so is never a repeat of anything:
-     * it is kept unconditionally. Keyed like the rest, every rule that matched no signal would
-     * share {@code unknown|OTHER|NEUTRAL|null} and all but the first would be discarded —
-     * collapsing the record of which sources failed to answer into a single anonymous gap.
-     */
-    private List<EvidenceItem> deduplicate(List<EvidenceItem> items) {
-        Set<String> seen = new LinkedHashSet<>();
-        List<EvidenceItem> unique = new ArrayList<>();
-        for (EvidenceItem item : items) {
-            String key = item.source()
-                + "|" + item.type()
-                + "|" + item.evidenceHypothesisAlignment()
-                + "|" + item.rawSnippet();
-            if (item.rawSnippet() == null || seen.add(key)) {
-                unique.add(item);
-            }
-        }
-        return unique;
     }
 }

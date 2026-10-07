@@ -2,13 +2,10 @@ package com.causa.core.services.evidence.impl;
 
 import com.causa.common.constants.ContextConstants;
 import com.causa.common.constants.EvidenceConstants.Ids;
-import com.causa.common.constants.EvidenceConstants.Metadata;
-import com.causa.common.constants.EvidenceConstants.Priority;
 import com.causa.common.constants.EvidenceConstants.Snippet;
 import com.causa.common.constants.EvidenceConstants.StrengthBands;
 import com.causa.core.domain.validation.Evidence;
 import com.causa.core.domain.validation.EvidenceItem;
-import com.causa.core.domain.validation.EvidenceItem.EvidenceHypothesisAlignment;
 import com.causa.core.domain.validation.EvidenceItem.EvidenceStrength;
 import com.causa.core.domain.validation.ValidationResult;
 import com.causa.core.services.evidence.McpSourceResolver;
@@ -17,9 +14,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * PATH A Evidence Mapper
@@ -75,58 +70,29 @@ public class PathAEvidenceMapper {
             if (carriesNoData(evidence.snippet())) {
                 continue;
             }
-            items.add(toItem(finding, result, evidence, EvidenceHypothesisAlignment.SUPPORTS, ++index));
+            items.add(toItem(result, evidence, ++index));
         }
         for (Evidence evidence : result.refutingEvidence()) {
             if (carriesNoData(evidence.snippet())) {
                 continue;
             }
-            items.add(toItem(finding, result, evidence, EvidenceHypothesisAlignment.REFUTES, ++index));
+            items.add(toItem(result, evidence, ++index));
         }
 
         return items;
     }
 
-    private EvidenceItem toItem(
-        RcaFinding finding,
-        ValidationResult result,
-        Evidence evidence,
-        EvidenceHypothesisAlignment alignment,
-        int index
-    ) {
-        EvidenceStrength strength = strengthOf(evidence.relevanceScore());
-
-        Map<String, String> metadata = baseMetadata(finding, result);
-        metadata.put(Metadata.RAW_SOURCE_LABEL, evidence.source());
-
+    private EvidenceItem toItem(ValidationResult result, Evidence evidence, int index) {
         return EvidenceItem.builder()
             .id(evidenceId(result, index))
             .source(sourceResolver.resolve(evidence.source()))
             .type(typeOf(evidence.type()))
-            .strength(strength)
-            .evidenceHypothesisAlignment(alignment)
+            .strength(strengthOf(evidence.relevanceScore()))
             .rawSnippet(truncate(evidence.snippet()))
             .statement(evidence.statement())
             .explanation(explanationOf(evidence, result))
             .confidence(evidence.relevanceScore())
-            .priority(priorityOf(strength))
-            .metadata(metadata)
             .build();
-    }
-
-    private Map<String, String> baseMetadata(RcaFinding finding, ValidationResult result) {
-        Map<String, String> metadata = new LinkedHashMap<>();
-        metadata.put(Metadata.PATH, Metadata.PATH_A);
-        if (finding != null) {
-            metadata.put(Metadata.FINDING_ID, finding.findingId());
-            if (finding.anomalyType() != null) {
-                metadata.put(Metadata.ANOMALY_TYPE, finding.anomalyType().name());
-            }
-        }
-        metadata.put(Metadata.ASSERTION_ID, result.assertion().id());
-        metadata.put(Metadata.ASSERTION_TYPE, result.assertion().type().name());
-        metadata.put(Metadata.ASSERTION_STATUS, result.status().name());
-        return metadata;
     }
 
     private String evidenceId(ValidationResult result, int index) {
@@ -176,14 +142,6 @@ public class PathAEvidenceMapper {
             return EvidenceStrength.WEAK;
         }
         return EvidenceStrength.CIRCUMSTANTIAL;
-    }
-
-    private int priorityOf(EvidenceStrength strength) {
-        return switch (strength) {
-            case DEFINITIVE -> Priority.PRIMARY;
-            case STRONG -> Priority.SECONDARY;
-            default -> Priority.CONTEXTUAL;
-        };
     }
 
     /**

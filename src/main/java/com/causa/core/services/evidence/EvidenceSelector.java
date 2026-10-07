@@ -7,23 +7,19 @@ import java.util.List;
 /**
  * Evidence Selector
  *
- * <p>Narrows a full evidence harvest down to the handful a developer should actually read.
- *
- * <p>A harvest runs to dozens of items — every assertion the LLM checked, every rule the
- * engine evaluated. Nearly all of it is corroboration of the same few facts. Selection picks
- * the strongest distinct ones and, deliberately, keeps room for the two kinds of evidence a
- * "top N by confidence" ranking would always drop: what <em>contradicts</em> the finding, and
- * what could not be obtained at all.
+ * <p>The place where a full evidence harvest would be narrowed or ordered. Nothing is
+ * narrowed or ordered today: every collected item is returned as collected, until the
+ * ranking design is settled.
  *
  * @since 0.0.1
  */
 public interface EvidenceSelector {
 
     /**
-     * Selects the user-facing subset of collected evidence.
+     * Returns the evidence to report for a finding.
      *
      * @param items all harvested evidence
-     * @return the selected items in display order, never null, at most the configured maximum
+     * @return every item, as collected, never null
      */
     List<EvidenceItem> select(List<EvidenceItem> items);
 }

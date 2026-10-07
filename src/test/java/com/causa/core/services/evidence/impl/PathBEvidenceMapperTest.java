@@ -59,8 +59,6 @@ class PathBEvidenceMapperTest {
             RuleEvaluationResult.passed(rule(RuleType.REQUIRED), List.of(signal), "matched"));
 
         assertThat(item.source()).isEqualTo(Sources.KUBERNETES);
-        assertThat(item.metadata()).containsEntry(
-            Metadata.RAW_SOURCE_LABEL, POD_STATUS);
     }
 
     /**

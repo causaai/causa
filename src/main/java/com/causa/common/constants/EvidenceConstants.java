@@ -43,26 +43,6 @@ public final class EvidenceConstants {
     public static final class Metadata {
         private Metadata() {}
 
-        public static final String PATH                 = "path";
-        public static final String PATH_A               = "A";
-        public static final String PATH_B               = "B";
-        public static final String FINDING_ID           = "findingId";
-        public static final String ANOMALY_TYPE         = "anomalyType";
-
-        // PATH A
-        public static final String ASSERTION_ID         = "assertionId";
-        public static final String ASSERTION_TYPE       = "assertionType";
-        public static final String ASSERTION_STATUS     = "assertionStatus";
-        /** The evidence source string exactly as the LLM emitted it, before normalisation. */
-        public static final String RAW_SOURCE_LABEL     = "rawSourceLabel";
-
-        // PATH B
-        public static final String RULE_ID              = "ruleId";
-        public static final String RULE_TYPE            = "ruleType";
-        public static final String RULE_WEIGHT          = "weight";
-        public static final String RULE_PASSED          = "passed";
-        public static final String INSPECTED_SIGNAL     = "inspectedSignal";
-
         /**
          * Key under which {@code DiagnosticContextSignalExtractor} stamps the originating
          * context section onto {@code Signal.metadata}. Signals are matched against a
@@ -117,42 +97,47 @@ public final class EvidenceConstants {
     }
 
     /**
-     * Display priority — lower sorts first when selecting evidence for the UI.
+     * Display priority carried by every evidence item until the ranking design is finalised.
+     * Lower sorts first, so a flat value leaves ordering to confidence and strength.
      */
-    public static final class Priority {
-        private Priority() {}
-
-        /** Definitive facts that directly settle the hypothesis. */
-        public static final int PRIMARY      = 1;
-        /** Strong corroborating facts. */
-        public static final int SECONDARY    = 2;
-        /** Supporting context (limits, counts, configuration). */
-        public static final int CONTEXTUAL   = 3;
-        /** Ruled-out alternatives — recorded, but never surfaced. */
-        public static final int BACKGROUND   = 8;
-    }
+    public static final int DEFAULT_PRIORITY = 1;
 
     /**
      * Relevance-score bands used to derive {@code EvidenceStrength} from PATH A evidence.
+     * One band per {@code EvidenceStrength}, each the inclusive floor of its band.
      */
     public static final class StrengthBands {
         private StrengthBands() {}
 
-        public static final double DEFINITIVE = 0.95;
-        public static final double STRONG     = 0.85;
-        public static final double MODERATE   = 0.65;
-        public static final double WEAK       = 0.40;
+        /** Definitive proof — exit code 137, OOMKilled status. */
+        public static final double DEFINITIVE     = 0.95;
+        /** Strong indicator — heap above 95%, repeated full GCs. */
+        public static final double STRONG         = 0.85;
+        /** Moderate indicator — heap above 80%, rising trend. */
+        public static final double MODERATE       = 0.65;
+        /** Weak indicator — a single metric spike. */
+        public static final double WEAK           = 0.40;
+        /** Circumstantial — indirect, and the floor everything below WEAK lands on. */
+        public static final double CIRCUMSTANTIAL = 0.0;
     }
 
     /**
      * Rule-weight bands used to derive {@code EvidenceStrength} from PATH B rules.
+     * One band per {@code EvidenceStrength}, each the inclusive floor of its band.
      */
     public static final class RuleWeightBands {
         private RuleWeightBands() {}
 
-        public static final int DEFINITIVE = 10;
-        public static final int STRONG     = 5;
-        public static final int MODERATE   = 3;
+        /** Definitive proof. */
+        public static final int DEFINITIVE     = 10;
+        /** Strong indicator. */
+        public static final int STRONG         = 5;
+        /** Moderate indicator. */
+        public static final int MODERATE       = 3;
+        /** Weak indicator — any rule carrying weight at all. */
+        public static final int WEAK           = 1;
+        /** Circumstantial — a weightless rule, which evidences nothing on its own. */
+        public static final int CIRCUMSTANTIAL = 0;
     }
 
     /**
@@ -165,47 +150,6 @@ public final class EvidenceConstants {
         public static final double PASSED_SUPPORTING  = 0.75;
         public static final double REFUTED            = 0.90;
         public static final double RULED_OUT          = 0.50;
-    }
-
-    /**
-     * User-facing reliability labels rendered into {@code DiagnosticDetailResponse.Evidence}.
-     */
-    public static final class Reliability {
-        private Reliability() {}
-
-        public static final String HIGH           = "High";
-        public static final String MEDIUM         = "Medium";
-        public static final String LOW            = "Low";
-        public static final String REFUTES_SUFFIX = " — refutes";
-    }
-
-    /**
-     * Limits applied when selecting the user-facing evidence panel.
-     */
-    public static final class Selection {
-        private Selection() {}
-
-        /**
-         * Ceiling on evidence entries rendered in the API response — not a target. The panel
-         * stops early whenever the diagnosis has fewer solid facts than slots.
-         */
-        public static final int MAX_UI_EVIDENCE   = 15;
-        /**
-         * Slots held back from decisive evidence for MODERATE and weaker supporting entries.
-         *
-         * <p>A panel of nothing but DEFINITIVE facts reads as though the diagnosis were
-         * assembled from certainties alone, hiding the softer observations it also rests on.
-         * These slots keep a few of them visible.
-         *
-         * <p>Deliberately a small reservation rather than a free fill: nothing upstream checks
-         * that an LLM-supplied snippet actually speaks to the claim it is attached to, so
-         * handing weak items every spare slot surfaces things like a startup banner cited as
-         * proof of allocation retention — which discredits the solid entries beside it.
-         * Whatever these slots do not use goes back to the decisive items.
-         */
-        public static final int WEAKER_SUPPORTING = 3;
-        /** Maximum REFUTES entries — contradictions matter, but must not crowd out the finding. */
-        public static final int MAX_REFUTING      = 3;
     }
 
     /**

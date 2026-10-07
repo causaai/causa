@@ -3,12 +3,10 @@ package com.causa.core.services.evidence.impl;
 import com.causa.common.constants.EvidenceConstants.Ids;
 import com.causa.common.constants.EvidenceConstants.Messages;
 import com.causa.common.constants.EvidenceConstants.Metadata;
-import com.causa.common.constants.EvidenceConstants.Priority;
 import com.causa.common.constants.EvidenceConstants.RuleConfidence;
 import com.causa.common.constants.EvidenceConstants.RuleWeightBands;
 import com.causa.common.constants.EvidenceConstants.Snippet;
 import com.causa.core.domain.validation.EvidenceItem;
-import com.causa.core.domain.validation.EvidenceItem.EvidenceHypothesisAlignment;
 import com.causa.core.domain.validation.EvidenceItem.EvidenceStrength;
 import com.causa.core.services.evidence.McpSourceResolver;
 import com.causa.core.services.evidence.RcaFinding;
@@ -19,10 +17,8 @@ import com.causa.core.services.rules.Signal;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -37,9 +33,8 @@ import java.util.Optional;
  *
  * <p>Whether a failure is a finding or a gap depends on
  * {@link RuleEvaluationResult#getInspectedSignals()}: a signal that was examined and held the
- * wrong value {@link EvidenceHypothesisAlignment#REFUTES refutes} the hypothesis, while a rule
- * that inspected nothing produces no evidence at all — it read no source output, so it has
- * none to show.
+ * wrong value is evidence, while a rule that inspected nothing produces no evidence at all —
+ * it read no source output, so it has none to show.
  *
  * @since 0.0.1
  */
@@ -80,34 +75,24 @@ public class PathBEvidenceMapper {
         }
 
         EvidenceStrength strength = strengthOf(rule.getWeight());
-        EvidenceHypothesisAlignment alignment;
         double confidence;
-        int priority;
 
         if (ruleType == RuleType.EXCLUSION) {
             if (passed) {
-                // A matched exclusion is contradictory evidence: something other than the
-                // hypothesis explains the termination.
-                alignment = EvidenceHypothesisAlignment.REFUTES;
+                // A matched exclusion contradicts the hypothesis: something other than it
+                // explains the termination.
                 confidence = RuleConfidence.REFUTED;
-                priority = priorityOf(strength);
             } else {
-                // A ruled-out alternative. Worth recording, never worth showing.
-                alignment = EvidenceHypothesisAlignment.NEUTRAL;
+                // A ruled-out alternative — recorded, but it evidences nothing on its own.
                 confidence = RuleConfidence.RULED_OUT;
                 strength = EvidenceStrength.CIRCUMSTANTIAL;
-                priority = Priority.BACKGROUND;
             }
         } else if (passed) {
-            alignment = EvidenceHypothesisAlignment.SUPPORTS;
             confidence = ruleType == RuleType.REQUIRED
                 ? RuleConfidence.PASSED_REQUIRED
                 : RuleConfidence.PASSED_SUPPORTING;
-            priority = priorityOf(strength);
         } else {
-            alignment = EvidenceHypothesisAlignment.REFUTES;
             confidence = RuleConfidence.REFUTED;
-            priority = priorityOf(strength);
         }
 
         return EvidenceItem.builder()
@@ -115,13 +100,10 @@ public class PathBEvidenceMapper {
             .source(resolveSource(signal))
             .type(typeOf(signal))
             .strength(strength)
-            .evidenceHypothesisAlignment(alignment)
             .rawSnippet(snippetOf(signal))
             .statement(statementOf(result))
             .explanation(reasoningOf(rule, result))
             .confidence(confidence)
-            .priority(priority)
-            .metadata(metadataOf(finding, rule, result, signal))
             .build();
     }
 
@@ -138,30 +120,6 @@ public class PathBEvidenceMapper {
         return sourceResolver.resolve(
             signal.getMetadata(Metadata.SIGNAL_SECTION).map(Object::toString).orElse(null)
         );
-    }
-
-    private Map<String, String> metadataOf(
-        RcaFinding finding,
-        Rule rule,
-        RuleEvaluationResult result,
-        Signal signal
-    ) {
-        Map<String, String> metadata = new LinkedHashMap<>();
-        metadata.put(Metadata.PATH, Metadata.PATH_B);
-        if (finding != null) {
-            metadata.put(Metadata.FINDING_ID, finding.findingId());
-            if (finding.anomalyType() != null) {
-                metadata.put(Metadata.ANOMALY_TYPE, finding.anomalyType().name());
-            }
-        }
-        metadata.put(Metadata.RULE_ID, rule.getId());
-        metadata.put(Metadata.RULE_TYPE, rule.getType().name());
-        metadata.put(Metadata.RULE_WEIGHT, String.valueOf(rule.getWeight()));
-        metadata.put(Metadata.RULE_PASSED, String.valueOf(result.isPassed()));
-        metadata.put(Metadata.INSPECTED_SIGNAL, signal.getName());
-        signal.getMetadata(Metadata.SIGNAL_SECTION)
-            .ifPresent(section -> metadata.put(Metadata.RAW_SOURCE_LABEL, section.toString()));
-        return metadata;
     }
 
     /**
@@ -215,18 +173,10 @@ public class PathBEvidenceMapper {
         if (magnitude >= RuleWeightBands.MODERATE) {
             return EvidenceStrength.MODERATE;
         }
-        if (magnitude > 0) {
+        if (magnitude >= RuleWeightBands.WEAK) {
             return EvidenceStrength.WEAK;
         }
         return EvidenceStrength.CIRCUMSTANTIAL;
-    }
-
-    private int priorityOf(EvidenceStrength strength) {
-        return switch (strength) {
-            case DEFINITIVE -> Priority.PRIMARY;
-            case STRONG -> Priority.SECONDARY;
-            default -> Priority.CONTEXTUAL;
-        };
     }
 
     private EvidenceItem.EvidenceType typeOf(Signal signal) {

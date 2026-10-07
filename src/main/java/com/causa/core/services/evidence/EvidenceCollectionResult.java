@@ -1,7 +1,6 @@
 package com.causa.core.services.evidence;
 
 import com.causa.core.domain.validation.EvidenceItem;
-import com.causa.core.domain.validation.EvidenceItem.EvidenceHypothesisAlignment;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -42,13 +41,6 @@ public record EvidenceCollectionResult(
     /** Total number of evidence items collected. */
     public int totalCount() {
         return items.size();
-    }
-
-    /** Items that contradict the finding. */
-    public long refutingCount() {
-        return items.stream()
-            .filter(i -> i.evidenceHypothesisAlignment() == EvidenceHypothesisAlignment.REFUTES)
-            .count();
     }
 
     /**
