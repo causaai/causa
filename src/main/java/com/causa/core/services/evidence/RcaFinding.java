@@ -14,14 +14,14 @@ import com.causa.core.domain.RootCauseAnalysis.AnomalyType;
  * {@link com.causa.core.domain.validation.EvidenceItem} be traced back to the diagnosis it
  * belongs to, and lets a collector decide whether it handles this kind of finding at all.
  *
- * @param findingId   the diagnostic ID this finding belongs to
- * @param anomalyType the classified anomaly, which selects the applicable collector
- * @param issueTitle  human-readable title, retained for logging and evidence reasoning text
+ * @param diagnosticId the diagnostic this finding belongs to
+ * @param anomalyType  the classified anomaly, which selects the applicable collector
+ * @param issueTitle   human-readable title, retained for logging and evidence reasoning text
  *
  * @since 0.0.1
  */
 public record RcaFinding(
-    String findingId,
+    String diagnosticId,
     AnomalyType anomalyType,
     String issueTitle
 ) {
