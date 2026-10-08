@@ -61,6 +61,7 @@ Prometheus + Alertmanager
 causa  ←── gathers context from:
     │                - Kubernetes MCP Server (pod, logs, events)
     │                - Quarkus MCP Server (JVM metrics)
+    │                - Prometheus MCP Server (PromQL memory trend queries — Kind only)
     │                - Jafra (Experimental) MCP Server (JFR analysis)
     │  runs AI analysis via LLM provider
     ▼
@@ -79,6 +80,7 @@ Developer sees root cause + prioritised remediation steps
 | `jafra-controller - Experimental` | [bharathappali/jafra-controller](https://github.com/bharathappali/jafra-controller) | Go mutating webhook; injects async-profiler into opted-in Java pods |
 | `jafra-agent - Experimental` | [bharathappali/jafra-agent](https://github.com/bharathappali/jafra-agent) | Rust DaemonSet; streams JFR chunks from nodes to the analyzer |
 | `jafra-analyzer - Experimental` | [bharathappali/jafra-analyzer](https://github.com/bharathappali/jafra-analyzer) | Quarkus service; stores recordings and serves automated JFR analysis |
+| `prometheus-mcp-server` | [prometheus/prometheus-mcp](https://github.com/prometheus/prometheus-mcp) | Exposes PromQL instant and range queries as MCP tools; provides memory trend data to Causa |
 | `installer` | [causaai/installer](https://github.com/causaai/installer) | Shell installer; deploys the full stack in one command |
 | `causa-demos` | [causaai/causa-demos](https://github.com/causaai/causa-demos) | End-to-end demos with a pre-built chaos workload |
 
@@ -166,6 +168,8 @@ When the installer completes, all components are running in the `causa-rca` name
 | `30004` | Quarkus MCP Server |
 | `30005` | Causa MCP Server |
 
+> **Note:** The Prometheus MCP Server is a `ClusterIP`-only service consumed internally by the Causa Backend. It does not need to be exposed locally — Causa queries it directly inside the cluster.
+
 **What gets installed on Kind:**
 - Kind cluster + local registry
 - Prometheus stack (kube-prometheus-stack) — for alerting
@@ -174,6 +178,7 @@ When the installer completes, all components are running in the `causa-rca` name
 - Jafra Ecosystem - Experimental (Controller, Agent, Analyzer)
 - Jafra MCP Server
 - Quarkus MCP Server
+- Prometheus MCP Server
 - PostgreSQL with pgvector
 - Causa
 - Causa MCP Server
