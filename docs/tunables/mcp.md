@@ -106,6 +106,77 @@ The cluster diagnostic path calls the Cryostat Kubernetes mux through `mcp.json`
 (`deployment/kubernetes/base/mcp-config/mcp-cluster-default.json`). Both tools must already be
 exposed by that server (`toolLevel` `ALL`). Causa does not start a JFR recording.
 
+### Prerequisites: Cryostat agent & discovery
+
+**JFR analysis is only available for pods that are registered in Cryostat's discovery tree.**
+
+1. **Deploy the Cryostat agent** on each target pod (typically via the Cryostat operator or a sidecar).
+2. The agent registers the pod's JVM with Cryostat, making it appear in the discovery tree under its Kubernetes namespace → deployment → replica set → pod hierarchy.
+3. When an alert fires, Causa calls `getDiscoveryTree` with the alert namespace and `mergeRealms=true`.
+4. **If the alert pod is not found in the tree**, `CryostatContextCollector` records a not-found note in `CRYOSTAT_DISCOVERY` and **skips** the `getAnalysisReport` call entirely — no JFR analysis is available for that alert.
+5. **If the pod is found**, the collector proceeds to call `getAnalysisReport` with the pod name and an ISO-8601 time window (alert timestamp ± `analysisLookbackMinutes`, default 15 min).
+
+> **Note**: Installing the Cryostat MCP server alone is not sufficient. The target workloads must have the Cryostat agent running and be discoverable. Pods without the agent (or in namespaces not watched by Cryostat) will not receive automated JFR analysis.
+
+#### Required pod labels / annotations
+
+Add the following labels to your workload's pod template (`spec.template.metadata.labels`) so the Cryostat agent auto-configures and registers the JVM:
+
+| Label | Required | Description |
+|---|---|---|
+| `cryostat.io/name` | Yes | Name of the Cryostat instance (e.g., `cryostat-sample`) |
+| `cryostat.io/namespace` | Yes | Namespace where the Cryostat instance is running (e.g., `openshift-tuning`) |
+| `cryostat.io/harvester-template` | Yes | Recording template — use `Continuous` for ongoing JFR recordings |
+| `cryostat.io/harvester-period` | No | Harvester period (e.g., `5m`) — how often to rotate recordings |
+| `cryostat.io/harvester-max-files` | No | Max archived recordings to retain (e.g., `"6"`) |
+| `cryostat.io/log-level` | No | Agent log level (e.g., `debug`) |
+
+**Example Deployment snippet:**
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-cache
+  namespace: openshift-tuning
+  labels:
+    app: auth-cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-cache
+  template:
+    metadata:
+      labels:
+        app: auth-cache
+        cryostat.io/name: cryostat-sample
+        cryostat.io/namespace: openshift-tuning
+        cryostat.io/harvester-template: Continuous
+        cryostat.io/harvester-period: 5m
+        cryostat.io/harvester-max-files: "6"
+        cryostat.io/log-level: debug
+    spec:
+      containers:
+        - name: auth-cache
+          image: "quay.io/causa-ai-hub/quarkus-gc-pause:promotion-pressure-nd"
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              memory: "650Mi"
+            limits:
+              memory: "650Mi"
+          env:
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:+UseContainerSupport -Xms256m -Xmx378m -Xlog:gc"
+            - name: GC_SCENARIO
+              value: "PROMOTION_PRESSURE"
+          ports:
+            - containerPort: 8080
+```
+
+> **Reference**: [Effortless Java Observability: Cryostat Agent Autoconfiguration](https://developers.redhat.com/blog/2025/03/20/effortless-java-observability-cryostat-agent-autoconfiguration) — Red Hat blog with full setup walkthrough.
+
 `getDiscoveryTree` is called first with the alert namespace and `mergeRealms=true`.
 `getAnalysisReport` runs only when that tree contains the alert namespace and pod. The report
 call passes the pod name plus an ISO-8601 window ending at the alert timestamp.

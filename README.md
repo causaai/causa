@@ -81,7 +81,7 @@ Instead of engineers manually collecting data from multiple tools, Causa deliver
 | Manual Incident Response | With Causa 🚀 |
 |---------------------------|---------------|
 | Engineer waits for an alert and starts investigating manually. | Automatically responds to Prometheus Alertmanager alerts. |
-| Switches between Grafana, kubectl, logs, JFR, and monitoring dashboards. | Collects logs, Kubernetes events, JFR (Planned), JVM metrics (Planned), and infrastructure context automatically. |
+| Switches between Grafana, kubectl, logs, JFR, and monitoring dashboards. | Collects logs, Kubernetes events, **automated JFR analysis (requires Cryostat agent on target pods)**, JVM metrics, and infrastructure context automatically. |
 | Correlates data across multiple tools manually. | AI correlates all production context into a single diagnosis. |
 | Requires JVM and Kubernetes expertise to identify the root cause. | AI identifies the most likely root cause with supporting evidence. |
 | Engineers spend hours debugging memory leaks, OOMKills, and GC issues. | Root cause analysis is completed in minutes, reducing MTTR. |
@@ -105,6 +105,7 @@ Instead of engineers manually collecting data from multiple tools, Causa deliver
 | PostgreSQL | 14+ | must have **[pgvector](https://github.com/pgvector/pgvector)** installed |
 | [Kubernetes MCP Server](https://github.com/containers/kubernetes-mcp-server) | latest | pod status, logs, events via JSON-RPC 2.0 |
 | [Kruize MCP Server](https://github.com/kruize/kruize-mcp-server) | latest | resource cost & performance recommendations |
+| [Cryostat MCP Server](https://github.com/cryostatio/cryostat-mcp) | latest | automated JFR analysis via discovery tree + analysis report; **requires Cryostat agent deployed on target pods for discovery** |
 | `kubectl` + `kustomize` | 1.27+ / 5+ | for Kubernetes deployment |
 
 ### Running in Dev Mode
