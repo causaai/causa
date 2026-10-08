@@ -1,9 +1,16 @@
 package com.causa.api.dto.response;
 
+import com.causa.common.logging.CausaLogger;
+import com.causa.common.logging.LogMessages;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
 import com.causa.core.domain.RootCauseAnalysis;
+import com.causa.core.domain.validation.EvidenceItem;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import java.time.Instant;
 import java.util.List;
@@ -47,6 +54,22 @@ public record DiagnosticDetailResponse(
 
 ) {
 
+    private static final CausaLogger log = CausaLogger.getLogger(DiagnosticDetailResponse.class);
+
+    /**
+     * Reader for the stored evidence JSON.
+     *
+     * <p>JavaTimeModule is not optional: {@code EvidenceItem.collectedAt} is an {@link Instant},
+     * and a bare ObjectMapper cannot read one. Unknown properties are ignored so an evidence
+     * model that gains a field stays readable against rows written before it existed.
+     */
+    private static final ObjectMapper MAPPER = new ObjectMapper()
+        .registerModule(new JavaTimeModule())
+        .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
+    private static final TypeReference<List<EvidenceItem>> EVIDENCE_ITEMS =
+        new TypeReference<>() {};
+
     // -------------------------------------------------------------------------
     // Nested records
     // -------------------------------------------------------------------------
@@ -62,8 +85,8 @@ public record DiagnosticDetailResponse(
     /**
      * Evidence - UI Model (5 fields).
      *
-     * <p>User-friendly evidence for API response. Selected from top 3-5
-     * EvidenceItems by priority and transformed for display.
+     * <p>User-friendly evidence for API response: every collected EvidenceItem,
+     * transformed for display.
      *
      * @since 0.0.1
      */
@@ -72,7 +95,7 @@ public record DiagnosticDetailResponse(
         @JsonProperty("explanation")        String explanation,
         @JsonProperty("source")             String source,
         @JsonProperty("rawSnippet")         String rawSnippet,
-        @JsonProperty("reliability")        String reliability
+        @JsonProperty("evidenceStrength")   String evidenceStrength
     ) {}
 
     public record DiagnosisInfo(
@@ -142,8 +165,6 @@ public record DiagnosticDetailResponse(
                     .toList();
             }
 
-            // TODO: Once validation pipeline is integrated, transform EvidenceItem -> Evidence
-            // For now, validationEvidences is null; existing RCA evidences are preserved
             diagnosisInfo = new DiagnosisInfo(
                 rca.issueTitle(),
                 rca.issueSummary(),
@@ -152,7 +173,7 @@ public record DiagnosticDetailResponse(
                 rca.anomalyType() != null ? rca.anomalyType().name() : null,
                 rca.rootCause(),
                 rca.evidences(),  // LLM-generated evidences (backward compatible)
-                null,  // validationEvidences - will be populated from allEvidence in future
+                toValidationEvidences(diagnostic.getEvidence()),
                 rca.supportingLogs(),
                 rcaScore,
                 summaryText,
@@ -172,5 +193,62 @@ public record DiagnosticDetailResponse(
             diagnosisInfo,
             diagnostic.getValidationResult()
         );
+    }
+
+    // -------------------------------------------------------------------------
+    // Evidence rendering
+    // -------------------------------------------------------------------------
+
+    /**
+     * Renders the stored evidence selection into the UI model.
+     *
+     * <p>Selection already happened when the diagnostic completed; this only reshapes the
+     * chosen items. Malformed or absent stored JSON yields null rather than failing the
+     * request — evidence is supplementary to a diagnosis, never a precondition for reading it.
+     */
+    private static List<Evidence> toValidationEvidences(String evidenceJson) {
+        if (evidenceJson == null || evidenceJson.isBlank()) {
+            return null;
+        }
+        try {
+            List<EvidenceItem> items = MAPPER.readValue(evidenceJson, EVIDENCE_ITEMS);
+            return items.stream().map(DiagnosticDetailResponse::toEvidence).toList();
+        } catch (Exception e) {
+            // Logged, not silent: a swallowed failure here is indistinguishable from a
+            // diagnostic that collected no evidence at all.
+            log.warn(LogMessages.Evidence.RENDERING_FAILED)
+                .exception(e)
+                .log();
+            return null;
+        }
+    }
+
+    /**
+     * Maps one stored item onto the UI model.
+     *
+     * <p>{@code supportingEvidence} carries the one-line statement of what was observed, not the
+     * assertion it was collected for, and {@code explanation} argues why that observation
+     * settles the point. {@code rawSnippet} is the verbatim source text behind the statement, so
+     * the reader can check it rather than take it on trust.
+     *
+     * <p>Rule-derived items have no statement — no narrator wrote one — and the snippet stands
+     * in. Repeating it is honest: the snippet is all that was observed.
+     */
+    private static Evidence toEvidence(EvidenceItem item) {
+        String statement = item.statement() != null && !item.statement().isBlank()
+            ? item.statement()
+            : item.rawSnippet();
+        return new Evidence(
+            statement,
+            item.explanation(),
+            item.type() != null ? item.type().name() : "OTHER",
+            item.rawSnippet(),
+            evidenceStrengthOf(item)
+        );
+    }
+
+    /** Strength label for the reader; WEAK when the item carries none. */
+    private static String evidenceStrengthOf(EvidenceItem item) {
+        return item.strength() == null ? "WEAK" : item.strength().name();
     }
 }

@@ -89,6 +89,18 @@ prompts:
       - UNSUPPORTED: Evidence contradicts the claim
       - UNKNOWN: Insufficient evidence to validate
 
+      Evidence Type:
+      Classify by the kind of artifact the snippet was taken from, NOT by what the value
+      looks like. A number is not automatically a METRIC.
+      - METRIC: a value sampled from a metrics endpoint (Prometheus, JMX)
+      - CONTAINER_STATUS: container state or its configured resources — exit code,
+        termination reason, restart count, resource requests and limits
+      - KRUIZE_RECOMMENDATION: any value read out of a resource recommendation document,
+        including the current config it echoes back and its observed min/max/median fields
+      - GC_ANALYSIS / MEMORY_ANALYSIS / THREAD_ANALYSIS / EXCEPTION_ANALYSIS: profiler or
+        JVM analysis output, whichever subject it concerns
+      Use the value from the list above verbatim. Pick OTHER only when none applies.
+
       IMPORTANT: Respond with ONLY a JSON object, no explanatory text before or after.
 
       JSON format:
@@ -100,7 +112,7 @@ prompts:
             "snippet": "exact text from context",
             "source": "section name",
             "relevance": 0.0-1.0,
-            "type": "KUBERNETES_EVENT|METRIC|POD_LOG|etc",
+            "type": "KUBERNETES_EVENT|POD_STATUS|CONTAINER_STATUS|POD_LOG|METRIC|KRUIZE_RECOMMENDATION|GC_ANALYSIS|MEMORY_ANALYSIS|THREAD_ANALYSIS|EXCEPTION_ANALYSIS|CRYOSTAT_ANALYSIS|OTHER",
             "statement": "one line stating only what this snippet shows, max 80 chars",
             "explanation": "why this snippet matters for the assertion - what it proves or rules out"
           }
