@@ -4,8 +4,8 @@ import com.causa.common.constants.LLMConstants;
 import com.causa.common.exceptions.LLMException;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
-import com.causa.config.AppConfig;
-import com.causa.config.LlmConfigSnapshot;
+import com.causa.config.LlmConfigCache;
+import com.causa.core.domain.LlmConfig;
 import com.google.auth.oauth2.GoogleCredentials;
 import dev.langchain4j.model.anthropic.AnthropicChatModel;
 import dev.langchain4j.model.chat.ChatModel;
@@ -44,11 +44,11 @@ public class ChatModelFactory {
 
     private static final CausaLogger log = CausaLogger.getLogger(ChatModelFactory.class);
 
-    private final AppConfig appConfig;
+    private final LlmConfigCache llmConfigCache;
 
     @Inject
-    public ChatModelFactory(AppConfig appConfig) {
-        this.appConfig = appConfig;
+    public ChatModelFactory(LlmConfigCache llmConfigCache) {
+        this.llmConfigCache = llmConfigCache;
     }
 
     /**
@@ -58,10 +58,15 @@ public class ChatModelFactory {
      * @throws LLMException if the provider is unsupported or configuration is missing
      */
     public ChatModel chatModel() {
-        LlmConfigSnapshot llm = appConfig.getLlmConfig();
-        String provider = llm.getProvider();
+        LlmConfig active = llmConfigCache.getActive().orElseThrow(() ->
+            new LLMException(
+                LLMConstants.ErrorMessages.LLM_CONFIG_NOT_AVAILABLE,
+                LLMConstants.ErrorTypes.MISSING_CONFIGURATION
+            )
+        );
+        String provider = active.getProvider().name().toLowerCase();
 
-        if (provider == null || provider.isBlank()) {
+        if (provider.isBlank()) {
             log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
                 .field(LLMConstants.ConfigKeys.MISSING_CONFIG, "LLM_PROVIDER")
                 .log();
@@ -75,9 +80,9 @@ public class ChatModelFactory {
             .field(LLMConstants.Fields.PROVIDER, provider)
             .log();
 
-        return switch (provider.toLowerCase()) {
-            case LLMConstants.Provider.ANTHROPIC -> buildAnthropicModel(llm);
-            case LLMConstants.Provider.VERTEX_AI_ANTHROPIC -> buildVertexAiAnthropicModel(llm);
+        return switch (provider) {
+            case LLMConstants.Provider.ANTHROPIC -> buildAnthropicModel(active);
+            case "vertex_ai" -> buildVertexAiAnthropicModel(active);
             // Future providers:
             // case LLMConstants.Provider.IBM_BOB -> buildIbmBobModel();  // OpenAI-compatible interface
             // case LLMConstants.Provider.OLLAMA -> buildOllamaModel();
@@ -99,10 +104,9 @@ public class ChatModelFactory {
      * @return true if provider and model name are configured
      */
     public boolean isReady() {
-        LlmConfigSnapshot llm = appConfig.getLlmConfig();
-        String provider = llm.getProvider();
-        String modelName = llm.getModelName();
-        return provider != null && !provider.isBlank() && modelName != null && !modelName.isBlank();
+        return llmConfigCache.getActive()
+            .filter(a -> a.getModels() != null && !a.getModels().isEmpty())
+            .isPresent();
     }
 
     /**
@@ -112,8 +116,8 @@ public class ChatModelFactory {
      * @return the Anthropic chat model
      * @throws LLMException if API key is missing
      */
-    private ChatModel buildAnthropicModel(LlmConfigSnapshot llm) {
-        String apiKey = llm.getApiKey();
+    private ChatModel buildAnthropicModel(LlmConfig llm) {
+        String apiKey = llm.getAuthConfig() != null ? llm.getAuthConfig().apiKey() : null;
         if (apiKey == null || apiKey.isBlank()) {
             log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
                 .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.ANTHROPIC)
@@ -125,22 +129,26 @@ public class ChatModelFactory {
             );
         }
 
-        String modelName = llm.getModelName();
+        String modelName = llm.getModels() != null && !llm.getModels().isEmpty() ? llm.getModels().get(0) : "";
+        double temperature = llm.getTemperature() != null ? llm.getTemperature().doubleValue() : 0.1;
+        int maxTokens = llm.getMaxTokens() != null ? llm.getMaxTokens() : 8192;
+        long timeoutSeconds = llm.getTimeoutMs() != null ? llm.getTimeoutMs() / 1000L : 180L;
+
         log.info(LogMessages.LLM.LLM_PROVIDER_DETECTED)
             .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.ANTHROPIC)
             .field(LLMConstants.Fields.AUTH_TYPE, LLMConstants.AuthModes.API_KEY)
             .field(LLMConstants.Fields.MODEL, modelName)
-            .field(LLMConstants.Fields.TEMPERATURE, llm.getTemperature())
-            .field(LLMConstants.Fields.MAX_TOKENS, llm.getMaxTokens())
+            .field(LLMConstants.Fields.TEMPERATURE, temperature)
+            .field(LLMConstants.Fields.MAX_TOKENS, maxTokens)
             .field(LLMConstants.Fields.CACHE_ENABLED, true)
             .log();
 
         return AnthropicChatModel.builder()
             .apiKey(apiKey)
             .modelName(modelName)
-            .temperature(llm.getTemperature())
-            .maxTokens(llm.getMaxTokens())
-            .timeout(Duration.ofSeconds(llm.getTimeoutSeconds()))
+            .temperature(temperature)
+            .maxTokens(maxTokens)
+            .timeout(Duration.ofSeconds(timeoutSeconds))
             .cacheSystemMessages(true)  // Enable prompt caching for system messages
             .logRequests(true)
             .logResponses(true)
@@ -160,8 +168,8 @@ public class ChatModelFactory {
      * @return the Vertex AI Anthropic chat model
      * @throws LLMException if project ID or credentials are missing/invalid
      */
-    private ChatModel buildVertexAiAnthropicModel(LlmConfigSnapshot llm) {
-        String projectId = llm.getVertexProjectId();
+    private ChatModel buildVertexAiAnthropicModel(LlmConfig llm) {
+        String projectId = additionalConfig(llm, "projectId");
         if (projectId == null || projectId.isBlank()) {
             log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
                 .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.VERTEX_AI_ANTHROPIC)
@@ -173,7 +181,7 @@ public class ChatModelFactory {
             );
         }
 
-        String adcBase64 = llm.getGoogleApplicationCredentials();
+        String adcBase64 = llm.getAuthConfig() != null ? llm.getAuthConfig().credentialsJson() : null;
         if (adcBase64 == null || adcBase64.isBlank()) {
             log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
                 .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.VERTEX_AI_ANTHROPIC)
@@ -202,11 +210,12 @@ public class ChatModelFactory {
             );
         }
 
-        String location = llm.getVertexLocation();
+        String location = additionalConfig(llm, "location");
         if (location == null || location.isBlank()) {
             location = "us-east5";
         }
-        String modelName = llm.getModelName();
+        String modelName = llm.getModels() != null && !llm.getModels().isEmpty() ? llm.getModels().get(0) : "";
+        int maxTokens = llm.getMaxTokens() != null ? llm.getMaxTokens() : 8192;
 
         log.info(LogMessages.LLM.LLM_PROVIDER_DETECTED)
             .field(LLMConstants.Fields.PROVIDER, LLMConstants.Provider.VERTEX_AI_ANTHROPIC)
@@ -215,17 +224,24 @@ public class ChatModelFactory {
             .field(LLMConstants.Fields.VERTEX_PROJECT_ID, projectId)
             .field(LLMConstants.Fields.VERTEX_LOCATION, location)
             .field(LLMConstants.Fields.TEMPERATURE, llm.getTemperature())
-            .field(LLMConstants.Fields.MAX_TOKENS, llm.getMaxTokens())
+            .field(LLMConstants.Fields.MAX_TOKENS, maxTokens)
             .log();
 
         return VertexAiAnthropicChatModel.builder()
             .project(projectId)
             .location(location)
             .modelName(modelName)
-            .maxTokens(llm.getMaxTokens())
+            .maxTokens(maxTokens)
             .credentials(credentials)
             .logRequests(true)
             .logResponses(true)
             .build();
+    }
+
+    /** Reads a string value from {@code additionalConfig}, returning null if absent. */
+    private static String additionalConfig(LlmConfig llm, String key) {
+        if (llm.getAdditionalConfig() == null) return null;
+        Object val = llm.getAdditionalConfig().get(key);
+        return val != null ? val.toString() : null;
     }
 }

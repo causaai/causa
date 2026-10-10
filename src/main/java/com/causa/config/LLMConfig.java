@@ -26,7 +26,7 @@ import java.util.Optional;
 public interface LLMConfig {
 
     /**
-     * LLM provider to use (anthropic, vertex-ai-anthropic, openai, ollama).
+     * LLM provider to use (anthropic, vertex-ai-anthropic, bob).
      *
      * @return the provider name, or empty if not configured
      */
