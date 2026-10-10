@@ -496,6 +496,10 @@ public class RuleEngine implements HypothesisValidator {
             List<String> signalNames = toStringList(signalNameRaw);
 
             List<Signal> matched = new ArrayList<>();
+            // Signals of the right type and name, whatever their value. On failure this is the
+            // difference between "the fact was checked and did not hold" and "the fact was
+            // never extracted" — evidence collection depends on telling those apart.
+            List<Signal> inspected = new ArrayList<>();
             for (Signal signal : signals) {
                 boolean typeMatch = signalTypes.isEmpty() ||
                     signalTypes.stream().anyMatch(t -> t.equalsIgnoreCase(signal.getType().name()));
@@ -504,6 +508,8 @@ public class RuleEngine implements HypothesisValidator {
                         n.equalsIgnoreCase(signal.getName()) : n.equals(signal.getName()));
 
                 if (!typeMatch || !nameMatch) continue;
+
+                inspected.add(signal);
 
                 boolean valueMatch = evaluateCondition(signal, condition, signalValueRaw,
                     (Number) match.get("threshold"), caseInsensitive);
@@ -517,7 +523,7 @@ public class RuleEngine implements HypothesisValidator {
                 return RuleEvaluationResult.passed(this, matched,
                     messages.getOrDefault("success", "Rule matched"));
             }
-            return RuleEvaluationResult.failed(this,
+            return RuleEvaluationResult.failed(this, inspected,
                 messages.getOrDefault("failure", "Rule did not match"));
         }
 
