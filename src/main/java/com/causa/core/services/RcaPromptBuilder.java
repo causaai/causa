@@ -1,7 +1,7 @@
 package com.causa.core.services;
 
 import com.causa.common.constants.ModelType;
-import com.causa.config.LLMConfig;
+import com.causa.config.LlmConfigCache;
 import com.causa.core.domain.Alert;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -21,12 +21,12 @@ import jakarta.inject.Inject;
 public class RcaPromptBuilder {
 
     private final PromptTemplateLoader templateLoader;
-    private final LLMConfig llmConfig;
+    private final LlmConfigCache llmConfigCache;
 
     @Inject
-    public RcaPromptBuilder(PromptTemplateLoader templateLoader, LLMConfig llmConfig) {
+    public RcaPromptBuilder(PromptTemplateLoader templateLoader, LlmConfigCache llmConfigCache) {
         this.templateLoader = templateLoader;
-        this.llmConfig = llmConfig;
+        this.llmConfigCache = llmConfigCache;
     }
 
     /**
@@ -40,15 +40,15 @@ public class RcaPromptBuilder {
      * @return the complete RCA prompt
      */
     public String buildPrompt(Alert alert, String mcpContext) {
-        // Determine model type for template selection
-        ModelType modelType = determineModelType(
-                llmConfig.provider().orElse(""), llmConfig.modelName().orElse(""));
+        String provider  = llmConfigCache.getActive()
+            .map(a -> a.getProvider().name().toLowerCase()).orElse("");
+        String modelName = llmConfigCache.getActive()
+            .filter(a -> a.getModels() != null && !a.getModels().isEmpty())
+            .map(a -> a.getModels().get(0)).orElse("");
 
-        // Load appropriate template using provider and model name
-        PromptTemplateLoader.PromptTemplate template = templateLoader.loadTemplate(
-                modelType.getTemplateName(), llmConfig.modelName().orElse(""));
-
-        // Render the prompt with context (alert details already in context)
+        ModelType modelType = determineModelType(provider, modelName);
+        PromptTemplateLoader.PromptTemplate template =
+            templateLoader.loadTemplate(modelType.getTemplateName(), modelName);
         return template.render(mcpContext);
     }
 
@@ -58,10 +58,15 @@ public class RcaPromptBuilder {
      * @return the system prompt
      */
     public String getSystemPrompt() {
-        ModelType modelType = determineModelType(
-                llmConfig.provider().orElse(""), llmConfig.modelName().orElse(""));
-        PromptTemplateLoader.PromptTemplate template = templateLoader.loadTemplate(
-                modelType.getTemplateName(), llmConfig.modelName().orElse(""));
+        String provider  = llmConfigCache.getActive()
+            .map(a -> a.getProvider().name().toLowerCase()).orElse("");
+        String modelName = llmConfigCache.getActive()
+            .filter(a -> a.getModels() != null && !a.getModels().isEmpty())
+            .map(a -> a.getModels().get(0)).orElse("");
+
+        ModelType modelType = determineModelType(provider, modelName);
+        PromptTemplateLoader.PromptTemplate template =
+            templateLoader.loadTemplate(modelType.getTemplateName(), modelName);
         return template.systemPrompt();
     }
 

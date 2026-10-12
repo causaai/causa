@@ -1,9 +1,11 @@
 package com.causa.llm;
 
+import com.causa.common.constants.ConfigConstants.LlmProvider;
 import com.causa.common.exceptions.LLMException;
-import com.causa.config.AppConfig;
-import com.causa.config.LlmConfigSnapshot;
+import com.causa.config.LlmConfigCache;
+import com.causa.core.domain.AuthConfig;
 import com.causa.core.domain.LLMRequest;
+import com.causa.core.domain.LlmConfig;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.skills.Skills;
@@ -14,6 +16,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -23,9 +28,18 @@ class LangChainPromptSenderTest {
 
     @Mock ChatModelFactory chatModelFactory;
     @Mock ChatModel chatModel;
-    @Mock AppConfig appConfig;
-    @Mock LlmConfigSnapshot llmConfig;
+    @Mock LlmConfigCache llmConfigCache;
     @Mock Skills skills;
+
+    private LlmConfig activeConfig(String model) {
+        return LlmConfig.builder()
+            .id("llm_cnf_test")
+            .provider(LlmProvider.ANTHROPIC)
+            .url("https://api.example.com")
+            .models(model != null && !model.isBlank() ? List.of(model) : List.of())
+            .authConfig(new AuthConfig(null, null, null, null, null, null, null, null))
+            .build();
+    }
 
     // -----------------------------------------------------------------------
     // isReady()
@@ -35,38 +49,35 @@ class LangChainPromptSenderTest {
     class IsReadyTests {
 
         @Test
-        @DisplayName("returns true when chatModelFactory non-null and modelName present")
-        void ready_whenChatModelFactoryAndModelNamePresent() {
-            when(appConfig.getLlmConfig()).thenReturn(llmConfig);
-            when(llmConfig.getModelName()).thenReturn("claude-3");
-            LangChainPromptSender sender = new LangChainPromptSender(chatModelFactory, appConfig, skills);
+        @DisplayName("returns true when chatModelFactory non-null and model present")
+        void ready_whenChatModelFactoryAndModelPresent() {
+            when(llmConfigCache.getActive()).thenReturn(Optional.of(activeConfig("claude-3")));
+            LangChainPromptSender sender = new LangChainPromptSender(chatModelFactory, llmConfigCache, skills);
             assertThat(sender.isReady()).isTrue();
         }
 
         @Test
-        @DisplayName("returns false when modelName is empty")
-        void notReady_whenModelNameEmpty() {
-            when(appConfig.getLlmConfig()).thenReturn(llmConfig);
-            when(llmConfig.getModelName()).thenReturn("");
-            LangChainPromptSender sender = new LangChainPromptSender(chatModelFactory, appConfig, skills);
+        @DisplayName("returns false when no models in active config")
+        void notReady_whenNoModels() {
+            when(llmConfigCache.getActive()).thenReturn(Optional.of(activeConfig("")));
+            LangChainPromptSender sender = new LangChainPromptSender(chatModelFactory, llmConfigCache, skills);
             assertThat(sender.isReady()).isFalse();
         }
 
         @Test
-        @DisplayName("returns false when modelName is blank")
-        void notReady_whenModelNameBlank() {
-            when(appConfig.getLlmConfig()).thenReturn(llmConfig);
-            when(llmConfig.getModelName()).thenReturn("   ");
-            LangChainPromptSender sender = new LangChainPromptSender(chatModelFactory, appConfig, skills);
+        @DisplayName("returns false when no active config")
+        void notReady_whenNoActiveConfig() {
+            when(llmConfigCache.getActive()).thenReturn(Optional.empty());
+            LangChainPromptSender sender = new LangChainPromptSender(chatModelFactory, llmConfigCache, skills);
             assertThat(sender.isReady()).isFalse();
         }
 
         @Test
         @DisplayName("returns false when chatModelFactory is null")
         void notReady_whenChatModelFactoryNull() {
-            when(appConfig.getLlmConfig()).thenReturn(llmConfig);
-            when(llmConfig.getModelName()).thenReturn("claude-3");
-            LangChainPromptSender sender = new LangChainPromptSender(null, appConfig, skills);
+            // isReady() short-circuits on null factory — stub is lenient because getActive() is never called
+            lenient().when(llmConfigCache.getActive()).thenReturn(Optional.of(activeConfig("claude-3")));
+            LangChainPromptSender sender = new LangChainPromptSender(null, llmConfigCache, skills);
             assertThat(sender.isReady()).isFalse();
         }
     }
@@ -79,26 +90,19 @@ class LangChainPromptSenderTest {
     class SendNotReadyTests {
 
         @Test
-        @DisplayName("throws LLMException when model not ready")
+        @DisplayName("throws LLMException when no models configured")
         void send_throwsLLMException_whenNotReady() {
-            when(appConfig.getLlmConfig()).thenReturn(llmConfig);
-            when(llmConfig.getModelName()).thenReturn("");
-            when(llmConfig.getProvider()).thenReturn("vertex-ai-anthropic");
-            LangChainPromptSender sender = new LangChainPromptSender(chatModelFactory, appConfig, skills);
-
-            LLMRequest request = LLMRequest.of("analyze this");
-            assertThatThrownBy(() -> sender.send(request))
+            when(llmConfigCache.getActive()).thenReturn(Optional.of(activeConfig("")));
+            LangChainPromptSender sender = new LangChainPromptSender(chatModelFactory, llmConfigCache, skills);
+            assertThatThrownBy(() -> sender.send(LLMRequest.of("analyze this")))
                     .isInstanceOf(LLMException.class);
         }
 
         @Test
-        @DisplayName("throws LLMException with no provider configured")
-        void send_throwsLLMException_noProvider() {
-            when(appConfig.getLlmConfig()).thenReturn(llmConfig);
-            when(llmConfig.getModelName()).thenReturn("");
-            when(llmConfig.getProvider()).thenReturn("");
-            LangChainPromptSender sender = new LangChainPromptSender(chatModelFactory, appConfig, skills);
-
+        @DisplayName("throws LLMException with no active config")
+        void send_throwsLLMException_noActiveConfig() {
+            when(llmConfigCache.getActive()).thenReturn(Optional.empty());
+            LangChainPromptSender sender = new LangChainPromptSender(chatModelFactory, llmConfigCache, skills);
             assertThatThrownBy(() -> sender.send(LLMRequest.of("test")))
                     .isInstanceOf(LLMException.class);
         }
@@ -114,14 +118,11 @@ class LangChainPromptSenderTest {
         @Test
         @DisplayName("wraps ChatModel exception in LLMException")
         void send_wrapsException() {
-            when(appConfig.getLlmConfig()).thenReturn(llmConfig);
-            when(llmConfig.getModelName()).thenReturn("claude-3");
-            when(llmConfig.getProvider()).thenReturn("anthropic");
-            when(llmConfig.isSkillsEnabled()).thenReturn(false);
+            when(llmConfigCache.getActive()).thenReturn(Optional.of(activeConfig("claude-3")));
             when(chatModelFactory.chatModel()).thenReturn(chatModel);
             when(chatModel.chat(any(ChatRequest.class))).thenThrow(new RuntimeException("timeout"));
 
-            LangChainPromptSender sender = new LangChainPromptSender(chatModelFactory, appConfig, skills);
+            LangChainPromptSender sender = new LangChainPromptSender(chatModelFactory, llmConfigCache, skills);
             assertThatThrownBy(() -> sender.send(LLMRequest.of("test prompt")))
                     .isInstanceOf(LLMException.class)
                     .hasMessageContaining("timeout");
@@ -130,14 +131,11 @@ class LangChainPromptSenderTest {
         @Test
         @DisplayName("works with skills=null (no NPE)")
         void send_nullSkills_wrapsException() {
-            when(appConfig.getLlmConfig()).thenReturn(llmConfig);
-            when(llmConfig.getModelName()).thenReturn("claude-3");
-            when(llmConfig.getProvider()).thenReturn("anthropic");
-            when(llmConfig.isSkillsEnabled()).thenReturn(false);
+            when(llmConfigCache.getActive()).thenReturn(Optional.of(activeConfig("claude-3")));
             when(chatModelFactory.chatModel()).thenReturn(chatModel);
             when(chatModel.chat(any(ChatRequest.class))).thenThrow(new RuntimeException("error"));
 
-            LangChainPromptSender sender = new LangChainPromptSender(chatModelFactory, appConfig, null);
+            LangChainPromptSender sender = new LangChainPromptSender(chatModelFactory, llmConfigCache, null);
             assertThatThrownBy(() -> sender.send(LLMRequest.of("prompt")))
                     .isInstanceOf(LLMException.class);
         }
@@ -145,14 +143,11 @@ class LangChainPromptSenderTest {
         @Test
         @DisplayName("request with systemPrompt and context sent without NPE")
         void send_withSystemPromptAndContext() {
-            when(appConfig.getLlmConfig()).thenReturn(llmConfig);
-            when(llmConfig.getModelName()).thenReturn("claude-3");
-            when(llmConfig.getProvider()).thenReturn("anthropic");
-            when(llmConfig.isSkillsEnabled()).thenReturn(false);
+            when(llmConfigCache.getActive()).thenReturn(Optional.of(activeConfig("claude-3")));
             when(chatModelFactory.chatModel()).thenReturn(chatModel);
             when(chatModel.chat(any(ChatRequest.class))).thenThrow(new RuntimeException("server error"));
 
-            LangChainPromptSender sender = new LangChainPromptSender(chatModelFactory, appConfig, skills);
+            LangChainPromptSender sender = new LangChainPromptSender(chatModelFactory, llmConfigCache, skills);
             LLMRequest request = LLMRequest.builder("analyze this")
                     .systemPrompt("You are a helpful assistant")
                     .context("some k8s context")

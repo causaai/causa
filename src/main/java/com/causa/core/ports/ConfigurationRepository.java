@@ -47,6 +47,14 @@ public interface ConfigurationRepository {
     void upsert(String key, String value, boolean encrypted);
 
     /**
+     * Deletes the configuration entry for the given key.
+     * No-op if the key does not exist.
+     *
+     * @param key the configuration key
+     */
+    void delete(String key);
+
+    /**
      * Lightweight projection of a configuration entry.
      *
      * @param key       the configuration key

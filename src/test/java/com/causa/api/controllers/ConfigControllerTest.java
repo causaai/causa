@@ -2,6 +2,7 @@ package com.causa.api.controllers;
 
 import com.causa.api.dto.request.ConfigUpdateRequest;
 import com.causa.api.dto.response.ConfigResponse;
+import com.causa.api.dto.response.ConfigSettingsResponse;
 import com.causa.api.dto.response.ConfigUpdateResponse;
 import com.causa.core.ports.ConfigurationRepository;
 import com.causa.core.services.ConfigService;
@@ -18,7 +19,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -47,23 +47,45 @@ class ConfigControllerTest {
     }
 
     // -------------------------------------------------------------------------
-    // GET /api/v1/configs
+    // GET /api/v1/configs  — combined snapshot
     // -------------------------------------------------------------------------
 
     @Nested
-    @DisplayName("GET /api/v1/configs (list all)")
-    class ListConfigsTests {
+    @DisplayName("GET /api/v1/configs (combined snapshot)")
+    class GetAllConfigsTests {
 
         @Test
-        @DisplayName("Should return 200 with all configs when no category filter")
-        void shouldReturn200WithAllConfigsNoFilter() {
+        @DisplayName("Should return 200 with all four categories populated")
+        void shouldReturn200WithCombinedSnapshot() {
+            when(externalConfigService.listByCategory(any())).thenReturn(List.of());
+            when(llmConfigService.listAll()).thenReturn(List.of());
+            when(configService.getAll()).thenReturn(List.of());
+
+            Response response = controller.getAllConfigs();
+
+            assertEquals(200, response.getStatus());
+            assertInstanceOf(ConfigSettingsResponse.class, response.getEntity());
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /api/v1/configs/generic
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("GET /api/v1/configs/generic")
+    class ListGenericTests {
+
+        @Test
+        @DisplayName("Should return 200 with all generic configs when no category filter")
+        void shouldReturn200WithAllGenericConfigs() {
             List<ConfigurationRepository.ConfigEntry> entries = List.of(
-                    new ConfigurationRepository.ConfigEntry("LLM_PROVIDER", "ollama", false),
-                    new ConfigurationRepository.ConfigEntry("LLM_API_KEY", "enc_secret", true)
+                    new ConfigurationRepository.ConfigEntry("ALERT_FILTER_SEVERITY", "critical", false),
+                    new ConfigurationRepository.ConfigEntry("ALERT_IGNORE_NAMESPACES", "kube-system", false)
             );
             when(configService.getAll()).thenReturn(entries);
 
-            Response response = controller.listConfigs(null);
+            Response response = controller.listGeneric(null);
 
             assertEquals(200, response.getStatus());
             @SuppressWarnings("unchecked")
@@ -75,150 +97,76 @@ class ConfigControllerTest {
         @Test
         @DisplayName("Should return 200 with filtered configs when category is provided")
         void shouldReturn200WithFilteredConfigs() {
-            List<ConfigurationRepository.ConfigEntry> entries = List.of(
-                    new ConfigurationRepository.ConfigEntry("LLM_PROVIDER", "ollama", false)
-            );
-            when(configService.getByCategory("llm")).thenReturn(entries);
+            when(configService.getByCategory("alerts")).thenReturn(List.of(
+                    new ConfigurationRepository.ConfigEntry("ALERT_FILTER_SEVERITY", "critical", false)
+            ));
 
-            Response response = controller.listConfigs("llm");
+            Response response = controller.listGeneric("alerts");
 
             assertEquals(200, response.getStatus());
-            verify(configService).getByCategory("llm");
+            verify(configService).getByCategory("alerts");
             verify(configService, never()).getAll();
         }
 
         @Test
         @DisplayName("Should return 400 for unknown category")
         void shouldReturn400ForUnknownCategory() {
-            Response response = controller.listConfigs("unknown_category");
+            Response response = controller.listGeneric("unknown_xyz");
 
             assertEquals(400, response.getStatus());
             verifyNoInteractions(configService);
         }
-
-        @Test
-        @DisplayName("Should accept known category case-insensitively")
-        void shouldAcceptKnownCategoryCaseInsensitively() {
-            when(configService.getByCategory("llm")).thenReturn(List.of());
-
-            Response response = controller.listConfigs("LLM");
-
-            assertEquals(200, response.getStatus());
-            verify(configService).getByCategory("llm");
-        }
-
-        @Test
-        @DisplayName("Should return all configs when category is blank")
-        void shouldReturnAllConfigsWhenCategoryIsBlank() {
-            when(configService.getAll()).thenReturn(List.of());
-
-            Response response = controller.listConfigs("  ");
-
-            assertEquals(200, response.getStatus());
-            verify(configService).getAll();
-        }
-
-        @Test
-        @DisplayName("Should return all configs for alerts category")
-        void shouldReturnAllConfigsForAlertsCategory() {
-            when(configService.getByCategory("alerts")).thenReturn(List.of());
-
-            Response response = controller.listConfigs("alerts");
-
-            assertEquals(200, response.getStatus());
-            verify(configService).getByCategory("alerts");
-        }
-
-        @Test
-        @DisplayName("Should return all configs for cluster category")
-        void shouldReturnAllConfigsForClusterCategory() {
-            when(configService.getByCategory("cluster")).thenReturn(List.of());
-
-            Response response = controller.listConfigs("cluster");
-
-            assertEquals(200, response.getStatus());
-        }
     }
 
-    // -------------------------------------------------------------------------
-    // GET /api/v1/configs/{key}
-    // -------------------------------------------------------------------------
-
     @Nested
-    @DisplayName("GET /api/v1/configs/{key}")
-    class GetConfigByKeyTests {
+    @DisplayName("GET /api/v1/configs/generic/{key}")
+    class GetGenericConfigTests {
 
         @Test
         @DisplayName("Should return 200 with config value when key exists")
         void shouldReturn200WhenKeyExists() {
-            when(configService.get("LLM_PROVIDER")).thenReturn(Optional.of("ollama"));
+            when(configService.get("ALERT_FILTER_SEVERITY")).thenReturn(java.util.Optional.of("critical"));
 
-            Response response = controller.getConfig("LLM_PROVIDER");
+            Response response = controller.getGenericConfig("ALERT_FILTER_SEVERITY");
 
             assertEquals(200, response.getStatus());
             ConfigResponse body = (ConfigResponse) response.getEntity();
-            assertEquals("LLM_PROVIDER", body.key());
+            assertEquals("ALERT_FILTER_SEVERITY", body.key());
+            assertEquals("critical", body.value());
         }
 
         @Test
         @DisplayName("Should return 200 with null value when key known but not set")
-        void shouldReturn200WithNullValueWhenKeyKnownButNotSet() {
-            when(configService.get("LLM_PROVIDER")).thenReturn(Optional.empty());
+        void shouldReturn200WhenKeyKnownButNotSet() {
+            when(configService.get("ALERT_FILTER_SEVERITY")).thenReturn(java.util.Optional.empty());
 
-            Response response = controller.getConfig("LLM_PROVIDER");
+            Response response = controller.getGenericConfig("ALERT_FILTER_SEVERITY");
 
             assertEquals(200, response.getStatus());
         }
 
         @Test
-        @DisplayName("Should return 400 for unknown config key")
+        @DisplayName("Should return 400 for unknown key")
         void shouldReturn400ForUnknownKey() {
-            Response response = controller.getConfig("UNKNOWN_KEY_XYZ");
+            Response response = controller.getGenericConfig("UNKNOWN_KEY_XYZ");
 
             assertEquals(400, response.getStatus());
             verifyNoInteractions(configService);
         }
-
-        @Test
-        @DisplayName("Should mask sensitive key values")
-        void shouldMaskSensitiveValues() {
-            when(configService.get("LLM_API_KEY")).thenReturn(Optional.of("my-secret-key"));
-
-            Response response = controller.getConfig("LLM_API_KEY");
-
-            assertEquals(200, response.getStatus());
-            ConfigResponse body = (ConfigResponse) response.getEntity();
-            assertEquals("********", body.value());
-            assertTrue(body.encrypted());
-        }
-
-        @Test
-        @DisplayName("Should return unmasked value for non-sensitive key")
-        void shouldReturnUnmaskedValueForNonSensitiveKey() {
-            when(configService.get("LLM_PROVIDER")).thenReturn(Optional.of("anthropic"));
-
-            Response response = controller.getConfig("LLM_PROVIDER");
-
-            ConfigResponse body = (ConfigResponse) response.getEntity();
-            assertEquals("anthropic", body.value());
-            assertFalse(body.encrypted());
-        }
     }
 
     // -------------------------------------------------------------------------
-    // POST /api/v1/configs
+    // PUT /api/v1/configs/generic
     // -------------------------------------------------------------------------
 
     @Nested
-    @DisplayName("POST /api/v1/configs")
-    class UpdateConfigsTests {
+    @DisplayName("PUT /api/v1/configs/generic")
+    class UpsertGenericConfigsTests {
 
         @Test
         @DisplayName("Should return 400 when configs map is null")
         void shouldReturn400WhenConfigsNull() {
-            ConfigUpdateRequest request = new ConfigUpdateRequest(null);
-
-            Response response = controller.updateConfigs(request);
+            Response response = controller.upsertGenericConfigs(new ConfigUpdateRequest(null));
 
             assertEquals(400, response.getStatus());
             verifyNoInteractions(configService);
@@ -227,9 +175,7 @@ class ConfigControllerTest {
         @Test
         @DisplayName("Should return 400 when configs map is empty")
         void shouldReturn400WhenConfigsEmpty() {
-            ConfigUpdateRequest request = new ConfigUpdateRequest(Map.of());
-
-            Response response = controller.updateConfigs(request);
+            Response response = controller.upsertGenericConfigs(new ConfigUpdateRequest(Map.of()));
 
             assertEquals(400, response.getStatus());
         }
@@ -237,24 +183,23 @@ class ConfigControllerTest {
         @Test
         @DisplayName("Should return 200 with updated keys on valid request")
         void shouldReturn200WithUpdatedKeys() {
-            ConfigUpdateRequest request = new ConfigUpdateRequest(Map.of("LLM_PROVIDER", "anthropic"));
-            doNothing().when(configService).update("LLM_PROVIDER", "anthropic");
+            ConfigUpdateRequest request = new ConfigUpdateRequest(Map.of("ALERT_FILTER_SEVERITY", "warning"));
+            doNothing().when(configService).update("ALERT_FILTER_SEVERITY", "warning");
 
-            Response response = controller.updateConfigs(request);
+            Response response = controller.upsertGenericConfigs(request);
 
             assertEquals(200, response.getStatus());
             ConfigUpdateResponse body = (ConfigUpdateResponse) response.getEntity();
             assertEquals(1, body.updated().size());
             assertTrue(body.rejected().isEmpty());
-            verify(configService).update("LLM_PROVIDER", "anthropic");
+            verify(configService).update("ALERT_FILTER_SEVERITY", "warning");
         }
 
         @Test
         @DisplayName("Should reject unknown config keys")
         void shouldRejectUnknownConfigKeys() {
-            ConfigUpdateRequest request = new ConfigUpdateRequest(Map.of("UNKNOWN_KEY", "value"));
-
-            Response response = controller.updateConfigs(request);
+            Response response = controller.upsertGenericConfigs(
+                    new ConfigUpdateRequest(Map.of("UNKNOWN_KEY", "value")));
 
             assertEquals(200, response.getStatus());
             ConfigUpdateResponse body = (ConfigUpdateResponse) response.getEntity();
@@ -267,91 +212,31 @@ class ConfigControllerTest {
         @Test
         @DisplayName("Should reject blank values")
         void shouldRejectBlankValues() {
-            ConfigUpdateRequest request = new ConfigUpdateRequest(Map.of("LLM_PROVIDER", "   "));
+            ConfigUpdateResponse body = (ConfigUpdateResponse) controller.upsertGenericConfigs(
+                    new ConfigUpdateRequest(Map.of("ALERT_FILTER_SEVERITY", "   "))).getEntity();
 
-            Response response = controller.updateConfigs(request);
-
-            assertEquals(200, response.getStatus());
-            ConfigUpdateResponse body = (ConfigUpdateResponse) response.getEntity();
             assertEquals(1, body.rejected().size());
-            assertEquals("LLM_PROVIDER", body.rejected().get(0).key());
+            assertEquals("ALERT_FILTER_SEVERITY", body.rejected().get(0).key());
         }
 
         @Test
-        @DisplayName("Should reject invalid integer values for integer-typed keys")
+        @DisplayName("Should reject invalid integer values")
         void shouldRejectInvalidIntegerValues() {
-            ConfigUpdateRequest request = new ConfigUpdateRequest(Map.of("LLM_MAX_TOKENS", "not-a-number"));
+            ConfigUpdateResponse body = (ConfigUpdateResponse) controller.upsertGenericConfigs(
+                    new ConfigUpdateRequest(Map.of("ALERT_COOLDOWN_MINUTES", "not-a-number"))).getEntity();
 
-            Response response = controller.updateConfigs(request);
-
-            assertEquals(200, response.getStatus());
-            ConfigUpdateResponse body = (ConfigUpdateResponse) response.getEntity();
             assertEquals(1, body.rejected().size());
             assertTrue(body.rejected().get(0).reason().contains("integer"));
         }
 
         @Test
-        @DisplayName("Should reject invalid double values for double-typed keys")
-        void shouldRejectInvalidDoubleValues() {
-            ConfigUpdateRequest request = new ConfigUpdateRequest(Map.of("LLM_TEMPERATURE", "abc"));
-
-            Response response = controller.updateConfigs(request);
-
-            assertEquals(200, response.getStatus());
-            ConfigUpdateResponse body = (ConfigUpdateResponse) response.getEntity();
-            assertEquals(1, body.rejected().size());
-            assertTrue(body.rejected().get(0).reason().toLowerCase().contains("numeric") ||
-                       body.rejected().get(0).reason().toLowerCase().contains("double"));
-        }
-
-        @Test
-        @DisplayName("Should reject invalid boolean values for boolean-typed keys")
-        void shouldRejectInvalidBooleanValues() {
-            ConfigUpdateRequest request = new ConfigUpdateRequest(Map.of("LLM_SKILLS_ENABLED", "yes"));
-
-            Response response = controller.updateConfigs(request);
-
-            assertEquals(200, response.getStatus());
-            ConfigUpdateResponse body = (ConfigUpdateResponse) response.getEntity();
-            assertEquals(1, body.rejected().size());
-            assertTrue(body.rejected().get(0).reason().toLowerCase().contains("boolean"));
-        }
-
-        @Test
-        @DisplayName("Should accept valid boolean values")
-        void shouldAcceptValidBooleanValues() {
-            ConfigUpdateRequest request = new ConfigUpdateRequest(Map.of("LLM_SKILLS_ENABLED", "true"));
-            doNothing().when(configService).update("LLM_SKILLS_ENABLED", "true");
-
-            Response response = controller.updateConfigs(request);
-
-            assertEquals(200, response.getStatus());
-            ConfigUpdateResponse body = (ConfigUpdateResponse) response.getEntity();
-            assertEquals(1, body.updated().size());
-        }
-
-        @Test
-        @DisplayName("Should accept valid double values")
-        void shouldAcceptValidDoubleValues() {
-            ConfigUpdateRequest request = new ConfigUpdateRequest(Map.of("LLM_TEMPERATURE", "0.7"));
-            doNothing().when(configService).update("LLM_TEMPERATURE", "0.7");
-
-            Response response = controller.updateConfigs(request);
-
-            ConfigUpdateResponse body = (ConfigUpdateResponse) response.getEntity();
-            assertEquals(1, body.updated().size());
-            assertTrue(body.rejected().isEmpty());
-        }
-
-        @Test
         @DisplayName("Should accept valid integer values")
         void shouldAcceptValidIntegerValues() {
-            ConfigUpdateRequest request = new ConfigUpdateRequest(Map.of("LLM_MAX_TOKENS", "4096"));
-            doNothing().when(configService).update("LLM_MAX_TOKENS", "4096");
+            doNothing().when(configService).update("ALERT_COOLDOWN_MINUTES", "4096");
 
-            Response response = controller.updateConfigs(request);
+            ConfigUpdateResponse body = (ConfigUpdateResponse) controller.upsertGenericConfigs(
+                    new ConfigUpdateRequest(Map.of("ALERT_COOLDOWN_MINUTES", "4096"))).getEntity();
 
-            ConfigUpdateResponse body = (ConfigUpdateResponse) response.getEntity();
             assertEquals(1, body.updated().size());
         }
 
@@ -359,16 +244,44 @@ class ConfigControllerTest {
         @DisplayName("Should process valid and invalid keys independently")
         void shouldProcessValidAndInvalidKeysSeparately() {
             Map<String, String> configs = new java.util.LinkedHashMap<>();
-            configs.put("LLM_PROVIDER", "anthropic");
+            configs.put("ALERT_FILTER_SEVERITY", "warning");
             configs.put("UNKNOWN_KEY", "value");
-            ConfigUpdateRequest request = new ConfigUpdateRequest(configs);
-            doNothing().when(configService).update("LLM_PROVIDER", "anthropic");
+            doNothing().when(configService).update("ALERT_FILTER_SEVERITY", "warning");
 
-            Response response = controller.updateConfigs(request);
+            ConfigUpdateResponse body = (ConfigUpdateResponse) controller.upsertGenericConfigs(
+                    new ConfigUpdateRequest(configs)).getEntity();
 
-            ConfigUpdateResponse body = (ConfigUpdateResponse) response.getEntity();
             assertEquals(1, body.updated().size());
             assertEquals(1, body.rejected().size());
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // DELETE /api/v1/configs/generic/{key}
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("DELETE /api/v1/configs/generic/{key}")
+    class DeleteGenericConfigTests {
+
+        @Test
+        @DisplayName("Should return 204 on successful delete")
+        void shouldReturn204OnSuccess() {
+            doNothing().when(configService).delete("ALERT_FILTER_SEVERITY");
+
+            Response response = controller.deleteGenericConfig("ALERT_FILTER_SEVERITY");
+
+            assertEquals(204, response.getStatus());
+            verify(configService).delete("ALERT_FILTER_SEVERITY");
+        }
+
+        @Test
+        @DisplayName("Should return 400 for unknown key")
+        void shouldReturn400ForUnknownKey() {
+            Response response = controller.deleteGenericConfig("UNKNOWN_KEY_XYZ");
+
+            assertEquals(400, response.getStatus());
+            verifyNoInteractions(configService);
         }
     }
 }

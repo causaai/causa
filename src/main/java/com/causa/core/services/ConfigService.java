@@ -48,6 +48,14 @@ public interface ConfigService {
     void update(String key, String value);
 
     /**
+     * Deletes the configuration entry for the given key from the database and cache.
+     * No-op if the key does not exist.
+     *
+     * @param key the configuration key
+     */
+    void delete(String key);
+
+    /**
      * Loads configuration from database and environment at startup.
      * Seeds missing known keys from MicroProfile Config (ENV → system props → application.yml).
      */

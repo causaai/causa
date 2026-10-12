@@ -1,7 +1,7 @@
 package com.causa.llm;
 
 import com.causa.common.constants.LLMConstants;
-import com.causa.config.AppConfig;
+import com.causa.config.LlmConfigCache;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
 import com.causa.core.ports.llm.PromptSender;
@@ -30,19 +30,21 @@ import jakarta.inject.Inject;
 @ApplicationScoped
 public class UnifiedPromptSender implements PromptSender {
 
-    private final AppConfig appConfig;
+    private final LlmConfigCache llmConfigCache;
     private final LangChainPromptSender langChainSender;
     private final BobShellPromptSender bobShellSender;
 
     @Inject
-    public UnifiedPromptSender(AppConfig appConfig, ChatModelFactory chatModelFactory, Skills skills) {
-        this.appConfig = appConfig;
-        this.langChainSender = new LangChainPromptSender(chatModelFactory, appConfig, skills);
-        this.bobShellSender = new BobShellPromptSender(appConfig);
+    public UnifiedPromptSender(LlmConfigCache llmConfigCache, ChatModelFactory chatModelFactory, Skills skills) {
+        this.llmConfigCache = llmConfigCache;
+        this.langChainSender = new LangChainPromptSender(chatModelFactory, llmConfigCache, skills);
+        this.bobShellSender = new BobShellPromptSender(llmConfigCache);
     }
 
     private PromptSender currentSender() {
-        String provider = appConfig.getLlmConfig().getProvider();
+        String provider = llmConfigCache.getActive()
+            .map(a -> a.getProvider().name().toLowerCase())
+            .orElse("");
         if (LLMConstants.Provider.IBM_BOB.equalsIgnoreCase(provider)) {
             return bobShellSender;
         }

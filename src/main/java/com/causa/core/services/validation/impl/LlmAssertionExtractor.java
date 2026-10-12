@@ -7,8 +7,7 @@ import java.util.UUID;
 import com.causa.common.constants.LLMConstants;
 import com.causa.common.constants.PromptConstants;
 import com.causa.common.logging.CausaLogger;
-import com.causa.config.AppConfig;
-import com.causa.config.LLMConfig;
+import com.causa.config.LlmConfigCache;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
 import com.causa.core.domain.RootCauseAnalysis;
@@ -42,26 +41,36 @@ public class LlmAssertionExtractor implements AssertionExtractor {
     private final PromptSender promptSender;
     private final ObjectMapper objectMapper;
     private final PromptTemplateLoader promptTemplateLoader;
-    private final String provider;
+    private final LlmConfigCache llmConfigCache;
 
     @Inject
     public LlmAssertionExtractor(
         PromptSender promptSender,
-        AppConfig appConfig,
+        LlmConfigCache llmConfigCache,
         ObjectMapper objectMapper
     ) {
         this.promptSender = promptSender;
         this.objectMapper = objectMapper;
         this.promptTemplateLoader = new PromptTemplateLoader(PromptConstants.TEMPLATE_PATH_ASSERTION_EXTRACTION);
-        this.provider = determineProvider(appConfig.getLlmConfig());
+        this.llmConfigCache = llmConfigCache;
+    }
+
+    /** Resolves the current provider string from the live cache at call time. */
+    private String resolveProvider() {
+        String providerName = llmConfigCache.getActive()
+            .map(a -> a.getProvider().name().toLowerCase())
+            .orElse("");
+        String modelName = llmConfigCache.getActive()
+            .filter(a -> a.getModels() != null && !a.getModels().isEmpty())
+            .map(a -> a.getModels().get(0))
+            .orElse("");
+        return determineProvider(providerName, modelName);
     }
 
     /**
-     * Determines the model type for template selection based on LLM configuration.
+     * Determines the model type for template selection based on provider name and model name.
      */
-    private String determineProvider(com.causa.config.LlmConfigSnapshot config) {
-        String provider = config.getProvider();
-        String modelName = config.getModelName();
+    private String determineProvider(String provider, String modelName) {
 
         // Check for BOB/Granite models
         if (!modelName.isEmpty() && (
@@ -151,7 +160,7 @@ public class LlmAssertionExtractor implements AssertionExtractor {
 
         try {
             // Load template for the current model type
-            PromptTemplateLoader.PromptTemplate template = promptTemplateLoader.loadTemplate(provider, "");
+            PromptTemplateLoader.PromptTemplate template = promptTemplateLoader.loadTemplate(resolveProvider(), "");
 
             // Build prompt using template
             String userPrompt = buildExtractionPrompt(text, source, template);
