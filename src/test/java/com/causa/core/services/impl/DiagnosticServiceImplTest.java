@@ -70,6 +70,9 @@ class DiagnosticServiceImplTest {
     @Mock
     private jakarta.enterprise.inject.Instance<com.causa.core.services.validation.RcaValidator> rcaValidatorInstance;
 
+    @Mock
+    private jakarta.enterprise.inject.Instance<com.causa.core.services.evidence.EvidenceHarvester> evidenceHarvesters;
+
     private DiagnosticServiceImpl diagnosticService;
 
     @BeforeEach
@@ -84,7 +87,8 @@ class DiagnosticServiceImplTest {
                 appConfig,
                 objectMapper,
                 validator,
-                rcaValidatorInstance
+                rcaValidatorInstance,
+                evidenceHarvesters
         );
     }
 

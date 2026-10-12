@@ -32,7 +32,7 @@
       "tools": [
         {
           "name": "list_directory_with_sizes",
-          "contextKey": "LIBERTY_LOGS_DIRECTORY_LISTING",
+          "contextKey": "LIBERTY_LOGS",
           "description": "Directory listing (with file sizes) of the Liberty logs root, used to discover which log/FFDC files to read.",
           "arguments": { "path": "${metadata.libertyLogsDir}" }
         }
