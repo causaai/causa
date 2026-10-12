@@ -62,17 +62,17 @@ supporting:
       success: "Frequent Full GC events detected"
       failure: "Full GC count below threshold"
 
-  - id: gc.supporting.long_gc_pause
-    description: "GC pause duration exceeds 30ms"
+  - id: gc.supporting.long_gc_pause_ratio
+    description: "Single max GC pause exceeds 0.5% of total runtime"
     weight: 3
     match:
       signalType: METRIC
-      signalName: gc.pause.max
+      signalName: gc.pause.max.ratio
       condition: GREATER_THAN
-      threshold: 30
+      threshold: 0.005
     messages:
-      success: "Long GC pauses detected (>30ms)"
-      failure: "No long GC pauses detected"
+      success: "Max GC pause >0.5% of runtime — significant pause detected"
+      failure: "Max GC pause under threshold"
 
   - id: gc.supporting.heap_high
     description: "Heap usage exceeded 80%"

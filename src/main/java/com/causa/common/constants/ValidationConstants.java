@@ -117,6 +117,7 @@ public final class ValidationConstants {
 
         // GC metric signals
         public static final String GC_PAUSE_MAX = "gc.pause.max";
+        public static final String GC_PAUSE_MAX_RATIO = "gc.pause.max.ratio";
         public static final String GC_PAUSE_TOTAL = "gc.pause.total";
         public static final String GC_PAUSE_PERCENT = "gc.pause.percent";
         public static final String HEAP_AFTER_GC_RATIO = "heap.after.gc.ratio";

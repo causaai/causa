@@ -89,6 +89,9 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
     private static final Pattern QUARKUS_GC_PAUSE_SUM_PATTERN = Pattern.compile(
         "\"jvm_gc_pause_seconds_sum\\{[^}]*}\"\\s*:\\s*(\\d+\\.?\\d*(?:E-?\\d+)?)"
     );
+    private static final Pattern QUARKUS_GC_PAUSE_MAX_PATTERN = Pattern.compile(
+        "\"jvm_gc_pause_seconds_max\\{[^}]*}\"\\s*:\\s*(\\d+\\.?\\d*(?:E-?\\d+)?)"
+    );
     private static final Pattern QUARKUS_PROCESS_UPTIME_PATTERN = Pattern.compile(
         "\"process_uptime_seconds\"\\s*:\\s*(\\d+\\.?\\d*)"
     );
@@ -411,6 +414,21 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
                 .value(maxHeapAfterGcRatio)
                 .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_VERBOSE_GC)
                 .build());
+
+            // Calculate gc.pause.max.ratio if we have uptime
+            Matcher uptimeMatcher = QUARKUS_PROCESS_UPTIME_PATTERN.matcher(context);
+            if (uptimeMatcher.find()) {
+                double uptimeSeconds = Double.parseDouble(uptimeMatcher.group(1));
+                if (uptimeSeconds > 0) {
+                    // maxPause is in ms, convert to seconds for ratio
+                    double maxPauseSeconds = maxPause / 1000.0;
+                    double maxPauseRatio = maxPauseSeconds / uptimeSeconds;
+                    signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.GC_PAUSE_MAX_RATIO)
+                        .value(maxPauseRatio)
+                        .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_VERBOSE_GC)
+                        .build());
+                }
+            }
         }
 
         if (beforeGcValues.size() >= SignalThresholds.MIN_GC_VALUES_FOR_TREND) {
@@ -458,6 +476,24 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
             double pausePercent = totalPauseSeconds / uptimeSeconds;
             signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.GC_PAUSE_PERCENT)
                 .value(pausePercent)
+                .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_QUARKUS_GC_PAUSE)
+                .build());
+        }
+
+        // Extract max pause ratio: single max pause / total elapsed time
+        Matcher pauseMaxMatcher = QUARKUS_GC_PAUSE_MAX_PATTERN.matcher(context);
+        double maxPauseSeconds = 0;
+        while (pauseMaxMatcher.find()) {
+            double pauseMax = Double.parseDouble(pauseMaxMatcher.group(1));
+            if (pauseMax > maxPauseSeconds) {
+                maxPauseSeconds = pauseMax;
+            }
+        }
+
+        if (maxPauseSeconds > 0) {
+            double maxPauseRatio = maxPauseSeconds / uptimeSeconds;
+            signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.GC_PAUSE_MAX_RATIO)
+                .value(maxPauseRatio)
                 .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_QUARKUS_GC_PAUSE)
                 .build());
         }
