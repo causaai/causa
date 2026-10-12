@@ -70,11 +70,18 @@ class DiagnosticServiceImplTest {
     @Mock
     private jakarta.enterprise.inject.Instance<com.causa.core.services.validation.RcaValidator> rcaValidatorInstance;
 
+    @Mock
+    private jakarta.enterprise.inject.Instance<com.causa.core.services.evidence.EvidenceHarvester> evidenceHarvesterInstance;
+
+    @Mock
+    private jakarta.enterprise.inject.Instance<com.causa.core.services.evidence.EvidenceSelector> evidenceSelectorInstance;
+
     private DiagnosticServiceImpl diagnosticService;
 
     @BeforeEach
     void setUp() {
         org.mockito.Mockito.when(rcaValidatorInstance.isResolvable()).thenReturn(false);
+        org.mockito.Mockito.when(evidenceSelectorInstance.isResolvable()).thenReturn(false);
         diagnosticService = new DiagnosticServiceImpl(
                 diagnosticRepository,
                 alertRepository,
@@ -84,7 +91,9 @@ class DiagnosticServiceImplTest {
                 appConfig,
                 objectMapper,
                 validator,
-                rcaValidatorInstance
+                rcaValidatorInstance,
+                evidenceHarvesterInstance,
+                evidenceSelectorInstance
         );
     }
 

@@ -1,5 +1,7 @@
 package com.causa.core.domain.validation;
 
+import com.causa.common.constants.EvidenceConstants;
+
 import java.time.Instant;
 import java.util.Map;
 
@@ -15,8 +17,9 @@ import java.util.Map;
  * <p>The prose fields are deliberately distinct: {@link #rawSnippet} is the verbatim text the
  * source returned, {@link #statement} says what that text shows, and {@link #explanation} argues
  * why it settles the question. Collapsing any two makes an item look like corroboration of
- * itself. What the evidence was offered for is carried by the origin — PATH A's assertion id
- * and PATH B's rule id, both in {@link #metadata} — not restated on every sibling item.
+ * itself. {@link #metadata} is left empty and {@link #evidenceHypothesisAlignment} null:
+ * provenance keys — PATH A's assertion id, PATH B's rule id — and whether a fact aligns with
+ * the RCA are not populated until those designs are settled.
  *
  * @since 0.0.1
  */
@@ -28,6 +31,7 @@ public record EvidenceItem(
     String source,
     EvidenceType type,
     EvidenceStrength strength,
+    // Always null: deciding whether a fact aligns with the RCA is still being designed.
     EvidenceHypothesisAlignment evidenceHypothesisAlignment,
     String rawSnippet,
     // One line stating only what rawSnippet shows. Null for rule-derived evidence, which has no
@@ -53,11 +57,14 @@ public record EvidenceItem(
         /** Pod status (phase, conditions) */
         POD_STATUS,
 
-        /** Metric value (gauge, counter) */
+        /** Metric value (gauge, counter) from Prometheus/cAdvisor */
         METRIC,
 
         /** Time series data */
         TIME_SERIES,
+
+        /** Pod log entry */
+        POD_LOG,
 
         /** Log pattern match */
         LOG_PATTERN,
@@ -140,7 +147,8 @@ public record EvidenceItem(
         private String statement;
         private String explanation;
         private double confidence;
-        private int priority;
+        // Flat until the ranking design lands; then derive it per evidence item.
+        private int priority = EvidenceConstants.DEFAULT_PRIORITY;
         private Instant collectedAt;
         private Map<String, String> metadata;
 

@@ -22,6 +22,7 @@ import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
 import com.causa.core.domain.RootCauseAnalysis;
 import com.causa.core.domain.RootCauseAnalysis.AnomalyType;
+import com.causa.core.domain.validation.EvidenceItem;
 import com.causa.core.domain.validation.ValidatedRCA;
 import com.causa.core.domain.validation.ValidationResult;
 import com.causa.core.ports.AlertRepository;
@@ -29,6 +30,10 @@ import com.causa.core.ports.DiagnosticRepository;
 import com.causa.core.ports.llm.PromptSender;
 import com.causa.core.services.DiagnosticService;
 import com.causa.core.services.RcaPromptBuilder;
+import com.causa.core.services.evidence.EvidenceCollectionResult;
+import com.causa.core.services.evidence.EvidenceHarvester;
+import com.causa.core.services.evidence.EvidenceSelector;
+import com.causa.core.services.evidence.RcaFinding;
 import com.causa.core.services.validation.RcaValidator;
 import com.causa.infrastructure.persistence.mappers.AlertEntityMapper;
 import com.causa.mcp.McpRegistry;
@@ -40,6 +45,7 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -74,6 +80,8 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     private final Validator validator;
     private final ExecutorService pipelineExecutor;
     private final Optional<RcaValidator> rcaValidator;
+    private final Instance<EvidenceHarvester> evidenceHarvesters;
+    private final Optional<EvidenceSelector> evidenceSelector;
 
     @Inject
     public DiagnosticServiceImpl(DiagnosticRepository diagnosticRepository,
@@ -84,7 +92,9 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                                   AppConfig appConfig,
                                   ObjectMapper objectMapper,
                                   Validator validator,
-                                  Instance<RcaValidator> rcaValidatorInstance) {
+                                  Instance<RcaValidator> rcaValidatorInstance,
+                                  Instance<EvidenceHarvester> evidenceHarvesters,
+                                  Instance<EvidenceSelector> evidenceSelectorInstance) {
         this.diagnosticRepository = diagnosticRepository;
         this.alertRepository      = alertRepository;
         this.mcpRegistry          = mcpRegistry;
@@ -96,6 +106,9 @@ public class DiagnosticServiceImpl implements DiagnosticService {
         this.pipelineExecutor     = Executors.newCachedThreadPool();
         this.rcaValidator         = rcaValidatorInstance.isResolvable() ?
             Optional.of(rcaValidatorInstance.get()) : Optional.empty();
+        this.evidenceHarvesters   = evidenceHarvesters;
+        this.evidenceSelector     = evidenceSelectorInstance.isResolvable() ?
+            Optional.of(evidenceSelectorInstance.get()) : Optional.empty();
     }
 
     @Override
@@ -223,7 +236,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                 .log();
 
             // Step 6: Persist completed diagnostic with RCA + validation results
-            updateDiagnosticWithValidation(pending, rca, validatedRCA);
+            updateDiagnosticWithValidation(pending, rca, validatedRCA, contextForLLM);
 
             // Step 6: Mark alert PROCESSED — pipeline finished successfully
             alertRepository.updateProcessingStatus(alert.getAlertId(), AlertEntityMapper.STATUS_PROCESSED);
@@ -575,21 +588,101 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     }
 
     /**
+     * Evidence serialised for persistence: the complete record and the selected subset.
+     *
+     * @param allEvidence      every collected {@code EvidenceItem} as JSON, null when none
+     * @param selectedEvidence the user-facing subset as JSON, null when none
+     */
+    private record CollectedEvidence(String allEvidence, String selectedEvidence) {
+        static final CollectedEvidence NONE = new CollectedEvidence(null, null);
+    }
+
+    /**
+     * Collects and selects the evidence behind a finding.
+     *
+     * <p>Runs after validation because both validation paths are its input. Selection happens
+     * here rather than in the response layer so the chosen subset is stored alongside the full
+     * record and never recomputed per request.
+     *
+     * <p>Strictly additive: any failure here is logged and swallowed. A diagnostic that
+     * produced a usable RCA must not fail because its evidence could not be gathered.
+     */
+    private CollectedEvidence collectEvidence(
+        String diagnosticId,
+        RootCauseAnalysis rca,
+        ValidatedRCA validatedRCA,
+        String diagnosticContext
+    ) {
+        RcaFinding finding = RcaFinding.from(diagnosticId, rca);
+        if (finding == null) {
+            return CollectedEvidence.NONE;
+        }
+
+        try {
+            EvidenceHarvester harvester = null;
+            for (EvidenceHarvester candidate : evidenceHarvesters) {
+                if (candidate.supports(finding.anomalyType())) {
+                    harvester = candidate;
+                    break;
+                }
+            }
+
+            if (harvester == null) {
+                log.info(LogMessages.Evidence.COLLECTION_SKIPPED)
+                    .field(LogFields.DIAGNOSTIC_ID, diagnosticId)
+                    .field("anomalyType", finding.anomalyType())
+                    .log();
+                return CollectedEvidence.NONE;
+            }
+
+            EvidenceCollectionResult result =
+                harvester.harvest(finding, validatedRCA, diagnosticContext);
+            if (result.isEmpty()) {
+                return CollectedEvidence.NONE;
+            }
+
+            List<EvidenceItem> selected = evidenceSelector
+                .map(selector -> selector.select(result.items()))
+                .orElse(List.of());
+
+            log.info(LogMessages.Evidence.SELECTION_COMPLETED)
+                .field(LogFields.DIAGNOSTIC_ID, diagnosticId)
+                .field("selected", selected.size())
+                .field("outOf", result.totalCount())
+                .log();
+
+            return new CollectedEvidence(
+                objectMapper.writeValueAsString(result.items()),
+                selected.isEmpty() ? null : objectMapper.writeValueAsString(selected)
+            );
+        } catch (Exception e) {
+            log.error(LogMessages.Evidence.COLLECTION_FAILED)
+                .field(LogFields.DIAGNOSTIC_ID, diagnosticId)
+                .exception(e)
+                .log();
+            return CollectedEvidence.NONE;
+        }
+    }
+
+    /**
      * Updates diagnostic with RCA and validation results.
      *
      * <p>Reuses {@link #persistCompletedDiagnostic} to extract {@code confidenceScore} and
      * {@code faultDomain} from the RCA, then layers the validation fields
      * ({@code validationResult}, {@code validationData}) on top before persisting.
      *
-     * @param pending      the original PENDING diagnostic
-     * @param rca          the root cause analysis
-     * @param validatedRCA the validated RCA with validation results
+     * @param pending           the original PENDING diagnostic
+     * @param rca               the root cause analysis
+     * @param validatedRCA      the validated RCA with validation results
+     * @param diagnosticContext the rendered MCP context validation ran against, carried through
+     *                          so harvested evidence can quote the source text behind it
      * @return updated diagnostic
      */
     private Diagnostic updateDiagnosticWithValidation(
         Diagnostic diagnostic,
         RootCauseAnalysis rca,
-        ValidatedRCA validatedRCA
+        ValidatedRCA validatedRCA,
+        String diagnosticContext
     ) {
         log.info("Starting to build validation persistence data")
             .field(LogFields.DIAGNOSTIC_ID, diagnostic.getDiagnosticId())
@@ -700,6 +793,10 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                 }
             }
 
+            // Harvest the evidence behind this finding from the validation results above
+            CollectedEvidence collected =
+                collectEvidence(base.getDiagnosticId(), rca, validatedRCA, diagnosticContext);
+
             // Layer validation fields on top of the already-persisted base diagnostic
             Diagnostic updated = Diagnostic.builder()
                 .diagnosticId(base.getDiagnosticId())
@@ -711,6 +808,8 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                 .rca(base.getRca())
                 .validationResult(validationResult)
                 .validationData(validationDataString)
+                .allEvidence(collected.allEvidence())
+                .evidence(collected.selectedEvidence())
                 .build();
 
             // Log validation persistence data before saving
