@@ -1,5 +1,6 @@
 package com.causa.core.services.evidence.impl;
 
+import com.causa.common.constants.DiagnosticConstants.LogFields;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
 import com.causa.core.domain.RootCauseAnalysis.AnomalyType;
@@ -9,6 +10,7 @@ import com.causa.core.domain.validation.ValidationResult;
 import com.causa.core.services.evidence.EvidenceCollectionResult;
 import com.causa.core.services.evidence.EvidenceHarvester;
 import com.causa.core.services.evidence.RcaFinding;
+import com.causa.core.services.rules.RuleEvaluationResult;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -20,12 +22,11 @@ import java.util.Set;
 /**
  * Dual-Path Evidence Harvester
  *
- * <p>Collects evidence for any diagnosed finding from the LLM assertion path (PATH A). The
- * rule-derived path (PATH B) lands in a later change; rule signals do not yet carry the
- * source line they were read from, so evidence mapped from them could not be attributed.
+ * <p>Collects evidence for any diagnosed finding from both validation paths.
  *
  * <p>Nothing here is specific to a kind of anomaly. PATH A reads whatever assertions the RCA
- * made, and the mapping is driven by the validation output rather than by the hypothesis.
+ * made, PATH B reads whatever ruleset the rule engine ran for the anomaly type, and the
+ * mapping in between is driven by the validation output rather than by the hypothesis.
  * A per-anomaly harvester would therefore be this class with a different {@link #supports}.
  *
  * <p>Only {@code HEALTHY} is excluded: a finding that claims nothing went wrong has no
@@ -33,7 +34,9 @@ import java.util.Set;
  * of collecting evidence is to establish which the data actually supports, so gating on the
  * confident variant alone would skip exactly the findings that most need checking.
  *
- * <p>A harvest over an empty validation yields an empty result rather than an error.
+ * <p>Neither path is required: PATH A alone still produces evidence when the rule engine had
+ * no ruleset to run, and a harvest over an empty validation yields an empty result rather
+ * than an error.
  *
  * @since 0.0.1
  */
@@ -45,35 +48,39 @@ public class DualPathEvidenceHarvester implements EvidenceHarvester {
     @Inject
     PathAEvidenceMapper pathAMapper;
 
+    @Inject
+    PathBEvidenceMapper pathBMapper;
+
     @Override
     public boolean supports(AnomalyType anomalyType) {
         return anomalyType != null && anomalyType != AnomalyType.HEALTHY;
     }
 
     @Override
-    public EvidenceCollectionResult harvest(RcaFinding finding, ValidatedRCA validatedRca,
-                                            String diagnosticContext) {
-        String findingId = finding != null ? finding.findingId() : null;
+    public EvidenceCollectionResult harvest(RcaFinding finding, ValidatedRCA validatedRca) {
+        String diagnosticId = finding != null ? finding.diagnosticId() : null;
 
         if (validatedRca == null) {
             log.info(LogMessages.Evidence.NO_VALIDATION_RESULT)
-                .field("findingId", findingId)
+                .field(LogFields.DIAGNOSTIC_ID, diagnosticId)
                 .log();
-            return EvidenceCollectionResult.empty(findingId);
+            return EvidenceCollectionResult.empty(diagnosticId);
         }
 
         log.info(LogMessages.Evidence.COLLECTION_STARTED)
-            .field("findingId", findingId)
+            .field(LogFields.DIAGNOSTIC_ID, diagnosticId)
             .field("anomalyType", finding != null ? finding.anomalyType() : null)
             .log();
 
-        EvidenceCollectionResult result = new EvidenceCollectionResult(
-            findingId, deduplicate(harvestPathA(finding, validatedRca)));
+        List<EvidenceItem> items = new ArrayList<>(harvestPathA(finding, validatedRca));
+        items.addAll(harvestPathB(finding, validatedRca));
+
+        EvidenceCollectionResult result =
+            new EvidenceCollectionResult(diagnosticId, deduplicate(items));
 
         log.info(LogMessages.Evidence.COLLECTION_COMPLETED)
-            .field("findingId", findingId)
+            .field(LogFields.DIAGNOSTIC_ID, diagnosticId)
             .field("total", result.totalCount())
-            .field("refuting", result.refutingCount())
             .field("sources", String.join(",", result.contributingSources()))
             .log();
 
@@ -89,6 +96,32 @@ public class DualPathEvidenceHarvester implements EvidenceHarvester {
         List<EvidenceItem> items = new ArrayList<>();
         for (ValidationResult result : results) {
             items.addAll(pathAMapper.map(finding, result));
+        }
+        return items;
+    }
+
+    /**
+     * Maps the rule engine's verdict, one evidence item per rule that matched a signal.
+     *
+     * <p>Absent when the engine had no ruleset for the anomaly type — a gap worth logging,
+     * since it is the difference between "the rules found nothing" and "no rules ran".
+     */
+    private List<EvidenceItem> harvestPathB(RcaFinding finding, ValidatedRCA validatedRca) {
+        if (validatedRca.dualValidation() == null
+            || validatedRca.dualValidation().ruleBasedVerdict() == null) {
+            log.info(LogMessages.Evidence.PATH_B_UNAVAILABLE)
+                .field(LogFields.DIAGNOSTIC_ID, finding != null ? finding.diagnosticId() : null)
+                .log();
+            return List.of();
+        }
+
+        List<EvidenceItem> items = new ArrayList<>();
+        for (RuleEvaluationResult result :
+                validatedRca.dualValidation().ruleBasedVerdict().getAllResults()) {
+            EvidenceItem item = pathBMapper.map(finding, result);
+            if (item != null) {
+                items.add(item);
+            }
         }
         return items;
     }
