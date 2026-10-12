@@ -353,6 +353,7 @@ public final class LogMessages {
         public static final String PATH_B_UNAVAILABLE     = "No rule-based verdict on this validation, PATH B contributes nothing";
         public static final String COLLECTION_SKIPPED     = "No harvester supports this anomaly type, evidence not collected";
         public static final String COLLECTION_FAILED      = "Evidence collection failed, diagnosis is unaffected";
+        public static final String RENDERING_FAILED       = "Stored evidence could not be read, omitted from the response";
     }
 
     /**
