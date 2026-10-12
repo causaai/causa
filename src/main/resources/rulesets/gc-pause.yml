@@ -13,9 +13,34 @@ thresholds:
   minPartiallySupportedScore: 5
 
 required:
-  - id: gc.required.full_gc_detected
-    description: "Full GC events detected in logs"
+  - id: gc.required.heap_after_gc_high
+    description: "Heap usage remains high after GC (poor reclamation)"
     weight: 10
+    match:
+      signalType: METRIC
+      signalName: heap.after.gc.ratio
+      condition: GREATER_THAN
+      threshold: 0.75
+    messages:
+      success: "Heap remains >75% full after GC — poor reclamation"
+      failure: "Heap reclamation is adequate after GC"
+
+  - id: gc.required.total_gc_pause_time
+    description: "Total GC pause time exceeds 10% of elapsed time"
+    weight: 10
+    match:
+      signalType: METRIC
+      signalName: gc.pause.percent
+      condition: GREATER_THAN
+      threshold: 0.10
+    messages:
+      success: "Total GC pause time exceeds 10% of elapsed time"
+      failure: "Total GC pause time under threshold"
+
+supporting:
+  - id: gc.supporting.full_gc_detected
+    description: "Full GC events detected in logs"
+    weight: 5
     match:
       signalType: LOG_PATTERN
       signalName: gc.full.count
@@ -25,31 +50,6 @@ required:
       success: "Full GC events detected"
       failure: "No Full GC events found in logs"
 
-  - id: gc.required.long_gc_pause
-    description: "GC pause duration exceeds 30ms"
-    weight: 10
-    match:
-      signalType: METRIC
-      signalName: gc.pause.max
-      condition: GREATER_THAN
-      threshold: 30
-    messages:
-      success: "Long GC pauses detected (>30ms)"
-      failure: "No long GC pauses detected"
-
-  - id: gc.required.heap_after_gc_high
-    description: "Heap usage remains high after GC (poor reclamation)"
-    weight: 10
-    match:
-      signalType: METRIC
-      signalName: heap.after.gc.ratio
-      condition: GREATER_THAN
-      threshold: 0.50
-    messages:
-      success: "Heap remains >50% full after GC — poor reclamation"
-      failure: "Heap reclamation is adequate after GC"
-
-supporting:
   - id: gc.supporting.frequent_full_gc
     description: "Frequent Full GC events (more than 5)"
     weight: 3
@@ -61,6 +61,18 @@ supporting:
     messages:
       success: "Frequent Full GC events detected"
       failure: "Full GC count below threshold"
+
+  - id: gc.supporting.long_gc_pause
+    description: "GC pause duration exceeds 30ms"
+    weight: 3
+    match:
+      signalType: METRIC
+      signalName: gc.pause.max
+      condition: GREATER_THAN
+      threshold: 30
+    messages:
+      success: "Long GC pauses detected (>30ms)"
+      failure: "No long GC pauses detected"
 
   - id: gc.supporting.heap_high
     description: "Heap usage exceeded 80%"
@@ -86,18 +98,6 @@ supporting:
     messages:
       success: "Memory trend increasing"
       failure: "No increasing memory trend"
-
-  - id: gc.supporting.total_gc_pause_time
-    description: "Total GC pause time exceeds 10% of elapsed time"
-    weight: 2
-    match:
-      signalType: METRIC
-      signalName: gc.pause.percent
-      condition: GREATER_THAN
-      threshold: 0.10
-    messages:
-      success: "Total GC pause time exceeds 10% of elapsed time"
-      failure: "Total GC pause time under threshold"
 
 exclusion:
   - id: gc.exclusion.oom_killed
