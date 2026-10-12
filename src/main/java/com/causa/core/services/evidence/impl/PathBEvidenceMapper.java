@@ -26,15 +26,9 @@ import java.util.Optional;
  *
  * <p>Maps deterministic rule evaluation into {@link EvidenceItem}.
  *
- * <p>Rules that <em>failed</em> are mapped as deliberately as rules that passed. A failed
- * REQUIRED rule is frequently the sharpest fact in a diagnosis — "exit code was 143, not 137"
- * is what distinguishes a JVM heap exhaustion from a kernel OOM kill — and discarding it
- * leaves the verdict unexplained.
- *
- * <p>Whether a failure is a finding or a gap depends on
- * {@link RuleEvaluationResult#getInspectedSignals()}: a signal that was examined and held the
- * wrong value is evidence, while a rule that inspected nothing produces no evidence at all —
- * it read no source output, so it has none to show.
+ * <p>Only rules that matched a signal produce evidence. A rule that matched nothing has no
+ * source output to show, so it is skipped — the rule score already records that it did not
+ * hold.
  *
  * @since 0.0.1
  */
@@ -54,7 +48,7 @@ public class PathBEvidenceMapper {
      * @param finding the RCA finding this evidence is attributed to
      * @param result  the outcome of evaluating a single rule
      * @return the evidence item, or null when there is no rule to describe or the rule
-     *         inspected no signal and so has no source output to offer
+     *         matched no signal and so has no source output to offer
      */
     public EvidenceItem map(RcaFinding finding, RuleEvaluationResult result) {
         if (result == null || result.getRule() == null) {
@@ -63,43 +57,26 @@ public class PathBEvidenceMapper {
 
         Rule rule = result.getRule();
         RuleType ruleType = rule.getType();
-        boolean passed = result.isPassed();
 
-        List<Signal> inspected = result.getInspectedSignals();
-        Signal signal = passed
-            ? first(result.getMatchedSignals()).orElseGet(() -> first(inspected).orElse(null))
-            : first(inspected).orElse(null);
+        Signal signal = first(result.getMatchedSignals()).orElse(null);
 
         if (signal == null) {
             return null;
         }
 
-        EvidenceStrength strength = strengthOf(rule.getWeight());
-        double confidence;
-
-        if (ruleType == RuleType.EXCLUSION) {
-            if (passed) {
-                // A matched exclusion contradicts the hypothesis: something other than it
-                // explains the termination.
-                confidence = RuleConfidence.REFUTED;
-            } else {
-                // A ruled-out alternative — recorded, but it evidences nothing on its own.
-                confidence = RuleConfidence.RULED_OUT;
-                strength = EvidenceStrength.CIRCUMSTANTIAL;
-            }
-        } else if (passed) {
-            confidence = ruleType == RuleType.REQUIRED
-                ? RuleConfidence.PASSED_REQUIRED
-                : RuleConfidence.PASSED_SUPPORTING;
-        } else {
-            confidence = RuleConfidence.REFUTED;
-        }
+        // Only matched signals reach here, so the rule passed. A matched EXCLUSION contradicts
+        // the hypothesis: something other than it explains the termination.
+        double confidence = switch (ruleType) {
+            case EXCLUSION -> RuleConfidence.REFUTED;
+            case REQUIRED -> RuleConfidence.PASSED_REQUIRED;
+            default -> RuleConfidence.PASSED_SUPPORTING;
+        };
 
         return EvidenceItem.builder()
             .id(Ids.PATH_B_PREFIX + rule.getId())
             .source(resolveSource(signal))
             .type(typeOf(signal))
-            .strength(strength)
+            .strength(strengthOf(rule.getWeight()))
             .rawSnippet(snippetOf(signal))
             .statement(statementOf(result))
             .explanation(reasoningOf(rule, result))

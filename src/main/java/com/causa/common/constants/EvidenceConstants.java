@@ -149,7 +149,6 @@ public final class EvidenceConstants {
         public static final double PASSED_REQUIRED    = 0.95;
         public static final double PASSED_SUPPORTING  = 0.75;
         public static final double REFUTED            = 0.90;
-        public static final double RULED_OUT          = 0.50;
     }
 
     /**

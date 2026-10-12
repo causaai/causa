@@ -93,11 +93,11 @@ class PathBEvidenceMapperTest {
     }
 
     /**
-     * A rule that inspected nothing read no source output, so it has none to show. Mapping it
+     * A rule that matched nothing read no source output, so it has none to show. Mapping it
      * anyway would put an item on the panel whose snippet is the rule's own restated name.
      */
     @Test
-    void producesNoEvidenceWhenNoSignalWasInspected() {
+    void producesNoEvidenceWhenNoSignalWasMatched() {
         assertThat(mapper.map(null,
             RuleEvaluationResult.failed(rule(RuleType.REQUIRED), "no such signal"))).isNull();
     }
