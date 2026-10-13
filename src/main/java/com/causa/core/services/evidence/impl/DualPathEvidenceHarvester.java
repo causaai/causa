@@ -1,5 +1,6 @@
 package com.causa.core.services.evidence.impl;
 
+import com.causa.common.constants.DiagnosticConstants.LogFields;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
 import com.causa.core.domain.RootCauseAnalysis.AnomalyType;
@@ -53,25 +54,25 @@ public class DualPathEvidenceHarvester implements EvidenceHarvester {
     @Override
     public EvidenceCollectionResult harvest(RcaFinding finding, ValidatedRCA validatedRca,
                                             String diagnosticContext) {
-        String findingId = finding != null ? finding.findingId() : null;
+        String diagnosticId = finding != null ? finding.diagnosticId() : null;
 
         if (validatedRca == null) {
             log.info(LogMessages.Evidence.NO_VALIDATION_RESULT)
-                .field("findingId", findingId)
+                .field(LogFields.DIAGNOSTIC_ID, diagnosticId)
                 .log();
-            return EvidenceCollectionResult.empty(findingId);
+            return EvidenceCollectionResult.empty(diagnosticId);
         }
 
         log.info(LogMessages.Evidence.COLLECTION_STARTED)
-            .field("findingId", findingId)
+            .field(LogFields.DIAGNOSTIC_ID, diagnosticId)
             .field("anomalyType", finding != null ? finding.anomalyType() : null)
             .log();
 
         EvidenceCollectionResult result = new EvidenceCollectionResult(
-            findingId, deduplicate(harvestPathA(finding, validatedRca)));
+            diagnosticId, deduplicate(harvestPathA(finding, validatedRca)));
 
         log.info(LogMessages.Evidence.COLLECTION_COMPLETED)
-            .field("findingId", findingId)
+            .field(LogFields.DIAGNOSTIC_ID, diagnosticId)
             .field("total", result.totalCount())
             .field("refuting", result.refutingCount())
             .field("sources", String.join(",", result.contributingSources()))

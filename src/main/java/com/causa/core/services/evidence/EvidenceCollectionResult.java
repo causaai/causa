@@ -15,13 +15,13 @@ import java.util.TreeSet;
  * <p>The outcome of harvesting evidence for a single RCA finding: every
  * {@link EvidenceItem} produced, bound to the finding it was collected for.
  *
- * @param findingId the RCA finding this evidence belongs to
+ * @param diagnosticId the diagnostic this evidence belongs to
  * @param items     every evidence item collected, in emission order
  *
  * @since 0.0.1
  */
 public record EvidenceCollectionResult(
-    String findingId,
+    String diagnosticId,
     List<EvidenceItem> items
 ) {
 
@@ -32,11 +32,11 @@ public record EvidenceCollectionResult(
     /**
      * Returns an empty result for a finding that produced no evidence.
      *
-     * @param findingId the finding, may be null when there was no RCA at all
+     * @param diagnosticId the diagnostic, may be null when there was no RCA at all
      * @return an empty collection result
      */
-    public static EvidenceCollectionResult empty(String findingId) {
-        return new EvidenceCollectionResult(findingId, List.of());
+    public static EvidenceCollectionResult empty(String diagnosticId) {
+        return new EvidenceCollectionResult(diagnosticId, List.of());
     }
 
     /** Total number of evidence items collected. */
