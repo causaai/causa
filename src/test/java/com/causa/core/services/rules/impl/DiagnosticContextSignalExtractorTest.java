@@ -33,7 +33,7 @@ class DiagnosticContextSignalExtractorTest {
 
     @Test
     void quotesTheContextLineEachSignalWasReadFrom() {
-        assertThat(snippetOf("exitCode")).contains("Exit Code: 137");
+        assertThat(snippetOf("exitCode")).isEqualTo("Exit Code: 137");
     }
 
     @Test
