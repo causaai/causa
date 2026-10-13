@@ -14,9 +14,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Dual-Path Evidence Harvester
@@ -69,7 +67,7 @@ public class DualPathEvidenceHarvester implements EvidenceHarvester {
             .log();
 
         EvidenceCollectionResult result = new EvidenceCollectionResult(
-            diagnosticId, deduplicate(harvestPathA(finding, validatedRca)));
+            diagnosticId, harvestPathA(finding, validatedRca));
 
         log.info(LogMessages.Evidence.COLLECTION_COMPLETED)
             .field(LogFields.DIAGNOSTIC_ID, diagnosticId)
@@ -92,33 +90,5 @@ public class DualPathEvidenceHarvester implements EvidenceHarvester {
             items.addAll(pathAMapper.map(finding, result));
         }
         return items;
-    }
-
-    /**
-     * Drops exact repeats, keeping the first occurrence.
-     *
-     * <p>The LLM cites the same log line under several assertions, so the raw harvest carries
-     * substantial repetition. Identity here is the quoted text together with its source and
-     * stance — the same snippet offered once in support and once against is a genuine conflict,
-     * not a duplicate, and must survive.
-     *
-     * <p>An item that quoted nothing is kept unconditionally. Keyed like the rest, all such
-     * items would collide on a shared {@code …|null} key and all but the first would be
-     * discarded — collapsing the record of which sources failed to answer into one anonymous
-     * gap.
-     */
-    private List<EvidenceItem> deduplicate(List<EvidenceItem> items) {
-        Set<String> seen = new LinkedHashSet<>();
-        List<EvidenceItem> unique = new ArrayList<>();
-        for (EvidenceItem item : items) {
-            String key = item.source()
-                + "|" + item.type()
-                + "|" + item.evidenceHypothesisAlignment()
-                + "|" + item.rawSnippet();
-            if (item.rawSnippet() == null || seen.add(key)) {
-                unique.add(item);
-            }
-        }
-        return unique;
     }
 }
