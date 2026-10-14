@@ -54,8 +54,8 @@ public final class EvidenceConstants {
     /**
      * Reasoning text rendered onto evidence derived from rule evaluation.
      */
-    public static final class Messages {
-        private Messages() {}
+    public static final class RuleEvidenceMessages {
+        private RuleEvidenceMessages() {}
 
         // The rule description is NOT interpolated into either format: the evaluation reasoning
         // already names what was looked for, and the rule itself is identified by the item id.

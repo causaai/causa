@@ -1,7 +1,7 @@
 package com.causa.core.services.evidence.impl;
 
 import com.causa.common.constants.EvidenceConstants.Ids;
-import com.causa.common.constants.EvidenceConstants.Messages;
+import com.causa.common.constants.EvidenceConstants.RuleEvidenceMessages;
 import com.causa.common.constants.EvidenceConstants.Metadata;
 import com.causa.common.constants.EvidenceConstants.RuleConfidence;
 import com.causa.common.constants.EvidenceConstants.RuleWeightBands;
@@ -110,7 +110,7 @@ public class PathBEvidenceMapper {
         return truncate(signal.getMetadata(Metadata.SIGNAL_SNIPPET)
             .map(Object::toString)
             .orElseGet(() -> String.format(
-                Messages.SIGNAL_SNIPPET_FORMAT,
+                RuleEvidenceMessages.SIGNAL_SNIPPET_FORMAT,
                 signal.getName(),
                 signal.getValueAsString()
             )));
@@ -132,7 +132,9 @@ public class PathBEvidenceMapper {
     }
 
     private String reasoningOf(Rule rule, RuleEvaluationResult result) {
-        String format = result.isPassed() ? Messages.RULE_PASSED_FORMAT : Messages.RULE_FAILED_FORMAT;
+        String format = result.isPassed()
+            ? RuleEvidenceMessages.RULE_PASSED_FORMAT
+            : RuleEvidenceMessages.RULE_FAILED_FORMAT;
         return String.format(format, titleCase(rule.getType().name()), result.getReasoning());
     }
 
