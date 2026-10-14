@@ -79,8 +79,8 @@ CREATE TRIGGER trg_external_config_notify
 -- =============================================================================
 -- 4. DIAGNOSTICS — all_evidence COLUMN
 --    Stores complete EvidenceItem instances from the validation pipeline for
---    debugging and audit. The top 3-5 are selected into the evidence column and transformed
---    to the Evidence UI model for the API response.
+--    debugging and audit. The top and relevant evidence is selected into the evidence
+--    column and transformed to the Evidence UI model for the API response.
 --
 --    Existing evidence column: LLM-generated evidences from RCA (backward compatible)
 --    New all_evidence column:  Structured validation evidences from PATH A + PATH B
