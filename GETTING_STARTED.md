@@ -687,13 +687,20 @@ curl -s https://$(oc get route causa-backend -n causa-rca -o jsonpath='{.spec.ho
 Inspect the `mcp.json` configuration loaded from the ConfigMap:
 
 ```bash
-kubectl get configmap causa-mcp-config -n causa-rca -o jsonpath='{.data.mcp\.json}' | jq .mcpServers
+# Get the exact name of config map
+kubectl get configmap -n causa-rca | grep causa-mcp-config
+
+# Full configuration dump (useful for initial setup and debugging)
+kubectl get configmap <config-map-name> -n causa-rca -o jsonpath='{.data.mcp\.json}' | jq .mcpServers
+
+# Security Tip: If your mcp.json contains sensitive authorization headers (e.g. OpenShift bearer tokens), you can list server keys without revealing credentials:
+kubectl get configmap <config-map-name> -n causa-rca -o jsonpath='{.data.mcp\.json}' | jq '.mcpServers | keys'
 ```
 
 Verify Causa Backend successfully loaded and validated `mcp.json` on startup:
 
 ```bash
-kubectl logs -n causa-rca -l app=causa-backend | grep "MCP startup"
+kubectl logs -n causa-rca deployment/causa-backend | grep "MCP startup: completed successfully"
 ```
 
 Check the `/api/v1/healthz` endpoint to confirm the live connectivity status of every dynamic MCP server declared in `mcp.json`:
