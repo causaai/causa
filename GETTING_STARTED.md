@@ -191,31 +191,49 @@ Causa discovers and invokes MCP servers declaratively using `mcp.json`, mounted 
 If you want to customize an MCP server (such as pointing the Quarkus MCP server to your application's `/q/metrics` endpoint), update `mcp.json` or the ConfigMap:
 
 ```json
-"quarkus": {
-  "type": "streamable-http",
-  "url": "http://quarkus-mcp-server:8080/mcp",
-  "metadata": {
-    "metricsBaseUrl": "http://my-app.my-namespace.svc.cluster.local:8080/q/metrics"
-  },
-  "tools": [
-    {
-      "name": "fetch_raw_metrics_from_endpoint",
-      "contextKey": "QUARKUS_RAW_METRICS",
-      "description": "Raw Prometheus-format metrics text scraped from the application's /q/metrics endpoint.",
-      "arguments": {
-        "pod_name": "${podName}",
-        "namespace": "${namespace}",
-        "baseUrl": "${metadata.metricsBaseUrl}"
-      }
+{
+  "mcpServers": {
+    "quarkus": {
+      "type": "streamable-http",
+      "url": "http://quarkus-mcp-server:8080/mcp",
+      "optional": false,
+      "healthCheck": {
+        "url": "http://quarkus-mcp-server:8080/healthz",
+        "timeoutMs": 10000
+      },
+      "timeoutMs": 10000,
+      "metadata": {
+        "metricsBaseUrl": "http://my-app.my-namespace.svc.cluster.local:8080/q/metrics"
+      },
+      "description": "Quarkus MCP — raw Prometheus-format metrics scraped from the target application's metrics endpoint",
+      "tools": [
+        {
+          "name": "fetch_raw_metrics_from_endpoint",
+          "contextKey": "QUARKUS_RAW_METRICS",
+          "description": "Raw Prometheus-format metrics text scraped from the application's /q/metrics endpoint.",
+          "arguments": {
+            "pod_name": "${podName}",
+            "namespace": "${namespace}",
+            "baseUrl": "${metadata.metricsBaseUrl}"
+          }
+        }
+      ]
     }
-  ]
+  }
 }
 ```
 
-You can update the configuration after installation:
+
+You can update the configuration after installation in two steps:
 
 ```bash
-kubectl edit configmap causa-mcp-config -n causa-rca
+# Step 1: Find the exact ConfigMap name (handles any Kustomize hash suffix)
+kubectl get configmap -n causa-rca | grep causa-mcp-config
+
+# Step 2: Edit the ConfigMap and restart the Causa deployment
+kubectl edit configmap <configmap-name> -n causa-rca
+
+# Step 3: Rollout restart 
 kubectl rollout restart deployment/causa-backend -n causa-rca
 ```
 
