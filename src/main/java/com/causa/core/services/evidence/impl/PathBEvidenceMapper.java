@@ -77,6 +77,7 @@ public class PathBEvidenceMapper {
             .source(resolveSource(signal))
             .type(typeOf(signal))
             .strength(strengthOf(rule.getWeight()))
+            .evidenceHypothesisAlignment(alignmentOf(ruleType))
             .rawSnippet(snippetOf(signal))
             .statement(statementOf(result))
             .explanation(reasoningOf(rule, result))
@@ -136,8 +137,24 @@ public class PathBEvidenceMapper {
     }
 
     /**
+     * Which way a matched rule points.
+     *
+     * <p>This is the axis {@link #strengthOf} deliberately drops: a matched exclusion at
+     * weight -10 is every bit as decisive as a required rule at +10, it just decides the
+     * other way. Keeping direction here is what lets strength stay a single comparable
+     * scale — {@code DEFINITIVE / REFUTES} rather than a strength value that doubles as a
+     * verdict and has to be special-cased by everything that ranks evidence.
+     */
+    private EvidenceItem.EvidenceHypothesisAlignment alignmentOf(RuleType ruleType) {
+        return ruleType == RuleType.EXCLUSION
+            ? EvidenceItem.EvidenceHypothesisAlignment.REFUTES
+            : EvidenceItem.EvidenceHypothesisAlignment.SUPPORTS;
+    }
+
+    /**
      * Rule weight stands in for relevance: the ruleset author already expressed how decisive
      * each condition is, and exclusion weights are negative, so magnitude is what matters.
+     * Which way that weight points is {@link #alignmentOf}, not a strength band of its own.
      */
     private EvidenceStrength strengthOf(int weight) {
         int magnitude = Math.abs(weight);

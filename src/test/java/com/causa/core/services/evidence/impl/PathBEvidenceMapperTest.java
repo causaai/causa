@@ -124,6 +124,34 @@ class PathBEvidenceMapperTest {
         assertThat(item.rawSnippet()).isEqualTo("heap.usage.trend: INCREASING");
     }
 
+    /**
+     * A matched exclusion is a decisive fact pointing the other way, not a weak one. Strength
+     * stays a single comparable scale — the direction lives in the alignment.
+     */
+    @Test
+    void readsAMatchedExclusionAsDecisiveEvidenceAgainstTheHypothesis() {
+        EvidenceItem item = mapper.map(null, RuleEvaluationResult.passed(
+            rule(RuleType.EXCLUSION, -10),
+            List.of(signalFrom(POD_STATUS)),
+            "Deployment rollout restart detected"));
+
+        assertThat(item.strength()).isEqualTo(EvidenceItem.EvidenceStrength.DEFINITIVE);
+        assertThat(item.evidenceHypothesisAlignment())
+            .isEqualTo(EvidenceItem.EvidenceHypothesisAlignment.REFUTES);
+    }
+
+    @Test
+    void readsAMatchedSupportingRuleAsEvidenceForTheHypothesis() {
+        EvidenceItem item = mapper.map(null, RuleEvaluationResult.passed(
+            rule(RuleType.SUPPORTING, 3),
+            List.of(signalFrom(CRYOSTAT_ANALYSIS)),
+            "Heap usage exceeded 90%"));
+
+        assertThat(item.strength()).isEqualTo(EvidenceItem.EvidenceStrength.MODERATE);
+        assertThat(item.evidenceHypothesisAlignment())
+            .isEqualTo(EvidenceItem.EvidenceHypothesisAlignment.SUPPORTS);
+    }
+
     private Signal signalFrom(String section) {
         return Signal.builder(Signal.SignalType.METRIC, "heap.usage.trend")
             .value("INCREASING")
@@ -132,7 +160,11 @@ class PathBEvidenceMapperTest {
     }
 
     private Rule rule(RuleType type) {
-        return new Rule.BaseRule("test.rule", "A test rule", type, 10) {
+        return rule(type, 10);
+    }
+
+    private Rule rule(RuleType type, int weight) {
+        return new Rule.BaseRule("test.rule", "A test rule", type, weight) {
             @Override
             public RuleEvaluationResult evaluate(List<Signal> signals) {
                 throw new UnsupportedOperationException("not evaluated in this test");

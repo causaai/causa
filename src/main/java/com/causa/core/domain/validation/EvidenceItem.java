@@ -17,9 +17,8 @@ import java.util.Map;
  * <p>The prose fields are deliberately distinct: {@link #rawSnippet} is the verbatim text the
  * source returned, {@link #statement} says what that text shows, and {@link #explanation} argues
  * why it settles the question. Collapsing any two makes an item look like corroboration of
- * itself. {@link #metadata} is left empty and {@link #evidenceHypothesisAlignment} null:
- * provenance keys — PATH A's assertion id, PATH B's rule id — and whether a fact aligns with
- * the RCA are not populated until those designs are settled.
+ * itself. {@link #metadata} is left empty: provenance keys — PATH A's assertion id, PATH B's
+ * rule id — are not populated until that design is settled.
  *
  * @since 0.0.1
  */
@@ -31,7 +30,8 @@ public record EvidenceItem(
     String source,
     EvidenceType type,
     EvidenceStrength strength,
-    // Always null: deciding whether a fact aligns with the RCA is still being designed.
+    // Which way the fact points, kept out of strength so strength stays one comparable
+    // scale. Set from the rule type on PATH B; still null on PATH A.
     EvidenceHypothesisAlignment evidenceHypothesisAlignment,
     String rawSnippet,
     // One line stating only what rawSnippet shows. Null for rule-derived evidence, which has no
