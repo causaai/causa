@@ -124,7 +124,7 @@ public final class ValidationConstants {
 
         // Log pattern signals
         public static final String ERROR_OOM = "error.oom";
-        public static final String FULL_GC_COUNT = "full.gc.count";
+        public static final String FULL_GC_COUNT = "gc.full.count";
 
         // Kruize signals
         public static final String MEMORY_LIMIT_RECOMMENDATION = "memory.limit.recommendation";

@@ -26,15 +26,15 @@ required:
       failure: "Heap reclamation is adequate after GC"
 
   - id: gc.required.total_gc_pause_time
-    description: "Total GC pause time exceeds 10% of elapsed time"
+    description: "Total GC pause time exceeds 1% of elapsed time"
     weight: 10
     match:
       signalType: METRIC
       signalName: gc.pause.percent
       condition: GREATER_THAN
-      threshold: 0.10
+      threshold: 0.01
     messages:
-      success: "Total GC pause time exceeds 10% of elapsed time"
+      success: "Total GC pause time exceeds 1% of elapsed time"
       failure: "Total GC pause time under threshold"
 
 supporting:
