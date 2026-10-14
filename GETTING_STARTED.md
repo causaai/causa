@@ -184,21 +184,39 @@ When the installer completes, all components are running in the `causa-rca` name
 - Causa
 - Causa MCP Server
 
-#### Set the target Quarkus app URL (optional at install time)
+#### Configure MCP servers via `mcp.json`
 
-If you already know the in-cluster URL of the Java app you want to monitor, set it before running the installer so the Quarkus MCP server can start scraping metrics immediately:
+Causa discovers and invokes MCP servers declaratively using `mcp.json`, mounted into the Causa Backend container from the `causa-mcp-config` ConfigMap (at `/etc/causa/mcp.json`). Pre-configured profile templates are provided in `deployment/kubernetes/base/mcp-config/`.
 
-```bash
-export CAUSA_MCP_QUARKUS_METRICS_BASE_URL="http://my-app.my-namespace.svc.cluster.local:8080"
-./install.sh
+If you want to customize an MCP server (such as pointing the Quarkus MCP server to your application's `/q/metrics` endpoint), update `mcp.json` or the ConfigMap:
+
+```json
+"quarkus": {
+  "type": "streamable-http",
+  "url": "http://quarkus-mcp-server:8080/mcp",
+  "metadata": {
+    "metricsBaseUrl": "http://my-app.my-namespace.svc.cluster.local:8080/q/metrics"
+  },
+  "tools": [
+    {
+      "name": "fetch_raw_metrics_from_endpoint",
+      "contextKey": "QUARKUS_RAW_METRICS",
+      "description": "Raw Prometheus-format metrics text scraped from the application's /q/metrics endpoint.",
+      "arguments": {
+        "pod_name": "${podName}",
+        "namespace": "${namespace}",
+        "baseUrl": "${metadata.metricsBaseUrl}"
+      }
+    }
+  ]
+}
 ```
 
-You can always set or update it after installation:
+You can update the configuration after installation:
 
 ```bash
-kubectl set env deployment/causa-backend -n causa-rca \
-  CAUSA_MCP_QUARKUS_METRICS_BASE_URL="http://my-app.my-namespace.svc.cluster.local:8080"
-kubectl rollout status deployment/causa-backend -n causa-rca --timeout=180s
+kubectl edit configmap causa-mcp-config -n causa-rca
+kubectl rollout restart deployment/causa-backend -n causa-rca
 ```
 
 ---
@@ -646,16 +664,18 @@ curl -s http://localhost:30001/q/health/ready | jq .
 curl -s https://$(oc get route causa-backend -n causa-rca -o jsonpath='{.spec.host}')/q/health/ready | jq .
 ```
 
-**Verify MCP environment variables were stamped:**
+**Verify MCP configuration (`mcp.json`):**
+
+Inspect the `mcp.json` configuration loaded from the ConfigMap:
 
 ```bash
-kubectl set env deployment/causa-backend -n causa-rca --list | grep CAUSA_MCP
+kubectl get configmap causa-mcp-config -n causa-rca -o jsonpath='{.data.mcp\.json}' | jq .mcpServers
 ```
 
-Expected output:
-```
-CAUSA_MCP_QUARKUS_ENDPOINT=http://mcp-metrics.causa-rca.svc.cluster.local:8080
-CAUSA_MCP_ASYNC_PROFILER_ENDPOINT=http://jafra-mcp.causa-rca.svc.cluster.local:8083
+Verify Causa Backend successfully loaded and validated `mcp.json` on startup:
+
+```bash
+kubectl logs -n causa-rca -l app=causa-backend | grep "MCP startup"
 ```
 
 **Verify Jafra is running (Kind only):**
