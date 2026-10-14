@@ -664,7 +664,7 @@ curl -s http://localhost:30001/q/health/ready | jq .
 curl -s https://$(oc get route causa-backend -n causa-rca -o jsonpath='{.spec.host}')/q/health/ready | jq .
 ```
 
-**Verify MCP configuration (`mcp.json`):**
+**Verify MCP configuration and health (`mcp.json`):**
 
 Inspect the `mcp.json` configuration loaded from the ConfigMap:
 
@@ -676,6 +676,53 @@ Verify Causa Backend successfully loaded and validated `mcp.json` on startup:
 
 ```bash
 kubectl logs -n causa-rca -l app=causa-backend | grep "MCP startup"
+```
+
+Check the `/api/v1/healthz` endpoint to confirm the live connectivity status of every dynamic MCP server declared in `mcp.json`:
+
+```bash
+# Kind
+curl -s http://localhost:30001/api/v1/healthz | jq .
+
+# OpenShift
+curl -s https://$(oc get route causa-backend -n causa-rca -o jsonpath='{.spec.host}')/api/v1/healthz | jq .
+```
+
+Example response:
+
+```json
+{
+  ...
+  "components": {
+    ...
+    "mcp": {
+      "status": "UP",
+      "servers": {
+        "kubernetes": {
+          "status": "UP",
+          "message": "Connected successfully",
+          "latency_ms": 6
+        },
+        "quarkus": {
+          "status": "UP",
+          "message": "Connected successfully",
+          "latency_ms": 199
+        },
+        "async-profiler": {
+          "status": "UP",
+          "message": "Connected successfully",
+          "latency_ms": 38
+        },
+        "prometheus": {
+          "status": "UP",
+          "message": "Connected successfully",
+          "latency_ms": 16,
+          "optional": true
+        }
+      }
+    }
+  }
+}
 ```
 
 **Verify Jafra is running (Kind only):**
