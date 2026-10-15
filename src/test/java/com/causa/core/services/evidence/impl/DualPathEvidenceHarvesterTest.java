@@ -3,8 +3,14 @@ package com.causa.core.services.evidence.impl;
 import com.causa.common.constants.EvidenceConstants;
 import com.causa.core.domain.RootCauseAnalysis;
 import com.causa.core.domain.RootCauseAnalysis.AnomalyType;
+import com.causa.core.domain.validation.Assertion;
+import com.causa.core.domain.validation.Assertion.AssertionSource;
+import com.causa.core.domain.validation.Assertion.AssertionType;
 import com.causa.core.domain.validation.DualValidationResult;
+import com.causa.core.domain.validation.Evidence;
+import com.causa.core.domain.validation.EvidenceItem;
 import com.causa.core.domain.validation.ValidatedRCA;
+import com.causa.core.domain.validation.ValidationResult;
 import com.causa.core.services.evidence.EvidenceCollectionResult;
 import com.causa.core.services.evidence.EvidenceHarvester;
 import com.causa.core.services.evidence.McpSourceResolver;
@@ -62,11 +68,34 @@ class DualPathEvidenceHarvesterTest {
     }
 
     /**
-     * PATH A alone still produces a harvest. A run where the engine had no ruleset for the
-     * anomaly must yield an empty result, not a failure.
+     * PATH A alone still produces a harvest — a run where the engine had no ruleset for the
+     * anomaly keeps the assertion evidence rather than dropping it with PATH B.
      */
     @Test
-    void harvestsWithoutARuleBasedVerdict() {
+    void harvestsPathAWithoutARuleBasedVerdict() {
+        EvidenceCollectionResult result = wiredHarvester().harvest(
+            FINDING, validatedRca(null, supportedAssertion()));
+
+        assertThat(result.items()).singleElement()
+            .satisfies(item -> {
+                assertThat(item.id()).isEqualTo("pathA.a1.ev-01");
+                assertThat(item.rawSnippet()).isEqualTo("Exit Code: 137");
+            });
+    }
+
+    /** The two paths are additive — one harvest carries both, PATH A first. */
+    @Test
+    void mergesBothPathsIntoOneHarvest() {
+        EvidenceCollectionResult result = wiredHarvester().harvest(
+            FINDING, validatedRca(ruleVerdictThatMatched(), supportedAssertion()));
+
+        assertThat(result.items()).extracting(EvidenceItem::id)
+            .containsExactly("pathA.a1.ev-01", "pathB.exit.code");
+    }
+
+    /** Neither path ran: an empty result, not a failure. */
+    @Test
+    void harvestsNothingWhenNeitherPathProducedOutput() {
         assertThat(wiredHarvester().harvest(FINDING, validatedRca(null)).isEmpty()).isTrue();
     }
 
@@ -85,15 +114,26 @@ class DualPathEvidenceHarvesterTest {
         return wired;
     }
 
-    private ValidatedRCA validatedRca(HypothesisValidationResult ruleVerdict) {
+    private ValidatedRCA validatedRca(HypothesisValidationResult ruleVerdict, ValidationResult... pathA) {
         return ValidatedRCA.builder()
             .originalRca(new RootCauseAnalysis(
                 "Container OOM killed", null, null, null,
                 AnomalyType.OOM_KILLED, null, null, null, null, null, null))
+            .validationResults(List.of(pathA))
             .dualValidation(ruleVerdict == null
                 ? null
                 : new DualValidationResult(null, ruleVerdict, null))
             .build();
+    }
+
+    private ValidationResult supportedAssertion() {
+        return ValidationResult.supported(
+            Assertion.of("a1", "Container was OOMKilled",
+                AssertionType.OBSERVATION, AssertionSource.ROOT_CAUSE),
+            0.9,
+            List.of(Evidence.of("POD_STATUS", Evidence.EvidenceType.KUBERNETES_EVENT,
+                "Exit Code: 137", 0.9)),
+            "exit code 137 observed");
     }
 
     private HypothesisValidationResult ruleVerdictThatMatched() {
