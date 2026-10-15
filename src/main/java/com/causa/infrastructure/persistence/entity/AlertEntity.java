@@ -72,6 +72,13 @@ public class AlertEntity extends BaseEntity {
     private String namespace;
 
     /**
+     * ID of the diagnostic linked to this alert, resolved in the same SELECT via a subquery.
+     * Read-only — not persisted. Null when no diagnostic exists (e.g. rejected alerts).
+     */
+    @Formula("(select d.id from diagnostics d where d.alert_id = id)")
+    private String diagnosticId;
+
+    /**
      * alert_metadata JSONB.
      * Shape: {@code { "labels": {...}, "annotations": {...}, "alert_source": "prometheus" }}
      */
@@ -122,6 +129,8 @@ public class AlertEntity extends BaseEntity {
     public void setWorkloadName(String v) { this.workloadName = v; }
 
     public String getNamespace() { return namespace; }
+
+    public String getDiagnosticId() { return diagnosticId; }
 
     public JsonNode getAlertMetadata() { return alertMetadata; }
     public void setAlertMetadata(JsonNode alertMetadata) { this.alertMetadata = alertMetadata; }
