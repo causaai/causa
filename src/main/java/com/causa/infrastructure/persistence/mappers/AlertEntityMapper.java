@@ -98,6 +98,15 @@ public final class AlertEntityMapper {
      * Converts an {@link AlertEntity} back to a domain {@link Alert}.
      */
     public static Alert toDomain(AlertEntity entity) {
+        return toDomain(entity, null);
+    }
+
+    /**
+     * Converts an {@link AlertEntity} back to a domain {@link Alert}, attaching the ID of its diagnostic.
+     *
+     * @param diagnosticId ID of the linked diagnostic; null when none exists
+     */
+    public static Alert toDomain(AlertEntity entity, String diagnosticId) {
         if (entity == null) return null;
 
         // Unpack workload_info JSONB
@@ -139,7 +148,7 @@ public final class AlertEntityMapper {
             .workloadInfo(WorkloadInfo.of(podName, containerName, namespace, clusterName, workloadType))
             .workloadName(entity.getWorkloadName())
             .alertMetadata(AlertMetadata.of(labels, annotations, alertSource, rejectionReason))
-            .diagnosticId(entity.getDiagnosticId())
+            .diagnosticId(diagnosticId)
             .build();
     }
 
