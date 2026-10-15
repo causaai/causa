@@ -119,11 +119,13 @@ public final class AlertEntityMapper {
         Map<String, String> labels      = Map.of();
         Map<String, String> annotations = Map.of();
         String alertSource = AlertMetadata.DEFAULT_SOURCE;
+        String rejectionReason = null;
         if (entity.getAlertMetadata() != null) {
             var am  = entity.getAlertMetadata();
             labels      = JsonUtils.jsonNodeToMap(am.get("labels"));
             annotations = JsonUtils.jsonNodeToMap(am.get("annotations"));
             alertSource = am.path("alert_source").asText(AlertMetadata.DEFAULT_SOURCE);
+            rejectionReason = am.path("rejection_reason").asText(null);
         }
 
         return Alert.builder()
@@ -136,7 +138,8 @@ public final class AlertEntityMapper {
             .status(AlertStatus.fromString(entity.getStatus()))
             .workloadInfo(WorkloadInfo.of(podName, containerName, namespace, clusterName, workloadType))
             .workloadName(entity.getWorkloadName())
-            .alertMetadata(AlertMetadata.of(labels, annotations, alertSource))
+            .alertMetadata(AlertMetadata.of(labels, annotations, alertSource, rejectionReason))
+            .diagnosticId(entity.getDiagnosticId())
             .build();
     }
 
