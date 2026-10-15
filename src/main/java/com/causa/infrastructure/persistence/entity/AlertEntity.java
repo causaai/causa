@@ -72,11 +72,11 @@ public class AlertEntity extends BaseEntity {
     private String namespace;
 
     /**
-     * ID of the diagnostic linked to this alert, resolved in the same SELECT via a subquery.
-     * Read-only — not persisted. Null when no diagnostic exists (e.g. rejected alerts).
+     * IDs of all diagnostics linked to this alert, aggregated in the same SELECT via a subquery.
+     * Read-only — not persisted. Null when the alert has no diagnostics (e.g. rejected alerts).
      */
-    @Formula("(select d.id from diagnostics d where d.alert_id = id)")
-    private String diagnosticId;
+    @Formula("(select array_agg(d.id order by d.created_at desc) from diagnostics d where d.alert_id = id)")
+    private String[] diagnosticIds;
 
     /**
      * alert_metadata JSONB.
@@ -127,10 +127,9 @@ public class AlertEntity extends BaseEntity {
 
     public String getWorkloadName() { return workloadName; }
     public void setWorkloadName(String v) { this.workloadName = v; }
-
     public String getNamespace() { return namespace; }
 
-    public String getDiagnosticId() { return diagnosticId; }
+    public String[] getDiagnosticIds() { return diagnosticIds; }
 
     public JsonNode getAlertMetadata() { return alertMetadata; }
     public void setAlertMetadata(JsonNode alertMetadata) { this.alertMetadata = alertMetadata; }

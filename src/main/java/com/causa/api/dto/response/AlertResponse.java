@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -20,8 +21,8 @@ public record AlertResponse(
     @JsonProperty("id")
     String alertId,
 
-    @JsonProperty("diag_id")
-    String diagId,
+    @JsonProperty("diag_ids")
+    List<String> diagIds,
 
     @JsonProperty("source_alert_id")
     String sourceAlertId,
@@ -72,7 +73,7 @@ public record AlertResponse(
 
         return new AlertResponse(
             a.getAlertId(),
-            a.getDiagnosticId(),
+            a.getDiagnosticIds(),
             a.getSourceAlertId(),
             a.getAlertName(),
             a.getAlertTimestamp(),

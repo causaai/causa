@@ -5,6 +5,7 @@ import com.causa.common.constants.AlertConstants.AlertStatus;
 
 import java.time.Instant;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -37,7 +38,7 @@ public final class Alert {
     private final WorkloadInfo workloadInfo;
     private final String workloadName;
     private final AlertMetadata alertMetadata;
-    private final String diagnosticId;
+    private final List<String> diagnosticIds;
 
     private Alert(Builder builder) {
         this.alertId        = Objects.requireNonNull(builder.alertId, "alertId cannot be null");
@@ -49,7 +50,7 @@ public final class Alert {
         this.workloadInfo   = Objects.requireNonNull(builder.workloadInfo, "workloadInfo cannot be null");
         this.workloadName   = Objects.requireNonNull(builder.workloadName, "workloadName cannot be null");
         this.alertMetadata  = builder.alertMetadata != null ? builder.alertMetadata : AlertMetadata.empty();
-        this.diagnosticId    = builder.diagnosticId;
+        this.diagnosticIds  = builder.diagnosticIds != null ? List.copyOf(builder.diagnosticIds) : List.of();
     }
 
     // -------------------------------------------------------------------------
@@ -66,8 +67,8 @@ public final class Alert {
     /** Denormalised container name stored in {@code workload_name} column for fast lookups. */
     public String getWorkloadName()         { return workloadName; }
     public AlertMetadata getAlertMetadata() { return alertMetadata; }
-    /** ID of the diagnostic linked to this alert; null when none exists (e.g. rejected alerts). */
-    public String getDiagnosticId()         { return diagnosticId; }
+    /** IDs of the diagnostics linked to this alert; empty when none exist (e.g. rejected alerts). */
+    public List<String> getDiagnosticIds()  { return diagnosticIds; }
 
     /**
      * Cooldown deduplication key.
@@ -197,7 +198,7 @@ public final class Alert {
         private WorkloadInfo workloadInfo;
         private String workloadName;
         private AlertMetadata alertMetadata;
-        private String diagnosticId;
+        private List<String> diagnosticIds;
 
         private Builder() {}
 
@@ -210,7 +211,7 @@ public final class Alert {
         public Builder workloadInfo(WorkloadInfo v)   { this.workloadInfo = v; return this; }
         public Builder workloadName(String v)         { this.workloadName = v; return this; }
         public Builder alertMetadata(AlertMetadata v) { this.alertMetadata = v; return this; }
-        public Builder diagnosticId(String v)         { this.diagnosticId = v; return this; }
+        public Builder diagnosticIds(List<String> v)  { this.diagnosticIds = v; return this; }
 
         public Alert build() { return new Alert(this); }
     }
