@@ -1,6 +1,7 @@
 package com.causa.api.dto.response;
 
 import com.causa.core.domain.Alert;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.Instant;
@@ -19,6 +20,9 @@ public record AlertResponse(
     @JsonProperty("id")
     String alertId,
 
+    @JsonProperty("diag_id")
+    String diagId,
+
     @JsonProperty("source_alert_id")
     String sourceAlertId,
 
@@ -33,6 +37,10 @@ public record AlertResponse(
 
     @JsonProperty("status")
     String status,
+
+    @JsonProperty("rejection_reason")
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    String rejectionReason,
 
     @JsonProperty("workload_info")
     WorkloadInfoDto workloadInfo,
@@ -64,11 +72,13 @@ public record AlertResponse(
 
         return new AlertResponse(
             a.getAlertId(),
+            a.getDiagnosticId(),
             a.getSourceAlertId(),
             a.getAlertName(),
             a.getAlertTimestamp(),
             a.getSeverity() != null ? a.getSeverity().getValue() : null,
             a.getStatus()   != null ? a.getStatus().getValue()   : null,
+            am.rejectionReason(),
             new WorkloadInfoDto(wi.podName(), wi.containerName(), wi.namespace(), wi.clusterName(), wi.workloadType()),
             a.getWorkloadName(),
             am.labels(),
