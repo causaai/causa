@@ -26,6 +26,8 @@ import java.time.Instant;
  *   generatedAt        ↔  diagnosticsMetadata JSONB  { "generatedAt": epochMillis }
  *   validationResult   ↔  validationResult
  *   validationData     ↔  validationData JSONB
+ *   allEvidence        ↔  allEvidence JSONB
+ *   evidence           ↔  evidence JSONB
  * </pre>
  *
  * @since 0.0.1
@@ -97,6 +99,16 @@ public final class DiagnosticEntityMapper {
             }
         }
 
+        // allEvidence / evidence — JSON string → JSONB
+        if (d.getAllEvidence() != null) {
+            try { entity.setAllEvidence(MAPPER.readTree(d.getAllEvidence())); }
+            catch (Exception ignored) {}
+        }
+        if (d.getEvidence() != null) {
+            try { entity.setEvidence(MAPPER.readTree(d.getEvidence())); }
+            catch (Exception ignored) {}
+        }
+
         return entity;
     }
 
@@ -147,6 +159,16 @@ public final class DiagnosticEntityMapper {
         // validationData JSONB → JSON string
         if (e.getValidationData() != null) {
             try { b.validationData(MAPPER.writeValueAsString(e.getValidationData())); }
+            catch (Exception ignored) {}
+        }
+
+        // allEvidence / evidence JSONB → JSON string
+        if (e.getAllEvidence() != null) {
+            try { b.allEvidence(MAPPER.writeValueAsString(e.getAllEvidence())); }
+            catch (Exception ignored) {}
+        }
+        if (e.getEvidence() != null) {
+            try { b.evidence(MAPPER.writeValueAsString(e.getEvidence())); }
             catch (Exception ignored) {}
         }
 
