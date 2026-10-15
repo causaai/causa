@@ -3,11 +3,14 @@ package com.causa.api.dto.response;
 import com.causa.common.constants.AlertConstants.AlertSeverity;
 import com.causa.common.constants.AlertConstants.AlertStatus;
 import com.causa.core.domain.Alert;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -142,6 +145,113 @@ class AlertResponseTest {
             // Should not throw
             assertNotNull(response);
         }
+
+        @Test
+        @DisplayName("Should map diagnostic IDs to diagIds")
+        void shouldMapDiagnosticIds() {
+            Alert alert = Alert.builder()
+                    .alertId("a1").alertName("Test")
+                    .severity(AlertSeverity.CRITICAL).status(AlertStatus.PROCESSED)
+                    .workloadInfo(Alert.WorkloadInfo.of("p", "c", "ns", "cl", "D"))
+                    .workloadName("wl")
+                    .diagnosticIds(List.of("diag_2", "diag_1"))
+                    .build();
+
+            assertEquals(List.of("diag_2", "diag_1"), AlertResponse.from(alert).diagIds());
+        }
+
+        @Test
+        @DisplayName("Should return empty diagIds when alert has no diagnostics")
+        void shouldReturnEmptyDiagIdsWhenNone() {
+            assertTrue(AlertResponse.from(buildAlert("a1")).diagIds().isEmpty());
+        }
+
+        @Test
+        @DisplayName("Should map rejection reason from alertMetadata")
+        void shouldMapRejectionReason() {
+            Alert alert = Alert.builder()
+                    .alertId("a1").alertName("Test")
+                    .severity(AlertSeverity.WARNING).status(AlertStatus.REJECTED)
+                    .workloadInfo(Alert.WorkloadInfo.of("p", "c", "ns", "cl", "D"))
+                    .workloadName("wl")
+                    .alertMetadata(Alert.AlertMetadata.of(Map.of(), Map.of(), "prometheus", "Alert is in cooldown"))
+                    .build();
+
+            AlertResponse response = AlertResponse.from(alert);
+
+            assertEquals("REJECTED", response.status());
+            assertEquals("Alert is in cooldown", response.rejectionReason());
+        }
+
+        @Test
+        @DisplayName("Should return null rejectionReason for non-rejected alert")
+        void shouldReturnNullRejectionReasonWhenNotRejected() {
+            assertNull(AlertResponse.from(buildAlert("a1")).rejectionReason());
+        }
+    }
+
+    @Nested
+    @DisplayName("JSON Serialization Tests")
+    class JsonSerializationTests {
+
+        private final ObjectMapper mapper = new ObjectMapper();
+
+        private Alert alertWithoutTimestamp(AlertStatus status, Alert.AlertMetadata metadata, List<String> diagIds) {
+            return Alert.builder()
+                    .alertId("a1").alertName("Test")
+                    .severity(AlertSeverity.WARNING).status(status)
+                    .workloadInfo(Alert.WorkloadInfo.of("p", "c", "ns", "cl", "D"))
+                    .workloadName("wl")
+                    .alertMetadata(metadata)
+                    .diagnosticIds(diagIds)
+                    .build();
+        }
+
+        @Test
+        @DisplayName("Should serialize diag_ids as a JSON array")
+        void shouldSerializeDiagIdsAsArray() throws Exception {
+            JsonNode json = mapper.valueToTree(AlertResponse.from(
+                    alertWithoutTimestamp(AlertStatus.PROCESSED, null, List.of("diag_2", "diag_1"))));
+
+            assertTrue(json.get("diag_ids").isArray());
+            assertEquals("diag_2", json.get("diag_ids").get(0).asText());
+            assertEquals("diag_1", json.get("diag_ids").get(1).asText());
+        }
+
+        @Test
+        @DisplayName("Should serialize empty diag_ids array when alert has no diagnostics")
+        void shouldSerializeEmptyDiagIds() {
+            JsonNode json = mapper.valueToTree(AlertResponse.from(
+                    alertWithoutTimestamp(AlertStatus.REJECTED, null, null)));
+
+            assertTrue(json.has("diag_ids"));
+            assertEquals(0, json.get("diag_ids").size());
+        }
+
+        @Test
+        @DisplayName("Should include rejection_reason when present")
+        void shouldIncludeRejectionReasonWhenPresent() {
+            JsonNode json = mapper.valueToTree(AlertResponse.from(alertWithoutTimestamp(
+                    AlertStatus.REJECTED,
+                    Alert.AlertMetadata.of(Map.of(), Map.of(), "prometheus", "Alert is in cooldown"),
+                    null)));
+
+            assertEquals("Alert is in cooldown", json.get("rejection_reason").asText());
+        }
+
+        @Test
+        @DisplayName("Should omit rejection_reason when absent")
+        void shouldOmitRejectionReasonWhenAbsent() {
+            JsonNode json = mapper.valueToTree(AlertResponse.from(
+                    alertWithoutTimestamp(AlertStatus.PROCESSED, null, null)));
+
+            assertFalse(json.has("rejection_reason"));
+        }
+    }
+
+    @Nested
+    @DisplayName("Null Handling Tests")
+    class NullHandlingTests {
 
         @Test
         @DisplayName("Should return null sourceAlertId when null")
