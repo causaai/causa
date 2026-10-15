@@ -37,6 +37,7 @@ public final class Alert {
     private final WorkloadInfo workloadInfo;
     private final String workloadName;
     private final AlertMetadata alertMetadata;
+    private final String diagnosticId;
 
     private Alert(Builder builder) {
         this.alertId        = Objects.requireNonNull(builder.alertId, "alertId cannot be null");
@@ -48,6 +49,7 @@ public final class Alert {
         this.workloadInfo   = Objects.requireNonNull(builder.workloadInfo, "workloadInfo cannot be null");
         this.workloadName   = Objects.requireNonNull(builder.workloadName, "workloadName cannot be null");
         this.alertMetadata  = builder.alertMetadata != null ? builder.alertMetadata : AlertMetadata.empty();
+        this.diagnosticId    = builder.diagnosticId;
     }
 
     // -------------------------------------------------------------------------
@@ -64,6 +66,8 @@ public final class Alert {
     /** Denormalised container name stored in {@code workload_name} column for fast lookups. */
     public String getWorkloadName()         { return workloadName; }
     public AlertMetadata getAlertMetadata() { return alertMetadata; }
+    /** ID of the diagnostic linked to this alert; null when none exists (e.g. rejected alerts). */
+    public String getDiagnosticId()         { return diagnosticId; }
 
     /**
      * Cooldown deduplication key.
@@ -111,28 +115,39 @@ public final class Alert {
 
     // -------------------------------------------------------------------------
     // alert_metadata JSONB
-    // Shape: { "labels": {...}, "annotations": {...}, "alert_source": "prometheus" }
+    // Shape: { "labels": {...}, "annotations": {...}, "alert_source": "prometheus",
+    //          "rejection_reason": "..." }
     // alert_source defaults to "prometheus" if not present in annotations.
+    // rejection_reason is only present for REJECTED alerts (null otherwise).
     // -------------------------------------------------------------------------
 
     public record AlertMetadata(
         Map<String, String> labels,
         Map<String, String> annotations,
-        String alertSource
+        String alertSource,
+        String rejectionReason
     ) {
         public static final String DEFAULT_SOURCE = "prometheus";
 
         public static AlertMetadata empty() {
-            return new AlertMetadata(Map.of(), Map.of(), DEFAULT_SOURCE);
+            return new AlertMetadata(Map.of(), Map.of(), DEFAULT_SOURCE, null);
         }
 
         public static AlertMetadata of(Map<String, String> labels,
                                        Map<String, String> annotations,
                                        String alertSource) {
+            return of(labels, annotations, alertSource, null);
+        }
+
+        public static AlertMetadata of(Map<String, String> labels,
+                                       Map<String, String> annotations,
+                                       String alertSource,
+                                       String rejectionReason) {
             return new AlertMetadata(
                 labels      != null ? Collections.unmodifiableMap(labels)      : Map.of(),
                 annotations != null ? Collections.unmodifiableMap(annotations) : Map.of(),
-                alertSource != null  ? alertSource : DEFAULT_SOURCE
+                alertSource != null  ? alertSource : DEFAULT_SOURCE,
+                rejectionReason
             );
         }
     }
@@ -182,6 +197,7 @@ public final class Alert {
         private WorkloadInfo workloadInfo;
         private String workloadName;
         private AlertMetadata alertMetadata;
+        private String diagnosticId;
 
         private Builder() {}
 
@@ -194,6 +210,7 @@ public final class Alert {
         public Builder workloadInfo(WorkloadInfo v)   { this.workloadInfo = v; return this; }
         public Builder workloadName(String v)         { this.workloadName = v; return this; }
         public Builder alertMetadata(AlertMetadata v) { this.alertMetadata = v; return this; }
+        public Builder diagnosticId(String v)         { this.diagnosticId = v; return this; }
 
         public Alert build() { return new Alert(this); }
     }
