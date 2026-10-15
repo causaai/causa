@@ -186,7 +186,7 @@ When the installer completes, all components are running in the `causa-rca` name
 
 #### Configure MCP servers via `mcp.json`
 
-Causa discovers and invokes MCP servers declaratively using `mcp.json`, mounted into the Causa Backend container from the `causa-mcp-config` ConfigMap (at `/etc/causa/mcp.json`). Pre-configured profile templates are provided in `deployment/kubernetes/base/mcp-config/`.
+Causa discovers and invokes MCP servers declaratively using `mcp.json`, mounted into the Causa Backend container from the `causa-mcp-config` ConfigMap (at `/etc/causa/mcp.json`). Pre-configured profile templates are provided in `manifests/causa/mcp.json`.
 
 If you want to customize an MCP server (such as pointing the Quarkus MCP server to your application's `/q/metrics` endpoint), update `mcp.json` or the ConfigMap:
 
