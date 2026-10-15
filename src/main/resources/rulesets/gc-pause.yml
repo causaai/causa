@@ -38,21 +38,9 @@ required:
       failure: "Total GC pause time under threshold"
 
 supporting:
-  - id: gc.supporting.full_gc_detected
-    description: "Full GC events detected in logs"
-    weight: 5
-    match:
-      signalType: LOG_PATTERN
-      signalName: gc.full.count
-      condition: GREATER_THAN
-      threshold: 0
-    messages:
-      success: "Full GC events detected"
-      failure: "No Full GC events found in logs"
-
   - id: gc.supporting.frequent_full_gc
     description: "Frequent Full GC events (more than 5)"
-    weight: 3
+    weight: 5
     match:
       signalType: LOG_PATTERN
       signalName: gc.full.count
