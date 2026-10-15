@@ -22,7 +22,8 @@ import java.util.Objects;
  *   status           → status            (ACCEPTED / REJECTED / PROCESSING / PROCESSED)
  *   workload_info    → workloadInfo      JSONB: pod_name, container_name, namespace, cluster_name, workload_type
  *   workload_name    → workloadName      denormalised container name for fast index lookups
- *   alert_metadata   → alertMetadata     JSONB: labels, annotations, alert_source
+ *   alert_metadata   → alertMetadata     JSONB: labels, annotations, alert_source, rejection_reason (REJECTED only)
+ *   (derived)        → diagnosticIds     IDs of linked diagnostics, newest first; empty if none
  * </pre>
  *
  * @since 0.0.1

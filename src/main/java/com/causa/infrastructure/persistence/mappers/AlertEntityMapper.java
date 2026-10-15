@@ -23,7 +23,7 @@ import java.util.Map;
  * <pre>
  *   workload_info  JSONB  ← { pod_name, container_name, namespace, cluster_name, workload_type }
  *   workload_name         ← workloadInfo.containerName  (denormalised for index lookups)
- *   alert_metadata JSONB  ← { labels, annotations, alert_source }
+ *   alert_metadata JSONB  ← { labels, annotations, alert_source, rejection_reason (REJECTED alerts only) }
  * </pre>
  *
  * @since 0.0.1

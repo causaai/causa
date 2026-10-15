@@ -21,7 +21,7 @@ import java.time.OffsetDateTime;
  *   status           ← status           (ACCEPTED / REJECTED / PROCESSING / PROCESSED)
  *   workload_info    ← workloadInfo     JSONB: pod_name, container_name, namespace, cluster_name, workload_type
  *   workload_name    ← workloadName     denormalised container name for fast index lookups
- *   alert_metadata   ← alertMetadata   JSONB: labels, annotations, alert_source
+ *   alert_metadata   ← alertMetadata   JSONB: labels, annotations, alert_source, rejection_reason (REJECTED alerts only)
  * </pre>
  *
  * @since 0.0.1
@@ -80,7 +80,9 @@ public class AlertEntity extends BaseEntity {
 
     /**
      * alert_metadata JSONB.
-     * Shape: {@code { "labels": {...}, "annotations": {...}, "alert_source": "prometheus" }}
+     * Shape: {@code { "labels": {...}, "annotations": {...}, "alert_source": "prometheus",
+     *                  "rejection_reason": "..." }}
+     * {@code rejection_reason} is present only for REJECTED alerts.
      */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
