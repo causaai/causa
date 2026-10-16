@@ -1,5 +1,10 @@
 package com.causa.core.services.rules.impl;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import com.causa.common.constants.ContextConstants;
 import com.causa.common.constants.EvidenceConstants.Metadata;
 import com.causa.common.constants.ValidationConstants.ContextKeywords;
@@ -12,12 +17,8 @@ import com.causa.common.logging.LogMessages;
 import com.causa.core.domain.DiagnosticContextIndex;
 import com.causa.core.services.rules.Signal;
 import com.causa.core.services.rules.SignalExtractor;
-import jakarta.enterprise.context.ApplicationScoped;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import jakarta.enterprise.context.ApplicationScoped;
 
 /**
  * Diagnostic Context Signal Extractor.
@@ -99,9 +100,18 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
         Pattern.CASE_INSENSITIVE
     );
 
+    // GC log timestamp pattern: extracts JVM uptime from verbose GC logs
+    // Example: "[579.343s][info][gc] GC(30) Pause Young..." → 579.343
+    private static final Pattern GC_LOG_TIMESTAMP_PATTERN = Pattern.compile(
+        "\\[(\\d+\\.?\\d*)s\\]\\[info\\]\\[gc\\]"
+    );
+
     // Quarkus GC pause metrics patterns (JSON format from MCP metrics endpoint)
     private static final Pattern QUARKUS_GC_PAUSE_SUM_PATTERN = Pattern.compile(
         "\"jvm_gc_pause_seconds_sum\\{[^}]*}\"\\s*:\\s*(\\d+\\.?\\d*(?:E-?\\d+)?)"
+    );
+    private static final Pattern QUARKUS_GC_PAUSE_MAX_PATTERN = Pattern.compile(
+        "\"jvm_gc_pause_seconds_max\\{[^}]*}\"\\s*:\\s*(\\d+\\.?\\d*(?:E-?\\d+)?)"
     );
     private static final Pattern QUARKUS_PROCESS_UPTIME_PATTERN = Pattern.compile(
         "\"process_uptime_seconds\"\\s*:\\s*(\\d+\\.?\\d*)"
@@ -418,6 +428,12 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
                 .value(fullGcCount)
                 .metadata(SignalMetadata.FREQUENT, fullGcCount > SignalThresholds.FULL_GC_FREQUENT_THRESHOLD)
                 .build());
+
+            // ALSO emit with legacy name for different metrics format: full.gc.count
+            signals.add(Signal.builder(Signal.SignalType.LOG_PATTERN, "full.gc.count")
+                .value(fullGcCount)
+                .metadata(SignalMetadata.FREQUENT, fullGcCount > SignalThresholds.FULL_GC_FREQUENT_THRESHOLD)
+                .build());
         }
 
         Matcher gcDetailMatcher = GC_PAUSE_DETAIL_PATTERN.matcher(context);
@@ -471,6 +487,44 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
                 .value(maxHeapAfterGcRatio)
                 .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_VERBOSE_GC)
                 .build());
+
+            // Extract uptime from GC log timestamps or Quarkus metrics
+            double uptimeSeconds = 0;
+
+            // Try Quarkus process uptime first
+            Matcher uptimeMatcher = QUARKUS_PROCESS_UPTIME_PATTERN.matcher(context);
+            if (uptimeMatcher.find()) {
+                uptimeSeconds = Double.parseDouble(uptimeMatcher.group(1));
+            } else {
+                // Fall back to GC log timestamps - find the maximum timestamp
+                Matcher timestampMatcher = GC_LOG_TIMESTAMP_PATTERN.matcher(context);
+                while (timestampMatcher.find()) {
+                    double timestamp = Double.parseDouble(timestampMatcher.group(1));
+                    if (timestamp > uptimeSeconds) {
+                        uptimeSeconds = timestamp;
+                    }
+                }
+            }
+
+            if (uptimeSeconds > 0) {
+                // Calculate gc.pause.percent (total pause time / uptime)
+                // totalPause is in ms, convert to seconds
+                double totalPauseSeconds = totalPause / 1000.0;
+                double pausePercent = totalPauseSeconds / uptimeSeconds;
+                signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.GC_PAUSE_PERCENT)
+                    .value(pausePercent)
+                    .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_VERBOSE_GC)
+                    .build());
+
+                // Calculate gc.pause.max.ratio (max pause / uptime)
+                // maxPause is in ms, convert to seconds
+                double maxPauseSeconds = maxPause / 1000.0;
+                double maxPauseRatio = maxPauseSeconds / uptimeSeconds;
+                signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.GC_PAUSE_MAX_RATIO)
+                    .value(maxPauseRatio)
+                    .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_VERBOSE_GC)
+                    .build());
+            }
         }
 
         if (beforeGcValues.size() >= SignalThresholds.MIN_GC_VALUES_FOR_TREND) {
@@ -522,6 +576,24 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
             double pausePercent = totalPauseSeconds / uptimeSeconds;
             signals.add(signal(Signal.SignalType.METRIC, SignalNames.GC_PAUSE_PERCENT, sections, firstPauseSumAt)
                 .value(pausePercent)
+                .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_QUARKUS_GC_PAUSE)
+                .build());
+        }
+
+        // Extract max pause ratio: single max pause / total elapsed time
+        Matcher pauseMaxMatcher = QUARKUS_GC_PAUSE_MAX_PATTERN.matcher(context);
+        double maxPauseSeconds = 0;
+        while (pauseMaxMatcher.find()) {
+            double pauseMax = Double.parseDouble(pauseMaxMatcher.group(1));
+            if (pauseMax > maxPauseSeconds) {
+                maxPauseSeconds = pauseMax;
+            }
+        }
+
+        if (maxPauseSeconds > 0) {
+            double maxPauseRatio = maxPauseSeconds / uptimeSeconds;
+            signals.add(Signal.builder(Signal.SignalType.METRIC, SignalNames.GC_PAUSE_MAX_RATIO)
+                .value(maxPauseRatio)
                 .metadata(SignalMetadata.SOURCE, SignalMetadata.SOURCE_QUARKUS_GC_PAUSE)
                 .build());
         }
