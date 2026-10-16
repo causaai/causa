@@ -21,7 +21,7 @@ import java.time.OffsetDateTime;
  *   status           ← status           (ACCEPTED / REJECTED / PROCESSING / PROCESSED)
  *   workload_info    ← workloadInfo     JSONB: pod_name, container_name, namespace, cluster_name, workload_type
  *   workload_name    ← workloadName     denormalised container name for fast index lookups
- *   alert_metadata   ← alertMetadata   JSONB: labels, annotations, alert_source
+ *   alert_metadata   ← alertMetadata   JSONB: labels, annotations, alert_source, rejection_reason (REJECTED alerts only)
  * </pre>
  *
  * @since 0.0.1
@@ -72,8 +72,17 @@ public class AlertEntity extends BaseEntity {
     private String namespace;
 
     /**
+     * IDs of all diagnostics linked to this alert, aggregated in the same SELECT via a subquery.
+     * Read-only — not persisted. Null when the alert has no diagnostics (e.g. rejected alerts).
+     */
+    @Formula("(select array_agg(d.id order by d.created_at desc) from diagnostics d where d.alert_id = id)")
+    private String[] diagnosticIds;
+
+    /**
      * alert_metadata JSONB.
-     * Shape: {@code { "labels": {...}, "annotations": {...}, "alert_source": "prometheus" }}
+     * Shape: {@code { "labels": {...}, "annotations": {...}, "alert_source": "prometheus",
+     *                  "rejection_reason": "..." }}
+     * {@code rejection_reason} is present only for REJECTED alerts.
      */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
@@ -120,8 +129,9 @@ public class AlertEntity extends BaseEntity {
 
     public String getWorkloadName() { return workloadName; }
     public void setWorkloadName(String v) { this.workloadName = v; }
-
     public String getNamespace() { return namespace; }
+
+    public String[] getDiagnosticIds() { return diagnosticIds; }
 
     public JsonNode getAlertMetadata() { return alertMetadata; }
     public void setAlertMetadata(JsonNode alertMetadata) { this.alertMetadata = alertMetadata; }
