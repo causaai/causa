@@ -10,6 +10,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.Map;
 
@@ -85,6 +86,34 @@ class AlertEntityMapperTest {
             e.setAlertMetadata(null);
             Alert a = AlertEntityMapper.toDomain(e);
             assertThat(a.getAlertMetadata().alertSource()).isEqualTo("prometheus");
+        }
+
+        @Test void rejectedEntity_restoresRejectionReason() {
+            AlertEntity e = AlertEntityMapper.toEntityWithStatus(buildAlert(), "REJECTED", "too old");
+            Alert a = AlertEntityMapper.toDomain(e);
+            assertThat(a.getStatus()).isEqualTo(AlertStatus.REJECTED);
+            assertThat(a.getAlertMetadata().rejectionReason()).isEqualTo("too old");
+        }
+
+        @Test void acceptedEntity_hasNoRejectionReason() {
+            Alert a = AlertEntityMapper.toDomain(AlertEntityMapper.toEntity(buildAlert()));
+            assertThat(a.getAlertMetadata().rejectionReason()).isNull();
+        }
+
+        @Test void entityWithoutDiagnostics_hasEmptyDiagnosticIds() {
+            Alert a = AlertEntityMapper.toDomain(AlertEntityMapper.toEntity(buildAlert()));
+            assertThat(a.getDiagnosticIds()).isEmpty();
+        }
+
+        @Test void entityWithDiagnostics_mapsDiagnosticIdsInOrder() throws Exception {
+            AlertEntity e = AlertEntityMapper.toEntity(buildAlert());
+            // diagnosticIds is a read-only @Formula column (no setter) — populate it as Hibernate would
+            Field f = AlertEntity.class.getDeclaredField("diagnosticIds");
+            f.setAccessible(true);
+            f.set(e, new String[] {"diag_new", "diag_old"});
+
+            Alert a = AlertEntityMapper.toDomain(e);
+            assertThat(a.getDiagnosticIds()).containsExactly("diag_new", "diag_old");
         }
 
         @Test void nullAlertTimestamp_isNull() {
