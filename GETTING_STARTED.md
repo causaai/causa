@@ -184,21 +184,57 @@ When the installer completes, all components are running in the `causa-rca` name
 - Causa
 - Causa MCP Server
 
-#### Set the target Quarkus app URL (optional at install time)
+#### Configure MCP servers via `mcp.json`
 
-If you already know the in-cluster URL of the Java app you want to monitor, set it before running the installer so the Quarkus MCP server can start scraping metrics immediately:
+Causa discovers and invokes MCP servers declaratively using `mcp.json`, mounted into the Causa Backend container from the `causa-mcp-config` ConfigMap (at `/etc/causa/mcp.json`). Pre-configured profile templates are provided in `manifests/causa/mcp.json`.
 
-```bash
-export CAUSA_MCP_QUARKUS_METRICS_BASE_URL="http://my-app.my-namespace.svc.cluster.local:8080"
-./install.sh
+If you want to customize an MCP server (such as pointing the Quarkus MCP server to your application's `/q/metrics` endpoint), update `mcp.json` or the ConfigMap:
+
+```json
+{
+  "mcpServers": {
+    "quarkus": {
+      "type": "streamable-http",
+      "url": "http://quarkus-mcp-server:8080/mcp",
+      "optional": false,
+      "healthCheck": {
+        "url": "http://quarkus-mcp-server:8080/healthz",
+        "timeoutMs": 10000
+      },
+      "timeoutMs": 10000,
+      "metadata": {
+        "metricsBaseUrl": "http://my-app.my-namespace.svc.cluster.local:8080/q/metrics"
+      },
+      "description": "Quarkus MCP — raw Prometheus-format metrics scraped from the target application's metrics endpoint",
+      "tools": [
+        {
+          "name": "fetch_raw_metrics_from_endpoint",
+          "contextKey": "QUARKUS_RAW_METRICS",
+          "description": "Raw Prometheus-format metrics text scraped from the application's /q/metrics endpoint.",
+          "arguments": {
+            "pod_name": "${podName}",
+            "namespace": "${namespace}",
+            "baseUrl": "${metadata.metricsBaseUrl}"
+          }
+        }
+      ]
+    }
+  }
+}
 ```
 
-You can always set or update it after installation:
+
+You can update the configuration after installation in two steps:
 
 ```bash
-kubectl set env deployment/causa-backend -n causa-rca \
-  CAUSA_MCP_QUARKUS_METRICS_BASE_URL="http://my-app.my-namespace.svc.cluster.local:8080"
-kubectl rollout status deployment/causa-backend -n causa-rca --timeout=180s
+# Step 1: Find the exact ConfigMap name (handles any Kustomize hash suffix)
+kubectl get configmap -n causa-rca | grep causa-mcp-config
+
+# Step 2: Edit the ConfigMap and restart the Causa deployment
+kubectl edit configmap <configmap-name> -n causa-rca
+
+# Step 3: Rollout restart 
+kubectl rollout restart deployment/causa-backend -n causa-rca
 ```
 
 ---
@@ -646,16 +682,72 @@ curl -s http://localhost:30001/q/health/ready | jq .
 curl -s https://$(oc get route causa-backend -n causa-rca -o jsonpath='{.spec.host}')/q/health/ready | jq .
 ```
 
-**Verify MCP environment variables were stamped:**
+**Verify MCP configuration and health (`mcp.json`):**
+
+Inspect the `mcp.json` configuration loaded from the ConfigMap:
 
 ```bash
-kubectl set env deployment/causa-backend -n causa-rca --list | grep CAUSA_MCP
+# Get the exact name of config map
+kubectl get configmap -n causa-rca | grep causa-mcp-config
+
+# Full configuration dump (useful for initial setup and debugging)
+kubectl get configmap <config-map-name> -n causa-rca -o jsonpath='{.data.mcp\.json}' | jq .mcpServers
+
+# Security Tip: If your mcp.json contains sensitive authorization headers (e.g. OpenShift bearer tokens), you can list server keys without revealing credentials:
+kubectl get configmap <config-map-name> -n causa-rca -o jsonpath='{.data.mcp\.json}' | jq '.mcpServers | keys'
 ```
 
-Expected output:
+Verify Causa Backend successfully loaded and validated `mcp.json` on startup:
+
+```bash
+kubectl logs -n causa-rca deployment/causa-backend | grep "MCP startup: completed successfully"
 ```
-CAUSA_MCP_QUARKUS_ENDPOINT=http://mcp-metrics.causa-rca.svc.cluster.local:8080
-CAUSA_MCP_ASYNC_PROFILER_ENDPOINT=http://jafra-mcp.causa-rca.svc.cluster.local:8083
+
+Check the `/api/v1/healthz` endpoint to confirm the live connectivity status of every dynamic MCP server declared in `mcp.json`:
+
+```bash
+# Kind
+curl -s http://localhost:30001/api/v1/healthz | jq .
+
+# OpenShift
+curl -s https://$(oc get route causa-backend -n causa-rca -o jsonpath='{.spec.host}')/api/v1/healthz | jq .
+```
+
+Example response:
+
+```json
+{
+  ...
+  "components": {
+    ...
+    "mcp": {
+      "status": "UP",
+      "servers": {
+        "kubernetes": {
+          "status": "UP",
+          "message": "Connected successfully",
+          "latency_ms": 6
+        },
+        "quarkus": {
+          "status": "UP",
+          "message": "Connected successfully",
+          "latency_ms": 199
+        },
+        "async-profiler": {
+          "status": "UP",
+          "message": "Connected successfully",
+          "latency_ms": 38
+        },
+        "prometheus": {
+          "status": "UP",
+          "message": "Connected successfully",
+          "latency_ms": 16,
+          "optional": true
+        }
+      }
+    }
+  }
+}
 ```
 
 **Verify Jafra is running (Kind only):**
