@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Signal - Normalized Evidence from Observability Data.
+ * Signal - Normalized ValidationEvidence from Observability Data.
  *
  * <p>Represents a structured piece of evidence extracted from logs, metrics,
  * events, traces, or other diagnostic sources.

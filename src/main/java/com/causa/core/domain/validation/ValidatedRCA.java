@@ -174,7 +174,7 @@ public record ValidatedRCA(
         public String toSummaryString() {
             return String.format(
                 "Validated %d assertions: %d supported, %d partial, %d unsupported, %d unknown | " +
-                "Score: %.2f | Avg Confidence: %.2f | Evidence: %d pieces",
+                "Score: %.2f | Avg Confidence: %.2f | ValidationEvidence: %d pieces",
                 totalAssertions,
                 supportedCount,
                 partiallySupportedCount,

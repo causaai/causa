@@ -331,15 +331,15 @@ public final class LogMessages {
     }
 
     /**
-     * Evidence collection log messages.
+     * ValidationEvidence collection log messages.
      */
-    public static final class Evidence {
-        private Evidence() {}
+    public static final class ValidationEvidence {
+        private ValidationEvidence() {}
 
         public static final String COLLECTION_STARTED     = "Collecting evidence for RCA finding";
-        public static final String COLLECTION_COMPLETED   = "Evidence collection completed";
+        public static final String COLLECTION_COMPLETED   = "ValidationEvidence collection completed";
         public static final String NO_VALIDATION_RESULT   = "No validation result available, nothing to harvest";
-        public static final String UNRESOLVED_SOURCE      = "Evidence source label could not be attributed to an MCP server";
+        public static final String UNRESOLVED_SOURCE      = "ValidationEvidence source label could not be attributed to an MCP server";
     }
 
     /**

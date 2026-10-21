@@ -17,7 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Dual-Path Evidence Harvester
+ * Dual-Path ValidationEvidence Harvester
  *
  * <p>Collects evidence for any diagnosed finding from the LLM assertion path (PATH A). The
  * rule-derived path (PATH B) lands in a later change; rule signals do not yet carry the
@@ -55,13 +55,13 @@ public class DualPathEvidenceHarvester implements EvidenceHarvester {
         String diagnosticId = finding != null ? finding.diagnosticId() : null;
 
         if (validatedRca == null) {
-            log.info(LogMessages.Evidence.NO_VALIDATION_RESULT)
+            log.info(LogMessages.ValidationEvidence.NO_VALIDATION_RESULT)
                 .field(LogFields.DIAGNOSTIC_ID, diagnosticId)
                 .log();
             return EvidenceCollectionResult.empty(diagnosticId);
         }
 
-        log.info(LogMessages.Evidence.COLLECTION_STARTED)
+        log.info(LogMessages.ValidationEvidence.COLLECTION_STARTED)
             .field(LogFields.DIAGNOSTIC_ID, diagnosticId)
             .field("anomalyType", finding != null ? finding.anomalyType() : null)
             .log();
@@ -69,7 +69,7 @@ public class DualPathEvidenceHarvester implements EvidenceHarvester {
         EvidenceCollectionResult result = new EvidenceCollectionResult(
             diagnosticId, harvestPathA(finding, validatedRca));
 
-        log.info(LogMessages.Evidence.COLLECTION_COMPLETED)
+        log.info(LogMessages.ValidationEvidence.COLLECTION_COMPLETED)
             .field(LogFields.DIAGNOSTIC_ID, diagnosticId)
             .field("total", result.totalCount())
             .field("refuting", result.refutingCount())

@@ -9,12 +9,15 @@ import java.util.UUID;
 /**
  * Represents evidence found in diagnostic context that supports or refutes an assertion.
  *
- * <p>Evidence is extracted from MCP context sources like Kubernetes events, pod logs,
+ * <p>ValidationEvidence is extracted from MCP context sources like Kubernetes events, pod logs,
  * Prometheus metrics, Kruize recommendations, and Cryostat analysis.
+ *
+ * <p>This is the validation pipeline's working model. For the database persistence model,
+ * see {@link EvidenceItem}. For the API response model, see DiagnosticDetailResponse.Evidence.
  *
  * @since 0.0.1
  */
-public record Evidence(
+public record ValidationEvidence(
     String id,
     String source,
     EvidenceType type,
@@ -26,7 +29,7 @@ public record Evidence(
 ) {
 
     /**
-     * Creates a new evidence instance.
+     * Creates a new validation evidence instance.
      *
      * @param id unique identifier for this evidence (for ranking/deduplication)
      * @param source the data source (e.g., "kubernetes-events", "prometheus-metrics")
@@ -39,9 +42,9 @@ public record Evidence(
      * @param relevanceScore how relevant this evidence is (0.0 to 1.0)
      * @param structuredData optional structured representation (JSON)
      */
-    public Evidence {
+    public ValidationEvidence {
         if (id == null || id.isBlank()) {
-            throw new IllegalArgumentException("Evidence ID cannot be null or blank");
+            throw new IllegalArgumentException("ValidationEvidence ID cannot be null or blank");
         }
         if (source == null || source.isBlank()) {
             throw new IllegalArgumentException(ValidationConstants.ErrorMessages.EVIDENCE_SOURCE_BLANK);
@@ -64,23 +67,23 @@ public record Evidence(
     /**
      * Creates simple evidence without structured data (with explicit ID).
      */
-    public static Evidence of(String id, String source, EvidenceType type, String snippet, double relevanceScore) {
-        return new Evidence(id, source, type, snippet, null, null, relevanceScore, Optional.empty());
+    public static ValidationEvidence of(String id, String source, EvidenceType type, String snippet, double relevanceScore) {
+        return new ValidationEvidence(id, source, type, snippet, null, null, relevanceScore, Optional.empty());
     }
 
     /**
      * Creates evidence with structured data (with explicit ID).
      */
-    public static Evidence of(String id, String source, EvidenceType type, String snippet, double relevanceScore, String structuredData) {
-        return new Evidence(id, source, type, snippet, null, null, relevanceScore, Optional.of(structuredData));
+    public static ValidationEvidence of(String id, String source, EvidenceType type, String snippet, double relevanceScore, String structuredData) {
+        return new ValidationEvidence(id, source, type, snippet, null, null, relevanceScore, Optional.of(structuredData));
     }
 
     /**
      * Creates narrated evidence (with explicit ID).
      */
-    public static Evidence of(String id, String source, EvidenceType type, String snippet, String statement,
+    public static ValidationEvidence of(String id, String source, EvidenceType type, String snippet, String statement,
                               String explanation, double relevanceScore) {
-        return new Evidence(id, source, type, snippet, statement, explanation, relevanceScore, Optional.empty());
+        return new ValidationEvidence(id, source, type, snippet, statement, explanation, relevanceScore, Optional.empty());
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -92,8 +95,8 @@ public record Evidence(
      * @deprecated Use {@link #of(String, String, EvidenceType, String, double)} with explicit ID
      */
     @Deprecated(since = "0.0.2")
-    public static Evidence of(String source, EvidenceType type, String snippet, double relevanceScore) {
-        return new Evidence(generateId(source, type, snippet), source, type, snippet, null, null, relevanceScore, Optional.empty());
+    public static ValidationEvidence of(String source, EvidenceType type, String snippet, double relevanceScore) {
+        return new ValidationEvidence(generateId(source, type, snippet), source, type, snippet, null, null, relevanceScore, Optional.empty());
     }
 
     /**
@@ -101,8 +104,8 @@ public record Evidence(
      * @deprecated Use {@link #of(String, String, EvidenceType, String, double, String)} with explicit ID
      */
     @Deprecated(since = "0.0.2")
-    public static Evidence of(String source, EvidenceType type, String snippet, double relevanceScore, String structuredData) {
-        return new Evidence(generateId(source, type, snippet), source, type, snippet, null, null, relevanceScore, Optional.of(structuredData));
+    public static ValidationEvidence of(String source, EvidenceType type, String snippet, double relevanceScore, String structuredData) {
+        return new ValidationEvidence(generateId(source, type, snippet), source, type, snippet, null, null, relevanceScore, Optional.of(structuredData));
     }
 
     /**
@@ -110,9 +113,9 @@ public record Evidence(
      * @deprecated Use {@link #of(String, String, EvidenceType, String, String, String, double)} with explicit ID
      */
     @Deprecated(since = "0.0.2")
-    public static Evidence of(String source, EvidenceType type, String snippet, String statement,
+    public static ValidationEvidence of(String source, EvidenceType type, String snippet, String statement,
                               String explanation, double relevanceScore) {
-        return new Evidence(generateId(source, type, snippet), source, type, snippet, statement, explanation, relevanceScore, Optional.empty());
+        return new ValidationEvidence(generateId(source, type, snippet), source, type, snippet, statement, explanation, relevanceScore, Optional.empty());
     }
 
     /**
@@ -212,9 +215,9 @@ public record Evidence(
             return this;
         }
 
-        public Evidence build() {
+        public ValidationEvidence build() {
             String snippet = snippetBuilder.toString();
-            return new Evidence(
+            return new ValidationEvidence(
                 generateId(source, type, snippet),  // Auto-generate ID
                 source,
                 type,

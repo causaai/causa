@@ -19,7 +19,7 @@ import java.util.Map;
  *
  * <p>Maps a diagnostic context section label onto the canonical MCP server that produced it.
  *
- * <p>Evidence reaches us labelled with a section name rather than a server name — PATH A
+ * <p>ValidationEvidence reaches us labelled with a section name rather than a server name — PATH A
  * evidence carries whatever string the LLM echoed from the context it was shown, and PATH B
  * signals are stamped with the section they were extracted from. Both need normalising to a
  * single server identifier so evidence can be attributed to the source that actually

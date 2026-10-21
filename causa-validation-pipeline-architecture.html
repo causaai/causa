@@ -1,0 +1,727 @@
+
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Causa Validation Pipeline Architecture</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    background: #ffffff;
+    color: #1f2328;
+    padding: 32px 24px;
+  }
+  .page { max-width: 920px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .subtitle { color: #57606a; font-size: 13px; margin-bottom: 32px; }
+
+  /* Section title */
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #57606a;
+    margin: 32px 0 12px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  /* Pipeline flow */
+  .pipeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* Stage card */
+  .stage {
+    display: grid;
+    grid-template-columns: 28px 1fr;
+    gap: 0 16px;
+    margin-bottom: 0;
+  }
+
+  /* Connector column */
+  .connector {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .connector .node {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: #ffffff;
+    flex-shrink: 0;
+    z-index: 1;
+  }
+  .connector .line {
+    width: 2px;
+    flex: 1;
+    min-height: 24px;
+    background: #e5e7eb;
+  }
+  .connector .line.last { display: none; }
+
+  /* Content box */
+  .stage-body {
+    padding-bottom: 24px;
+  }
+  .stage-header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding-top: 4px;
+    margin-bottom: 6px;
+  }
+  .stage-name {
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .stage-class {
+    font-size: 11px;
+    color: #57606a;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: #f7f8fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 3px;
+    padding: 1px 5px;
+  }
+  .stage-desc {
+    color: #1f2328;
+    font-size: 13px;
+    margin-bottom: 8px;
+  }
+
+  /* Evidence box */
+  .evidence-box {
+    background: #f7f8fa;
+    border: 1px solid #e5e7eb;
+    border-left: 3px solid #3b82d4;
+    border-radius: 4px;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+  }
+  .evidence-box .ev-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #3b82d4;
+    margin-bottom: 6px;
+  }
+  .evidence-box ul {
+    list-style: none;
+    padding: 0;
+  }
+  .evidence-box ul li {
+    font-size: 12px;
+    color: #1f2328;
+    padding: 2px 0 2px 12px;
+    position: relative;
+  }
+  .evidence-box ul li::before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: #57606a;
+  }
+
+  /* Output badge */
+  .outputs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .badge {
+    font-size: 11px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    padding: 2px 8px;
+    border-radius: 10px;
+    border: 1px solid;
+  }
+  .badge-blue   { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+  .badge-green  { background: #f0fdf4; border-color: #86efac; color: #15803d; }
+  .badge-purple { background: #faf5ff; border-color: #c4b5fd; color: #6d28d9; }
+  .badge-amber  { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+  .badge-red    { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+  .badge-gray   { background: #f7f8fa; border-color: #d1d5db; color: #374151; }
+
+  /* Node colors */
+  .n1  { background: #3b82d4; }
+  .n2  { background: #7c5cd8; }
+  .n3  { background: #0d9488; }
+  .n4a { background: #ea580c; }
+  .n4b { background: #64748b; }
+  .n5  { background: #16a34a; }
+  .n6  { background: #dc2626; }
+
+  /* Split path section */
+  .dual-path {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 8px 0;
+  }
+  .path-box {
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 12px 14px;
+  }
+  .path-box.path-a { border-top: 3px solid #ea580c; }
+  .path-box.path-b { border-top: 3px solid #64748b; }
+  .path-title {
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+  .path-a .path-title { color: #ea580c; }
+  .path-b .path-title { color: #64748b; }
+  .path-box ul {
+    list-style: none;
+    padding: 0;
+  }
+  .path-box ul li {
+    font-size: 12px;
+    padding: 2px 0 2px 12px;
+    position: relative;
+  }
+  .path-box ul li::before { content: "•"; position: absolute; left: 0; color: #57606a; }
+
+  /* Signal table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-top: 8px;
+  }
+  th {
+    background: #f7f8fa;
+    border: 1px solid #e5e7eb;
+    padding: 6px 10px;
+    text-align: left;
+    font-weight: 600;
+    color: #374151;
+  }
+  td {
+    border: 1px solid #e5e7eb;
+    padding: 5px 10px;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #f7f8fa; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 11px;
+    background: #f0f0f0;
+    padding: 1px 4px;
+    border-radius: 3px;
+  }
+
+  /* Scoring summary */
+  .scoring-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .score-card {
+    background: #f7f8fa;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    padding: 8px 10px;
+    text-align: center;
+  }
+  .score-card .sc-label { font-size: 11px; color: #57606a; }
+  .score-card .sc-val { font-size: 18px; font-weight: 700; margin: 2px 0; }
+  .sc-blue { color: #1d4ed8; }
+  .sc-orange { color: #ea580c; }
+  .sc-slate { color: #475569; }
+  .sc-green { color: #15803d; }
+
+  /* Status flow */
+  .status-flow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+  .sf-box {
+    font-size: 11px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid #e5e7eb;
+    background: #f7f8fa;
+    font-weight: 600;
+  }
+  .sf-arrow { color: #57606a; font-size: 14px; }
+  .sf-pending   { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+  .sf-progress  { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+  .sf-validating{ background: #faf5ff; border-color: #c4b5fd; color: #6d28d9; }
+  .sf-complete  { background: #f0fdf4; border-color: #86efac; color: #15803d; }
+  .sf-failed    { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+
+  footer {
+    text-align: center;
+    font-size: 12px;
+    color: #57606a;
+    border-top: 1px solid #e5e7eb;
+    margin-top: 48px;
+    padding-top: 16px;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>Causa Validation Pipeline Architecture</h1>
+  <p class="subtitle">End-to-end component breakdown — how evidence is fetched, analyzed, and aggregated at each stage</p>
+
+  
+  <div class="section-title">Diagnostic Lifecycle</div>
+  <div class="status-flow">
+    <div class="sf-box sf-pending">PENDING</div>
+    <span class="sf-arrow">→</span>
+    <div class="sf-box sf-progress">IN_PROGRESS</div>
+    <span class="sf-arrow">→</span>
+    <div class="sf-box sf-validating">VALIDATING</div>
+    <span class="sf-arrow">→</span>
+    <div class="sf-box sf-complete">COMPLETED</div>
+    <span class="sf-arrow">/</span>
+    <div class="sf-box sf-failed">FAILED</div>
+  </div>
+  <p style="font-size:12px;color:#57606a;margin-top:6px">
+    Orchestrated by <code>DiagnosticServiceImpl.runPipelineAsync()</code> — fully asynchronous; HTTP response returns immediately with the PENDING diagnostic.
+  </p>
+
+  
+  <div class="section-title">Pipeline Stages</div>
+  <div class="pipeline">
+
+    
+    <div class="stage">
+      <div class="connector">
+        <div class="node n1">1</div>
+        <div class="line"></div>
+      </div>
+      <div class="stage-body">
+        <div class="stage-header">
+          <span class="stage-name">Alert Intake</span>
+          <span class="stage-class">AlertService → DiagnosticServiceImpl</span>
+        </div>
+        <p class="stage-desc">
+          An inbound alert (namespace + pod + container) triggers <code>triggerDiagnostics(alert)</code>.
+          A new <code>Diagnostic</code> record is persisted as <strong>PENDING</strong> and immediately returned to the caller.
+          All subsequent work runs on an async thread pool.
+        </p>
+        <div class="outputs">
+          <span class="badge badge-blue">Alert domain object</span>
+          <span class="badge badge-amber">Diagnostic ID (PENDING)</span>
+        </div>
+      </div>
+    </div>
+
+    
+    <div class="stage">
+      <div class="connector">
+        <div class="node n2">2</div>
+        <div class="line"></div>
+      </div>
+      <div class="stage-body">
+        <div class="stage-header">
+          <span class="stage-name">Context Collection</span>
+          <span class="stage-class">McpContextCollector → DiagnosticContext</span>
+        </div>
+        <p class="stage-desc">
+          <code>McpContextCollector.collectContext(alert)</code> fans out to multiple data sources and populates a
+          <code>DiagnosticContext</code> value object. The context is serialized via <code>DiagnosticContext.toString()</code>
+          into a labeled, section-structured string consumed by the LLM prompt.
+        </p>
+        <div class="evidence-box">
+          <div class="ev-title">Evidence Fetched — by Source</div>
+          <ul>
+            <li><strong>Kubernetes API</strong> — pod status, events, current &amp; previous container logs, termination reason, exit codes</li>
+            <li><strong>Kruize</strong> — cost recommendations, performance recommendations (memory limit increase signals)</li>
+            <li><strong>Cryostat / JFR</strong> — GC analysis, memory analysis, thread analysis, exception analysis, container analysis</li>
+            <li><strong>Quarkus metrics endpoint</strong> — raw JVM metrics (GC pause sum, pause max, uptime, heap used/committed)</li>
+            <li><strong>Liberty logs / filesystem</strong> — Liberty server logs (VM-platform deployments)</li>
+            <li><strong>JMX / heap dumps</strong> — heap status, GC activity, thread state, GC pressure analysis, memory-leak indicators, thread contention, JVM runtime info</li>
+          </ul>
+        </div>
+        <div class="outputs">
+          <span class="badge badge-purple">DiagnosticContext (structured)</span>
+          <span class="badge badge-gray">contextString (LLM-formatted)</span>
+        </div>
+      </div>
+    </div>
+
+    
+    <div class="stage">
+      <div class="connector">
+        <div class="node n3">3</div>
+        <div class="line"></div>
+      </div>
+      <div class="stage-body">
+        <div class="stage-header">
+          <span class="stage-name">LLM Root-Cause Analysis</span>
+          <span class="stage-class">RcaPromptBuilder → PromptSender → RootCauseAnalysis</span>
+        </div>
+        <p class="stage-desc">
+          <code>RcaPromptBuilder</code> constructs a system prompt and a user prompt embedding the full
+          <code>contextString</code>. The prompt is sent to the configured LLM (IBM BOB / Granite / Anthropic / Ollama).
+          The response is parsed into a <code>RootCauseAnalysis</code> JSON record and validated with Bean Validation.
+        </p>
+        <div class="evidence-box">
+          <div class="ev-title">Evidence Used — inside the LLM prompt</div>
+          <ul>
+            <li>All labeled sections of the DiagnosticContext string (Kubernetes, Kruize, Cryostat, Quarkus, JMX)</li>
+            <li>Pod events, termination reasons, exit codes — directly embedded as text sections</li>
+            <li>GC/memory/thread analyses from Cryostat — embedded verbatim</li>
+            <li>Raw Quarkus metrics — embedded as key-value metrics block</li>
+          </ul>
+        </div>
+        <div class="outputs">
+          <span class="badge badge-blue">RootCauseAnalysis</span>
+          <span class="badge badge-amber">anomalyType (e.g. OOM_KILLED, POSSIBLE_GC_PAUSE)</span>
+          <span class="badge badge-green">rootCause, issueDescription, technicalDescription, possibleSolutions</span>
+        </div>
+      </div>
+    </div>
+
+    
+    <div class="stage">
+      <div class="connector">
+        <div class="node n4a">4</div>
+        <div class="line"></div>
+      </div>
+      <div class="stage-body">
+        <div class="stage-header">
+          <span class="stage-name">Dual Validation</span>
+          <span class="stage-class">RcaValidatorImpl</span>
+        </div>
+        <p class="stage-desc">
+          <code>RcaValidatorImpl.validate(rca, contextString)</code> drives two independent validation paths in parallel,
+          then aggregates their verdicts. The diagnostic status transitions to <strong>VALIDATING</strong> before this stage.
+        </p>
+
+        <div class="dual-path">
+          
+          <div class="path-box path-a">
+            <div class="path-title">PATH A — LLM Assertion Analysis</div>
+            <ul>
+              <li><strong>AssertionExtractor</strong> — extracts discrete, typed assertions from <code>rca.rootCause()</code></li>
+              <li>Two implementations:
+                <ul style="margin-left:12px;list-style:none">
+                  <li>• <code>LlmAssertionExtractor</code> — sends text to LLM with a prompt template; parses JSON assertion DTOs; falls back to sentence splitting on error</li>
+                  <li>• <code>SimpleAssertionExtractor</code> — splits on sentence punctuation; classifies by keyword heuristics (causal, trend, config, recommendation)</li>
+                </ul>
+              </li>
+              <li>Assertions capped at <code>MAX_ASSERTIONS_PER_VALIDATION</code> to limit LLM cost</li>
+              <li><strong>AssertionAnalyzer</strong> (<code>LlmAssertionAnalyzer</code>) — sends each assertion + full contextString to LLM; concurrent via <code>CompletableFuture</code>; parses <code>status</code>, <code>confidence</code>, and evidence snippets from the JSON response</li>
+              <li>Fallback path: <code>ContextBasedEvidenceMatcher</code> — regex-based evidence extraction from contextString (no LLM needed)</li>
+              <li>Recommendations always skip to <code>UNKNOWN</code></li>
+            </ul>
+          </div>
+          
+          <div class="path-box path-b">
+            <div class="path-title">PATH B — Deterministic Rule Engine</div>
+            <ul>
+              <li><strong>DiagnosticContextSignalExtractor</strong> — regex-parses contextString into typed <code>Signal</code> objects (no LLM)</li>
+              <li><strong>RuleEngine</strong> — loads YAML rule set matched to <code>anomalyType</code>:<br />
+                <code>OOM_KILLED → oom-killed.yaml</code><br />
+                <code>POSSIBLE_GC_PAUSE → gc-pause.yaml</code>
+              </li>
+              <li>Rules categorized as <code>REQUIRED</code>, <code>SUPPORTING</code>, <code>EXCLUSION</code></li>
+              <li>Score = required-passed + supporting-passed + exclusion-passed (exclusions carry negative weights)</li>
+              <li>Status: fails instantly if any required rule fails; otherwise scored against <code>minSupported</code> / <code>minPartial</code> thresholds</li>
+              <li>Confidence mapped: Supported→0.8–1.0, Partial→0.5–0.79, Unsupported→0.0–0.49</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="evidence-box">
+          <div class="ev-title">Evidence Fetched — Path A (LlmAssertionAnalyzer)</div>
+          <ul>
+            <li>Each assertion is analyzed against the full <code>contextString</code> via LLM prompt</li>
+            <li>LLM response includes <code>EvidenceDto[]</code>: snippet, source label, relevance score (0–1), evidence type</li>
+            <li>Snippets classified as <code>SUPPORTING</code> evidence (status=supported/partial) or <code>REFUTING</code> (status=unsupported)</li>
+            <li>Evidence types: <code>KUBERNETES_EVENT, POD_LOG, METRIC, KRUIZE_RECOMMENDATION, CRYOSTAT_ANALYSIS, GC_ANALYSIS, MEMORY_ANALYSIS, THREAD_ANALYSIS, EXCEPTION_ANALYSIS, OTHER</code></li>
+          </ul>
+        </div>
+        <div class="evidence-box">
+          <div class="ev-title">Evidence Fetched — Path A Fallback (ContextBasedEvidenceMatcher)</div>
+          <ul>
+            <li><strong>OBSERVATION</strong> assertions → scans for OOMKilled text, pod status, restart count patterns in context sections</li>
+            <li><strong>TREND</strong> assertions → requires ≥2 metric values; scans JFR/memory/Cryostat sections for heap trends</li>
+            <li><strong>CAUSALITY</strong> assertions → combines OOMKilled + heap-trend evidence</li>
+            <li><strong>CONFIGURATION</strong> assertions → scans for memory-limit values</li>
+            <li>All types also receive keyword-match evidence from assertion text (≥2 non-stop-words match a context line)</li>
+            <li>Relevance scores: OOMKilled=0.95, pod-status=0.90, memory-limit=0.90, heap-trend=0.85, restart=0.85, memory-trend=0.80</li>
+          </ul>
+        </div>
+        <div class="evidence-box">
+          <div class="ev-title">Evidence Fetched — Path B (DiagnosticContextSignalExtractor)</div>
+          <ul>
+            <li><strong>Kubernetes events</strong> → reason field, OOMKilled detection, rollout activity, eviction pressure</li>
+            <li><strong>Container status</strong> → exit code (137 → OOMKilled even if Kubernetes says generic error), termination reason</li>
+            <li><strong>Pod status</strong> → phase, CrashLoopBackOff detection</li>
+            <li><strong>Metrics</strong> → memory trend (increasing/stable), heap % used, after-GC ratio, restart-derived pressure, Quarkus heap</li>
+            <li><strong>Log patterns</strong> → OOM errors, full-GC count, GC pause max/total, heap-after-GC ratio, increasing heap from verbose GC</li>
+            <li><strong>Quarkus GC metrics</strong> → total GC pause % = pause-sum / process-uptime × 100</li>
+            <li><strong>Kruize recommendations</strong> → detects "increase memory limit" language in recommendations</li>
+          </ul>
+        </div>
+        <div class="outputs">
+          <span class="badge badge-orange">List&lt;ValidationResult&gt; (Path A)</span>
+          <span class="badge badge-gray">HypothesisValidationResult (Path B)</span>
+        </div>
+      </div>
+    </div>
+
+    
+    <div class="stage">
+      <div class="connector">
+        <div class="node n5">5</div>
+        <div class="line"></div>
+      </div>
+      <div class="stage-body">
+        <div class="stage-header">
+          <span class="stage-name">Verdict Aggregation</span>
+          <span class="stage-class">ValidationAggregator → DualValidationResult</span>
+        </div>
+        <p class="stage-desc">
+          <code>ValidationAggregator.aggregate()</code> combines Path A and Path B verdicts using one of four configurable strategies.
+          Default is <strong>WEIGHTED_AVERAGE</strong> (40% assertion / 60% rule-based).
+        </p>
+        <div class="scoring-grid">
+          <div class="score-card">
+            <div class="sc-label">Path A Weight</div>
+            <div class="sc-val sc-orange">40%</div>
+            <div class="sc-label">Assertion-based</div>
+          </div>
+          <div class="score-card">
+            <div class="sc-label">Path B Weight</div>
+            <div class="sc-val sc-slate">60%</div>
+            <div class="sc-label">Rule-based</div>
+          </div>
+          <div class="score-card">
+            <div class="sc-label">Min Confidence</div>
+            <div class="sc-val sc-blue">0.5</div>
+            <div class="sc-label">to be VALID</div>
+          </div>
+          <div class="score-card">
+            <div class="sc-label">High Confidence</div>
+            <div class="sc-val sc-green">0.8</div>
+            <div class="sc-label">threshold</div>
+          </div>
+        </div>
+        <p style="font-size:12px;color:#57606a;margin-top:10px">
+          Other strategies: <code>STRICT_CONSENSUS</code> (both must agree),
+          <code>HIGHEST_CONFIDENCE</code> (pick winner by confidence),
+          <code>RULE_BASED_PRIORITY</code> (deterministic wins unless inconclusive).
+        </p>
+        <div class="outputs">
+          <span class="badge badge-purple">DualValidationResult</span>
+          <span class="badge badge-green">FinalVerdict (status + confidence + strategy)</span>
+        </div>
+      </div>
+    </div>
+
+    
+    <div class="stage">
+      <div class="connector">
+        <div class="node n6">6</div>
+        <div class="line last"></div>
+      </div>
+      <div class="stage-body">
+        <div class="stage-header">
+          <span class="stage-name">Persistence &amp; Summary</span>
+          <span class="stage-class">DiagnosticServiceImpl → DiagnosticRepository</span>
+        </div>
+        <p class="stage-desc">
+          <code>updateDiagnosticWithValidation()</code> serializes the final verdict, assertion results, and rule-based
+          results into JSON and persists a completed <code>Diagnostic</code>. <code>ValidationSummarizer</code> optionally
+          generates a natural-language summary via LLM. The alert is marked processed.
+        </p>
+        <div class="evidence-box">
+          <div class="ev-title">Persisted Validation Fields</div>
+          <ul>
+            <li><code>validation_result</code> — SUPPORTED / PARTIALLY_SUPPORTED / UNSUPPORTED</li>
+            <li><code>is_valid</code>, <code>overall_confidence</code> — derived from DualValidationResult.FinalVerdict</li>
+            <li><code>dual_validation</code> — full JSON: assertionBasedVerdict, ruleBasedVerdict, finalVerdict</li>
+            <li><code>assertion_results</code> — per-assertion status, confidence, supporting/refuting evidence snippets</li>
+            <li><code>validation_summary</code> — LLM-generated or deterministic fallback narrative</li>
+          </ul>
+        </div>
+        <div class="outputs">
+          <span class="badge badge-green">Diagnostic (COMPLETED)</span>
+          <span class="badge badge-blue">ValidatedRCA</span>
+          <span class="badge badge-gray">Alert marked processed</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  
+  <div class="section-title">Signal Extraction Detail (Path B — DiagnosticContextSignalExtractor)</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Signal Category</th>
+        <th>Source Section(s)</th>
+        <th>What is Extracted</th>
+        <th>Signal Type</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Kubernetes events</td>
+        <td>Pod Events</td>
+        <td>Event reason, OOMKilled detection, rollout activity, eviction pressure</td>
+        <td><code>KUBERNETES_EVENT</code></td>
+      </tr>
+      <tr>
+        <td>Container status</td>
+        <td>Pod Status / Container Status</td>
+        <td>Exit code (137→OOMKilled), termination reason</td>
+        <td><code>CONTAINER_STATUS</code></td>
+      </tr>
+      <tr>
+        <td>Pod phase</td>
+        <td>Pod Status</td>
+        <td>Running/Failed/Pending phase, CrashLoopBackOff detection</td>
+        <td><code>POD_STATUS</code></td>
+      </tr>
+      <tr>
+        <td>Memory &amp; heap metrics</td>
+        <td>Metrics, JFR, Cryostat, Quarkus</td>
+        <td>Heap % used, after-GC ratio, memory utilization trend, restart-derived pressure, increasing heap inference</td>
+        <td><code>METRIC</code></td>
+      </tr>
+      <tr>
+        <td>GC log patterns</td>
+        <td>Pod Logs / GC logs</td>
+        <td>OOM errors, full-GC count, GC pause max/total, heap-after-GC, increasing pre-GC heap from verbose logs</td>
+        <td><code>LOG_PATTERN</code></td>
+      </tr>
+      <tr>
+        <td>Quarkus GC metrics</td>
+        <td>Quarkus Raw Metrics</td>
+        <td>Total GC pause % = <code>gc.pause.sum / process.uptime × 100</code></td>
+        <td><code>LOG_PATTERN</code></td>
+      </tr>
+      <tr>
+        <td>Kruize recommendations</td>
+        <td>Performance Recommendations</td>
+        <td>"increase memory limit" language detection</td>
+        <td><code>KRUIZE_RECOMMENDATION</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  
+  <div class="section-title">Assertion Types &amp; Classification</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Meaning</th>
+        <th>Classification Trigger</th>
+        <th>Evidence Strategy (Fallback Matcher)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>OBSERVATION</code></td>
+        <td>Factual state observed in telemetry</td>
+        <td>Default — no keyword match</td>
+        <td>OOMKilled pattern, pod status, restart count</td>
+      </tr>
+      <tr>
+        <td><code>TREND</code></td>
+        <td>A metric value increasing or decreasing over time</td>
+        <td>trend keywords: increasing, growing, rising…</td>
+        <td>Requires ≥2 memory or heap values from metrics sections</td>
+      </tr>
+      <tr>
+        <td><code>CAUSALITY</code></td>
+        <td>Causal relationship between two events</td>
+        <td>causal keywords: caused, led to, resulted in, triggered…</td>
+        <td>OOMKilled evidence + heap-trend evidence combined</td>
+      </tr>
+      <tr>
+        <td><code>CONFIGURATION</code></td>
+        <td>A configuration setting contributing to the issue</td>
+        <td>config keywords: limit, threshold, setting, configured…</td>
+        <td>Memory limit value extraction from config sections</td>
+      </tr>
+      <tr>
+        <td><code>RECOMMENDATION</code></td>
+        <td>Suggested action to remediate the issue</td>
+        <td>Source = POSSIBLE_SOLUTIONS or recommendation keywords</td>
+        <td>Skipped — automatically <code>UNKNOWN</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  
+  <div class="section-title">Key Domain Objects</div>
+  <table>
+    <thead>
+      <tr><th>Class</th><th>Role</th><th>Key Fields</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>DiagnosticContext</code></td>
+        <td>Structured container for all collected telemetry</td>
+        <td>podStatus, podEvents, podLogs, gcAnalysis, memoryAnalysis, quarkusRawMetrics, heapStatus, gcActivity, costRecommendations…</td>
+      </tr>
+      <tr>
+        <td><code>Assertion</code></td>
+        <td>A single typed claim extracted from the RCA text</td>
+        <td>id, text, type (OBSERVATION/TREND/CAUSALITY/CONFIGURATION/RECOMMENDATION), source</td>
+      </tr>
+      <tr>
+        <td><code>Evidence</code></td>
+        <td>A piece of context that supports or refutes an assertion</td>
+        <td>source label, type (KUBERNETES_EVENT/METRIC/…), snippet, relevanceScore (0–1), structuredData</td>
+      </tr>
+      <tr>
+        <td><code>ValidationResult</code></td>
+        <td>Per-assertion outcome from Path A</td>
+        <td>assertion, status (SUPPORTED/PARTIAL/UNSUPPORTED/UNKNOWN), confidence, supportingEvidence[], refutingEvidence[], explanation</td>
+      </tr>
+      <tr>
+        <td><code>HypothesisValidationResult</code></td>
+        <td>Rule-engine verdict from Path B</td>
+        <td>status, confidence, totalScore, maxPossibleScore, requiredPassed/total, explanation, ScoreBreakdown</td>
+      </tr>
+      <tr>
+        <td><code>DualValidationResult</code></td>
+        <td>Combined Path A + Path B outcome</td>
+        <td>assertionBasedVerdict (Path A stats), ruleBasedVerdict (Path B stats), finalVerdict (status + confidence + strategy)</td>
+      </tr>
+      <tr>
+        <td><code>ValidatedRCA</code></td>
+        <td>Top-level validated result returned to the API</td>
+        <td>originalRca, validationResults[], dualValidation, ValidationSummary (counts + score + confidence), validatedAt</td>
+      </tr>
+    </tbody>
+  </table>
+
+</div>
+<footer>Made with IBM Bob</footer>
+</body>
+</html>

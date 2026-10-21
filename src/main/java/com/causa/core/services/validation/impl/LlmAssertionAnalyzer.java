@@ -10,7 +10,7 @@ import com.causa.config.LlmConfigCache;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
 import com.causa.core.domain.validation.Assertion;
-import com.causa.core.domain.validation.Evidence;
+import com.causa.core.domain.validation.ValidationEvidence;
 import com.causa.core.domain.validation.ValidationResult;
 import com.causa.core.ports.llm.PromptSender;
 import com.causa.core.services.PromptTemplateLoader;
@@ -262,10 +262,10 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
         );
 
         // Convert evidence
-        List<Evidence> evidenceList = new ArrayList<>();
+        List<ValidationEvidence> evidenceList = new ArrayList<>();
         if (result.evidence != null) {
             for (EvidenceDto dto : result.evidence) {
-                Evidence evidence = Evidence.of(
+                ValidationEvidence evidence = ValidationEvidence.of(
                     dto.source != null ? dto.source : "llm-analysis",
                     parseEvidenceType(dto.type),
                     dto.snippet,
@@ -306,14 +306,14 @@ public class LlmAssertionAnalyzer implements AssertionAnalyzer {
     /**
      * Parses evidence type from string.
      */
-    private Evidence.EvidenceType parseEvidenceType(String typeStr) {
+    private ValidationEvidence.EvidenceType parseEvidenceType(String typeStr) {
         if (typeStr == null) {
-            return Evidence.EvidenceType.OTHER;
+            return ValidationEvidence.EvidenceType.OTHER;
         }
         try {
-            return Evidence.EvidenceType.valueOf(typeStr.toUpperCase());
+            return ValidationEvidence.EvidenceType.valueOf(typeStr.toUpperCase());
         } catch (IllegalArgumentException e) {
-            return Evidence.EvidenceType.OTHER;
+            return ValidationEvidence.EvidenceType.OTHER;
         }
     }
 

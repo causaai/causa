@@ -1,0 +1,184 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║           EVIDENCE FRAMEWORK - DOCUMENTATION SUMMARY                         ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+📁 Documents Created:
+
+1. ✅ Design Document
+   Location: docs/design/evidence-framework-design.md
+   Size: 24 KB
+   Purpose: Complete technical design with models, API integration, examples
+   
+2. ✅ ADR (Architecture Decision Record) - Markdown
+   Location: docs/adr/ADR-001-evidence-framework.md
+   Size: 14 KB
+   Purpose: Decision rationale, alternatives, consequences
+   
+3. ✅ ADR - Word-Friendly Version
+   Location: docs/adr/ADR-001-evidence-framework-word.md
+   Size: 20 KB
+   Purpose: Enhanced formatting for MS Word export with tables, approval section
+
+══════════════════════════════════════════════════════════════════════════════
+
+📋 FROZEN MODELS:
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Model 1: EvidenceItem                                                        │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ Fields:                                                                      │
+│   • id: String                                                               │
+│   • source: EvidenceSource (KUBERNETES_MCP, PROMETHEUS_MCP, CRYOSTAT_MCP)  │
+│   • type: EvidenceType (CONTAINER_STATUS, METRIC, JVM_ANALYSIS, etc.)      │
+│   • strength: EvidenceStrength (DEFINITIVE, STRONG, MODERATE, WEAK)        │
+│   • relationship: EvidenceRelationship (SUPPORTS, REFUTES, CONFLICTS)      │
+│   • availability: EvidenceAvailability (AVAILABLE, MISSING, UNAVAILABLE)   │
+│   • rawSnippet: String (actual data/text)                                   │
+│   • reasoning: String (why this matters)                                     │
+│   • confidence: double (0.0-1.0)                                            │
+│   • priority: int (1-10)                                                     │
+│   • collectedAt: Instant                                                     │
+│   • metadata: Map<String,String> (query, pod, rule ID, etc.)               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ Model 2: EvidenceCollection                                                  │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ Fields:                                                                      │
+│   • keyEvidence: List<EvidenceItem> (top 3-5 for main API)                 │
+│   • supporting: List<EvidenceItem> (all supporting)                         │
+│   • refuting: List<EvidenceItem> (all refuting)                            │
+│   • missing: List<EvidenceItem> (expected but not found)                   │
+│   • conflicting: List<EvidenceItem> (conflicts)                            │
+│   • summary: EvidenceSummary (counts, aggregate confidence)                 │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+══════════════════════════════════════════════════════════════════════════════
+
+🔄 API INTEGRATION:
+
+Main Diagnostic API Response:
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ GET /api/diagnostics/{id}                                                    │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ {                                                                            │
+│   "id": "diag-123",                                                          │
+│   "rca": { ... },                                                            │
+│   "validation": { ... },                                                     │
+│   "keyEvidence": [         ← ONLY 3-5 TOP ITEMS                             │
+│     {                                                                        │
+│       "source": "KUBERNETES_STATUS",                                         │
+│       "strength": "DEFINITIVE",                                              │
+│       "rawSnippet": "Exit Code: 137",                                        │
+│       "reasoning": "Container killed by OOM killer",                         │
+│       "confidence": 1.0                                                      │
+│     },                                                                       │
+│     { ... 2-4 more items }                                                   │
+│   ]                                                                          │
+│ }                                                                            │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+Optional Full Evidence API (Future):
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ GET /api/diagnostics/{id}/evidence                                           │
+├──────────────────────────────────────────────────────────────────────────────┤
+│ Returns: Full EvidenceCollection                                             │
+│   • keyEvidence                                                              │
+│   • supporting                                                               │
+│   • missing                                                                  │
+│   • conflicting                                                              │
+│   • summary                                                                  │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+══════════════════════════════════════════════════════════════════════════════
+
+💾 STORAGE:
+
+DiagnosticEntity:
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ @Column(columnDefinition = "TEXT")                                           │
+│ private String rcaResult;           // JSON: RootCauseAnalysis               │
+│                                                                              │
+│ @Column(columnDefinition = "TEXT")                                           │
+│ private String validationResult;    // JSON: ValidatedRCA                    │
+│                                                                              │
+│ @Column(columnDefinition = "TEXT")                                           │
+│ private String evidenceCollection;  // JSON: EvidenceCollection ← NEW!      │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+Strategy: Store FULL collection, send only KEY evidence in main API
+
+══════════════════════════════════════════════════════════════════════════════
+
+📊 KEY DECISIONS:
+
+1. ✅ Only keyEvidence (3-5 items) in main API response
+   Why: UI team requirement - lean response, fast load
+
+2. ✅ Evidence at root level (not nested in validation)
+   Why: User needs quick access, not buried in nested objects
+
+3. ✅ Include missing evidence
+   Why: Transparency, identify observability gaps
+
+4. ✅ Store full collection in DB
+   Why: Can provide full evidence via separate endpoint if needed
+
+5. ✅ Use metadata Map<String,String>
+   Why: Flexible for different sources (query, pod, rule ID, etc.)
+
+6. ✅ Source = WHERE (MCP server), Type = WHAT (data kind)
+   Why: Clear distinction - source is system providing data (KUBERNETES_MCP),
+        type is what the data is (CONTAINER_STATUS, METRIC)
+
+══════════════════════════════════════════════════════════════════════════════
+
+📝 NEXT STEPS:
+
+Implementation Plan (4 weeks):
+
+Week 1: Core Models
+  □ Create EvidenceItem.java
+  □ Create EvidenceCollection.java
+  □ Database migration
+  □ Unit tests
+
+Week 2: Evidence Extraction
+  □ EvidenceCollectionBuilder service
+  □ Extract from PATH A (ValidationResult)
+  □ Extract from PATH B (HypothesisValidationResult)
+  □ Key evidence selection algorithm
+  □ Integration tests
+
+Week 3: API Integration
+  □ Update DiagnosticDetailResponse
+  □ Persist evidenceCollection in validation flow
+  □ API tests
+  □ Documentation
+
+Week 4: Optional Full Evidence API
+  □ GET /diagnostics/{id}/evidence endpoint
+  □ Tests
+  □ Documentation
+
+══════════════════════════════════════════════════════════════════════════════
+
+📚 For MS Word Export:
+
+Open this file in Word:
+  docs/adr/ADR-001-evidence-framework-word.md
+
+Use these settings:
+  • Font: Calibri 11pt (body), Calibri 14pt (headings)
+  • Tables: Grid style with borders
+  • Code blocks: Consolas 10pt, light gray background
+  • Approval section: Add signatures before finalizing
+
+══════════════════════════════════════════════════════════════════════════════
+
+✅ DOCUMENTATION COMPLETE
+
+All design documents created and saved in:
+  /Users/pinkygupta/Documents/workspace/causa-backend/docs/
+
+JIRA: KRUIZE-241 ready for implementation kickoff

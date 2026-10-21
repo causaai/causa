@@ -19,8 +19,8 @@ public record ValidationResult(
     Assertion assertion,
     ValidationStatus status,
     double confidence,
-    List<Evidence> supportingEvidence,
-    List<Evidence> refutingEvidence,
+    List<ValidationEvidence> supportingEvidence,
+    List<ValidationEvidence> refutingEvidence,
     Optional<String> explanation
 ) {
 
@@ -63,7 +63,7 @@ public record ValidationResult(
     /**
      * Creates a supported validation result.
      */
-    public static ValidationResult supported(Assertion assertion, double confidence, List<Evidence> evidence, String explanation) {
+    public static ValidationResult supported(Assertion assertion, double confidence, List<ValidationEvidence> evidence, String explanation) {
         return new ValidationResult(
             assertion,
             ValidationStatus.SUPPORTED,
@@ -80,8 +80,8 @@ public record ValidationResult(
     public static ValidationResult partiallySupported(
         Assertion assertion,
         double confidence,
-        List<Evidence> supportingEvidence,
-        List<Evidence> refutingEvidence,
+        List<ValidationEvidence> supportingEvidence,
+        List<ValidationEvidence> refutingEvidence,
         String explanation
     ) {
         return new ValidationResult(
@@ -97,7 +97,7 @@ public record ValidationResult(
     /**
      * Creates an unsupported validation result.
      */
-    public static ValidationResult unsupported(Assertion assertion, double confidence, List<Evidence> evidence, String explanation) {
+    public static ValidationResult unsupported(Assertion assertion, double confidence, List<ValidationEvidence> evidence, String explanation) {
         return new ValidationResult(
             assertion,
             ValidationStatus.UNSUPPORTED,
@@ -167,8 +167,8 @@ public record ValidationResult(
         private Assertion assertion;
         private ValidationStatus status;
         private double confidence;
-        private List<Evidence> supportingEvidence = new ArrayList<>();
-        private List<Evidence> refutingEvidence = new ArrayList<>();
+        private List<ValidationEvidence> supportingEvidence = new ArrayList<>();
+        private List<ValidationEvidence> refutingEvidence = new ArrayList<>();
         private String explanation;
 
         public Builder assertion(Assertion assertion) {
@@ -186,12 +186,12 @@ public record ValidationResult(
             return this;
         }
 
-        public Builder addSupportingEvidence(Evidence evidence) {
+        public Builder addSupportingEvidence(ValidationEvidence evidence) {
             this.supportingEvidence.add(evidence);
             return this;
         }
 
-        public Builder addRefutingEvidence(Evidence evidence) {
+        public Builder addRefutingEvidence(ValidationEvidence evidence) {
             this.refutingEvidence.add(evidence);
             return this;
         }

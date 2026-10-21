@@ -4,7 +4,7 @@ import com.causa.core.domain.RootCauseAnalysis.AnomalyType;
 import com.causa.core.domain.validation.ValidatedRCA;
 
 /**
- * Evidence Harvester
+ * ValidationEvidence Harvester
  *
  * <p>Collects the evidence behind an RCA finding and maps it into the internal evidence model.
  *
@@ -32,7 +32,7 @@ public interface EvidenceHarvester {
      * Collects all evidence for a finding.
      *
      * <p>Never throws on partial data: a missing validation path, an empty diagnostic section,
-     * or an unrecognised source yields a recorded gap rather than a failure. Evidence
+     * or an unrecognised source yields a recorded gap rather than a failure. ValidationEvidence
      * collection is additive to a diagnostic and must not be able to fail one.
      *
      * @param finding           the RCA finding evidence is collected for

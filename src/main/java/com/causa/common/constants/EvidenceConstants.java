@@ -1,7 +1,7 @@
 package com.causa.common.constants;
 
 /**
- * Evidence Constants
+ * ValidationEvidence Constants
  *
  * <p>Constants for the evidence collection pipeline — the MCP source fallback, signal
  * provenance keys, identifier prefixes, and the bands that derive evidence strength from

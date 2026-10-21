@@ -22,7 +22,7 @@ import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
 import com.causa.core.domain.RootCauseAnalysis;
 import com.causa.core.domain.RootCauseAnalysis.AnomalyType;
-import com.causa.core.domain.validation.Evidence;
+import com.causa.core.domain.validation.ValidationEvidence;
 import com.causa.core.domain.validation.EvidenceRankingRequest.RcaSummary;
 import com.causa.core.domain.validation.EvidenceRankingResponse;
 import com.causa.core.domain.validation.ValidatedRCA;
@@ -565,7 +565,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             if (!result.supportingEvidence().isEmpty()) {
                 for (int i = 0; i < result.supportingEvidence().size(); i++) {
                     var evidence = result.supportingEvidence().get(i);
-                    log.debug(String.format("  Evidence %d: %s (relevance: %.2f)",
+                    log.debug(String.format("  ValidationEvidence %d: %s (relevance: %.2f)",
                         i + 1,
                         evidence.snippet().substring(0, Math.min(100, evidence.snippet().length())),
                         evidence.relevanceScore()))
@@ -664,7 +664,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             if (evidenceRanker.isPresent()) {
                 try {
                     // Collect all evidence from validation results
-                    List<Evidence> allEvidence = collectAllEvidence(validatedRCA);
+                    List<ValidationEvidence> allEvidence = collectAllEvidence(validatedRCA);
 
                     if (!allEvidence.isEmpty()) {
                         // Get validation score and status
@@ -698,14 +698,14 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                         validationDataNode.set("rankedEvidenceIds",
                             objectMapper.valueToTree(rankingResponse.rankedEvidenceIds()));
 
-                        log.info("Evidence ranking completed")
+                        log.info("ValidationEvidence ranking completed")
                             .field("inputCount", allEvidence.size())
                             .field("rankedCount", rankingResponse.rankedEvidenceIds().size())
                             .field("rankingMethod", rankingResponse.reasoning())
                             .log();
                     }
                 } catch (Exception e) {
-                    log.warn("Evidence ranking failed - continuing without ranked evidence")
+                    log.warn("ValidationEvidence ranking failed - continuing without ranked evidence")
                         .exception(e)
                         .log();
                     // Continue without ranked evidence (non-blocking)
@@ -963,8 +963,8 @@ public class DiagnosticServiceImpl implements DiagnosticService {
      * @param validatedRCA the validated RCA containing validation results
      * @return list of all evidence items
      */
-    private List<Evidence> collectAllEvidence(ValidatedRCA validatedRCA) {
-        List<Evidence> allEvidence = new ArrayList<>();
+    private List<ValidationEvidence> collectAllEvidence(ValidatedRCA validatedRCA) {
+        List<ValidationEvidence> allEvidence = new ArrayList<>();
 
         // Collect evidence from assertion validation results (PATH A)
         for (ValidationResult result : validatedRCA.validationResults()) {
