@@ -2,7 +2,7 @@ package com.causa.core.services.validation.impl;
 
 import com.causa.common.logging.CausaLogger;
 import com.causa.core.domain.validation.Assertion;
-import com.causa.core.domain.validation.Evidence;
+import com.causa.core.domain.validation.ValidationEvidence;
 import com.causa.core.services.validation.EvidenceMatcher;
 import jakarta.enterprise.context.ApplicationScoped;
 
@@ -42,13 +42,13 @@ public class ContextBasedEvidenceMatcher implements EvidenceMatcher {
     );
 
     @Override
-    public List<Evidence> findEvidence(Assertion assertion, String diagnosticContext) {
+    public List<ValidationEvidence> findEvidence(Assertion assertion, String diagnosticContext) {
         log.debug("Finding evidence for assertion")
             .field("assertionId", assertion.id())
             .field("assertionType", assertion.type())
             .log();
 
-        List<Evidence> evidence = new ArrayList<>();
+        List<ValidationEvidence> evidence = new ArrayList<>();
 
         // Parse context into sections
         Map<String, String> sections = parseContextSections(diagnosticContext);
@@ -77,7 +77,7 @@ public class ContextBasedEvidenceMatcher implements EvidenceMatcher {
     }
 
     @Override
-    public Map<String, List<Evidence>> findEvidenceForAll(
+    public Map<String, List<ValidationEvidence>> findEvidenceForAll(
         List<Assertion> assertions,
         String diagnosticContext
     ) {
@@ -85,10 +85,10 @@ public class ContextBasedEvidenceMatcher implements EvidenceMatcher {
             .field("totalAssertions", assertions.size())
             .log();
 
-        Map<String, List<Evidence>> evidenceMap = new HashMap<>();
+        Map<String, List<ValidationEvidence>> evidenceMap = new HashMap<>();
 
         for (Assertion assertion : assertions) {
-            List<Evidence> evidence = findEvidence(assertion, diagnosticContext);
+            List<ValidationEvidence> evidence = findEvidence(assertion, diagnosticContext);
             evidenceMap.put(assertion.id(), evidence);
         }
 
@@ -136,11 +136,11 @@ public class ContextBasedEvidenceMatcher implements EvidenceMatcher {
     /**
      * Finds evidence for observation assertions.
      */
-    private List<Evidence> findObservationEvidence(
+    private List<ValidationEvidence> findObservationEvidence(
         Assertion assertion,
         Map<String, String> sections
     ) {
-        List<Evidence> evidence = new ArrayList<>();
+        List<ValidationEvidence> evidence = new ArrayList<>();
         String text = assertion.text().toLowerCase();
 
         // Check for OOMKilled
@@ -164,11 +164,11 @@ public class ContextBasedEvidenceMatcher implements EvidenceMatcher {
     /**
      * Finds evidence for trend assertions.
      */
-    private List<Evidence> findTrendEvidence(
+    private List<ValidationEvidence> findTrendEvidence(
         Assertion assertion,
         Map<String, String> sections
     ) {
-        List<Evidence> evidence = new ArrayList<>();
+        List<ValidationEvidence> evidence = new ArrayList<>();
         String text = assertion.text().toLowerCase();
 
         // Check for memory trends
@@ -187,12 +187,12 @@ public class ContextBasedEvidenceMatcher implements EvidenceMatcher {
     /**
      * Finds evidence for causality assertions.
      */
-    private List<Evidence> findCausalityEvidence(
+    private List<ValidationEvidence> findCausalityEvidence(
         Assertion assertion,
         Map<String, String> sections
     ) {
         // Causality is complex - look for both cause and effect evidence
-        List<Evidence> evidence = new ArrayList<>();
+        List<ValidationEvidence> evidence = new ArrayList<>();
         String text = assertion.text().toLowerCase();
 
         // OOMKill caused by heap exhaustion
@@ -207,11 +207,11 @@ public class ContextBasedEvidenceMatcher implements EvidenceMatcher {
     /**
      * Finds evidence for configuration assertions.
      */
-    private List<Evidence> findConfigurationEvidence(
+    private List<ValidationEvidence> findConfigurationEvidence(
         Assertion assertion,
         Map<String, String> sections
     ) {
-        List<Evidence> evidence = new ArrayList<>();
+        List<ValidationEvidence> evidence = new ArrayList<>();
         String text = assertion.text().toLowerCase();
 
         // Memory limit configuration
@@ -225,8 +225,8 @@ public class ContextBasedEvidenceMatcher implements EvidenceMatcher {
     /**
      * Finds OOMKilled evidence.
      */
-    private List<Evidence> findOOMKilledEvidence(Map<String, String> sections) {
-        List<Evidence> evidence = new ArrayList<>();
+    private List<ValidationEvidence> findOOMKilledEvidence(Map<String, String> sections) {
+        List<ValidationEvidence> evidence = new ArrayList<>();
 
         for (Map.Entry<String, String> entry : sections.entrySet()) {
             String sectionName = entry.getKey();
@@ -235,9 +235,9 @@ public class ContextBasedEvidenceMatcher implements EvidenceMatcher {
             Matcher matcher = EVIDENCE_PATTERNS.get("oomkilled").matcher(content);
             if (matcher.find()) {
                 String snippet = extractSnippet(content, matcher.start(), 100);
-                evidence.add(Evidence.of(
+                evidence.add(ValidationEvidence.of(
                     sectionName,
-                    Evidence.EvidenceType.KUBERNETES_EVENT,
+                    ValidationEvidence.EvidenceType.KUBERNETES_EVENT,
                     snippet,
                     0.95 // High relevance
                 ));
@@ -250,8 +250,8 @@ public class ContextBasedEvidenceMatcher implements EvidenceMatcher {
     /**
      * Finds pod status evidence.
      */
-    private List<Evidence> findPodStatusEvidence(Map<String, String> sections, String targetStatus) {
-        List<Evidence> evidence = new ArrayList<>();
+    private List<ValidationEvidence> findPodStatusEvidence(Map<String, String> sections, String targetStatus) {
+        List<ValidationEvidence> evidence = new ArrayList<>();
 
         for (Map.Entry<String, String> entry : sections.entrySet()) {
             String sectionName = entry.getKey();
@@ -261,9 +261,9 @@ public class ContextBasedEvidenceMatcher implements EvidenceMatcher {
                 Matcher matcher = EVIDENCE_PATTERNS.get("pod_status").matcher(content);
                 if (matcher.find()) {
                     String snippet = extractSnippet(content, matcher.start(), 80);
-                    evidence.add(Evidence.of(
+                    evidence.add(ValidationEvidence.of(
                         sectionName,
-                        Evidence.EvidenceType.KUBERNETES_EVENT,
+                        ValidationEvidence.EvidenceType.KUBERNETES_EVENT,
                         snippet,
                         0.90
                     ));
@@ -277,8 +277,8 @@ public class ContextBasedEvidenceMatcher implements EvidenceMatcher {
     /**
      * Finds restart evidence.
      */
-    private List<Evidence> findRestartEvidence(Map<String, String> sections) {
-        List<Evidence> evidence = new ArrayList<>();
+    private List<ValidationEvidence> findRestartEvidence(Map<String, String> sections) {
+        List<ValidationEvidence> evidence = new ArrayList<>();
 
         for (Map.Entry<String, String> entry : sections.entrySet()) {
             String sectionName = entry.getKey();
@@ -287,9 +287,9 @@ public class ContextBasedEvidenceMatcher implements EvidenceMatcher {
             Matcher matcher = EVIDENCE_PATTERNS.get("restart_count").matcher(content);
             if (matcher.find()) {
                 String snippet = extractSnippet(content, matcher.start(), 80);
-                evidence.add(Evidence.of(
+                evidence.add(ValidationEvidence.of(
                     sectionName,
-                    Evidence.EvidenceType.KUBERNETES_EVENT,
+                    ValidationEvidence.EvidenceType.KUBERNETES_EVENT,
                     snippet,
                     0.85
                 ));
@@ -302,8 +302,8 @@ public class ContextBasedEvidenceMatcher implements EvidenceMatcher {
     /**
      * Finds memory trend evidence.
      */
-    private List<Evidence> findMemoryTrendEvidence(Map<String, String> sections) {
-        List<Evidence> evidence = new ArrayList<>();
+    private List<ValidationEvidence> findMemoryTrendEvidence(Map<String, String> sections) {
+        List<ValidationEvidence> evidence = new ArrayList<>();
 
         // Look for memory usage patterns
         for (Map.Entry<String, String> entry : sections.entrySet()) {
@@ -318,9 +318,9 @@ public class ContextBasedEvidenceMatcher implements EvidenceMatcher {
 
                 if (memoryValues.size() >= 2) {
                     String snippet = "Memory values: " + String.join(", ", memoryValues);
-                    evidence.add(Evidence.of(
+                    evidence.add(ValidationEvidence.of(
                         entry.getKey(),
-                        Evidence.EvidenceType.METRIC,
+                        ValidationEvidence.EvidenceType.METRIC,
                         snippet,
                         0.80
                     ));
@@ -334,8 +334,8 @@ public class ContextBasedEvidenceMatcher implements EvidenceMatcher {
     /**
      * Finds heap trend evidence.
      */
-    private List<Evidence> findHeapTrendEvidence(Map<String, String> sections) {
-        List<Evidence> evidence = new ArrayList<>();
+    private List<ValidationEvidence> findHeapTrendEvidence(Map<String, String> sections) {
+        List<ValidationEvidence> evidence = new ArrayList<>();
 
         for (Map.Entry<String, String> entry : sections.entrySet()) {
             if (entry.getKey().contains("jfr") || entry.getKey().contains("memory") || entry.getKey().contains("cryostat")) {
@@ -349,9 +349,9 @@ public class ContextBasedEvidenceMatcher implements EvidenceMatcher {
 
                 if (heapValues.size() >= 2) {
                     String snippet = "Heap values: " + String.join(", ", heapValues);
-                    evidence.add(Evidence.of(
+                    evidence.add(ValidationEvidence.of(
                         entry.getKey(),
-                        Evidence.EvidenceType.MEMORY_ANALYSIS,
+                        ValidationEvidence.EvidenceType.MEMORY_ANALYSIS,
                         snippet,
                         0.85
                     ));
@@ -365,8 +365,8 @@ public class ContextBasedEvidenceMatcher implements EvidenceMatcher {
     /**
      * Finds memory limit evidence.
      */
-    private List<Evidence> findMemoryLimitEvidence(Map<String, String> sections) {
-        List<Evidence> evidence = new ArrayList<>();
+    private List<ValidationEvidence> findMemoryLimitEvidence(Map<String, String> sections) {
+        List<ValidationEvidence> evidence = new ArrayList<>();
 
         for (Map.Entry<String, String> entry : sections.entrySet()) {
             String content = entry.getValue();
@@ -374,9 +374,9 @@ public class ContextBasedEvidenceMatcher implements EvidenceMatcher {
 
             if (matcher.find()) {
                 String snippet = extractSnippet(content, matcher.start(), 80);
-                evidence.add(Evidence.of(
+                evidence.add(ValidationEvidence.of(
                     entry.getKey(),
-                    Evidence.EvidenceType.KUBERNETES_EVENT,
+                    ValidationEvidence.EvidenceType.KUBERNETES_EVENT,
                     snippet,
                     0.90
                 ));
@@ -389,8 +389,8 @@ public class ContextBasedEvidenceMatcher implements EvidenceMatcher {
     /**
      * Finds evidence using keyword matching.
      */
-    private List<Evidence> findKeywordMatches(Assertion assertion, String context) {
-        List<Evidence> evidence = new ArrayList<>();
+    private List<ValidationEvidence> findKeywordMatches(Assertion assertion, String context) {
+        List<ValidationEvidence> evidence = new ArrayList<>();
 
         // Extract key terms from assertion (simple approach)
         String[] words = assertion.text().toLowerCase().split("\\W+");
@@ -416,9 +416,9 @@ public class ContextBasedEvidenceMatcher implements EvidenceMatcher {
             // If multiple keywords match, this line is relevant
             if (matchCount >= Math.min(2, keywords.size())) {
                 double relevance = Math.min(0.70, 0.40 + (matchCount * 0.10));
-                evidence.add(Evidence.of(
+                evidence.add(ValidationEvidence.of(
                     "keyword-match",
-                    Evidence.EvidenceType.OTHER,
+                    ValidationEvidence.EvidenceType.OTHER,
                     line.trim(),
                     relevance
                 ));
