@@ -4,7 +4,7 @@ import com.causa.common.constants.ContextConstants;
 import com.causa.common.constants.EvidenceConstants.Ids;
 import com.causa.common.constants.EvidenceConstants.Snippet;
 import com.causa.common.constants.EvidenceConstants.StrengthBands;
-import com.causa.core.domain.validation.ValidationEvidence;
+import com.causa.core.domain.validation.Evidence;
 import com.causa.core.domain.validation.EvidenceItem;
 import com.causa.core.domain.validation.EvidenceItem.EvidenceStrength;
 import com.causa.core.domain.validation.ValidationResult;
@@ -17,7 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * PATH A ValidationEvidence Mapper
+ * PATH A Evidence Mapper
  *
  * <p>Maps assertion-based validation output — the evidence the LLM found while checking each
  * claim the RCA made — into {@link EvidenceItem}.
@@ -25,11 +25,11 @@ import java.util.List;
  * <p>Two things get corrected on the way through:
  *
  * <ul>
- *   <li><strong>Source.</strong> {@link ValidationEvidence#source()} is whatever section label the LLM
+ *   <li><strong>Source.</strong> {@link Evidence#source()} is whatever section label the LLM
  *       echoed back, free text like {@code "POD_LOGS - sequence 124"}. It is resolved
  *       to the MCP server that declared that section in {@code mcp.json}.</li>
- *   <li><strong>Narration.</strong> {@link ValidationEvidence#statement()} says what the quote shows and
- *       {@link ValidationEvidence#explanation()} why that bears on the assertion. Both are null when the
+ *   <li><strong>Narration.</strong> {@link Evidence#statement()} says what the quote shows and
+ *       {@link Evidence#explanation()} why that bears on the assertion. Both are null when the
  *       validator wrote neither, and the per-evidence explanation falls back to the
  *       assertion-level explanation.</li>
  *   <li><strong>Empty sections cited as proof.</strong> The LLM will happily quote
@@ -66,13 +66,13 @@ public class PathAEvidenceMapper {
         List<EvidenceItem> items = new ArrayList<>();
         int index = 0;
 
-        for (ValidationEvidence evidence : result.supportingEvidence()) {
+        for (Evidence evidence : result.supportingEvidence()) {
             if (carriesNoData(evidence.snippet())) {
                 continue;
             }
             items.add(toItem(result, evidence, ++index));
         }
-        for (ValidationEvidence evidence : result.refutingEvidence()) {
+        for (Evidence evidence : result.refutingEvidence()) {
             if (carriesNoData(evidence.snippet())) {
                 continue;
             }
@@ -82,7 +82,7 @@ public class PathAEvidenceMapper {
         return items;
     }
 
-    private EvidenceItem toItem(ValidationResult result, ValidationEvidence evidence, int index) {
+    private EvidenceItem toItem(ValidationResult result, Evidence evidence, int index) {
         return EvidenceItem.builder()
             .id(evidenceId(result, index))
             .source(sourceResolver.resolve(evidence.source()))
@@ -111,7 +111,7 @@ public class PathAEvidenceMapper {
      * fallback: it is the claim under test, and an item that restated the claim as its own
      * justification would read as though it had settled it.
      */
-    private String explanationOf(ValidationEvidence evidence, ValidationResult result) {
+    private String explanationOf(Evidence evidence, ValidationResult result) {
         if (evidence.explanation() != null && !evidence.explanation().isBlank()) {
             return evidence.explanation();
         }
@@ -144,7 +144,7 @@ public class PathAEvidenceMapper {
         return EvidenceStrength.CIRCUMSTANTIAL;
     }
 
-    private EvidenceItem.EvidenceType typeOf(ValidationEvidence.EvidenceType type) {
+    private EvidenceItem.EvidenceType typeOf(Evidence.EvidenceType type) {
         if (type == null) {
             return EvidenceItem.EvidenceType.OTHER;
         }

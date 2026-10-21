@@ -10,7 +10,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * ValidationEvidence Collection Result
+ * Evidence Collection Result
  *
  * <p>The outcome of harvesting evidence for a single RCA finding: every
  * {@link EvidenceItem} produced, bound to the finding it was collected for.

@@ -7,7 +7,7 @@
  * <h2>Validation Strategy</h2>
  * Two-pass validation to prevent LLM hallucinations:
  * <ol>
- *   <li><strong>LLM ValidationEvidence Assertions</strong> - LLM must cite data sources</li>
+ *   <li><strong>LLM Evidence Assertions</strong> - LLM must cite data sources</li>
  *   <li><strong>Rule-Based Validation</strong> - Deterministic checks against metrics</li>
  * </ol>
  *

@@ -7,7 +7,7 @@ import java.util.stream.Collectors;
 import com.causa.common.constants.PromptConstants;
 import com.causa.common.logging.CausaLogger;
 import com.causa.config.LlmConfigCache;
-import com.causa.core.domain.validation.ValidationEvidence;
+import com.causa.core.domain.validation.Evidence;
 import com.causa.core.domain.validation.EvidenceRankingRequest.RcaSummary;
 import com.causa.core.domain.validation.EvidenceRankingResponse;
 import com.causa.core.services.PromptTemplateLoader;
@@ -60,12 +60,12 @@ public class LlmEvidenceRanker implements EvidenceRanker {
     @Override
     public EvidenceRankingResponse rankAndDeduplicate(
             RcaSummary rca,
-            List<ValidationEvidence> evidenceList,
+            List<Evidence> evidenceList,
             double validationScore,
             String validationStatus) {
 
         // Filter evidence with statements only
-        List<ValidationEvidence> statementEvidence = evidenceList.stream()
+        List<Evidence> statementEvidence = evidenceList.stream()
             .filter(ev -> ev.statement() != null && !ev.statement().isBlank())
             .toList();
 
@@ -80,9 +80,9 @@ public class LlmEvidenceRanker implements EvidenceRanker {
                 .log();
 
             List<String> rankedIds = statementEvidence.stream()
-                .sorted(Comparator.comparingDouble(ValidationEvidence::relevanceScore).reversed())
+                .sorted(Comparator.comparingDouble(Evidence::relevanceScore).reversed())
                 .limit(MAX_RANKED_ITEMS)
-                .map(ValidationEvidence::id)
+                .map(Evidence::id)
                 .toList();
 
             return new EvidenceRankingResponse(rankedIds, "Deterministic ranking (no LLM)");
@@ -94,7 +94,7 @@ public class LlmEvidenceRanker implements EvidenceRanker {
 
     private EvidenceRankingResponse rankWithLlm(
             RcaSummary rca,
-            List<ValidationEvidence> evidenceList,
+            List<Evidence> evidenceList,
             double validationScore,
             String validationStatus) {
 
@@ -129,9 +129,9 @@ public class LlmEvidenceRanker implements EvidenceRanker {
 
             // Fallback to deterministic ranking
             List<String> rankedIds = evidenceList.stream()
-                .sorted(Comparator.comparingDouble(ValidationEvidence::relevanceScore).reversed())
+                .sorted(Comparator.comparingDouble(Evidence::relevanceScore).reversed())
                 .limit(MAX_RANKED_ITEMS)
-                .map(ValidationEvidence::id)
+                .map(Evidence::id)
                 .toList();
 
             return new EvidenceRankingResponse(rankedIds, "Fallback ranking (LLM failed)");
@@ -148,7 +148,7 @@ public class LlmEvidenceRanker implements EvidenceRanker {
     private String buildCompactPrompt(
             PromptTemplateLoader.PromptTemplate template,
             RcaSummary rca,
-            List<ValidationEvidence> evidenceList,
+            List<Evidence> evidenceList,
             double validationScore,
             String validationStatus) {
 

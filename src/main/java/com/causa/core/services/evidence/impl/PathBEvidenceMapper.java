@@ -22,7 +22,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * PATH B ValidationEvidence Mapper
+ * PATH B Evidence Mapper
  *
  * <p>Maps deterministic rule evaluation into {@link EvidenceItem}.
  *

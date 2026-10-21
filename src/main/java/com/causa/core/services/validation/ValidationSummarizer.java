@@ -96,7 +96,7 @@ public class ValidationSummarizer {
         prompt.append("Validation Outcome: ").append(finalVerdict.status()).append("\n");
         prompt.append("Overall Confidence: ").append(String.format("%.0f%%", finalVerdict.confidence() * 100)).append("\n\n");
 
-        prompt.append("ValidationEvidence Checked:\n");
+        prompt.append("Evidence Checked:\n");
         prompt.append("- Analyzed ").append(assertionVerdict.totalAssertions()).append(" key claims from the analysis\n");
         prompt.append("- Found ").append(assertionVerdict.supportedAssertions()).append(" supported by evidence, ");
         prompt.append(assertionVerdict.unsupportedAssertions()).append(" contradicted, ");

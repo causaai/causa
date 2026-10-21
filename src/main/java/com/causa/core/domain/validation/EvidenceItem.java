@@ -12,7 +12,7 @@ import java.util.Map;
  * about evidence collected during validation (PATH A + PATH B).
  *
  * <p>This is the INTERNAL model - stored in DiagnosticEntity.allEvidence as JSON.
- * For the USER-FACING model, see DiagnosticDetailResponse.ValidationEvidence (5 fields).
+ * For the USER-FACING model, see DiagnosticDetailResponse.Evidence (5 fields).
  *
  * <p>The prose fields are deliberately distinct: {@link #rawSnippet} is the verbatim text the
  * source returned, {@link #statement} says what that text shows, and {@link #explanation} argues
@@ -115,7 +115,7 @@ public record EvidenceItem(
     }
 
     /**
-     * ValidationEvidence-Hypothesis Alignment - does this evidence support or refute the hypothesis?
+     * Evidence-Hypothesis Alignment - does this evidence support or refute the hypothesis?
      */
     public enum EvidenceHypothesisAlignment {
         /** Supports the hypothesis */

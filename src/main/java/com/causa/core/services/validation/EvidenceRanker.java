@@ -2,7 +2,7 @@ package com.causa.core.services.validation;
 
 import java.util.List;
 
-import com.causa.core.domain.validation.ValidationEvidence;
+import com.causa.core.domain.validation.Evidence;
 import com.causa.core.domain.validation.EvidenceRankingRequest.RcaSummary;
 import com.causa.core.domain.validation.EvidenceRankingResponse;
 
@@ -27,7 +27,7 @@ public interface EvidenceRanker {
      */
     EvidenceRankingResponse rankAndDeduplicate(
         RcaSummary rca,
-        List<ValidationEvidence> evidenceList,
+        List<Evidence> evidenceList,
         double validationScore,
         String validationStatus
     );

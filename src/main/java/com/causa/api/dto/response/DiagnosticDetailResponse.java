@@ -60,14 +60,14 @@ public record DiagnosticDetailResponse(
     ) {}
 
     /**
-     * ValidationEvidence - UI Model (5 fields).
+     * Evidence - UI Model (5 fields).
      *
      * <p>User-friendly evidence for API response. Selected from top 3-5
      * EvidenceItems by priority and transformed for display.
      *
      * @since 0.0.1
      */
-    public record ValidationEvidence(
+    public record Evidence(
         @JsonProperty("supportingEvidence") String supportingEvidence,
         @JsonProperty("explanation")        String explanation,
         @JsonProperty("source")             String source,
@@ -83,7 +83,7 @@ public record DiagnosticDetailResponse(
         @JsonProperty("anomaly_type")          String anomalyType,
         @JsonProperty("root_cause")            String rootCause,
         @JsonProperty("evidences")             List<String> evidences,  // LLM-generated evidences (existing)
-        @JsonProperty("validation_evidences")  List<ValidationEvidence> validationEvidences,  // Structured evidences from validation pipeline (new)
+        @JsonProperty("validation_evidences")  List<Evidence> validationEvidences,  // Structured evidences from validation pipeline (new)
         @JsonProperty("supporting_logs")       List<String> supportingLogs,
         @JsonProperty("rca_confidence_score")  Double rcaConfidenceScore,
         @JsonProperty("confidence_summary")    String confidenceSummaryText,
