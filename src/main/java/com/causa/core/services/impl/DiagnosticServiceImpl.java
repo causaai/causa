@@ -22,6 +22,9 @@ import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
 import com.causa.core.domain.RootCauseAnalysis;
 import com.causa.core.domain.RootCauseAnalysis.AnomalyType;
+import com.causa.core.domain.validation.ValidationEvidence;
+import com.causa.core.domain.validation.EvidenceRankingRequest.RcaSummary;
+import com.causa.core.domain.validation.EvidenceRankingResponse;
 import com.causa.core.domain.validation.ValidatedRCA;
 import com.causa.core.domain.validation.ValidationResult;
 import com.causa.core.ports.AlertRepository;
@@ -29,6 +32,7 @@ import com.causa.core.ports.DiagnosticRepository;
 import com.causa.core.ports.llm.PromptSender;
 import com.causa.core.services.DiagnosticService;
 import com.causa.core.services.RcaPromptBuilder;
+import com.causa.core.services.validation.EvidenceRanker;
 import com.causa.core.services.validation.RcaValidator;
 import com.causa.infrastructure.persistence.mappers.AlertEntityMapper;
 import com.causa.mcp.McpRegistry;
@@ -40,6 +44,8 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -74,6 +80,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     private final Validator validator;
     private final ExecutorService pipelineExecutor;
     private final Optional<RcaValidator> rcaValidator;
+    private final Optional<EvidenceRanker> evidenceRanker;
 
     @Inject
     public DiagnosticServiceImpl(DiagnosticRepository diagnosticRepository,
@@ -84,7 +91,8 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                                   LlmConfigCache llmConfigCache,
                                   ObjectMapper objectMapper,
                                   Validator validator,
-                                  Instance<RcaValidator> rcaValidatorInstance) {
+                                  Instance<RcaValidator> rcaValidatorInstance,
+                                  Instance<EvidenceRanker> evidenceRankerInstance) {
         this.diagnosticRepository = diagnosticRepository;
         this.alertRepository      = alertRepository;
         this.mcpRegistry          = mcpRegistry;
@@ -96,6 +104,8 @@ public class DiagnosticServiceImpl implements DiagnosticService {
         this.pipelineExecutor     = Executors.newCachedThreadPool();
         this.rcaValidator         = rcaValidatorInstance.isResolvable() ?
             Optional.of(rcaValidatorInstance.get()) : Optional.empty();
+        this.evidenceRanker       = evidenceRankerInstance.isResolvable() ?
+            Optional.of(evidenceRankerInstance.get()) : Optional.empty();
     }
 
     @Override
@@ -650,6 +660,58 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             // Add validated timestamp
             validationDataNode.put("validatedAt", validatedRCA.validatedAt().toString());
 
+            // Rank and deduplicate evidence (if ranker available)
+            if (evidenceRanker.isPresent()) {
+                try {
+                    // Collect all evidence from validation results
+                    List<ValidationEvidence> allEvidence = collectAllEvidence(validatedRCA);
+
+                    if (!allEvidence.isEmpty()) {
+                        // Get validation score and status
+                        double validationScore = validatedRCA.dualValidation() != null ?
+                            validatedRCA.dualValidation().finalVerdict().confidence() :
+                            validatedRCA.summary().averageConfidence();
+
+                        String validationStatus = determineValidationResult(validatedRCA);
+
+                        // Build RCA summary
+                        RcaSummary rcaSummary = new RcaSummary(
+                            rca.issueSummary(),
+                            rca.rootCause()
+                        );
+
+                        // Call evidence ranker
+                        log.info("Ranking evidence")
+                            .field("totalEvidence", allEvidence.size())
+                            .field("validationScore", validationScore)
+                            .field("validationStatus", validationStatus)
+                            .log();
+
+                        EvidenceRankingResponse rankingResponse = evidenceRanker.get().rankAndDeduplicate(
+                            rcaSummary,
+                            allEvidence,
+                            validationScore,
+                            validationStatus
+                        );
+
+                        // Add ranked evidence IDs to validation data
+                        validationDataNode.set("rankedEvidenceIds",
+                            objectMapper.valueToTree(rankingResponse.rankedEvidenceIds()));
+
+                        log.info("Evidence ranking completed")
+                            .field("inputCount", allEvidence.size())
+                            .field("rankedCount", rankingResponse.rankedEvidenceIds().size())
+                            .field("rankingMethod", rankingResponse.reasoning())
+                            .log();
+                    }
+                } catch (Exception e) {
+                    log.warn("Evidence ranking failed - continuing without ranked evidence")
+                        .exception(e)
+                        .log();
+                    // Continue without ranked evidence (non-blocking)
+                }
+            }
+
             // Convert validation data to JSON string (compact for DB)
             String validationDataString = objectMapper.writeValueAsString(validationDataNode);
 
@@ -893,5 +955,30 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     @Override
     public Optional<Diagnostic> getDiagnosticById(String diagnosticId) {
         return diagnosticRepository.findById(diagnosticId);
+    }
+
+    /**
+     * Collects all evidence from validation results (supporting + refuting).
+     *
+     * @param validatedRCA the validated RCA containing validation results
+     * @return list of all evidence items
+     */
+    private List<ValidationEvidence> collectAllEvidence(ValidatedRCA validatedRCA) {
+        List<ValidationEvidence> allEvidence = new ArrayList<>();
+
+        // Collect evidence from assertion validation results (PATH A)
+        for (ValidationResult result : validatedRCA.validationResults()) {
+            allEvidence.addAll(result.supportingEvidence());
+            allEvidence.addAll(result.refutingEvidence());
+        }
+
+        // Note: PATH B evidence (from rule verdicts) is already included in
+        // the assertion validation results via evidence matching
+
+        log.debug("Collected evidence from validation results")
+            .field("totalEvidence", allEvidence.size())
+            .log();
+
+        return allEvidence;
     }
 }

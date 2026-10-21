@@ -3,10 +3,18 @@ package com.causa.api.dto.response;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
 import com.causa.core.domain.RootCauseAnalysis;
+import com.causa.core.domain.validation.EvidenceItem;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Diagnostic detail DTO — returned by GET /api/v1/diagnostics/{id}.
@@ -142,8 +150,9 @@ public record DiagnosticDetailResponse(
                     .toList();
             }
 
-            // TODO: Once validation pipeline is integrated, transform EvidenceItem -> Evidence
-            // For now, validationEvidences is null; existing RCA evidences are preserved
+            // Build ranked evidence list from allEvidence + rankedEvidenceIds
+            List<Evidence> validationEvidences = buildRankedEvidenceList(diagnostic);
+
             diagnosisInfo = new DiagnosisInfo(
                 rca.issueTitle(),
                 rca.issueSummary(),
@@ -152,7 +161,7 @@ public record DiagnosticDetailResponse(
                 rca.anomalyType() != null ? rca.anomalyType().name() : null,
                 rca.rootCause(),
                 rca.evidences(),  // LLM-generated evidences (backward compatible)
-                null,  // validationEvidences - will be populated from allEvidence in future
+                validationEvidences,  // Ranked validation evidences
                 rca.supportingLogs(),
                 rcaScore,
                 summaryText,
@@ -171,6 +180,127 @@ public record DiagnosticDetailResponse(
             workloadInfo,
             diagnosisInfo,
             diagnostic.getValidationResult()
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Helper methods for ranked evidence
+    // -------------------------------------------------------------------------
+
+    /**
+     * Builds ranked evidence list from allEvidence using rankedEvidenceIds.
+     *
+     * <p>Steps:
+     * <ol>
+     *   <li>Extract rankedEvidenceIds from validationData JSONB</li>
+     *   <li>Parse allEvidence JSONB to List&lt;EvidenceItem&gt;</li>
+     *   <li>Filter and order by ranked IDs</li>
+     *   <li>Transform to API Evidence DTOs</li>
+     * </ol>
+     *
+     * @param diagnostic the diagnostic containing validationData and allEvidence
+     * @return ranked evidence list for UI, or null if no evidence/ranking available
+     */
+    private static List<Evidence> buildRankedEvidenceList(Diagnostic diagnostic) {
+        // 1. Extract ranked IDs from validationData
+        List<String> rankedIds = extractRankedIds(diagnostic.getValidationData());
+        if (rankedIds == null || rankedIds.isEmpty()) {
+            return null;  // No ranking available
+        }
+
+        // 2. Parse allEvidence JSON
+        List<EvidenceItem> allEvidence = parseAllEvidence(diagnostic.getAllEvidence());
+        if (allEvidence == null || allEvidence.isEmpty()) {
+            return null;  // No evidence available
+        }
+
+        // 3. Build ID -> EvidenceItem map for fast lookup
+        Map<String, EvidenceItem> evidenceById = allEvidence.stream()
+            .collect(Collectors.toMap(
+                EvidenceItem::id,
+                item -> item,
+                (existing, replacement) -> existing,  // Keep first if duplicates
+                LinkedHashMap::new
+            ));
+
+        // 4. Filter and order by ranked IDs, transform to API Evidence
+        List<Evidence> rankedEvidence = new ArrayList<>();
+        for (String id : rankedIds) {
+            EvidenceItem item = evidenceById.get(id);
+            if (item != null) {
+                rankedEvidence.add(toApiEvidence(item));
+            }
+        }
+
+        return rankedEvidence.isEmpty() ? null : rankedEvidence;
+    }
+
+    /**
+     * Extracts rankedEvidenceIds from validationData JSONB.
+     *
+     * @param validationDataJson the validationData JSONB string
+     * @return list of ranked evidence IDs, or null if not available
+     */
+    private static List<String> extractRankedIds(String validationDataJson) {
+        if (validationDataJson == null || validationDataJson.isBlank()) {
+            return null;
+        }
+
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode root = mapper.readTree(validationDataJson);
+            JsonNode rankedIdsNode = root.get("rankedEvidenceIds");
+
+            if (rankedIdsNode == null || !rankedIdsNode.isArray()) {
+                return null;
+            }
+
+            return mapper.convertValue(
+                rankedIdsNode,
+                new TypeReference<List<String>>() {}
+            );
+        } catch (Exception e) {
+            // Silently fail - ranking is optional
+            return null;
+        }
+    }
+
+    /**
+     * Parses allEvidence JSONB to List of EvidenceItem.
+     *
+     * @param allEvidenceJson the allEvidence JSONB string
+     * @return list of evidence items, or null if not available
+     */
+    private static List<EvidenceItem> parseAllEvidence(String allEvidenceJson) {
+        if (allEvidenceJson == null || allEvidenceJson.isBlank()) {
+            return null;
+        }
+
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            return mapper.readValue(
+                allEvidenceJson,
+                new TypeReference<List<EvidenceItem>>() {}
+            );
+        } catch (Exception e) {
+            // Silently fail - evidence parsing is optional
+            return null;
+        }
+    }
+
+    /**
+     * Transforms EvidenceItem (internal model) to Evidence (API DTO).
+     *
+     * @param item the internal evidence item
+     * @return API evidence DTO for UI rendering
+     */
+    private static Evidence toApiEvidence(EvidenceItem item) {
+        return new Evidence(
+            item.statement() != null ? item.statement() : item.rawSnippet(),  // supportingEvidence
+            item.explanation(),                                                 // explanation
+            item.source(),                                                      // source
+            item.rawSnippet(),                                                  // rawSnippet
+            item.strength() != null ? item.strength().name() : "UNKNOWN"       // reliability
         );
     }
 }
