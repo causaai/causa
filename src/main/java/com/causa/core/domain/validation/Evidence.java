@@ -4,6 +4,7 @@ import com.causa.common.constants.ValidationConstants;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Represents evidence found in diagnostic context that supports or refutes an assertion.
@@ -115,11 +116,10 @@ public record Evidence(
     }
 
     /**
-     * Generates a deterministic ID from evidence content.
+     * Generates a unique UUID-based ID for database primary key.
      */
     private static String generateId(String source, EvidenceType type, String snippet) {
-        int hash = Math.abs((source + type + snippet).hashCode() % 100000);
-        return String.format("ev-%s-%05d", type.name().toLowerCase().substring(0, Math.min(3, type.name().length())), hash);
+        return UUID.randomUUID().toString();
     }
 
     /**
