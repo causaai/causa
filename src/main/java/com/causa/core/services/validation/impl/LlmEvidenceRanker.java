@@ -29,8 +29,15 @@ import jakarta.inject.Inject;
 import java.util.List;
 
 /**
- * LLM-based evidence ranking and deduplication with smart routing optimization.
- * Uses deterministic ranking for ≤3 items to avoid LLM costs.
+ * Evidence ranking and deduplication with smart routing optimization.
+ *
+ * <p>Ranks PATH A evidence (from assertion validation). PATH B evidence (from rule engine)
+ * bypasses ranking and goes directly to EvidenceItem storage.
+ *
+ * <p>For ≤3 items: sorts by existing relevanceScore (no additional LLM call).
+ * For >3 items: uses LLM for intelligent ranking and deduplication.
+ *
+ * <p>Note: relevanceScore is set during assertion validation by LLM or rule-based matcher.
  *
  * @since 0.0.1
  */
@@ -74,9 +81,10 @@ public class LlmEvidenceRanker implements EvidenceRanker {
             .field("statementEvidence", statementEvidence.size())
             .log();
 
-        // Smart routing: ≤3 items = deterministic ranking (no LLM)
+        // Smart routing: ≤3 items = skip LLM ranking, sort by existing relevanceScore
+        // (relevanceScore was already calculated during assertion validation)
         if (statementEvidence.size() <= LLM_THRESHOLD) {
-            log.info("Using deterministic ranking (≤" + LLM_THRESHOLD + " items, no LLM call)")
+            log.info("Skipping LLM ranking (≤" + LLM_THRESHOLD + " items), sorting by existing relevanceScore")
                 .log();
 
             List<String> rankedIds = statementEvidence.stream()
@@ -85,10 +93,10 @@ public class LlmEvidenceRanker implements EvidenceRanker {
                 .map(ValidationEvidence::id)
                 .toList();
 
-            return new EvidenceRankingResponse(rankedIds, "Deterministic ranking (no LLM)");
+            return new EvidenceRankingResponse(rankedIds, "Sorted by relevanceScore (no LLM ranking)");
         }
 
-        // LLM-based ranking for >3 items
+        // >3 items: use LLM for intelligent ranking and deduplication
         return rankWithLlm(rca, statementEvidence, validationScore, validationStatus);
     }
 
