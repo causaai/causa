@@ -30,7 +30,7 @@ import java.util.List;
 
 /**
  * LLM-based evidence ranking and deduplication with smart routing optimization.
- * Uses deterministic ranking for ≤10 items to avoid LLM costs.
+ * Uses deterministic ranking for ≤3 items to avoid LLM costs.
  *
  * @since 0.0.1
  */
@@ -38,8 +38,8 @@ import java.util.List;
 public class LlmEvidenceRanker implements EvidenceRanker {
 
     private static final CausaLogger log = CausaLogger.getLogger(LlmEvidenceRanker.class);
-    private static final int LLM_THRESHOLD = 10;
-    private static final int MAX_RANKED_ITEMS = 15;
+    private static final int LLM_THRESHOLD = 3;
+    private static final int MAX_RANKED_ITEMS = 20;
 
     private final ChatModelFactory chatModelFactory;
     private final ObjectMapper objectMapper;
@@ -74,7 +74,7 @@ public class LlmEvidenceRanker implements EvidenceRanker {
             .field("statementEvidence", statementEvidence.size())
             .log();
 
-        // Smart routing: ≤10 items = deterministic ranking (no LLM)
+        // Smart routing: ≤3 items = deterministic ranking (no LLM)
         if (statementEvidence.size() <= LLM_THRESHOLD) {
             log.info("Using deterministic ranking (≤" + LLM_THRESHOLD + " items, no LLM call)")
                 .log();
@@ -88,7 +88,7 @@ public class LlmEvidenceRanker implements EvidenceRanker {
             return new EvidenceRankingResponse(rankedIds, "Deterministic ranking (no LLM)");
         }
 
-        // LLM-based ranking for >10 items
+        // LLM-based ranking for >3 items
         return rankWithLlm(rca, statementEvidence, validationScore, validationStatus);
     }
 

@@ -23,7 +23,7 @@ prompts:
       3. Remove duplicates (same fact from different sources)
       4. Most decisive evidence first
 
-      Return max 15 items, most important first.
+      Return max 20 items, most important first.
 
     user_prompt: |
       RCA: {{rca_summary}}
@@ -32,6 +32,6 @@ prompts:
       Evidence:
       {{evidence_compact}}
 
-      Task: Rank top 15 by relevance to the RCA, remove duplicates (same fact).
+      Task: Rank top 20 by relevance to the RCA, remove duplicates (same fact).
       Return JSON only:
       {"rankedEvidenceIds":["id1","id2"...]}
