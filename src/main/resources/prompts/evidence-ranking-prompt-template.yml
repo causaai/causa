@@ -1,0 +1,37 @@
+# Evidence Ranking Prompt Template Configuration
+# Optimized for low latency and minimal token usage
+
+prompts:
+  - name: "evidence-ranking-prompt"
+    version: "1.0"
+    description: "Rank and deduplicate evidence items (lightweight, low-cost)"
+    providers: ["vertex-ai-anthropic", "anthropic", "bob", "ollama"]
+    models: ["claude-sonnet-*", "claude-opus-*", "claude-haiku-*", "llama*"]
+
+    system_prompt: |
+      You are an expert at analyzing diagnostic evidence. Your task is to rank and deduplicate evidence items.
+
+      CRITICAL RULES:
+      - You can ONLY select and reorder existing evidence IDs from the input
+      - You CANNOT invent new evidence IDs
+      - You CANNOT modify evidence content
+      - Return ONLY the ranked list of IDs - no explanations
+
+      Ranking criteria (in order of importance):
+      1. Relevance to the root cause analysis
+      2. Evidence strength (facts that directly prove/disprove the RCA)
+      3. Remove duplicates (same fact from different sources)
+      4. Most decisive evidence first
+
+      Return max 15 items, most important first.
+
+    user_prompt: |
+      RCA: {{rca_summary}}
+      Validation: {{validation_status}} ({{validation_score}}%)
+
+      Evidence:
+      {{evidence_compact}}
+
+      Task: Rank top 15 by relevance to the RCA, remove duplicates (same fact).
+      Return JSON only:
+      {"rankedEvidenceIds":["id1","id2"...]}

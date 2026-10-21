@@ -14,6 +14,7 @@ import java.util.Optional;
  * @since 0.0.1
  */
 public record Evidence(
+    String id,
     String source,
     EvidenceType type,
     String snippet,
@@ -26,6 +27,7 @@ public record Evidence(
     /**
      * Creates a new evidence instance.
      *
+     * @param id unique identifier for this evidence (for ranking/deduplication)
      * @param source the data source (e.g., "kubernetes-events", "prometheus-metrics")
      * @param type the type of evidence
      * @param snippet the relevant text/data snippet
@@ -37,6 +39,9 @@ public record Evidence(
      * @param structuredData optional structured representation (JSON)
      */
     public Evidence {
+        if (id == null || id.isBlank()) {
+            throw new IllegalArgumentException("Evidence ID cannot be null or blank");
+        }
         if (source == null || source.isBlank()) {
             throw new IllegalArgumentException(ValidationConstants.ErrorMessages.EVIDENCE_SOURCE_BLANK);
         }
@@ -56,26 +61,65 @@ public record Evidence(
     }
 
     /**
-     * Creates simple evidence without structured data.
+     * Creates simple evidence without structured data (with explicit ID).
      */
+    public static Evidence of(String id, String source, EvidenceType type, String snippet, double relevanceScore) {
+        return new Evidence(id, source, type, snippet, null, null, relevanceScore, Optional.empty());
+    }
+
+    /**
+     * Creates evidence with structured data (with explicit ID).
+     */
+    public static Evidence of(String id, String source, EvidenceType type, String snippet, double relevanceScore, String structuredData) {
+        return new Evidence(id, source, type, snippet, null, null, relevanceScore, Optional.of(structuredData));
+    }
+
+    /**
+     * Creates narrated evidence (with explicit ID).
+     */
+    public static Evidence of(String id, String source, EvidenceType type, String snippet, String statement,
+                              String explanation, double relevanceScore) {
+        return new Evidence(id, source, type, snippet, statement, explanation, relevanceScore, Optional.empty());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Backward-compatible factory methods (auto-generate ID)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Creates simple evidence without structured data (auto-generates ID).
+     * @deprecated Use {@link #of(String, String, EvidenceType, String, double)} with explicit ID
+     */
+    @Deprecated(since = "0.0.2")
     public static Evidence of(String source, EvidenceType type, String snippet, double relevanceScore) {
-        return new Evidence(source, type, snippet, null, null, relevanceScore, Optional.empty());
+        return new Evidence(generateId(source, type, snippet), source, type, snippet, null, null, relevanceScore, Optional.empty());
     }
 
     /**
-     * Creates evidence with structured data.
+     * Creates evidence with structured data (auto-generates ID).
+     * @deprecated Use {@link #of(String, String, EvidenceType, String, double, String)} with explicit ID
      */
+    @Deprecated(since = "0.0.2")
     public static Evidence of(String source, EvidenceType type, String snippet, double relevanceScore, String structuredData) {
-        return new Evidence(source, type, snippet, null, null, relevanceScore, Optional.of(structuredData));
+        return new Evidence(generateId(source, type, snippet), source, type, snippet, null, null, relevanceScore, Optional.of(structuredData));
     }
 
     /**
-     * Creates narrated evidence - the LLM quoted the snippet and said both what it shows and
-     * why that bears on the assertion.
+     * Creates narrated evidence (auto-generates ID).
+     * @deprecated Use {@link #of(String, String, EvidenceType, String, String, String, double)} with explicit ID
      */
+    @Deprecated(since = "0.0.2")
     public static Evidence of(String source, EvidenceType type, String snippet, String statement,
                               String explanation, double relevanceScore) {
-        return new Evidence(source, type, snippet, statement, explanation, relevanceScore, Optional.empty());
+        return new Evidence(generateId(source, type, snippet), source, type, snippet, statement, explanation, relevanceScore, Optional.empty());
+    }
+
+    /**
+     * Generates a deterministic ID from evidence content.
+     */
+    private static String generateId(String source, EvidenceType type, String snippet) {
+        int hash = Math.abs((source + type + snippet).hashCode() % 100000);
+        return String.format("ev-%s-%05d", type.name().toLowerCase().substring(0, Math.min(3, type.name().length())), hash);
     }
 
     /**
@@ -169,10 +213,12 @@ public record Evidence(
         }
 
         public Evidence build() {
+            String snippet = snippetBuilder.toString();
             return new Evidence(
+                generateId(source, type, snippet),  // Auto-generate ID
                 source,
                 type,
-                snippetBuilder.toString(),
+                snippet,
                 statement,
                 explanation,
                 relevanceScore,
