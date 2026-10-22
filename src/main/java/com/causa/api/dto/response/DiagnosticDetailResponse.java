@@ -91,11 +91,11 @@ public record DiagnosticDetailResponse(
      * @since 0.0.1
      */
     public record Evidence(
-        @JsonProperty("supportingEvidence") String supportingEvidence,
-        @JsonProperty("explanation")        String explanation,
-        @JsonProperty("source")             String source,
-        @JsonProperty("rawSnippet")         String rawSnippet,
-        @JsonProperty("evidenceStrength")   String evidenceStrength
+        @JsonProperty("supporting_evidence") String supportingEvidence,
+        @JsonProperty("explanation")         String explanation,
+        @JsonProperty("source")              String source,
+        @JsonProperty("raw_snippet")         String rawSnippet,
+        @JsonProperty("evidence_strength")   String evidenceStrength
     ) {}
 
     public record DiagnosisInfo(
