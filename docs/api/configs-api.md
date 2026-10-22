@@ -60,7 +60,7 @@ curl http://localhost:8080/api/v1/configs
       "id": "ext_cnf_def456",
       "platform": "SLACK",
       "name": "slack-alerts",
-      "url": "https://hooks.slack.com/services/...",
+      "url": "<SLACK_WEBHOOK_URL>",
       "is_active": true,
       "auth_config": {
         "authType": "WEBHOOK",
@@ -238,8 +238,8 @@ curl -X PUT http://localhost:8080/api/v1/configs/observability/DATADOG \
     "is_active": true,
     "auth_config": {
       "authType": "API_KEY",
-      "apiKey": "dd-api-key-here",
-      "appKey": "dd-app-key-here"
+      "apiKey": "<DATADOG_API_KEY>",
+      "appKey": "<DATADOG_APP_KEY>"
     }
   }'
 ```
@@ -308,7 +308,7 @@ curl -X PUT http://localhost:8080/api/v1/configs/llm/ANTHROPIC \
     "is_active": true,
     "auth_config": {
       "authType": "API_KEY",
-      "apiKey": "sk-ant-api03-..."
+      "apiKey": "<ANTHROPIC_API_KEY>"
     }
   }'
 ```
@@ -391,11 +391,11 @@ curl -X PUT http://localhost:8080/api/v1/configs/integrations/SLACK \
   -H 'Content-Type: application/json' \
   -d '{
     "name": "slack-alerts",
-    "url": "https://hooks.slack.com/services/...",
+    "url": "<SLACK_WEBHOOK_URL>",
     "is_active": true,
     "auth_config": {
       "authType": "WEBHOOK",
-      "token": "xoxb-..."
+      "token": "<SLACK_BOT_TOKEN>"
     },
     "additional_config": {
       "channel": "#rca-alerts"
@@ -413,7 +413,7 @@ curl -X PUT http://localhost:8080/api/v1/configs/integrations/JIRA \
     "auth_config": {
       "authType": "API_TOKEN",
       "username": "bot@example.com",
-      "token": "jira-api-token"
+      "token": "<JIRA_API_TOKEN>"
     },
     "additional_config": {
       "projectName": "OPS",
