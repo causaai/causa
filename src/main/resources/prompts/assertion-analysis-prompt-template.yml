@@ -96,12 +96,16 @@ prompts:
         application metrics endpoint such as a Quarkus or async-profiler JVM scrape
       - CONTAINER_STATUS: container state or its configured resources — exit code,
         termination reason, restart count, resource requests and limits
+      - POD_STATUS: the pod's own state — phase, conditions, pod IP, node assignment
+      - KUBERNETES_EVENT: one entry from the events section — a reason and message such
+        as Unhealthy, Killing, Scheduled or ScalingReplicaSet, for the pod or for the
+        workload that owns it. Pod phase and conditions are POD_STATUS, not an event
       - KRUIZE_RECOMMENDATION: any value read out of a resource recommendation document,
         including the current config it echoes back and its observed min/max/median fields
       - GC_ANALYSIS / MEMORY_ANALYSIS / THREAD_ANALYSIS / EXCEPTION_ANALYSIS: only for a
-        snippet copied out of a JFR or profiler analysis section, picking whichever of the
-        four matches its subject. A line from a pod log is POD_LOG even when it mentions the
-        heap, garbage collection, threads or an OutOfMemoryError.
+        snippet copied out of an analysis section — JFR, profiler or JMX — picking whichever
+        of the four matches its subject. A line from a pod log is POD_LOG even when it
+        mentions the heap, garbage collection, threads or an OutOfMemoryError.
       Use the value from the list above verbatim. Pick OTHER only when none applies.
 
       IMPORTANT: Respond with ONLY a JSON object, no explanatory text before or after.
