@@ -89,6 +89,40 @@ prompts:
       - UNSUPPORTED: Evidence contradicts the claim
       - UNKNOWN: Insufficient evidence to validate
 
+      Evidence Type:
+      Classify each snippet by the artifact it was copied from, NOT by what the value
+      looks like. A number is not automatically a METRIC.
+
+      Pick exactly one type, written exactly as below. Use OTHER only when no type fits.
+      - METRIC: a value sampled from a metrics endpoint — Prometheus, JMX, or an
+        application metrics endpoint (for example Quarkus or async-profiler).
+      - CONTAINER_STATUS: container state or its configured resources — exit code,
+        termination reason, restart count, resource requests and limits
+      - POD_STATUS: the pod's own state — phase, conditions, pod IP, node assignment
+      - KUBERNETES_EVENT: one entry from the events section with a reason and message such
+        as Unhealthy, Killing, Scheduled or ScalingReplicaSet, for the pod or the
+        workload that owns it.
+      - KRUIZE_RECOMMENDATION: any value from Kruize recommendation document,
+        including the current config it echoes back and its observed min/max/median fields
+      - GC_ANALYSIS / MEMORY_ANALYSIS / THREAD_ANALYSIS / EXCEPTION_ANALYSIS: a snippet
+        from an analysis section (JFR, profiler or JMX). Choose the one that matches the section's
+        subject.
+      - POD_LOG: a line from a pod or container log.
+      - OTHER: none of the above.
+
+      Tie-breakers:
+      - Same value in two artifacts: classify by where this snippet was copied from. A
+        memory limit inside a Kruize document is KRUIZE_RECOMMENDATION. The same limit in
+        the container spec is CONTAINER_STATUS.
+      - A pod log line stays POD_LOG, even if it mentions the heap, garbage collection,
+        threads or an OutOfMemoryError.
+      - Pod phase and conditions are POD_STATUS, not an event. Only entries from the
+        events section are KUBERNETES_EVENT.
+      - JMX: a raw sampled value is METRIC. A summary written in an analysis section uses
+        the matching *_ANALYSIS type.
+      - If you cannot tell which artifact a snippet came from, use OTHER. Do not guess
+        from the content.
+
       IMPORTANT: Respond with ONLY a JSON object, no explanatory text before or after.
 
       JSON format:
@@ -100,7 +134,7 @@ prompts:
             "snippet": "exact text from context",
             "source": "section name",
             "relevance": 0.0-1.0,
-            "type": "KUBERNETES_EVENT|METRIC|POD_LOG|etc",
+            "type": "KUBERNETES_EVENT|POD_STATUS|CONTAINER_STATUS|POD_LOG|METRIC|KRUIZE_RECOMMENDATION|GC_ANALYSIS|MEMORY_ANALYSIS|THREAD_ANALYSIS|EXCEPTION_ANALYSIS|OTHER",
             "statement": "one line stating only what this snippet shows, max 80 chars",
             "explanation": "why this snippet matters for the assertion - what it proves or rules out"
           }
