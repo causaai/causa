@@ -111,6 +111,22 @@ curl http://localhost:8080/api/v1/diagnostics/diag_6YuCDWBMfwzWoMhY
       "Multiple rapid ReplicaSet scaling events observed: auth-cache-1-786bcc4d95 scaled up at 12:51:09 and deleted at 12:51:10 (< 1 minute); auth-cache-1-5cd5f89c6f scaled up at 12:51:10 and deleted at 12:51:24 — pattern consistent with rolling update loop or repeated probe failures",
       "JFR GC analysis, memory analysis, thread analysis, exception analysis, and container resource analysis all report 'No Data Available' — prevents direct confirmation of GC pause durations, heap pool saturation, or OOM exception counts"
     ],
+    "validation_evidences": [
+      {
+        "supporting_evidence": "Container auth-cache terminated with exit code 137",
+        "explanation": "Exit code 137 is SIGKILL from the kernel OOM killer, which confirms the container was killed for exceeding its memory limit rather than exiting on its own.",
+        "source": "CONTAINER_STATUS",
+        "raw_snippet": "lastState.terminated.exitCode: 137, reason: OOMKilled",
+        "evidence_strength": "DEFINITIVE"
+      },
+      {
+        "supporting_evidence": "Heap grew to 102016 KB with a leak cache of 1594 entries",
+        "explanation": "A second sequential log message shows the cache still growing, confirming the leak is ongoing rather than a one-time spike.",
+        "source": "LOG_ENTRY",
+        "raw_snippet": "[CHAOS] Memory leak: cached 1 object(s) (64 KB). Leak cache size: 1594 entries. Approx heap allocated: 102016 KB.",
+        "evidence_strength": "STRONG"
+      }
+    ],
     "supporting_logs": [
       "No direct supporting logs present — pod auth-cache-1-6c5dfb54b9-4cmbf not found when logs were retrieved (pod no longer exists in cluster)"
     ],
@@ -160,6 +176,20 @@ curl http://localhost:8080/api/v1/diagnostics/diag_6YuCDWBMfwzWoMhY
   "validation_result": null
 }
 ```
+
+### Response notes
+
+- `evidences` is the free-text list the LLM wrote while generating the RCA.
+- `validation_evidences` is the structured evidence harvested by the validation pipeline. It is
+  `null` when no evidence was collected for the diagnostic; otherwise each item carries:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `supporting_evidence` | string | One-line statement of what was observed. Falls back to `raw_snippet` for rule-derived evidence, which has no written statement. |
+| `explanation` | string | Why that observation matters — what it proves or rules out. |
+| `source` | string | Kind of artifact the snippet came from: `KUBERNETES_EVENT`, `CONTAINER_STATUS`, `POD_STATUS`, `METRIC`, `TIME_SERIES`, `LOG_PATTERN`, `LOG_ENTRY`, `JVM_ANALYSIS`, `GC_ANALYSIS`, `MEMORY_ANALYSIS`, `THREAD_ANALYSIS`, `HEAP_DUMP_ANALYSIS`, `RECOMMENDATION`, `OPTIMIZATION_SUGGESTION`, `OTHER`. |
+| `raw_snippet` | string | Verbatim source text behind the statement, so a reader can check it. |
+| `evidence_strength` | string | How conclusive the item is: `DEFINITIVE`, `STRONG`, `MODERATE`, `WEAK`, `CIRCUMSTANTIAL`. |
 
 ### Error example
 
