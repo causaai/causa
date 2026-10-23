@@ -24,8 +24,8 @@ import static java.util.Map.entry;
  * </ul>
  *
  * <p>LLM configuration has been moved to the {@code llm_configs} table and is managed via
- * {@link com.causa.config.LlmConfigCache}. Use {@code GET /api/v1/settings/llm} to read it
- * and {@code PUT /api/v1/settings/llm/{provider}} to update it.
+ * {@link com.causa.config.LlmConfigCache}. Use {@code GET /api/v1/configs/llm} to read it
+ * and {@code PUT /api/v1/configs/llm/{provider}} to update it.
  *
  * @since 0.0.1
  */

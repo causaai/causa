@@ -13,13 +13,13 @@ import jakarta.inject.Inject;
  * Unified Prompt Sender
  *
  * <p>Routes LLM requests to the appropriate sender implementation based on the
- * current {@code LLM_PROVIDER} value from {@link AppConfig}. This enables runtime
- * switching between LLM providers without restarting the application.
+ * active provider in {@link LlmConfigCache}. This enables runtime switching between
+ * LLM providers without restarting the application.
  *
  * <p>Supported providers:
  * <ul>
  *   <li>{@code bob} - Routes to {@link BobShellPromptSender}</li>
- *   <li>All others - Routes to {@link LangChainPromptSender} (anthropic, vertex-ai-anthropic, etc.)</li>
+ *   <li>All others - Routes to {@link LangChainPromptSender} (anthropic, vertex_ai, etc.)</li>
  * </ul>
  *
  * <p>This is the sole CDI {@link PromptSender} bean. Both sender implementations
