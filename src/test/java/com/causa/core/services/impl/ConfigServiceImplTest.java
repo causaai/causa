@@ -135,8 +135,8 @@ class ConfigServiceImplTest {
             List<ConfigurationRepository.ConfigEntry> result = configService.getAll();
 
             assertFalse(result.isEmpty());
-            // 4 alerts keys + 2 cluster keys = 6 total (LLM keys moved to llm_configs table)
-            assertEquals(6, result.size());
+            // 4 alerts keys + 2 cluster keys + 1 data key = 7 total (LLM keys moved to llm_configs table)
+            assertEquals(7, result.size());
         }
 
         @Test
