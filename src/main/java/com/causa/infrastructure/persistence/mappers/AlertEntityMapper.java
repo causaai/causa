@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -22,7 +23,7 @@ import java.util.Map;
  * <pre>
  *   workload_info  JSONB  ← { pod_name, container_name, namespace, cluster_name, workload_type }
  *   workload_name         ← workloadInfo.containerName  (denormalised for index lookups)
- *   alert_metadata JSONB  ← { labels, annotations, alert_source }
+ *   alert_metadata JSONB  ← { labels, annotations, alert_source, rejection_reason (REJECTED alerts only) }
  * </pre>
  *
  * @since 0.0.1
@@ -119,11 +120,13 @@ public final class AlertEntityMapper {
         Map<String, String> labels      = Map.of();
         Map<String, String> annotations = Map.of();
         String alertSource = AlertMetadata.DEFAULT_SOURCE;
+        String rejectionReason = null;
         if (entity.getAlertMetadata() != null) {
             var am  = entity.getAlertMetadata();
             labels      = JsonUtils.jsonNodeToMap(am.get("labels"));
             annotations = JsonUtils.jsonNodeToMap(am.get("annotations"));
             alertSource = am.path("alert_source").asText(AlertMetadata.DEFAULT_SOURCE);
+            rejectionReason = am.path("rejection_reason").asText(null);
         }
 
         return Alert.builder()
@@ -136,7 +139,8 @@ public final class AlertEntityMapper {
             .status(AlertStatus.fromString(entity.getStatus()))
             .workloadInfo(WorkloadInfo.of(podName, containerName, namespace, clusterName, workloadType))
             .workloadName(entity.getWorkloadName())
-            .alertMetadata(AlertMetadata.of(labels, annotations, alertSource))
+            .alertMetadata(AlertMetadata.of(labels, annotations, alertSource, rejectionReason))
+            .diagnosticIds(entity.getDiagnosticIds() != null ? List.of(entity.getDiagnosticIds()) : List.of())
             .build();
     }
 
