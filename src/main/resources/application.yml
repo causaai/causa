@@ -140,7 +140,7 @@ causa:
 
   # Data Configuration
   data:
-    retention-days: ${DATA_RETENTION_DAYS:}
+    retention-days: ${DATA_RETENTION_DAYS:30}
 
   mcp:
     kubernetes:
