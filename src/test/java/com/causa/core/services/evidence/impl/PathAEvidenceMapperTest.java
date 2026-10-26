@@ -1,14 +1,14 @@
 package com.causa.core.services.evidence.impl;
 
-import com.causa.common.constants.EvidenceConstants;
-import com.causa.common.constants.EvidenceConstants.Snippet;
+import com.causa.common.constants.ValidationEvidenceConstants;
+import com.causa.common.constants.ValidationEvidenceConstants.Snippet;
 import com.causa.core.domain.RootCauseAnalysis.AnomalyType;
 import com.causa.core.domain.validation.Assertion;
 import com.causa.core.domain.validation.Assertion.AssertionSource;
 import com.causa.core.domain.validation.Assertion.AssertionType;
-import com.causa.core.domain.validation.Evidence;
-import com.causa.core.domain.validation.EvidenceItem;
-import com.causa.core.domain.validation.EvidenceItem.EvidenceStrength;
+import com.causa.core.domain.validation.ValidationValidationEvidence;
+import com.causa.core.domain.validation.ValidationEvidenceItem;
+import com.causa.core.domain.validation.ValidationEvidenceItem.ValidationEvidenceStrength;
 import com.causa.core.domain.validation.ValidationResult;
 import com.causa.core.services.evidence.McpSourceResolver;
 import com.causa.core.services.evidence.RcaFinding;
@@ -26,25 +26,25 @@ import static org.assertj.core.api.Assertions.assertThat;
  * verify, so the tests are about what survives the trip: the quote itself, the server it came
  * from, and the narration around it.
  */
-class PathAEvidenceMapperTest {
+class PathAValidationEvidenceMapperTest {
 
     private static final RcaFinding FINDING =
         new RcaFinding("diag_123", AnomalyType.OOM_KILLED, "Container OOMKilled");
 
-    private final PathAEvidenceMapper mapper = new PathAEvidenceMapper(sourceResolver());
+    private final PathAValidationEvidenceMapper mapper = new PathAValidationEvidenceMapper(sourceResolver());
 
     @Test
     void carriesTheQuoteItsSourceAndItsNarrationThrough() {
-        Evidence evidence = Evidence.of(
+        ValidationEvidence evidence = ValidationEvidence.of(
             "POD_STATUS",
-            Evidence.EvidenceType.KUBERNETES_EVENT,
+            ValidationEvidence.ValidationEvidenceType.KUBERNETES_EVENT,
             "Exit Code: 137",
             "The container exited with 137.",
             "137 is SIGKILL, which the kernel sends on an OOM kill.",
             0.97
         );
 
-        EvidenceItem item = onlyItem(supported(evidence));
+        ValidationEvidenceItem item = onlyItem(supported(evidence));
 
         assertThat(item.rawSnippet()).isEqualTo("Exit Code: 137");
         assertThat(item.statement()).isEqualTo("The container exited with 137.");
@@ -58,7 +58,7 @@ class PathAEvidenceMapperTest {
      */
     @Test
     void resolvesTheEchoedSectionLabelToAnMcpServer() {
-        EvidenceItem item = onlyItem(supported(quoting("POD_LOGS - sequence 124")));
+        ValidationEvidenceItem item = onlyItem(supported(quoting("POD_LOGS - sequence 124")));
 
         assertThat(item.source()).isEqualTo("kubernetes");
     }
@@ -77,7 +77,7 @@ class PathAEvidenceMapperTest {
     @Test
     void leavesEveryItemAtTheFlatDefaultPriority() {
         assertThat(onlyItem(supported(quoting("POD_STATUS"))).priority())
-            .isEqualTo(EvidenceConstants.DEFAULT_PRIORITY);
+            .isEqualTo(ValidationEvidenceConstants.DEFAULT_PRIORITY);
     }
 
     /**
@@ -85,7 +85,7 @@ class PathAEvidenceMapperTest {
      * agrees with it is a diagnosis nobody can check.
      */
     @Test
-    void keepsRefutingEvidenceAndNumbersItAfterTheSupporting() {
+    void keepsRefutingValidationEvidenceAndNumbersItAfterTheSupporting() {
         ValidationResult result = ValidationResult.partiallySupported(
             assertion(), 0.5,
             List.of(quoting("POD_STATUS")),
@@ -93,11 +93,11 @@ class PathAEvidenceMapperTest {
             "mixed"
         );
 
-        List<EvidenceItem> items = mapper.map(FINDING, result);
+        List<ValidationEvidenceItem> items = mapper.map(FINDING, result);
 
-        assertThat(items).extracting(EvidenceItem::id)
+        assertThat(items).extracting(ValidationEvidenceItem::id)
             .containsExactly("pathA.a1.ev-01", "pathA.a1.ev-02");
-        assertThat(items).extracting(EvidenceItem::source)
+        assertThat(items).extracting(ValidationEvidenceItem::source)
             .containsExactly("kubernetes", "kubernetes");
     }
 
@@ -106,10 +106,10 @@ class PathAEvidenceMapperTest {
      * does not report its blind spots.
      */
     @Test
-    void dropsEvidenceThatQuotesAnEmptySection() {
-        Evidence empty = Evidence.of(
+    void dropsValidationEvidenceThatQuotesAnEmptySection() {
+        ValidationEvidence empty = ValidationEvidence.of(
             "GC_ANALYSIS",
-            Evidence.EvidenceType.GC_ANALYSIS,
+            ValidationEvidence.ValidationEvidenceType.GC_ANALYSIS,
             "GC_ANALYSIS: No Data Available",
             0.9
         );
@@ -123,11 +123,11 @@ class PathAEvidenceMapperTest {
      */
     @Test
     void banksRelevanceIntoStrength() {
-        assertThat(strengthAt(0.95)).isEqualTo(EvidenceStrength.DEFINITIVE);
-        assertThat(strengthAt(0.85)).isEqualTo(EvidenceStrength.STRONG);
-        assertThat(strengthAt(0.65)).isEqualTo(EvidenceStrength.MODERATE);
-        assertThat(strengthAt(0.40)).isEqualTo(EvidenceStrength.WEAK);
-        assertThat(strengthAt(0.39)).isEqualTo(EvidenceStrength.CIRCUMSTANTIAL);
+        assertThat(strengthAt(0.95)).isEqualTo(ValidationEvidenceStrength.DEFINITIVE);
+        assertThat(strengthAt(0.85)).isEqualTo(ValidationEvidenceStrength.STRONG);
+        assertThat(strengthAt(0.65)).isEqualTo(ValidationEvidenceStrength.MODERATE);
+        assertThat(strengthAt(0.40)).isEqualTo(ValidationEvidenceStrength.WEAK);
+        assertThat(strengthAt(0.39)).isEqualTo(ValidationEvidenceStrength.CIRCUMSTANTIAL);
     }
 
     /** An unrecognised label is attributed to nothing rather than guessed at. */
@@ -144,10 +144,10 @@ class PathAEvidenceMapperTest {
      */
     @Test
     void fallsBackToTheAssertionExplanationButNeverTheAssertionText() {
-        Evidence unnarrated = Evidence.of(
-            "POD_STATUS", Evidence.EvidenceType.KUBERNETES_EVENT, "Exit Code: 137", 0.9);
+        ValidationEvidence unnarrated = ValidationEvidence.of(
+            "POD_STATUS", ValidationEvidence.ValidationEvidenceType.KUBERNETES_EVENT, "Exit Code: 137", 0.9);
 
-        EvidenceItem item = onlyItem(
+        ValidationEvidenceItem item = onlyItem(
             ValidationResult.supported(assertion(), 0.9, List.of(unnarrated), "every signal agrees"));
 
         assertThat(item.explanation()).isEqualTo("every signal agrees");
@@ -158,8 +158,8 @@ class PathAEvidenceMapperTest {
     void truncatesASnippetTooLongToStore() {
         String huge = "x".repeat(Snippet.MAX_LENGTH + 500);
 
-        String stored = onlyItem(supported(Evidence.of(
-            "POD LOGS (recent)", Evidence.EvidenceType.POD_LOG, huge, 0.9))).rawSnippet();
+        String stored = onlyItem(supported(ValidationEvidence.of(
+            "POD LOGS (recent)", ValidationEvidence.ValidationEvidenceType.POD_LOG, huge, 0.9))).rawSnippet();
 
         assertThat(stored).hasSize(Snippet.MAX_LENGTH)
             .endsWith(Snippet.TRUNCATION_SUFFIX);
@@ -196,27 +196,27 @@ class PathAEvidenceMapperTest {
                 .toList());
     }
 
-    private static ValidationResult supported(Evidence evidence) {
+    private static ValidationResult supported(ValidationEvidence evidence) {
         return ValidationResult.supported(assertion(), 0.9, List.of(evidence), "because");
     }
 
-    private static Evidence quoting(String source) {
-        return Evidence.of(source, Evidence.EvidenceType.KUBERNETES_EVENT, "Exit Code: 137",
+    private static ValidationEvidence quoting(String source) {
+        return ValidationEvidence.of(source, ValidationEvidence.ValidationEvidenceType.KUBERNETES_EVENT, "Exit Code: 137",
             "exited 137", "SIGKILL", 0.9);
     }
 
-    private static Evidence scoring(double relevance) {
-        return Evidence.of("POD_STATUS", Evidence.EvidenceType.KUBERNETES_EVENT,
+    private static ValidationEvidence scoring(double relevance) {
+        return ValidationEvidence.of("POD_STATUS", ValidationEvidence.ValidationEvidenceType.KUBERNETES_EVENT,
             "Exit Code: 137", "exited 137", "SIGKILL", relevance);
     }
 
-    private EvidenceItem onlyItem(ValidationResult result) {
-        List<EvidenceItem> items = mapper.map(FINDING, result);
+    private ValidationEvidenceItem onlyItem(ValidationResult result) {
+        List<ValidationEvidenceItem> items = mapper.map(FINDING, result);
         assertThat(items).hasSize(1);
         return items.get(0);
     }
 
-    private EvidenceStrength strengthAt(double relevance) {
+    private ValidationEvidenceStrength strengthAt(double relevance) {
         return onlyItem(supported(scoring(relevance))).strength();
     }
 }
