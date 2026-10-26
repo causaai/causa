@@ -160,9 +160,10 @@ public class LlmEvidenceRanker implements EvidenceRanker {
             double validationScore,
             String validationStatus) {
 
-        // Ultra-compact evidence format: "ID: statement"
+        // Evidence format: "ID: statement [strength: score]"
+        // Strength = assertion-level relevanceScore (used in formula: 0.4 × strength + 0.6 × relevance)
         String evidenceCompact = evidenceList.stream()
-            .map(ev -> String.format("%s: %s", ev.id(), ev.statement()))
+            .map(ev -> String.format("%s: %s [strength: %.2f]", ev.id(), ev.statement(), ev.relevanceScore()))
             .collect(Collectors.joining("\n"));
 
         return template.userPrompt()
