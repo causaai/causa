@@ -21,6 +21,7 @@ import static java.util.Map.entry;
  * <ul>
  *   <li><b>alerts</b> — Alert filtering and cooldown (4 keys)</li>
  *   <li><b>cluster</b> — Cluster identity (2 keys)</li>
+ *   <li><b>data</b> — Data lifecycle settings (1 key)</li>
  * </ul>
  *
  * <p>LLM configuration has been moved to the {@code llm_configs} table and is managed via
@@ -69,7 +70,10 @@ public final class ConfigConstants {
 
         // Cluster Configuration (2 keys)
         key("CLUSTER_NAME",                    "cluster", ValueType.STRING, false, "causa.cluster.name"),
-        key("CLUSTER_TYPE",                    "cluster", ValueType.STRING, false, "causa.cluster.target-cluster-type")
+        key("CLUSTER_TYPE",                    "cluster", ValueType.STRING, false, "causa.cluster.target-cluster-type"),
+
+        // Data Configuration (1 key)
+        key("DATA_RETENTION_DAYS",             "data",    ValueType.INTEGER, false, "causa.data.retention-days")
     );
 
     /** Keys that cannot be updated at runtime via the API — must be set via ENV/application.yml. */

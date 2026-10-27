@@ -115,7 +115,7 @@ curl http://localhost:8080/api/v1/configs/generic
 curl 'http://localhost:8080/api/v1/configs/generic?category=alerts'
 ```
 
-**Valid `category` values:** `alerts`, `cluster`
+**Valid `category` values:** `alerts`, `cluster`, `data`
 
 #### Response
 
@@ -204,8 +204,11 @@ Returns `204 No Content` on success. Returns `400` for unknown or env-only keys.
 | `ALERT_COOLDOWN_CLEANUP_INTERVAL` | `alerts` | string | Yes |
 | `CLUSTER_NAME` | `cluster` | string | Yes |
 | `CLUSTER_TYPE` | `cluster` | string | **No** (env-only) |
+| `DATA_RETENTION_DAYS` | `data` | integer | Yes |
 
 `CLUSTER_TYPE` must be set via environment variable or ConfigMap before startup. It cannot be updated or deleted through the API.
+
+`DATA_RETENTION_DAYS` is seeded from the `DATA_RETENTION_DAYS` environment variable (if set) and can be updated at runtime. Currently the value is only stored and returned by the Config API; no retention or purge job reads it yet, so changing it does not delete or retain any data.
 
 ---
 
