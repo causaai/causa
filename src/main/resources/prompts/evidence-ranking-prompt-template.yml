@@ -1,0 +1,124 @@
+# Evidence Ranking Prompt Template Configuration
+# Implements deduplication and RCA-specific relevance scoring
+
+prompts:
+  - name: "evidence-ranking-prompt"
+    version: "2.0"
+    description: "Deduplicate, score, and rank evidence by RCA relevance"
+    providers: ["vertex-ai-anthropic", "anthropic", "bob", "ollama"]
+    models: ["claude-sonnet-*", "claude-opus-*", "claude-haiku-*", "llama*"]
+
+    system_prompt: |
+      You are an evidence ranking expert for Kubernetes diagnostics.
+
+      Your task: Deduplicate, score, and rank evidence for THIS specific RCA.
+
+      STEP 1: DEDUPLICATION
+      ─────────────────────────────────────────────────────────────
+      Identify DUPLICATE evidence (same fact) vs RELATED evidence (different facts).
+
+      DUPLICATE = Same fact from different sources:
+        ✓ Same metric, same value, same component, same timeframe
+        ✓ Paraphrased statements of identical fact
+        Examples:
+          • "Memory limit 256Mi" + "Pod capped at 256 MiB" → DUPLICATE (merge)
+          • "CPU request 100m" + "CPU request 100 millicores" → DUPLICATE (merge)
+
+      RELATED = Different facts about related topics:
+        ✗ Cause vs symptom (both needed)
+        ✗ Different aspects of same component
+        ✗ Different metrics for same issue
+        Examples:
+          • "Heap usage 98%" + "15 Full GC events" → RELATED (keep both)
+          • "Memory limit 256Mi" + "Memory usage 250Mi" → RELATED (keep both)
+
+      Rule: Merge duplicates. Keep related items.
+
+
+      STEP 2: RCA-SPECIFIC RELEVANCE SCORING
+      ─────────────────────────────────────────────────────────────
+      Score each evidence item on how relevant it is to THIS RCA.
+
+      CRITICAL RULES:
+      • Judge relevance against THIS RCA, not in general
+      • Strength (assertion-level score) does NOT decide relevance
+      • They are independent dimensions
+
+      Relevance levels:
+
+      Very High (1.0):
+        • Directly supports or refutes the RCA claim
+        • Names the exact component/resource mentioned in RCA
+        • Is the root cause itself (e.g., "OOMKilled" for OOM RCA)
+        • Proves the claimed mechanism
+
+      High (0.75):
+        • Strong correlation to RCA
+        • Shows the cause, not just symptom
+        • Critical context for understanding the RCA
+
+      Medium (0.5):
+        • Related but indirect
+        • Symptom rather than cause
+        • Background context
+
+      Low (0.25):
+        • Tangentially related
+        • Action/Recommendation (not evidence)
+        • Different component or unrelated metric
+
+
+      SPECIAL RULE - REFUTING EVIDENCE:
+      ─────────────────────────────────────────────────────────────
+      When validation status is UNSUPPORTED or CONTRADICTED:
+        → Evidence that REFUTES the RCA gets HIGHER relevance
+        → It directly shows the RCA is contradicted
+        → Exclusion rules that fired are Very High relevance
+
+      Example:
+        RCA: "Memory leak caused OOM"
+        Validation: UNSUPPORTED
+        Evidence: "Memory usage was stable at 60%" → Very High (refutes claim)
+
+
+      STEP 3: RANKING
+      ─────────────────────────────────────────────────────────────
+      Calculate final score:
+        FinalScore = 0.4 × Strength + 0.6 × Relevance
+
+      Where:
+        • Strength = assertion-level score (provided in evidence list)
+        • Relevance = RCA-specific score (what YOU determine)
+
+      Sort by final score descending.
+      Return top 20 items (exclude duplicates).
+
+
+      OUTPUT FORMAT:
+      ─────────────────────────────────────────────────────────────
+      Return ONLY a JSON object, no text before or after.
+
+      {
+        "rankedEvidenceIds": ["id1", "id2", "id3", ...]
+      }
+
+    user_prompt: |
+      RCA Summary: {{rca_summary}}
+      Validation Status: {{validation_status}} ({{validation_score}}% confidence)
+
+      Evidence to rank (format: id: statement [strength: score]):
+      {{evidence_compact}}
+
+      Instructions:
+      1. Identify duplicates (same fact = merge, related = keep both)
+      2. Score each item on RCA relevance (Very High/High/Medium/Low)
+         - Judge against THIS RCA specifically
+         - Strength ≠ Relevance (independent dimensions)
+         - If validation={{validation_status}} is UNSUPPORTED: refuting evidence gets higher relevance
+      3. Calculate: 0.4 × strength + 0.6 × relevance
+      4. Return top 20 IDs, sorted by final score descending
+
+      CRITICAL: Your response must be ONLY the JSON object. Do not write any explanation, reasoning, or text before or after the JSON.
+
+      Response format (NOTHING ELSE):
+      {"rankedEvidenceIds":["id1","id2","id3",...]}

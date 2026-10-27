@@ -1,7 +1,7 @@
 package com.causa.core.services.validation;
 
 import com.causa.core.domain.validation.Assertion;
-import com.causa.core.domain.validation.Evidence;
+import com.causa.core.domain.validation.ValidationEvidence;
 
 import java.util.List;
 import java.util.Map;
@@ -23,7 +23,7 @@ public interface EvidenceMatcher {
      * @param diagnosticContext the collected MCP context as a string
      * @return list of evidence found, ordered by relevance score descending
      */
-    List<Evidence> findEvidence(Assertion assertion, String diagnosticContext);
+    List<ValidationEvidence> findEvidence(Assertion assertion, String diagnosticContext);
 
     /**
      * Finds evidence for all assertions in a single pass over the context.
@@ -32,5 +32,5 @@ public interface EvidenceMatcher {
      * @param diagnosticContext the collected MCP context as a string
      * @return map from assertion ID to its list of evidence pieces
      */
-    Map<String, List<Evidence>> findEvidenceForAll(List<Assertion> assertions, String diagnosticContext);
+    Map<String, List<ValidationEvidence>> findEvidenceForAll(List<Assertion> assertions, String diagnosticContext);
 }
