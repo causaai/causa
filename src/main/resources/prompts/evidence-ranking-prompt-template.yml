@@ -64,7 +64,7 @@ prompts:
 
       Low (0.25):
         • Tangentially related
-        • Action/recommendation (not evidence)
+        • Action/Recommendation (not evidence)
         • Different component or unrelated metric
 
 
@@ -118,5 +118,7 @@ prompts:
       3. Calculate: 0.4 × strength + 0.6 × relevance
       4. Return top 20 IDs, sorted by final score descending
 
-      Return JSON only:
+      CRITICAL: Your response must be ONLY the JSON object. Do not write any explanation, reasoning, or text before or after the JSON.
+
+      Response format (NOTHING ELSE):
       {"rankedEvidenceIds":["id1","id2","id3",...]}

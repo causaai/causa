@@ -81,6 +81,19 @@ public class LlmEvidenceRanker implements EvidenceRanker {
             .field("statementEvidence", statementEvidence.size())
             .log();
 
+        // Log input evidence details for verification
+        log.info("📥 INPUT EVIDENCE FOR RANKING")
+            .field("count", statementEvidence.size())
+            .log();
+
+        statementEvidence.forEach(ev -> {
+            log.info("  • Evidence")
+                .field("id", ev.id())
+                .field("strength", String.format("%.2f", ev.relevanceScore()))
+                .field("statement", truncate(ev.statement(), 100))
+                .log();
+        });
+
         // Smart routing: ≤3 items = skip LLM ranking, sort by existing relevanceScore
         // (relevanceScore was already calculated during assertion validation)
         if (statementEvidence.size() <= LLM_THRESHOLD) {
@@ -93,7 +106,9 @@ public class LlmEvidenceRanker implements EvidenceRanker {
                 .map(ValidationEvidence::id)
                 .toList();
 
-            return new EvidenceRankingResponse(rankedIds, "Sorted by relevanceScore (no LLM ranking)");
+            EvidenceRankingResponse response = new EvidenceRankingResponse(rankedIds, "Sorted by relevanceScore (no LLM ranking)");
+            logRankingResults(statementEvidence, response, "Deterministic (≤3 items)");
+            return response;
         }
 
         // >3 items: use LLM for intelligent ranking and deduplication
@@ -128,7 +143,17 @@ public class LlmEvidenceRanker implements EvidenceRanker {
             ChatResponse response = model.chat(chatRequest);
 
             String responseText = response.aiMessage().text();
-            return parseResponse(responseText);
+            log.info("LLM response received")
+                .field("responseLength", responseText.length())
+                .field("responsePreview", responseText.substring(0, Math.min(200, responseText.length())))
+                .log();
+
+            EvidenceRankingResponse rankingResponse = parseResponse(responseText);
+
+            // Log output ranking results
+            logRankingResults(evidenceList, rankingResponse, "LLM");
+
+            return rankingResponse;
 
         } catch (Exception e) {
             log.warn("LLM ranking failed, falling back to deterministic ranking")
@@ -142,7 +167,9 @@ public class LlmEvidenceRanker implements EvidenceRanker {
                 .map(ValidationEvidence::id)
                 .toList();
 
-            return new EvidenceRankingResponse(rankedIds, "Fallback ranking (LLM failed)");
+            EvidenceRankingResponse fallbackResponse = new EvidenceRankingResponse(rankedIds, "Fallback ranking (LLM failed)");
+            logRankingResults(evidenceList, fallbackResponse, "Fallback (LLM failed)");
+            return fallbackResponse;
         }
     }
 
@@ -174,13 +201,69 @@ public class LlmEvidenceRanker implements EvidenceRanker {
     }
 
     private EvidenceRankingResponse parseResponse(String response) throws JsonProcessingException {
-        // Extract JSON from response (handles markdown code blocks)
+        // Extract JSON from response - robust handling of markdown, mixed text, and embedded JSON
         String jsonStr = response.trim();
-        if (jsonStr.startsWith("```")) {
-            jsonStr = jsonStr.replaceFirst("```json\\s*", "")
-                .replaceFirst("```\\s*$", "")
-                .trim();
+
+        log.info("Parsing LLM response")
+            .field("responseLength", response.length())
+            .field("startsWithBrace", jsonStr.startsWith("{"))
+            .log();
+
+        // Strategy 1: Handle markdown code blocks
+        if (jsonStr.contains("```")) {
+            int start = jsonStr.indexOf("```json");
+            if (start == -1) start = jsonStr.indexOf("```");
+            if (start != -1) {
+                int end = jsonStr.indexOf("```", start + 3);
+                if (end != -1) {
+                    jsonStr = jsonStr.substring(start, end)
+                        .replaceFirst("```json\\s*", "")
+                        .replaceFirst("```\\s*", "")
+                        .trim();
+                }
+            }
         }
+
+        // Strategy 2: Look for JSON object with rankedEvidenceIds field
+        if (!jsonStr.startsWith("{")) {
+            // First try to find the exact pattern we expect
+            int jsonStart = jsonStr.indexOf("{\"rankedEvidenceIds\"");
+
+            // If not found, try with spaces
+            if (jsonStart == -1) {
+                jsonStart = jsonStr.indexOf("{ \"rankedEvidenceIds\"");
+            }
+
+            // If still not found, just find the first opening brace
+            if (jsonStart == -1) {
+                jsonStart = jsonStr.indexOf("{");
+            }
+
+            if (jsonStart != -1) {
+                // Find the matching closing brace
+                int braceCount = 0;
+                int jsonEnd = jsonStart;
+                for (int i = jsonStart; i < jsonStr.length(); i++) {
+                    char c = jsonStr.charAt(i);
+                    if (c == '{') braceCount++;
+                    else if (c == '}') {
+                        braceCount--;
+                        if (braceCount == 0) {
+                            jsonEnd = i + 1;
+                            break;
+                        }
+                    }
+                }
+                if (jsonEnd > jsonStart) {
+                    jsonStr = jsonStr.substring(jsonStart, jsonEnd).trim();
+                }
+            }
+        }
+
+        log.info("Extracted JSON for parsing")
+            .field("extractedLength", jsonStr.length())
+            .field("preview", jsonStr.substring(0, Math.min(100, jsonStr.length())))
+            .log();
 
         JsonNode json = objectMapper.readTree(jsonStr);
         List<String> rankedIds = objectMapper.convertValue(
@@ -191,6 +274,69 @@ public class LlmEvidenceRanker implements EvidenceRanker {
         String reasoning = json.has("reasoning") ? json.get("reasoning").asText() : "LLM ranking";
 
         return new EvidenceRankingResponse(rankedIds, reasoning);
+    }
+
+    /**
+     * Logs detailed ranking results showing input vs output and deduplication
+     */
+    private void logRankingResults(
+            List<ValidationEvidence> inputEvidence,
+            EvidenceRankingResponse response,
+            String method) {
+
+        log.info("📤 RANKING RESULTS")
+            .field("method", method)
+            .field("inputCount", inputEvidence.size())
+            .field("outputCount", response.rankedEvidenceIds().size())
+            .field("deduplicated", inputEvidence.size() - response.rankedEvidenceIds().size())
+            .log();
+
+        // Map IDs to evidence for easy lookup
+        var evidenceMap = inputEvidence.stream()
+            .collect(java.util.stream.Collectors.toMap(
+                ValidationEvidence::id,
+                ev -> ev
+            ));
+
+        // Log ranked output with statements
+        log.info("📊 RANKED EVIDENCE (Top 20):")
+            .log();
+
+        int rank = 1;
+        for (String id : response.rankedEvidenceIds()) {
+            ValidationEvidence ev = evidenceMap.get(id);
+            if (ev != null) {
+                log.info(String.format("  [%d] %s", rank++, id))
+                    .field("strength", String.format("%.2f", ev.relevanceScore()))
+                    .field("statement", truncate(ev.statement(), 120))
+                    .log();
+            }
+        }
+
+        // Log what was deduplicated (input IDs not in output)
+        var rankedIdSet = new java.util.HashSet<>(response.rankedEvidenceIds());
+        var deduplicatedEvidence = inputEvidence.stream()
+            .filter(ev -> !rankedIdSet.contains(ev.id()))
+            .toList();
+
+        if (!deduplicatedEvidence.isEmpty()) {
+            log.info("🗑️ DEDUPLICATED/FILTERED EVIDENCE")
+                .field("count", deduplicatedEvidence.size())
+                .log();
+
+            deduplicatedEvidence.forEach(ev -> {
+                log.info("  ✗ Removed")
+                    .field("id", ev.id())
+                    .field("strength", String.format("%.2f", ev.relevanceScore()))
+                    .field("statement", truncate(ev.statement(), 100))
+                    .log();
+            });
+        }
+
+        log.info("✅ Evidence ranking complete")
+            .field("method", method)
+            .field("finalCount", response.rankedEvidenceIds().size())
+            .log();
     }
 
     private String truncate(String text, int maxLength) {
