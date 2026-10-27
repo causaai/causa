@@ -78,6 +78,7 @@ jobs:
 
       - name: Build and push Docker image
         if: steps.check.outputs.skip == 'false'
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -85,11 +86,16 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           provenance: false
-          tags: |
-            quay.io/causaai/causa-dev:${{ steps.date.outputs.date }}
-            quay.io/causaai/causa-dev:latest
+          tags: quay.io/causaai/causa-dev:${{ steps.date.outputs.date }}
           labels: |
             quay.expires-after=7d
+
+      - name: Tag latest from pushed digest
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          docker buildx imagetools create \
+            --tag quay.io/causaai/causa-dev:latest \
+            quay.io/causaai/causa-dev@${{ steps.build.outputs.digest }}
 
       - name: Record built SHA
         if: steps.check.outputs.skip == 'false'
