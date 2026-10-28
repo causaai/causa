@@ -88,7 +88,7 @@ jobs:
           provenance: false
           tags: quay.io/causaai/causa-dev:${{ steps.date.outputs.date }}
           labels: |
-            quay.expires-after=7d
+            quay.expires-after=30d
 
       - name: Tag latest from pushed digest
         if: steps.check.outputs.skip == 'false'
