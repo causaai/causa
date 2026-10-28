@@ -19,26 +19,29 @@ jobs:
         with:
           ref: mvp_demo
 
+      - name: Get current commit SHA
+        id: sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
       - name: Restore last-built SHA
         id: sha-cache
         uses: actions/cache@v4
         with:
           path: .last-built-sha
-          key: last-built-sha-${{ github.sha }}
-          restore-keys: last-built-sha-
+          key: last-built-sha-${{ steps.sha.outputs.sha }}
 
       - name: Check for new commits
         id: check
+        env:
+          CACHE_HIT: ${{ steps.sha-cache.outputs.cache-hit }}
+          CURRENT_SHA: ${{ steps.sha.outputs.sha }}
         run: |
-          current=$(git rev-parse HEAD)
-          previous=$(cat .last-built-sha 2>/dev/null || echo "")
-          echo "current=$current" >> "$GITHUB_OUTPUT"
-          if [[ "$current" == "$previous" ]]; then
+          if [[ "$CACHE_HIT" == "true" ]]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "No new commits since last build ($current). Skipping."
+            echo "No new commits since last build ($CURRENT_SHA). Skipping."
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "New commits detected (previous: ${previous:-none}, current: $current). Building."
+            echo "New commit detected ($CURRENT_SHA). Building."
           fi
 
       - name: Get current date (YYYYMMDD)
@@ -99,5 +102,4 @@ jobs:
 
       - name: Record built SHA
         if: steps.check.outputs.skip == 'false'
-        run: echo "${{ steps.check.outputs.current }}" > .last-built-sha
-
+        run: echo "${{ steps.sha.outputs.sha }}" > .last-built-sha
