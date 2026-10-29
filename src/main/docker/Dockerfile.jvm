@@ -97,7 +97,7 @@ RUN curl -fsSL https://rpm.nodesource.com/setup_22.x | bash - && \
 RUN node --version && npm --version
 
 # Install BOB Shell using official IBM script pinned to tested version 2.0.2
-RUN curl -fsSL https://bob.ibm.com/download/bobshell.sh | bash -s -- --version 2.0.2 --pm npm
+RUN npm install --registry=https://registry.npmjs.org/ -g https://bob-shell.s3.us-south.cloud-object-storage.appdomain.cloud/bobshell-2.0.2.tgz
 
 # Ensure BOB Shell can write its working directory at runtime.
 # The container runs as UID 185 whose $HOME is /home/default (UBI9 default).
