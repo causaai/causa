@@ -1,0 +1,105 @@
+name: Daily Build and Push causa-dev
+
+on:
+  schedule:
+    # Runs every day at 00:00 UTC
+    - cron: '0 0 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-push:
+    name: Build & Push causa-dev Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: mvp_demo
+
+      - name: Get current commit SHA
+        id: sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore last-built SHA
+        id: sha-cache
+        uses: actions/cache@v4
+        with:
+          path: .last-built-sha
+          key: last-built-sha-${{ steps.sha.outputs.sha }}
+
+      - name: Check for new commits
+        id: check
+        env:
+          CACHE_HIT: ${{ steps.sha-cache.outputs.cache-hit }}
+          CURRENT_SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          if [[ "$CACHE_HIT" == "true" ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "No new commits since last build ($CURRENT_SHA). Skipping."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "New commit detected ($CURRENT_SHA). Building."
+          fi
+
+      - name: Get current date (YYYYMMDD)
+        if: steps.check.outputs.skip == 'false'
+        id: date
+        run: echo "date=$(date +'%Y%m%d')" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Java 21
+        if: steps.check.outputs.skip == 'false'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build package with Maven
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          chmod +x ./mvnw
+          ./mvnw clean package -DskipTests -Dquarkus.container-image.build=false
+
+      - name: Set up QEMU
+        if: steps.check.outputs.skip == 'false'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        if: steps.check.outputs.skip == 'false'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Quay.io
+        if: steps.check.outputs.skip == 'false'
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_USERNAME || secrets.QUAY_ROBOT_NAME || secrets.QUAY_USER }}
+          password: ${{ secrets.QUAY_ROBOT_TOKEN || secrets.QUAY_PASSWORD || secrets.QUAY_TOKEN }}
+
+      - name: Build and push Docker image
+        if: steps.check.outputs.skip == 'false'
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/main/docker/Dockerfile.jvm
+          platforms: linux/amd64,linux/arm64
+          push: true
+          provenance: false
+          tags: quay.io/causaai/causa-dev:${{ steps.date.outputs.date }}
+          labels: |
+            quay.expires-after=30d
+
+      - name: Tag latest from pushed digest
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          docker buildx imagetools create \
+            --tag quay.io/causaai/causa-dev:latest \
+            quay.io/causaai/causa-dev@${{ steps.build.outputs.digest }}
+
+      - name: Record built SHA
+        if: steps.check.outputs.skip == 'false'
+        run: echo "${{ steps.sha.outputs.sha }}" > .last-built-sha
