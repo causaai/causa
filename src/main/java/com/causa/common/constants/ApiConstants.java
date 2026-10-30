@@ -142,15 +142,16 @@ public final class ApiConstants {
 
             public static final String BASE = Version.API_V1 + "/configs";
 
-            // Generic key-value params
+            // Path param and query param for generic sub-resource
             public static final String PATH_PARAM_KEY = "key";
-            public static final String BY_KEY         = "/{" + PATH_PARAM_KEY + "}";
             public static final String QUERY_CATEGORY = "category";
 
             // Sub-resource segments
             public static final String OBSERVABILITY_SEGMENT = "/observability";
             public static final String LLM_SEGMENT           = "/llm";
             public static final String INTEGRATIONS_SEGMENT  = "/integrations";
+            public static final String GENERIC_SEGMENT        = "/generic";
+            public static final String GENERIC_BY_KEY         = GENERIC_SEGMENT + "/{" + PATH_PARAM_KEY + "}";
 
             // Path params for sub-resources
             public static final String PATH_PARAM_PLATFORM = "platform";

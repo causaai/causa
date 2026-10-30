@@ -12,7 +12,7 @@ import com.causa.common.constants.ValidationConstants;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
 import com.causa.common.utils.IdUtils;
-import com.causa.config.AppConfig;
+import com.causa.config.LlmConfigCache;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
 import com.causa.core.domain.DiagnosticContext;
@@ -29,6 +29,9 @@ import com.causa.core.ports.DiagnosticRepository;
 import com.causa.core.ports.llm.PromptSender;
 import com.causa.core.services.DiagnosticService;
 import com.causa.core.services.RcaPromptBuilder;
+import com.causa.core.services.evidence.EvidenceCollectionResult;
+import com.causa.core.services.evidence.EvidenceHarvester;
+import com.causa.core.services.evidence.RcaFinding;
 import com.causa.core.services.validation.RcaValidator;
 import com.causa.infrastructure.persistence.mappers.AlertEntityMapper;
 import com.causa.mcp.McpRegistry;
@@ -69,11 +72,12 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     private final McpRegistry mcpRegistry;
     private final RcaPromptBuilder rcaPromptBuilder;
     private final PromptSender promptSender;
-    private final AppConfig appConfig;
+    private final LlmConfigCache llmConfigCache;
     private final ObjectMapper objectMapper;
     private final Validator validator;
     private final ExecutorService pipelineExecutor;
     private final Optional<RcaValidator> rcaValidator;
+    private final Instance<EvidenceHarvester> evidenceHarvesters;
 
     @Inject
     public DiagnosticServiceImpl(DiagnosticRepository diagnosticRepository,
@@ -81,21 +85,23 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                                   McpRegistry mcpRegistry,
                                   RcaPromptBuilder rcaPromptBuilder,
                                   PromptSender promptSender,
-                                  AppConfig appConfig,
+                                  LlmConfigCache llmConfigCache,
                                   ObjectMapper objectMapper,
                                   Validator validator,
-                                  Instance<RcaValidator> rcaValidatorInstance) {
+                                  Instance<RcaValidator> rcaValidatorInstance,
+                                  Instance<EvidenceHarvester> evidenceHarvesters) {
         this.diagnosticRepository = diagnosticRepository;
         this.alertRepository      = alertRepository;
         this.mcpRegistry          = mcpRegistry;
         this.rcaPromptBuilder     = rcaPromptBuilder;
         this.promptSender         = promptSender;
-        this.appConfig            = appConfig;
+        this.llmConfigCache       = llmConfigCache;
         this.objectMapper         = objectMapper;
         this.validator            = validator;
         this.pipelineExecutor     = Executors.newCachedThreadPool();
         this.rcaValidator         = rcaValidatorInstance.isResolvable() ?
             Optional.of(rcaValidatorInstance.get()) : Optional.empty();
+        this.evidenceHarvesters   = evidenceHarvesters;
     }
 
     @Override
@@ -321,10 +327,17 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                 .log();
 
             // Build LLM request
+            double temperature = llmConfigCache.getActive()
+                .map(a -> a.getTemperature() != null ? a.getTemperature().doubleValue() : 0.1)
+                .orElse(0.1);
+            int maxTokens = llmConfigCache.getActive()
+                .map(a -> a.getMaxTokens() != null ? a.getMaxTokens() : 8192)
+                .orElse(8192);
+
             LLMRequest llmRequest = LLMRequest.builder(userPrompt)
                 .systemPrompt(systemPrompt)
-                .temperature(appConfig.getLlmConfig().getTemperature())
-                .maxTokens(appConfig.getLlmConfig().getMaxTokens())
+                .temperature(temperature)
+                .maxTokens(maxTokens)
                 .build();
 
             // Call the LLM (works with both LangChain and BobShell)
@@ -575,6 +588,55 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     }
 
     /**
+     * Collects the evidence behind a finding and serialises it for persistence.
+     *
+     * <p>Runs after validation because both validation paths are its input.
+     *
+     * <p>Strictly additive: any failure here is logged and swallowed. A diagnostic that
+     * produced a usable RCA must not fail because its evidence could not be gathered.
+     *
+     * @return the harvest as JSON, or null when nothing was collected
+     */
+    private String collectEvidence(
+        String diagnosticId,
+        RootCauseAnalysis rca,
+        ValidatedRCA validatedRCA
+    ) {
+        RcaFinding finding = RcaFinding.from(diagnosticId, rca);
+        if (finding == null) {
+            return null;
+        }
+
+        try {
+            EvidenceHarvester harvester = null;
+            for (EvidenceHarvester candidate : evidenceHarvesters) {
+                if (candidate.supports(finding.anomalyType())) {
+                    harvester = candidate;
+                    break;
+                }
+            }
+
+            if (harvester == null) {
+                log.info(LogMessages.Evidence.COLLECTION_SKIPPED)
+                    .field(LogFields.DIAGNOSTIC_ID, diagnosticId)
+                    .field("anomalyType", finding.anomalyType())
+                    .log();
+                return null;
+            }
+
+            EvidenceCollectionResult result = harvester.harvest(finding, validatedRCA);
+
+            return result.isEmpty() ? null : objectMapper.writeValueAsString(result.items());
+        } catch (Exception e) {
+            log.error(LogMessages.Evidence.COLLECTION_FAILED)
+                .field(LogFields.DIAGNOSTIC_ID, diagnosticId)
+                .exception(e)
+                .log();
+            return null;
+        }
+    }
+
+    /**
      * Updates diagnostic with RCA and validation results.
      *
      * <p>Reuses {@link #persistCompletedDiagnostic} to extract {@code confidenceScore} and
@@ -700,6 +762,9 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                 }
             }
 
+            // Harvest the evidence behind this finding from the validation results above
+            String allEvidence = collectEvidence(base.getDiagnosticId(), rca, validatedRCA);
+
             // Layer validation fields on top of the already-persisted base diagnostic
             Diagnostic updated = Diagnostic.builder()
                 .diagnosticId(base.getDiagnosticId())
@@ -711,6 +776,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                 .rca(base.getRca())
                 .validationResult(validationResult)
                 .validationData(validationDataString)
+                .allEvidence(allEvidence)
                 .build();
 
             // Log validation persistence data before saving

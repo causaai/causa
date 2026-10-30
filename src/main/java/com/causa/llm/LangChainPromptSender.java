@@ -4,7 +4,7 @@ import com.causa.common.constants.LLMConstants;
 import com.causa.common.exceptions.LLMException;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
-import com.causa.config.AppConfig;
+import com.causa.config.LlmConfigCache;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
 import com.causa.core.ports.llm.PromptSender;
@@ -40,21 +40,23 @@ public class LangChainPromptSender implements PromptSender {
     private static final CausaLogger log = CausaLogger.getLogger(LangChainPromptSender.class);
 
     private final ChatModelFactory chatModelFactory;
-    private final AppConfig appConfig;
+    private final LlmConfigCache llmConfigCache;
     private final Skills skills;
 
-    public LangChainPromptSender(ChatModelFactory chatModelFactory, AppConfig appConfig, Skills skills) {
+    public LangChainPromptSender(ChatModelFactory chatModelFactory, LlmConfigCache llmConfigCache, Skills skills) {
         this.chatModelFactory = chatModelFactory;
-        this.appConfig = appConfig;
+        this.llmConfigCache = llmConfigCache;
         this.skills = skills;
     }
 
     @Override
     public LLMResponse send(LLMRequest request) {
         if (!isReady()) {
-            String provider = appConfig.getLlmConfig().getProvider();
+            String provider = llmConfigCache.getActive()
+                .map(a -> a.getProvider().name().toLowerCase())
+                .orElse("(not configured)");
             log.error(LogMessages.LLM.MODEL_NOT_AVAILABLE)
-                .field(LLMConstants.Fields.PROVIDER, provider != null && !provider.isBlank() ? provider : "(not configured)")
+                .field(LLMConstants.Fields.PROVIDER, provider)
                 .log();
             throw new LLMException(
                 LLMConstants.ErrorMessages.MODEL_NOT_AVAILABLE,
@@ -62,9 +64,11 @@ public class LangChainPromptSender implements PromptSender {
             );
         }
 
-        String provider = appConfig.getLlmConfig().getProvider();
+        String provider = llmConfigCache.getActive()
+            .map(a -> a.getProvider().name().toLowerCase())
+            .orElse("(not configured)");
         log.info(LogMessages.LLM.PROMPT_SEND_START)
-            .field(LLMConstants.Fields.PROVIDER, provider != null && !provider.isBlank() ? provider : "(not configured)")
+            .field(LLMConstants.Fields.PROVIDER, provider)
             .field(LLMConstants.Fields.MODEL, resolveModel(request))
             .log();
 
@@ -133,8 +137,9 @@ public class LangChainPromptSender implements PromptSender {
 
     @Override
     public boolean isReady() {
-        String modelName = appConfig.getLlmConfig().getModelName();
-        return chatModelFactory != null && modelName != null && !modelName.isBlank();
+        return chatModelFactory != null && llmConfigCache.getActive()
+            .filter(a -> a.getModels() != null && !a.getModels().isEmpty())
+            .isPresent();
     }
 
     /**
@@ -172,7 +177,7 @@ public class LangChainPromptSender implements PromptSender {
         StringBuilder sb = new StringBuilder();
 
         // Add skills catalogue (preemptive disclosure) only if enabled
-        boolean skillsEnabled = request.enableSkills().orElse(appConfig.getLlmConfig().isSkillsEnabled());
+        boolean skillsEnabled = request.enableSkills().orElse(isSkillsEnabled());
         if (skillsEnabled && skills != null) {
             String catalogue = skills.formatAvailableSkills();
             if (catalogue != null && !catalogue.isBlank()) {
@@ -221,7 +226,7 @@ public class LangChainPromptSender implements PromptSender {
 
         ChatModel chatModel = chatModelFactory.chatModel();
 
-        boolean skillsEnabled = request.enableSkills().orElse(appConfig.getLlmConfig().isSkillsEnabled());
+        boolean skillsEnabled = request.enableSkills().orElse(isSkillsEnabled());
         boolean hasTools = skillsEnabled && skills != null && skills.toolProvider() != null;
 
         for (int iteration = 0; iteration < maxToolIterations; iteration++) {
@@ -381,6 +386,19 @@ public class LangChainPromptSender implements PromptSender {
      * @return the model name
      */
     private String resolveModel(LLMRequest request) {
-        return request.modelOverride().orElse(appConfig.getLlmConfig().getModelName());
+        String defaultModel = llmConfigCache.getActive()
+            .filter(a -> a.getModels() != null && !a.getModels().isEmpty())
+            .map(a -> a.getModels().get(0))
+            .orElse("");
+        return request.modelOverride().orElse(defaultModel);
+    }
+
+    private boolean isSkillsEnabled() {
+        return llmConfigCache.getActive()
+            .map(a -> {
+                Object v = a.getAdditionalConfig() != null ? a.getAdditionalConfig().get("skillsEnabled") : null;
+                return v == null || Boolean.parseBoolean(v.toString());
+            })
+            .orElse(true);
     }
 }

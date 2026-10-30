@@ -2,7 +2,7 @@ package com.causa.llm.skill;
 
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
-import com.causa.config.AppConfig;
+import com.causa.config.LlmConfigCache;
 import dev.langchain4j.skills.ClassPathSkillLoader;
 import dev.langchain4j.skills.FileSystemSkillLoader;
 import dev.langchain4j.skills.Skill;
@@ -39,11 +39,11 @@ public class SkillsConfiguration {
     private static final CausaLogger log = CausaLogger.getLogger(SkillsConfiguration.class);
     private static final String SKILLS_CLASSPATH = "skills";
 
-    private final AppConfig appConfig;
+    private final LlmConfigCache llmConfigCache;
 
     @Inject
-    public SkillsConfiguration(AppConfig appConfig) {
-        this.appConfig = appConfig;
+    public SkillsConfiguration(LlmConfigCache llmConfigCache) {
+        this.llmConfigCache = llmConfigCache;
     }
 
     /**
@@ -56,7 +56,14 @@ public class SkillsConfiguration {
     public Skills produceSkills() {
 
         // --- 0. Short-circuit when skills are globally disabled ---
-        if (!appConfig.getLlmConfig().isSkillsEnabled()) {
+        boolean skillsEnabled = llmConfigCache.getActive()
+            .map(a -> {
+                Object v = a.getAdditionalConfig() != null ? a.getAdditionalConfig().get("skillsEnabled") : null;
+                return v == null || Boolean.parseBoolean(v.toString());
+            })
+            .orElse(true);
+
+        if (!skillsEnabled) {
             log.info(LogMessages.Skills.SKILLS_DISABLED).log();
             return Skills.from(List.of());
         }
@@ -76,7 +83,12 @@ public class SkillsConfiguration {
 
         // --- 2. Load optional filesystem skills ---
         List<Skill> external = new ArrayList<>();
-        String skillsDir = appConfig.getLlmConfig().getSkillsDir();
+        String skillsDir = llmConfigCache.getActive()
+            .map(a -> {
+                Object v = a.getAdditionalConfig() != null ? a.getAdditionalConfig().get("skillsDir") : null;
+                return v != null ? v.toString() : null;
+            })
+            .orElse(null);
         if (skillsDir == null || skillsDir.isBlank()) {
             log.info(LogMessages.Skills.SKILLS_DIR_NOT_SET).log();
         } else {

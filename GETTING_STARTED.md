@@ -808,7 +808,7 @@ GOOGLE_APPLICATION_CREDENTIALS=~/.config/gcloud/application_default_credentials.
 # Anthropic Direct
 LLM_PROVIDER=anthropic
 LLM_MODEL_NAME=claude-sonnet-4-6
-LLM_API_KEY=sk-ant-api03-...
+LLM_API_KEY=<your-anthropic-api-key>
 ```
 
 > ⚠️ `llm.env` is git-ignored. Never commit it.

@@ -24,31 +24,13 @@ class ConfigResponseTest {
     class OfKeyValueTests {
 
         @Test
-        @DisplayName("Should mask sensitive key value with '********'")
-        void shouldMaskSensitiveKey() {
-            ConfigResponse response = ConfigResponse.of("LLM_API_KEY", "my-secret");
-
-            assertEquals("LLM_API_KEY", response.key());
-            assertEquals(ConfigConstants.MASKED_VALUE, response.value());
-            assertTrue(response.encrypted());
-        }
-
-        @Test
         @DisplayName("Should return plain value for non-sensitive key")
         void shouldReturnPlainValueForNonSensitiveKey() {
-            ConfigResponse response = ConfigResponse.of("LLM_PROVIDER", "anthropic");
+            ConfigResponse response = ConfigResponse.of("CLUSTER_NAME", "prod-cluster");
 
-            assertEquals("LLM_PROVIDER", response.key());
-            assertEquals("anthropic", response.value());
+            assertEquals("CLUSTER_NAME", response.key());
+            assertEquals("prod-cluster", response.value());
             assertFalse(response.encrypted());
-        }
-
-        @Test
-        @DisplayName("Should detect 'llm' category for LLM keys")
-        void shouldDetectLlmCategory() {
-            ConfigResponse response = ConfigResponse.of("LLM_PROVIDER", "ollama");
-
-            assertEquals("llm", response.category());
         }
 
         @Test
@@ -68,22 +50,24 @@ class ConfigResponseTest {
         }
 
         @Test
-        @DisplayName("Should handle null value for known non-sensitive key")
-        void shouldHandleNullValue() {
-            ConfigResponse response = ConfigResponse.of("LLM_PROVIDER", null);
+        @DisplayName("Should return null category for unknown key (LLM keys removed from generic_configs)")
+        void shouldReturnNullCategoryForRemovedLlmKey() {
+            ConfigResponse response = ConfigResponse.of("LLM_PROVIDER", "ollama");
 
-            assertEquals("LLM_PROVIDER", response.key());
-            assertNull(response.value());
+            // LLM keys no longer exist in generic_configs — category is null, value is not masked
+            assertNull(response.category());
+            assertEquals("ollama", response.value());
             assertFalse(response.encrypted());
         }
 
         @Test
-        @DisplayName("Should also mask VERTEX_PROJECT_ID as sensitive")
-        void shouldMaskVertexProjectId() {
-            ConfigResponse response = ConfigResponse.of("VERTEX_PROJECT_ID", "my-gcp-project");
+        @DisplayName("Should handle null value for known non-sensitive key")
+        void shouldHandleNullValue() {
+            ConfigResponse response = ConfigResponse.of("CLUSTER_NAME", null);
 
-            assertEquals(ConfigConstants.MASKED_VALUE, response.value());
-            assertTrue(response.encrypted());
+            assertEquals("CLUSTER_NAME", response.key());
+            assertNull(response.value());
+            assertFalse(response.encrypted());
         }
     }
 
@@ -98,7 +82,7 @@ class ConfigResponseTest {
         @Test
         @DisplayName("Should mask value when encrypted flag is true")
         void shouldMaskWhenEncryptedTrue() {
-            ConfigResponse response = ConfigResponse.of("LLM_PROVIDER", "stored-encrypted", true);
+            ConfigResponse response = ConfigResponse.of("CLUSTER_NAME", "stored-encrypted", true);
 
             assertEquals(ConfigConstants.MASKED_VALUE, response.value());
             assertTrue(response.encrypted());
@@ -107,20 +91,20 @@ class ConfigResponseTest {
         @Test
         @DisplayName("Should return plain value when encrypted flag is false")
         void shouldReturnPlainWhenEncryptedFalse() {
-            ConfigResponse response = ConfigResponse.of("LLM_PROVIDER", "ollama", false);
+            ConfigResponse response = ConfigResponse.of("CLUSTER_NAME", "prod-cluster", false);
 
-            assertEquals("ollama", response.value());
+            assertEquals("prod-cluster", response.value());
             assertFalse(response.encrypted());
         }
 
         @Test
         @DisplayName("Category is always derived from key, not from encrypted flag")
         void categoryDerivedFromKey() {
-            ConfigResponse r1 = ConfigResponse.of("LLM_PROVIDER", "val", false);
-            ConfigResponse r2 = ConfigResponse.of("LLM_PROVIDER", "val", true);
+            ConfigResponse r1 = ConfigResponse.of("CLUSTER_NAME", "val", false);
+            ConfigResponse r2 = ConfigResponse.of("CLUSTER_NAME", "val", true);
 
-            assertEquals("llm", r1.category());
-            assertEquals("llm", r2.category());
+            assertEquals("cluster", r1.category());
+            assertEquals("cluster", r2.category());
         }
     }
 }

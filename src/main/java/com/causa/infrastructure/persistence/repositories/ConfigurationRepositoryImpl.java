@@ -69,4 +69,10 @@ public class ConfigurationRepositoryImpl implements ConfigurationRepository {
             entity.persist();
         }
     }
+
+    @Override
+    @Transactional
+    public void delete(String key) {
+        ConfigurationEntity.delete("configKey", key);
+    }
 }

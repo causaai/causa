@@ -4,8 +4,10 @@ import com.causa.api.dto.ComponentHealthDto;
 import com.causa.api.dto.HealthCheckResponseDto;
 import com.causa.common.constants.AppConstants;
 import com.causa.common.constants.HealthCheckConstants;
-import com.causa.config.AppConfig;
-import com.causa.config.LlmConfigSnapshot;
+import com.causa.config.LlmConfigCache;
+import com.causa.core.domain.LlmConfig;
+import com.causa.common.constants.ConfigConstants.LlmProvider;
+import com.causa.core.domain.AuthConfig;
 import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
 import com.causa.core.ports.llm.PromptSender;
@@ -61,10 +63,7 @@ class HealthCheckServiceTest {
     private PromptSender llmPromptSender;
 
     @Mock
-    private AppConfig appConfig;
-
-    @Mock
-    private LlmConfigSnapshot llmConfigSnapshot;
+    private LlmConfigCache llmConfigCache;
 
     @Mock
     private McpRegistry mcpRegistry;
@@ -81,8 +80,19 @@ class HealthCheckServiceTest {
                 APP_VERSION,
                 mcpRegistry,
                 llmPromptSender,
-                appConfig
+                llmConfigCache
         );
+    }
+
+    private LlmConfig activeConfig(String providerName, String model) {
+        LlmProvider provider = LlmProvider.valueOf(providerName.toUpperCase());
+        return LlmConfig.builder()
+            .id("llm_cnf_test")
+            .provider(provider)
+            .url("https://api.example.com")
+            .models(model != null && !model.isBlank() ? java.util.List.of(model) : java.util.List.of())
+            .authConfig(new AuthConfig(null, null, null, null, null, null, null, null))
+            .build();
     }
 
     // -------------------------------------------------------------------------
@@ -229,11 +239,10 @@ class HealthCheckServiceTest {
         void upWhenReadyAndResponds() {
             when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(true);
-            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
-            when(llmConfigSnapshot.getProvider()).thenReturn("bob");
-            when(llmConfigSnapshot.getModelName()).thenReturn("bob");
+            when(llmConfigCache.getActive())
+                .thenReturn(java.util.Optional.of(activeConfig("anthropic", "claude-3")));
 
-            LLMResponse mockResponse = new LLMResponse("OK", "claude-sonnet-4-6", 11L, 4L, 0L, 0L, 100L);
+            LLMResponse mockResponse = new LLMResponse("OK", "claude-3", 11L, 4L, 0L, 0L, 100L);
             when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(mockResponse);
 
             HealthCheckResponseDto response = healthCheckService.getSystemHealth();
@@ -242,8 +251,8 @@ class HealthCheckServiceTest {
             ComponentHealthDto llmHealth = response.getComponents().get(HealthCheckConstants.ComponentNames.LLM_PROVIDER);
             assertNotNull(llmHealth);
             assertEquals(AppConstants.HealthStatus.UP.getValue(), llmHealth.getStatus());
-            assertTrue(llmHealth.getMessage().contains("bob / bob"),
-                    "Expected message to contain 'bob / bob' (provider / model), but was: " + llmHealth.getMessage());
+            assertTrue(llmHealth.getMessage().contains("anthropic / claude-3"),
+                    "Expected message to contain 'anthropic / claude-3' (provider / model), but was: " + llmHealth.getMessage());
             assertNotNull(llmHealth.getLatencyMs());
             assertTrue(llmHealth.getLatencyMs() >= 0);
 
@@ -256,11 +265,10 @@ class HealthCheckServiceTest {
         void upWithUnknownFallbackWhenModelNameAbsent() {
             when(databaseConnectionService.isReady()).thenReturn(false);
             when(llmPromptSender.isReady()).thenReturn(true);
-            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
-            when(llmConfigSnapshot.getProvider()).thenReturn("bob");
-            when(llmConfigSnapshot.getModelName()).thenReturn("");
+            when(llmConfigCache.getActive())
+                .thenReturn(java.util.Optional.of(activeConfig("anthropic", "")));
             when(llmPromptSender.send(any(LLMRequest.class))).thenReturn(
-                    new LLMResponse("OK", "bob", 1L, 1L, 0L, 0L, 10L));
+                    new LLMResponse("OK", "anthropic", 1L, 1L, 0L, 0L, 10L));
 
             HealthCheckResponseDto response = healthCheckService.getSystemHealth();
 
@@ -403,11 +411,10 @@ class HealthCheckServiceTest {
 
         private void llmUp() {
             when(llmPromptSender.isReady()).thenReturn(true);
-            when(appConfig.getLlmConfig()).thenReturn(llmConfigSnapshot);
-            when(llmConfigSnapshot.getProvider()).thenReturn("bob");
-            when(llmConfigSnapshot.getModelName()).thenReturn("bob");
+            when(llmConfigCache.getActive())
+                .thenReturn(java.util.Optional.of(activeConfig("anthropic", "claude-3")));
             when(llmPromptSender.send(any(LLMRequest.class)))
-                    .thenReturn(new LLMResponse("OK", "bob", 1L, 1L, 0L, 0L, 10L));
+                    .thenReturn(new LLMResponse("OK", "claude-3", 1L, 1L, 0L, 0L, 10L));
         }
 
         @Test

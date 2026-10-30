@@ -59,7 +59,7 @@ class DiagnosticServiceImplTest {
     private com.causa.core.ports.llm.PromptSender promptSender;
 
     @Mock
-    private com.causa.config.AppConfig appConfig;
+    private com.causa.config.LlmConfigCache llmConfigCache;
 
     @Mock
     private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
@@ -69,6 +69,9 @@ class DiagnosticServiceImplTest {
 
     @Mock
     private jakarta.enterprise.inject.Instance<com.causa.core.services.validation.RcaValidator> rcaValidatorInstance;
+
+    @Mock
+    private jakarta.enterprise.inject.Instance<com.causa.core.services.evidence.EvidenceHarvester> evidenceHarvesters;
 
     private DiagnosticServiceImpl diagnosticService;
 
@@ -81,10 +84,11 @@ class DiagnosticServiceImplTest {
                 mcpRegistry,
                 rcaPromptBuilder,
                 promptSender,
-                appConfig,
+                llmConfigCache,
                 objectMapper,
                 validator,
-                rcaValidatorInstance
+                rcaValidatorInstance,
+                evidenceHarvesters
         );
     }
 

@@ -230,4 +230,78 @@ class DiagnosticDetailResponseTest {
             assertEquals("Root Cause Fix", response.diagnosis().recommendations().get(0).solutionType());
         }
     }
+
+    @Nested
+    @DisplayName("Evidence Rendering Tests")
+    class EvidenceRenderingTests {
+
+        @Test
+        @DisplayName("renders stored evidence into the UI model")
+        void shouldRenderStoredEvidence() {
+            String stored = """
+                [{
+                  "id": "pathB.exit.code",
+                  "source": "kubernetes",
+                  "type": "CONTAINER_STATUS",
+                  "strength": "DEFINITIVE",
+                  "rawSnippet": "Exit Code: 137",
+                  "statement": "Container terminated with exit code 137",
+                  "explanation": "Required: Exit code 137 observed",
+                  "confidence": 0.95,
+                  "collectedAt": "2026-10-12T09:00:00Z"
+                }]""";
+
+            List<DiagnosticDetailResponse.Evidence> evidences =
+                diagnosisWithEvidence(stored).validationEvidences();
+
+            assertEquals(1, evidences.size());
+            DiagnosticDetailResponse.Evidence e = evidences.get(0);
+            assertEquals("Container terminated with exit code 137", e.supportingEvidence());
+            assertEquals("Required: Exit code 137 observed", e.explanation());
+            assertEquals("CONTAINER_STATUS", e.source());
+            assertEquals("Exit Code: 137", e.rawSnippet());
+            assertEquals("DEFINITIVE", e.evidenceStrength());
+        }
+
+        /** Rule-derived items carry no statement — no narrator wrote one — so the snippet stands in. */
+        @Test
+        @DisplayName("falls back to the snippet when no statement was written")
+        void shouldFallBackToSnippet() {
+            String stored = """
+                [{"id": "pathB.heap", "rawSnippet": "heap.usage.trend: INCREASING"}]""";
+
+            assertEquals("heap.usage.trend: INCREASING",
+                    diagnosisWithEvidence(stored).validationEvidences().get(0).supportingEvidence());
+        }
+
+        /**
+         * A diagnosis whose evidence cannot be read must still be readable. Null, blank and
+         * malformed stored JSON all render as no evidence rather than a failed request.
+         */
+        @Test
+        @DisplayName("renders no evidence rather than failing on unreadable JSON")
+        void shouldNotFailOnUnreadableEvidence() {
+            assertNull(diagnosisWithEvidence(null).validationEvidences());
+            assertNull(diagnosisWithEvidence("  ").validationEvidences());
+            assertNull(diagnosisWithEvidence("{not json").validationEvidences());
+        }
+
+        private DiagnosticDetailResponse.DiagnosisInfo diagnosisWithEvidence(String allEvidence) {
+            RootCauseAnalysis rca = new RootCauseAnalysis(
+                    "Container OOM killed", null, null, null,
+                    RootCauseAnalysis.AnomalyType.OOM_KILLED, null, null, null, null,
+                    new RootCauseAnalysis.ConfidenceSummary(0.9, "summary"), null);
+
+            Diagnostic d = Diagnostic.builder()
+                    .diagnosticId("d1")
+                    .alertId("a1")
+                    .status(DiagnosticStatus.COMPLETED)
+                    .generatedAt(Instant.parse("2025-06-01T12:00:00Z"))
+                    .rca(rca)
+                    .allEvidence(allEvidence)
+                    .build();
+
+            return DiagnosticDetailResponse.from(d, null, "cluster").diagnosis();
+        }
+    }
 }

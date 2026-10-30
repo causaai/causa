@@ -3,7 +3,7 @@ package com.causa.infrastructure.persistence.entity;
 import jakarta.persistence.*;
 
 /**
- * Configuration JPA Entity — maps to the {@code configurations} table.
+ * Configuration JPA Entity — maps to the {@code generic_configs} table.
  *
  * <p>Stores global cluster run parameters and microservice feature flags as key-value pairs.
  * Keys must be unique; values are stored as plain text (optionally encrypted at the
@@ -14,7 +14,7 @@ import jakarta.persistence.*;
  * @since 0.0.1
  */
 @Entity
-@Table(name = "configurations")
+@Table(name = "generic_configs")
 public class ConfigurationEntity extends BaseEntity {
 
     /** Application-generated PK: {@code cnfg_<16-char-alphanumeric>}. */
