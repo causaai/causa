@@ -99,14 +99,13 @@ RUN node --version && npm --version
 # Install BOB Shell using official IBM script pinned to tested version 2.0.2
 RUN npm install --registry=https://registry.npmjs.org/ -g https://bob-shell.s3.us-south.cloud-object-storage.appdomain.cloud/bobshell-2.0.2.tgz
 
-# Ensure BOB Shell can write its working directory at runtime.
-# The container runs as UID 185 whose $HOME is /home/default (UBI9 default).
-# Bob Shell creates $HOME/.bob/tmp/... on every invocation, so that directory
-# must be owned by the runtime user before we drop privileges.
-RUN mkdir -p /home/default/.bob && chown -R 185:0 /home/default && chmod -R g+rwX /home/default && mkdir -p /home/default/.bob/skills
-
 # Verify BOB Shell installation
 RUN bob --version
+
+# Ensure BOB Shell can write its working directory at runtime.
+RUN mkdir -p /home/default/.bob/skills /home/default/.bob/settings \
+    && chown -R 185:0 /home/default \
+    && chmod -R g+rwX /home/default
 
 # We make four distinct layers so if there are application changes the library layers can be re-used
 COPY --chown=185 target/quarkus-app/lib/ /deployments/lib/
