@@ -130,6 +130,16 @@ public class DiagnosticEntity extends BaseEntity {
     @Column(length = 255)
     private String createdBy = "AUTOMATIC";
 
+    /**
+     * Full Jira browse URL for the ticket created against the parent alert.
+     * Null until the user triggers ticket creation via
+     * {@code POST /api/v1/diagnostics/{id}/ticket}.
+     * Written once — the service layer uses a {@code WHERE ticket_link IS NULL}
+     * guard to prevent overwrites.
+     */
+    @Column(columnDefinition = "TEXT")
+    private String ticketLink;
+
     // -------------------------------------------------------------------------
     // Convenience accessor — avoids loading the full AlertEntity proxy
     // -------------------------------------------------------------------------
@@ -193,4 +203,7 @@ public class DiagnosticEntity extends BaseEntity {
 
     public String getCreatedBy() { return createdBy; }
     public void setCreatedBy(String createdBy) { this.createdBy = createdBy; }
+
+    public String getTicketLink() { return ticketLink; }
+    public void setTicketLink(String ticketLink) { this.ticketLink = ticketLink; }
 }
