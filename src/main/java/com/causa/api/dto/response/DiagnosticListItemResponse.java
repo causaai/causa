@@ -41,10 +41,17 @@ public record DiagnosticListItemResponse(
     String clusterName,
 
     @JsonProperty("date")
-    Instant date
+    Instant date,
+
+    @JsonProperty("ticket_link")
+    String ticketLink,
+
+    @JsonProperty("jira_configured")
+    boolean jiraConfigured
 
 ) {
-    public static DiagnosticListItemResponse from(Diagnostic diagnostic, Alert alert, String clusterName) {
+    public static DiagnosticListItemResponse from(Diagnostic diagnostic, Alert alert,
+                                                   String clusterName, boolean jiraConfigured) {
         RootCauseAnalysis rca = diagnostic.getRca();
         String issueTitle   = rca != null ? rca.issueTitle()   : null;
         String issueSummary = rca != null ? rca.issueSummary() : null;
@@ -63,7 +70,9 @@ public record DiagnosticListItemResponse(
             namespace,
             severity,
             cluster,
-            diagnostic.getGeneratedAt()
+            diagnostic.getGeneratedAt(),
+            diagnostic.getTicketLink(),
+            jiraConfigured
         );
     }
 }
