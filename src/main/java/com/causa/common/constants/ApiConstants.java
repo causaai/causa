@@ -90,8 +90,9 @@ public final class ApiConstants {
 
         /**
          * Diagnostics query API.
-         * GET /api/v1/diagnostics        — list all diagnostics (summary)
-         * GET /api/v1/diagnostics/{id}   — full diagnostic detail
+         * GET  /api/v1/diagnostics        — list all diagnostics (summary)
+         * GET  /api/v1/diagnostics/{id}   — full diagnostic detail
+         * POST /api/v1/diagnostics/{id}/ticket — create or return existing Jira ticket
          */
         public static final class Diagnostics {
             private Diagnostics() {}
@@ -99,6 +100,7 @@ public final class ApiConstants {
             public static final String BASE       = Version.API_V1 + "/diagnostics";
             public static final String PATH_PARAM = "id";
             public static final String BY_ID      = "/{" + PATH_PARAM + "}";
+            public static final String TICKET     = BY_ID + "/ticket";
             public static final String QUERY_NAMESPACE = "namespace";
             public static final String QUERY_WORKLOAD  = "workload_name";
         }
