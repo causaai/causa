@@ -4,8 +4,10 @@ import com.causa.api.dto.response.DiagnosticDetailResponse;
 import com.causa.api.dto.response.DiagnosticListItemResponse;
 import com.causa.api.dto.response.ErrorResponse;
 import com.causa.common.constants.ApiConstants;
+import com.causa.common.constants.ConfigConstants.PlatformCategory;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
+import com.causa.config.ExternalConfigCache;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
 import com.causa.core.domain.PageRequest;
@@ -43,15 +45,18 @@ public class DiagnosticsController {
 
     private final DiagnosticService diagnosticService;
     private final AlertRepository alertRepository;
+    private final ExternalConfigCache externalConfigCache;
     private final String clusterName;
 
     @Inject
     public DiagnosticsController(DiagnosticService diagnosticService,
                                   AlertRepository alertRepository,
+                                  ExternalConfigCache externalConfigCache,
                                   @ConfigProperty(name = "causa.cluster.name", defaultValue = "default")
                                   String clusterName) {
         this.diagnosticService = diagnosticService;
         this.alertRepository   = alertRepository;
+        this.externalConfigCache = externalConfigCache;
         this.clusterName       = clusterName;
     }
 
@@ -74,10 +79,11 @@ public class DiagnosticsController {
         Diagnostic.Filter filter = new Diagnostic.Filter(workloadName, namespace);
         PageResult<Diagnostic> result = diagnosticService.listDiagnostics(filter, PageRequest.of(page, pageSize));
 
+        boolean jiraConfigured = isJiraConfigured();
         List<DiagnosticListItemResponse> items = result.items().stream()
             .map(d -> {
                 Alert alert = alertRepository.findById(d.getAlertId()).orElse(null);
-                return DiagnosticListItemResponse.from(d, alert, clusterName);
+                return DiagnosticListItemResponse.from(d, alert, clusterName, jiraConfigured);
             })
             .toList();
 
@@ -128,6 +134,18 @@ public class DiagnosticsController {
             .field("diagnosticId", diagnosticId)
             .log();
 
-        return Response.ok(DiagnosticDetailResponse.from(diagnostic, alert, clusterName)).build();
+        return Response.ok(DiagnosticDetailResponse.from(diagnostic, alert, clusterName, isJiraConfigured())).build();
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    /** True when an active JIRA integration exists; read from the in-memory cache, no DB call. */
+    private boolean isJiraConfigured() {
+        return externalConfigCache
+            .getByCategory(PlatformCategory.INTEGRATION)
+            .stream()
+            .anyMatch(c -> "JIRA".equals(c.getPlatform()) && c.isActive());
     }
 }
