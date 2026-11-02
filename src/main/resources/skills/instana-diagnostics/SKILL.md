@@ -136,8 +136,11 @@ flowchart TD
   }
   ```
 * **LLM Reasoning Rule**:
-  - Compare `release.start` timestamp with the incident start time.
-  - **Correlation Rule**: If a release occurred within **60 minutes prior** to the incident onset, flag this deployment (version string, commit hash) as the **Primary Suspected Root Cause Trigger** (Regression).
+  - Compare `release.start` with the incident start time. A release shortly before the incident (for example, within 60 minutes) is only a lead. Timing alone does not make it the cause.
+  - Check that the release affects the impacted service. Look at the `applications` and `services` fields of the release. If the release is for a different service, do not link it to this incident.
+  - Look for supporting evidence in the Instana data from the other phases. For example, errors or latency on the impacted service start to rise after `release.start`, or they were normal before it.
+  - If the release affects the impacted service and the Instana data supports it, report it as a **suspected cause (possible regression)**, with its name and start time.
+  - If the release affects the service but there is no supporting evidence, report it as a lead only, and do not rank it as the main cause.
 
 ---
 
@@ -270,18 +273,32 @@ flowchart TD
 **Goal**: Measure error budget burn rate and business SLA violation.
 
 * **Tool**: `manage_slo`
-* **Operation**: `resource_type: "report", operation: "get"`
-* **Request**:
-  ```json
-  {
-    "resource_type": "report",
-    "operation": "get",
-    "params": {
-      "slo_id": "<slo_id>",
-      "var_from": "last 24 hours"
+* **Step 6A (Find the SLO ID)**: If the SLO ID is not already known from the incident context, look it up first. Do not call the report with a placeholder ID.
+  - **Operation**: `resource_type: "configuration", operation: "get_all"`
+  - **Request**:
+    ```json
+    {
+      "resource_type": "configuration",
+      "operation": "get_all",
+      "params": {
+        "query": "causa-backend"
+      }
     }
-  }
-  ```
+    ```
+  - Pick the SLO whose `entity` matches the impacted application or service. If none matches, skip the SLO report and say "SLO impact: not available (no matching SLO found)".
+* **Step 6B (Get the SLO Report)**:
+  - **Operation**: `resource_type: "report", operation: "get"`
+  - **Request**:
+    ```json
+    {
+      "resource_type": "report",
+      "operation": "get",
+      "params": {
+        "slo_id": "<slo_id from Step 6A>",
+        "var_from": "last 24 hours"
+      }
+    }
+    ```
 * **LLM Reasoning**: Extract `sliValue` vs `sloTarget` (e.g. 98.2% vs 99.5%), `remainingErrorBudgetPercentage`, and `burnRate`. If burn rate > 2.0x, flag as **Urgent SLA Breach**.
 
 ---
