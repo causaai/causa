@@ -62,6 +62,13 @@ class DiagnosticEntityMapperTest {
             assertThat(e.getIssueTitle()).isEqualTo("OOM Issue");
             assertThat(e.getIssueDescription()).isEqualTo("Desc");
         }
+        @Test void ticketLinkMapped() {
+            Diagnostic d = Diagnostic.builder().diagnosticId("d1").alertId("a1")
+                .status(DiagnosticStatus.COMPLETED).generatedAt(Instant.now())
+                .ticketLink("https://jira.example.com/browse/OPS-1").build();
+            assertThat(DiagnosticEntityMapper.toEntity(d).getTicketLink()).isEqualTo("https://jira.example.com/browse/OPS-1");
+        }
+        @Test void ticketLinkNullByDefault() { assertThat(DiagnosticEntityMapper.toEntity(minimal()).getTicketLink()).isNull(); }
         @Test void validationDataParsed() {
             DiagnosticEntity e = DiagnosticEntityMapper.toEntity(withRca());
             assertThat(e.getValidationData()).isNotNull();
@@ -82,6 +89,19 @@ class DiagnosticEntityMapperTest {
             assertThat(restored.getDiagnosticId()).isEqualTo(original.getDiagnosticId());
             assertThat(restored.getAlertId()).isEqualTo(original.getAlertId());
             assertThat(restored.getStatus()).isEqualTo(DiagnosticStatus.COMPLETED);
+        }
+
+        @Test void ticketLink_restored() {
+            DiagnosticEntity entity = DiagnosticEntityMapper.toEntity(minimal());
+            entity.createdAt = java.time.OffsetDateTime.now();
+            entity.setTicketLink("https://jira.example.com/browse/OPS-1");
+            assertThat(DiagnosticEntityMapper.toDomain(entity).getTicketLink()).isEqualTo("https://jira.example.com/browse/OPS-1");
+        }
+
+        @Test void ticketLink_nullWhenAbsent() {
+            DiagnosticEntity entity = DiagnosticEntityMapper.toEntity(minimal());
+            entity.createdAt = java.time.OffsetDateTime.now();
+            assertThat(DiagnosticEntityMapper.toDomain(entity).getTicketLink()).isNull();
         }
 
         @Test void roundTrip_withRca() {

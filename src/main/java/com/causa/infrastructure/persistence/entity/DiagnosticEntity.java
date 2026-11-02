@@ -136,8 +136,13 @@ public class DiagnosticEntity extends BaseEntity {
      * {@code POST /api/v1/diagnostics/{id}/ticket}.
      * Written once — the service layer uses a {@code WHERE ticket_link IS NULL}
      * guard to prevent overwrites.
+     * <p>
+     * {@code updatable = false} keeps this column out of JPA {@code UPDATE}
+     * statements, so {@code merge()} of a diagnostic rebuilt without a
+     * ticket link can never overwrite a stored value with NULL. The link is
+     * written only through the dedicated native-SQL update in the repository.
      */
-    @Column(columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT", updatable = false)
     private String ticketLink;
 
     // -------------------------------------------------------------------------

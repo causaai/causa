@@ -110,7 +110,8 @@ public final class DiagnosticEntityMapper {
             catch (Exception ignored) {}
         }
 
-        // ticketLink — plain TEXT column, written once by the service layer
+        // ticketLink — mapped for inserts only; the column is updatable=false on the
+        // entity, so merge() never overwrites a stored link with null
         entity.setTicketLink(d.getTicketLink());
 
         return entity;
