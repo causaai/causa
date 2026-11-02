@@ -24,10 +24,10 @@ This skill guides LLM agents through diagnosing application incidents, infrastru
 
 ## 1. Architecture & Smart Router Calling Rules
 
-The Instana MCP Server consolidates hundreds of REST endpoints into **11 domain-specific Smart Router tools**. Every call requires specifying the `resource_type`, `operation`, and operation-specific `params`.
+The Instana MCP Server consolidates hundreds of REST endpoints into **11 domain-specific Smart Router tools**. Every call requires an `operation` and its `params`. Most tools also need a `resource_type`, but `manage_events` and `manage_releases` do not take one. Use only the fields shown in the request examples below for each tool.
 
 ```
-LLM Request ──► [Smart Router Tool] ──► (resource_type + operation) ──► Instana REST Backend
+LLM Request ──► [Smart Router Tool] ──► (resource_type, if the tool has one + operation) ──► Instana REST Backend
 ```
 
 ### Critical Calling Rules & Filter Constraints:
@@ -40,6 +40,14 @@ LLM Request ──► [Smart Router Tool] ──► (resource_type + operation) 
 3. **Avoid Unnecessary Discovery Chaining**:
    - Do **not** call `get_metric_catalog` or `get_services` before querying metrics. Core metric names (`calls`, `errors`, `latency`, `memory.used`, `threads.count`) are static.
    - Calling `get_grouped_calls_metrics` with `groupbyTag: "endpoint.name"` retrieves endpoint names, call counts, error rates, and P95 latency in **one single call**.
+
+4. **Use the Affected Workload, Not Sample Values**:
+   - The requests below use these placeholders. Replace them with values for the workload in the incident **before making any call**:
+     - `${affected_service_name}`: the Instana service name (e.g., used in `service.name` filters, release name filters, and SLO searches).
+     - `${affected_pod_label}`: the Kubernetes pod label in `namespace/pod-name` form (e.g., `my-namespace/my-app-7d9f8b6c5-abcde`).
+     - `${affected_host_name}`: the host or container name that runs the workload (used for JVM and infrastructure queries).
+   - Take the values from the incident or alert context first. If a value is missing, try to find it from Instana (for example, with `manage_events` or `manage_infrastructure` `get_snapshots`). If you still cannot find it, ask the user.
+   - Never send a placeholder as-is in a request.
 
 ---
 
@@ -97,7 +105,7 @@ flowchart TD
       "params": {
         "time_range": "24h",
         "entity_name": "Kubernetes Pod",
-        "entity_label": "openshift-tuning/causa-backend-6cccf69c84-rlrrh",
+        "entity_label": "${affected_pod_label}",
         "max_events": 5
       }
     }
@@ -131,7 +139,7 @@ flowchart TD
   {
     "operation": "get_all_releases",
     "params": {
-      "name_filter": "causa-backend"
+      "name_filter": "${affected_service_name}"
     }
   }
   ```
@@ -184,7 +192,7 @@ flowchart TD
           "name": "service.name",
           "operator": "EQUALS",
           "entity": "DESTINATION",
-          "value": "causa-backend"
+          "value": "${affected_service_name}"
         },
         "time_frame": { "windowSize": 3600000 }
       }
@@ -220,7 +228,7 @@ flowchart TD
           "name": "service.name",
           "operator": "EQUALS",
           "entity": "DESTINATION",
-          "value": "causa-backend"
+          "value": "${affected_service_name}"
         },
         "time_frame": { "windowSize": 3600000 }
       }
@@ -251,7 +259,7 @@ flowchart TD
             "entity": "NOT_APPLICABLE",
             "name": "host.name",
             "operator": "CONTAINS",
-            "value": "causa-backend"
+            "value": "${affected_host_name}"
           }
         }
       }
@@ -263,7 +271,7 @@ flowchart TD
 
 * **Step 5C (JVM Startup Flags & Heap Limits - Chained)**:
   - If OOM or memory exhaustion is detected, fetch the JVM snapshot:
-    1. Search snapshot: `manage_infrastructure (resource_type: "resources", operation: "get_snapshots", params: { plugin: "jvmRuntimePlatform", query: "causa-backend", size: 1 })`
+    1. Search snapshot: `manage_infrastructure (resource_type: "resources", operation: "get_snapshots", params: { plugin: "jvmRuntimePlatform", query: "${affected_service_name}", size: 1 })`
     2. Read snapshot: `manage_infrastructure (resource_type: "resources", operation: "get_snapshot", params: { snapshot_id: "<id>" })`
   - Extract `data.jvm.args` (e.g. `-Xmx1024m`, `-XX:MaxRAMPercentage=80.0`, `-XX:+UseG1GC`) to verify if container memory limits match JVM maximum heap.
 
@@ -281,7 +289,7 @@ flowchart TD
       "resource_type": "configuration",
       "operation": "get_all",
       "params": {
-        "query": "causa-backend"
+        "query": "${affected_service_name}"
       }
     }
     ```
