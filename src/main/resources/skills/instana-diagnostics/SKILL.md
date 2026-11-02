@@ -103,10 +103,12 @@ flowchart TD
     {
       "operation": "get_events",
       "params": {
-        "time_range": "24h",
-        "entity_name": "Kubernetes Pod",
-        "entity_label": "${affected_pod_label}",
-        "max_events": 5
+        "filters": {
+          "time_range": "last 24 hours",
+          "entity_name": "Kubernetes Pod",
+          "entity_label": "${affected_pod_label}",
+          "max_events": 5
+        }
       }
     }
     ```
