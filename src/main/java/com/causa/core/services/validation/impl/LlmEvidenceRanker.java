@@ -174,18 +174,7 @@ public class LlmEvidenceRanker implements EvidenceRanker {
                 .field("responsePreview", responseText.substring(0, Math.min(200, responseText.length())))
                 .log();
 
-            // The LLM returns only {id, relevance} per non-duplicate item — it does not sort or cap.
-            Map<String, Double> relevanceById = parseRelevanceScores(responseText);
-            if (relevanceById.isEmpty()) {
-                // A well-formed response with no usable scores is as unusable as a parse failure —
-                // route it to the deterministic fallback rather than returning an empty ranking.
-                throw new IllegalStateException("LLM returned no evidence relevance scores");
-            }
-
-            // Scoring, sorting and the top-N cap all happen here in code so strength provably counts.
-            List<String> rankedIds = computeRanking(evidenceList, relevanceById, MAX_RANKED_ITEMS);
-            EvidenceRankingResponse rankingResponse = new EvidenceRankingResponse(
-                rankedIds, "LLM relevance + code-side scoring (0.2×strength + 0.8×relevance)");
+            EvidenceRankingResponse rankingResponse = sanitize(parseResponse(responseText), evidenceList);
 
             // Log output ranking results
             logRankingResults(evidenceList, rankingResponse, "LLM");
@@ -325,7 +314,14 @@ public class LlmEvidenceRanker implements EvidenceRanker {
             .log();
 
         JsonNode json = objectMapper.readTree(jsonStr);
-        JsonNode scores = json.get("evidenceScores");
+        JsonNode idsNode = json.get("rankedEvidenceIds");
+        if (idsNode == null || !idsNode.isArray()) {
+            throw new IllegalStateException("LLM response is missing the 'rankedEvidenceIds' array");
+        }
+        List<String> rankedIds = objectMapper.convertValue(
+            idsNode,
+            objectMapper.getTypeFactory().constructCollectionType(List.class, String.class)
+        );
 
         Map<String, Double> relevanceById = new LinkedHashMap<>();
         if (scores != null && scores.isArray()) {
@@ -375,6 +371,33 @@ public class LlmEvidenceRanker implements EvidenceRanker {
     /** Final ranking score — strength and relevance combined, strength weighted at 0.4. */
     static double finalScore(double strength, double relevance) {
         return STRENGTH_WEIGHT * strength + RELEVANCE_WEIGHT * relevance;
+    }
+
+    /**
+     * Drops IDs the model invented or repeated, and caps the list at {@link #MAX_RANKED_ITEMS}.
+     *
+     * <p>The model is only allowed to select from the evidence it was given. If nothing valid
+     * is left the response is unusable, so this throws and the caller falls back to
+     * deterministic ranking instead of silently discarding all evidence.
+     */
+    private EvidenceRankingResponse sanitize(EvidenceRankingResponse response, List<ValidationEvidence> input) {
+        var knownIds = input.stream().map(ValidationEvidence::id).collect(Collectors.toSet());
+        List<String> validIds = response.rankedEvidenceIds().stream()
+            .filter(knownIds::contains)
+            .distinct()
+            .limit(MAX_RANKED_ITEMS)
+            .toList();
+
+        if (validIds.size() != response.rankedEvidenceIds().size()) {
+            log.warn("Discarded invalid or repeated evidence IDs from LLM ranking")
+                .field("returned", response.rankedEvidenceIds().size())
+                .field("valid", validIds.size())
+                .log();
+        }
+        if (validIds.isEmpty() && !input.isEmpty()) {
+            throw new IllegalStateException("LLM ranking contained no valid evidence IDs");
+        }
+        return new EvidenceRankingResponse(validIds, response.reasoning());
     }
 
     /**
