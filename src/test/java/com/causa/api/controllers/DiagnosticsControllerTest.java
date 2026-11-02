@@ -3,6 +3,7 @@ package com.causa.api.controllers;
 import com.causa.api.dto.response.DiagnosticDetailResponse;
 import com.causa.api.dto.response.DiagnosticListItemResponse;
 import com.causa.api.dto.response.JiraTicketResponse;
+import com.causa.api.dto.response.JiraUserResponse;
 import com.causa.common.constants.AlertConstants.AlertSeverity;
 import com.causa.common.constants.AlertConstants.AlertStatus;
 import com.causa.common.constants.ConfigConstants.PlatformCategory;
@@ -369,6 +370,35 @@ class DiagnosticsControllerTest {
             assertEquals(404, controller.createJiraTicket("missing").getStatus());
             assertEquals(422, controller.createJiraTicket("nojira").getStatus());
             assertEquals(502, controller.createJiraTicket("broken").getStatus());
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /api/v1/diagnostics/jira/users")
+    class SearchJiraUsersTests {
+
+        @Test
+        @DisplayName("Should return 200 with mapped users")
+        void shouldReturnUsers() {
+            when(diagnosticService.searchJiraUsers("an"))
+                    .thenReturn(List.of(new com.causa.core.domain.JiraUser("u1", "Ann Lee", "ann@x.com")));
+
+            Response response = controller.searchJiraUsers("an");
+
+            assertEquals(200, response.getStatus());
+            assertEquals(List.of(new JiraUserResponse("u1", "Ann Lee", "ann@x.com")), response.getEntity());
+        }
+
+        @Test
+        @DisplayName("Should map JIRA_NOT_CONFIGURED to 422 and other errors to 502")
+        void shouldMapErrors() {
+            when(diagnosticService.searchJiraUsers("nojira"))
+                    .thenThrow(new DiagnosticException("not configured", "JIRA_NOT_CONFIGURED"));
+            when(diagnosticService.searchJiraUsers("broken"))
+                    .thenThrow(new DiagnosticException("Jira down", "JIRA_API_ERROR"));
+
+            assertEquals(422, controller.searchJiraUsers("nojira").getStatus());
+            assertEquals(502, controller.searchJiraUsers("broken").getStatus());
         }
     }
 }
