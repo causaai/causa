@@ -383,4 +383,35 @@ class DiagnosticServiceImplTest {
             verify(diagnosticRepository, never()).lockAlertForTicketCreation(any());
         }
     }
+
+    @Nested
+    @DisplayName("searchJiraUsers Tests")
+    class SearchJiraUsersTests {
+
+        @Test
+        @DisplayName("Should search through the Jira client using the active Jira config")
+        void shouldSearchUsers() {
+            ExternalConfig jiraConfig = ExternalConfig.builder()
+                    .id("cfg-1").name("jira").platform("JIRA")
+                    .authConfig(new com.causa.core.domain.AuthConfig(null, null, null, null, null, null, null, null))
+                    .category(PlatformCategory.INTEGRATION).isActive(true).build();
+            when(externalConfigCache.getByCategory(PlatformCategory.INTEGRATION)).thenReturn(List.of(jiraConfig));
+            List<com.causa.core.domain.JiraUser> users = List.of(new com.causa.core.domain.JiraUser("u1", "Ann", null));
+            when(jiraClient.searchAssignableUsers(jiraConfig, "an")).thenReturn(users);
+
+            assertEquals(users, diagnosticService.searchJiraUsers("an"));
+        }
+
+        @Test
+        @DisplayName("Should throw JIRA_NOT_CONFIGURED when no active Jira integration exists")
+        void shouldThrowWhenJiraNotConfigured() {
+            when(externalConfigCache.getByCategory(PlatformCategory.INTEGRATION)).thenReturn(List.of());
+
+            DiagnosticException ex = assertThrows(DiagnosticException.class,
+                    () -> diagnosticService.searchJiraUsers("an"));
+
+            assertEquals("JIRA_NOT_CONFIGURED", ex.getErrorType());
+            verifyNoInteractions(jiraClient);
+        }
+    }
 }
