@@ -1,7 +1,10 @@
 package com.causa.config;
 
+import com.causa.common.constants.ConfigConstants;
 import com.causa.common.constants.ConfigConstants.PlatformCategory;
 import com.causa.common.logging.CausaLogger;
+import com.causa.common.utils.EncryptionUtils;
+import com.causa.core.domain.AuthConfig;
 import com.causa.core.domain.ExternalConfig;
 import com.causa.core.ports.ExternalConfigRepository;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -11,6 +14,7 @@ import jakarta.inject.Inject;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -25,6 +29,9 @@ import java.util.concurrent.atomic.AtomicReference;
  * <p>Reads ({@link #getByCategory(PlatformCategory)}) never touch the database.
  * Writes go through the service layer directly to the repository; the subsequent
  * NOTIFY round-trip refreshes this cache on all pods.
+ *
+ * <p>Sensitive {@code auth_config} fields are stored encrypted; the cache holds them decrypted so
+ * internal consumers (e.g. the Jira client) can use them. Anything exposed over the API must mask them.
  *
  * <p>Thread-safe: the category map snapshot is replaced atomically on each refresh.
  *
@@ -75,7 +82,9 @@ public class ExternalConfigCache {
         try {
             Map<PlatformCategory, List<ExternalConfig>> fresh = new EnumMap<>(PlatformCategory.class);
             for (PlatformCategory category : PlatformCategory.values()) {
-                fresh.put(category, List.copyOf(repository.findByCategory(category)));
+                fresh.put(category, repository.findByCategory(category).stream()
+                    .map(ExternalConfigCache::decryptSensitiveFields)
+                    .toList());
             }
 
             snapshot.set(Map.copyOf(fresh));
@@ -88,6 +97,50 @@ public class ExternalConfigCache {
             log.warn("ExternalConfigCache refresh failed — stale cache preserved")
                     .field("error", e.getMessage())
                     .log();
+        }
+    }
+
+    static ExternalConfig decryptSensitiveFields(ExternalConfig config) {
+        AuthConfig auth = config.getAuthConfig();
+        Set<String> sensitive = ConfigConstants.SENSITIVE_AUTH_FIELDS.getOrDefault(config.getPlatform(), Set.of());
+        if (auth == null || sensitive.isEmpty()) {
+            return config;
+        }
+
+        AuthConfig decrypted = new AuthConfig(
+            auth.authType(),
+            sensitive.contains("apiKey")          ? tryDecrypt(auth.apiKey())          : auth.apiKey(),
+            sensitive.contains("appKey")          ? tryDecrypt(auth.appKey())          : auth.appKey(),
+            sensitive.contains("token")           ? tryDecrypt(auth.token())           : auth.token(),
+            sensitive.contains("credentialsJson") ? tryDecrypt(auth.credentialsJson()) : auth.credentialsJson(),
+            auth.headers(),
+            auth.username(),
+            sensitive.contains("password")        ? tryDecrypt(auth.password())        : auth.password()
+        );
+
+        return ExternalConfig.builder()
+            .id(config.getId())
+            .category(config.getCategory())
+            .platform(config.getPlatform())
+            .name(config.getName())
+            .url(config.getUrl())
+            .isActive(config.isActive())
+            .authConfig(decrypted)
+            .additionalConfig(config.getAdditionalConfig())
+            .createdAt(config.getCreatedAt())
+            .updatedAt(config.getUpdatedAt())
+            .build();
+    }
+
+    /** Returns the value unchanged when it is blank or not decryptable (e.g. legacy plaintext). */
+    private static String tryDecrypt(String value) {
+        if (value == null || value.isBlank()) {
+            return value;
+        }
+        try {
+            return EncryptionUtils.decrypt(value);
+        } catch (Exception e) {
+            return value;
         }
     }
 }

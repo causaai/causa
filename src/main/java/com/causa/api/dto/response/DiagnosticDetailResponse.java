@@ -50,7 +50,13 @@ public record DiagnosticDetailResponse(
     DiagnosisInfo diagnosis,
 
     @JsonProperty("validation_result")
-    String validationResult
+    String validationResult,
+
+    @JsonProperty("ticket_link")
+    String ticketLink,
+
+    @JsonProperty("jira_configured")
+    boolean jiraConfigured
 
 ) {
 
@@ -127,7 +133,8 @@ public record DiagnosticDetailResponse(
     // Factory
     // -------------------------------------------------------------------------
 
-    public static DiagnosticDetailResponse from(Diagnostic diagnostic, Alert alert, String clusterName) {
+    public static DiagnosticDetailResponse from(Diagnostic diagnostic, Alert alert,
+                                                 String clusterName, boolean jiraConfigured) {
         String cluster = (clusterName != null && !clusterName.isBlank()) ? clusterName : "default";
 
         // workload_info — all fields from Alert.WorkloadInfo; workload_name = denormalised column
@@ -191,7 +198,9 @@ public record DiagnosticDetailResponse(
             alert != null ? alert.getAlertTimestamp()                                     : null,
             workloadInfo,
             diagnosisInfo,
-            diagnostic.getValidationResult()
+            diagnostic.getValidationResult(),
+            diagnostic.getTicketLink(),
+            jiraConfigured
         );
     }
 

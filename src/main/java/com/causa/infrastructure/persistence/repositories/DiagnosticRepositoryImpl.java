@@ -11,6 +11,9 @@ import com.causa.infrastructure.persistence.mappers.DiagnosticEntityMapper;
 import io.quarkus.panache.common.Page;
 import io.quarkus.panache.common.Sort;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.NoResultException;
+import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
 import java.util.List;
@@ -30,6 +33,9 @@ import java.util.Optional;
  */
 @ApplicationScoped
 public class DiagnosticRepositoryImpl implements DiagnosticRepository {
+
+    @Inject
+    EntityManager em;
 
     @Override
     @Transactional
@@ -91,6 +97,42 @@ public class DiagnosticRepositoryImpl implements DiagnosticRepository {
         long total = query.count();
 
         return PageResult.of(items, total, pageRequest);
+    }
+
+    /** MANDATORY: an advisory lock outside the caller's transaction would release immediately. */
+    @Override
+    @Transactional(Transactional.TxType.MANDATORY)
+    public void lockAlertForTicketCreation(String alertId) {
+        // Wrapped in a sub-select because pg_advisory_xact_lock returns void
+        em.createNativeQuery(
+                "SELECT 1 FROM (SELECT pg_advisory_xact_lock(hashtext(:alertId))) AS locked")
+            .setParameter("alertId", alertId)
+            .getSingleResult();
+    }
+
+    @Override
+    public Optional<String> findTicketLinkByAlertId(String alertId) {
+        try {
+            String url = (String) em.createNativeQuery(
+                    "SELECT ticket_link FROM diagnostics " +
+                    "WHERE alert_id = :alertId AND ticket_link IS NOT NULL LIMIT 1")
+                .setParameter("alertId", alertId)
+                .getSingleResult();
+            return Optional.ofNullable(url);
+        } catch (NoResultException e) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
+    @Transactional
+    public void updateTicketLink(String diagnosticId, String ticketUrl) {
+        em.createNativeQuery(
+                "UPDATE diagnostics SET ticket_link = :url, updated_at = CURRENT_TIMESTAMP " +
+                "WHERE id = :id AND ticket_link IS NULL")
+            .setParameter("url", ticketUrl)
+            .setParameter("id", diagnosticId)
+            .executeUpdate();
     }
 
     private static boolean isBlank(String s) {
