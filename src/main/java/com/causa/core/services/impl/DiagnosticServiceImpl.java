@@ -20,6 +20,7 @@ import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
 import com.causa.core.domain.DiagnosticContext;
 import com.causa.core.domain.ExternalConfig;
+import com.causa.core.domain.JiraTicketOptions;
 import com.causa.core.domain.JiraUser;
 import com.causa.core.domain.PageRequest;
 import com.causa.core.domain.PageResult;
@@ -971,10 +972,12 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     /** One transaction holds the per-alert lock throughout, so concurrent requests for an alert queue up. */
     @Override
     @Transactional
-    public JiraTicket createOrGetJiraTicket(String diagnosticId) {
+    public JiraTicket createOrGetJiraTicket(String diagnosticId, JiraTicketOptions options) {
         log.info(LogMessages.Diagnostic.JIRA_TICKET_REQUEST)
             .field("diagnosticId", diagnosticId)
             .log();
+
+        JiraTicketOptions ticketOptions = validateTicketOptions(options);
 
         Diagnostic diagnostic = diagnosticRepository.findById(diagnosticId)
             .orElseThrow(() -> new DiagnosticException(
@@ -1007,7 +1010,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             return new JiraTicket(inJira.get(), true);
         }
 
-        String ticketLink = jiraClient.createTicket(jiraConfig, diagnostic);
+        String ticketLink = jiraClient.createTicket(jiraConfig, diagnostic, ticketOptions);
         diagnosticRepository.updateTicketLink(diagnosticId, ticketLink);
 
         log.info(LogMessages.Diagnostic.JIRA_TICKET_CREATED)
@@ -1021,6 +1024,25 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     @Override
     public List<JiraUser> searchJiraUsers(String query) {
         return jiraClient.searchAssignableUsers(requireJiraConfig(), query);
+    }
+
+    private static JiraTicketOptions validateTicketOptions(JiraTicketOptions options) {
+        if (options == null) {
+            return JiraTicketOptions.defaults();
+        }
+        if (options.additionalNotes() != null
+                && options.additionalNotes().length() > JiraTicketOptions.MAX_NOTES_LENGTH) {
+            throw new DiagnosticException(
+                "additional_notes must be at most " + JiraTicketOptions.MAX_NOTES_LENGTH + " characters.",
+                "INVALID_REQUEST");
+        }
+        if (options.assigneeId() != null
+                && options.assigneeId().length() > JiraTicketOptions.MAX_ASSIGNEE_LENGTH) {
+            throw new DiagnosticException(
+                "assignee_id must be at most " + JiraTicketOptions.MAX_ASSIGNEE_LENGTH + " characters.",
+                "INVALID_REQUEST");
+        }
+        return options;
     }
 
     private ExternalConfig requireJiraConfig() {
