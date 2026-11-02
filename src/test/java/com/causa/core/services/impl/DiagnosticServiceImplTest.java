@@ -9,6 +9,7 @@ import com.causa.core.domain.Alert;
 import com.causa.common.exceptions.DiagnosticException;
 import com.causa.core.domain.Diagnostic;
 import com.causa.core.domain.ExternalConfig;
+import com.causa.core.domain.JiraTicketOptions;
 import com.causa.core.domain.PageRequest;
 import com.causa.core.domain.PageResult;
 import com.causa.core.ports.AlertRepository;
@@ -293,6 +294,7 @@ class DiagnosticServiceImplTest {
     class CreateOrGetJiraTicketTests {
 
         private static final String TICKET_URL = "https://acme.atlassian.net/browse/OPS-1";
+        private static final JiraTicketOptions OPTIONS = JiraTicketOptions.defaults();
 
         private ExternalConfig jiraConfig;
 
@@ -317,7 +319,7 @@ class DiagnosticServiceImplTest {
                     .thenReturn(Optional.of(buildDiagnostic("d1", "alert-1", DiagnosticStatus.COMPLETED)));
             when(diagnosticRepository.findTicketLinkByAlertId("alert-1")).thenReturn(Optional.of(TICKET_URL));
 
-            DiagnosticService.JiraTicket ticket = diagnosticService.createOrGetJiraTicket("d1");
+            DiagnosticService.JiraTicket ticket = diagnosticService.createOrGetJiraTicket("d1", OPTIONS);
 
             assertEquals(new DiagnosticService.JiraTicket(TICKET_URL, true), ticket);
             var order = inOrder(diagnosticRepository);
@@ -335,10 +337,10 @@ class DiagnosticServiceImplTest {
             when(jiraClient.findTicketByAlertId(jiraConfig, "alert-1")).thenReturn(Optional.of(TICKET_URL));
 
             assertEquals(new DiagnosticService.JiraTicket(TICKET_URL, true),
-                    diagnosticService.createOrGetJiraTicket("d1"));
+                    diagnosticService.createOrGetJiraTicket("d1", OPTIONS));
 
             verify(diagnosticRepository).updateTicketLink("d1", TICKET_URL);
-            verify(jiraClient, never()).createTicket(any(), any());
+            verify(jiraClient, never()).createTicket(any(), any(), any());
         }
 
         @Test
@@ -348,10 +350,10 @@ class DiagnosticServiceImplTest {
             when(diagnosticRepository.findById("d1")).thenReturn(Optional.of(diagnostic));
             when(diagnosticRepository.findTicketLinkByAlertId("alert-1")).thenReturn(Optional.empty());
             when(jiraClient.findTicketByAlertId(jiraConfig, "alert-1")).thenReturn(Optional.empty());
-            when(jiraClient.createTicket(jiraConfig, diagnostic)).thenReturn(TICKET_URL);
+            when(jiraClient.createTicket(jiraConfig, diagnostic, OPTIONS)).thenReturn(TICKET_URL);
 
             assertEquals(new DiagnosticService.JiraTicket(TICKET_URL, false),
-                    diagnosticService.createOrGetJiraTicket("d1"));
+                    diagnosticService.createOrGetJiraTicket("d1", OPTIONS));
 
             verify(diagnosticRepository).updateTicketLink("d1", TICKET_URL);
         }
@@ -365,10 +367,24 @@ class DiagnosticServiceImplTest {
             when(jiraClient.findTicketByAlertId(jiraConfig, "alert-1"))
                     .thenThrow(new DiagnosticException("Jira API error: HTTP 500", "JIRA_API_ERROR"));
 
-            assertThrows(DiagnosticException.class, () -> diagnosticService.createOrGetJiraTicket("d1"));
+            assertThrows(DiagnosticException.class, () -> diagnosticService.createOrGetJiraTicket("d1", OPTIONS));
 
-            verify(jiraClient, never()).createTicket(any(), any());
+            verify(jiraClient, never()).createTicket(any(), any(), any());
             verify(diagnosticRepository, never()).updateTicketLink(any(), any());
+        }
+
+        @Test
+        @DisplayName("Should reject oversized notes with INVALID_REQUEST before touching the DB or Jira")
+        void shouldRejectOversizedNotes() {
+            JiraTicketOptions tooLong = new JiraTicketOptions(
+                    null, false, false, false, "x".repeat(JiraTicketOptions.MAX_NOTES_LENGTH + 1));
+
+            DiagnosticException ex = assertThrows(DiagnosticException.class,
+                    () -> diagnosticService.createOrGetJiraTicket("d1", tooLong));
+
+            assertEquals("INVALID_REQUEST", ex.getErrorType());
+            verify(diagnosticRepository, never()).lockAlertForTicketCreation(any());
+            verifyNoInteractions(jiraClient);
         }
 
         @Test
@@ -377,7 +393,7 @@ class DiagnosticServiceImplTest {
             when(externalConfigCache.getByCategory(PlatformCategory.INTEGRATION)).thenReturn(List.of());
 
             DiagnosticException ex = assertThrows(DiagnosticException.class,
-                    () -> diagnosticService.createOrGetJiraTicket("d1"));
+                    () -> diagnosticService.createOrGetJiraTicket("d1", OPTIONS));
 
             assertEquals("JIRA_NOT_CONFIGURED", ex.getErrorType());
             verify(diagnosticRepository, never()).lockAlertForTicketCreation(any());

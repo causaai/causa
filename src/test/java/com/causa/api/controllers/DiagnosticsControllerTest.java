@@ -2,6 +2,7 @@ package com.causa.api.controllers;
 
 import com.causa.api.dto.response.DiagnosticDetailResponse;
 import com.causa.api.dto.response.DiagnosticListItemResponse;
+import com.causa.api.dto.request.JiraTicketRequest;
 import com.causa.api.dto.response.JiraTicketResponse;
 import com.causa.api.dto.response.JiraUserResponse;
 import com.causa.common.constants.AlertConstants.AlertSeverity;
@@ -12,6 +13,7 @@ import com.causa.common.exceptions.DiagnosticException;
 import com.causa.config.ExternalConfigCache;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
+import com.causa.core.domain.JiraTicketOptions;
 import com.causa.core.domain.PageRequest;
 import com.causa.core.domain.PageResult;
 import com.causa.core.ports.AlertRepository;
@@ -305,10 +307,10 @@ class DiagnosticsControllerTest {
         @Test
         @DisplayName("Should return 201 when a new ticket was created")
         void shouldReturn201ForNewTicket() {
-            when(diagnosticService.createOrGetJiraTicket("d1"))
+            when(diagnosticService.createOrGetJiraTicket(eq("d1"), any()))
                     .thenReturn(new DiagnosticService.JiraTicket(URL, false));
 
-            Response response = controller.createJiraTicket("d1");
+            Response response = controller.createJiraTicket("d1", null);
 
             assertEquals(201, response.getStatus());
             assertEquals(JiraTicketResponse.created(URL), response.getEntity());
@@ -317,10 +319,10 @@ class DiagnosticsControllerTest {
         @Test
         @DisplayName("Should return 200 when the ticket already existed")
         void shouldReturn200ForExistingTicket() {
-            when(diagnosticService.createOrGetJiraTicket("d1"))
+            when(diagnosticService.createOrGetJiraTicket(eq("d1"), any()))
                     .thenReturn(new DiagnosticService.JiraTicket(URL, true));
 
-            Response response = controller.createJiraTicket("d1");
+            Response response = controller.createJiraTicket("d1", null);
 
             assertEquals(200, response.getStatus());
             assertEquals(JiraTicketResponse.existing(URL), response.getEntity());
@@ -329,16 +331,29 @@ class DiagnosticsControllerTest {
         @Test
         @DisplayName("Should map DiagnosticException error types to 404, 422 and 502")
         void shouldMapErrorsToStatusCodes() {
-            when(diagnosticService.createOrGetJiraTicket("missing"))
+            when(diagnosticService.createOrGetJiraTicket(eq("missing"), any()))
                     .thenThrow(new DiagnosticException("not found", "NOT_FOUND"));
-            when(diagnosticService.createOrGetJiraTicket("nojira"))
+            when(diagnosticService.createOrGetJiraTicket(eq("nojira"), any()))
                     .thenThrow(new DiagnosticException("not configured", "JIRA_NOT_CONFIGURED"));
-            when(diagnosticService.createOrGetJiraTicket("broken"))
+            when(diagnosticService.createOrGetJiraTicket(eq("broken"), any()))
                     .thenThrow(new DiagnosticException("Jira down", "JIRA_API_ERROR"));
 
-            assertEquals(404, controller.createJiraTicket("missing").getStatus());
-            assertEquals(422, controller.createJiraTicket("nojira").getStatus());
-            assertEquals(502, controller.createJiraTicket("broken").getStatus());
+            assertEquals(404, controller.createJiraTicket("missing", null).getStatus());
+            assertEquals(422, controller.createJiraTicket("nojira", null).getStatus());
+            assertEquals(502, controller.createJiraTicket("broken", null).getStatus());
+        }
+
+        @Test
+        @DisplayName("Should pass form selections to the service and map INVALID_REQUEST to 400")
+        void shouldPassOptionsAndMapBadRequest() {
+            JiraTicketRequest request = new JiraTicketRequest("u1", true, false, true, "note");
+            when(diagnosticService.createOrGetJiraTicket("d1", new JiraTicketOptions("u1", true, false, true, "note")))
+                    .thenReturn(new DiagnosticService.JiraTicket(URL, false));
+            when(diagnosticService.createOrGetJiraTicket(eq("bad"), any()))
+                    .thenThrow(new DiagnosticException("too long", "INVALID_REQUEST"));
+
+            assertEquals(201, controller.createJiraTicket("d1", request).getStatus());
+            assertEquals(400, controller.createJiraTicket("bad", null).getStatus());
         }
     }
 
