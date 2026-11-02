@@ -265,9 +265,11 @@ flowchart TD
       }
     }
     ```
-  - **LLM Reasoning**: 
-    - Continually rising `memory.used` without drops after GC indicates a **Java Memory Leak**.
-    - High `gc.major.time` (>1000ms) indicates **Stop-The-World GC Pauses** causing latency spikes and probe timeouts.
+  - **LLM Reasoning**:
+    - The values are summaries for each 10-minute interval (`memory.used` is the highest value, GC times are totals). They do not show individual GC events or what memory looked like right after a GC.
+    - If `memory.used` keeps rising across many intervals, report it as a **possible memory growth pattern**. Do not call it a memory leak from this data alone. A leak needs more proof, such as a heap dump, or memory that stays high after major GCs.
+    - If `gc.major.time` is high in an interval, report it as **a lot of time spent in major GC in that interval**. It could be one long pause or many short ones, so do not call it a single long (stop-the-world) pause from this data alone.
+    - Link GC time to latency or probe timeouts only if the slow or failing requests (Step 5A) or the events (Phase 2) happen in the same time period. Present it as a possible cause.
 
 * **Step 5C (JVM Startup Flags & Heap Limits - Chained)**:
   - If OOM or memory exhaustion is detected, fetch the JVM snapshot:
