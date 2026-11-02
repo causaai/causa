@@ -45,12 +45,14 @@ prompts:
           • "Memory limit 256Mi" + "Memory usage 250Mi" → RELATED (keep both)
       
       Rule: Merge duplicates. OUTPUT ONLY ONE id per duplicate group and drop the rest.
+      Keep related items.
+      When unsure, KEEP BOTH — wrongly dropping evidence is worse than keeping a near-duplicate.
+
       Which duplicate to keep (in order):
         1. The most specific (concrete values, names, timestamps)
         2. The one most directly tied to the RCA root cause
         3. The one with the higher strength
         4. The one listed first
-
 
 
       STEP 2: RCA-SPECIFIC RELEVANCE SCORING
