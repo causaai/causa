@@ -31,6 +31,12 @@ public final class Diagnostic {
     private final String allEvidence;
     /** The user-facing subset of {@link #allEvidence}, selected once in the pipeline, as JSON. */
     private final String evidence;
+    /**
+     * Full Jira browse URL for the ticket opened against this diagnostic's alert.
+     * Null until the user triggers ticket creation via
+     * {@code POST /api/v1/diagnostics/{id}/ticket}.
+     */
+    private final String ticketLink;
 
     private Diagnostic(Builder builder) {
         this.diagnosticId    = Objects.requireNonNull(builder.diagnosticId, "diagnosticId cannot be null");
@@ -44,6 +50,7 @@ public final class Diagnostic {
         this.validationData  = builder.validationData;
         this.allEvidence     = builder.allEvidence;
         this.evidence        = builder.evidence;
+        this.ticketLink      = builder.ticketLink;
     }
 
     // -------------------------------------------------------------------------
@@ -64,6 +71,8 @@ public final class Diagnostic {
     public String getAllEvidence()          { return allEvidence; }
     /** Pre-selected user-facing evidence as JSON — null when no evidence was collected. */
     public String getEvidence()             { return evidence; }
+    /** Full Jira browse URL — null until a ticket has been created for this alert. */
+    public String getTicketLink()           { return ticketLink; }
 
     /**
      * Generates a unique diagnostic ID: {@code diag_<16-char-alphanumeric>}.
@@ -118,6 +127,7 @@ public final class Diagnostic {
         private String validationData;
         private String allEvidence;
         private String evidence;
+        private String ticketLink;
 
         private Builder() {}
 
@@ -132,6 +142,7 @@ public final class Diagnostic {
         public Builder validationData(String v)       { this.validationData = v;  return this; }
         public Builder allEvidence(String v)          { this.allEvidence = v;     return this; }
         public Builder evidence(String v)             { this.evidence = v;        return this; }
+        public Builder ticketLink(String v)           { this.ticketLink = v;      return this; }
 
         public Diagnostic build() { return new Diagnostic(this); }
     }

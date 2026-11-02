@@ -1,6 +1,8 @@
 package com.causa.core.services.impl;
 
 import com.causa.common.constants.ApiConstants;
+import com.causa.common.constants.ConfigConstants.PlatformCategory;
+import com.causa.common.exceptions.DiagnosticException;
 import com.causa.common.exceptions.InvalidPaginationException;
 import com.causa.common.constants.DiagnosticConstants;
 import com.causa.common.constants.DiagnosticConstants.DiagnosticStatus;
@@ -12,10 +14,13 @@ import com.causa.common.constants.ValidationConstants;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
 import com.causa.common.utils.IdUtils;
+import com.causa.config.ExternalConfigCache;
 import com.causa.config.LlmConfigCache;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
 import com.causa.core.domain.DiagnosticContext;
+import com.causa.core.domain.ExternalConfig;
+import com.causa.core.domain.JiraUser;
 import com.causa.core.domain.PageRequest;
 import com.causa.core.domain.PageResult;
 import com.causa.core.domain.LLMRequest;
@@ -35,14 +40,17 @@ import com.causa.core.services.evidence.RcaFinding;
 import com.causa.core.services.validation.RcaValidator;
 import com.causa.infrastructure.persistence.mappers.AlertEntityMapper;
 import com.causa.mcp.McpRegistry;
+import com.causa.notification.jira.JiraClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -78,6 +86,8 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     private final ExecutorService pipelineExecutor;
     private final Optional<RcaValidator> rcaValidator;
     private final Instance<EvidenceHarvester> evidenceHarvesters;
+    private final ExternalConfigCache externalConfigCache;
+    private final JiraClient jiraClient;
 
     @Inject
     public DiagnosticServiceImpl(DiagnosticRepository diagnosticRepository,
@@ -89,7 +99,9 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                                   ObjectMapper objectMapper,
                                   Validator validator,
                                   Instance<RcaValidator> rcaValidatorInstance,
-                                  Instance<EvidenceHarvester> evidenceHarvesters) {
+                                  Instance<EvidenceHarvester> evidenceHarvesters,
+                                  ExternalConfigCache externalConfigCache,
+                                  JiraClient jiraClient) {
         this.diagnosticRepository = diagnosticRepository;
         this.alertRepository      = alertRepository;
         this.mcpRegistry          = mcpRegistry;
@@ -102,6 +114,8 @@ public class DiagnosticServiceImpl implements DiagnosticService {
         this.rcaValidator         = rcaValidatorInstance.isResolvable() ?
             Optional.of(rcaValidatorInstance.get()) : Optional.empty();
         this.evidenceHarvesters   = evidenceHarvesters;
+        this.externalConfigCache  = externalConfigCache;
+        this.jiraClient           = jiraClient;
     }
 
     @Override
@@ -952,5 +966,74 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     @Override
     public Optional<Diagnostic> getDiagnosticById(String diagnosticId) {
         return diagnosticRepository.findById(diagnosticId);
+    }
+
+    /** One transaction holds the per-alert lock throughout, so concurrent requests for an alert queue up. */
+    @Override
+    @Transactional
+    public JiraTicket createOrGetJiraTicket(String diagnosticId) {
+        log.info(LogMessages.Diagnostic.JIRA_TICKET_REQUEST)
+            .field("diagnosticId", diagnosticId)
+            .log();
+
+        ExternalConfig jiraConfig = requireJiraConfig();
+
+        Diagnostic diagnostic = diagnosticRepository.findById(diagnosticId)
+            .orElseThrow(() -> new DiagnosticException(
+                "Diagnostic not found: " + diagnosticId, "NOT_FOUND"));
+        String alertId = diagnostic.getAlertId();
+
+        diagnosticRepository.lockAlertForTicketCreation(alertId);
+
+        Optional<String> existing = diagnosticRepository.findTicketLinkByAlertId(alertId);
+        if (existing.isPresent()) {
+            log.info(LogMessages.Diagnostic.JIRA_TICKET_EXISTS)
+                .field("diagnosticId", diagnosticId)
+                .field("alertId", alertId)
+                .log();
+            return new JiraTicket(existing.get(), true);
+        }
+
+        // Jira may already hold a ticket whose URL was never saved (e.g. crash after creating it)
+        Optional<String> inJira = jiraClient.findTicketByAlertId(jiraConfig, alertId);
+        if (inJira.isPresent()) {
+            diagnosticRepository.updateTicketLink(diagnosticId, inJira.get());
+            log.info(LogMessages.Diagnostic.JIRA_TICKET_RECOVERED)
+                .field("diagnosticId", diagnosticId)
+                .field("alertId", alertId)
+                .field("ticketUrl", inJira.get())
+                .log();
+            return new JiraTicket(inJira.get(), true);
+        }
+
+        String ticketUrl = jiraClient.createTicket(jiraConfig, diagnostic);
+        diagnosticRepository.updateTicketLink(diagnosticId, ticketUrl);
+
+        log.info(LogMessages.Diagnostic.JIRA_TICKET_CREATED)
+            .field("diagnosticId", diagnosticId)
+            .field("ticketUrl", ticketUrl)
+            .log();
+
+        return new JiraTicket(ticketUrl, false);
+    }
+
+    @Override
+    public List<JiraUser> searchJiraUsers(String query) {
+        return jiraClient.searchAssignableUsers(requireJiraConfig(), query);
+    }
+
+    private ExternalConfig requireJiraConfig() {
+        return externalConfigCache
+            .getByCategory(PlatformCategory.INTEGRATION)
+            .stream()
+            .filter(c -> "JIRA".equals(c.getPlatform()) && c.isActive())
+            .findFirst()
+            .orElseThrow(() -> {
+                log.warn(LogMessages.Diagnostic.JIRA_NOT_CONFIGURED).log();
+                return new DiagnosticException(
+                    "Jira integration is not configured. "
+                    + "Set it up via PUT /api/v1/configs/integrations/JIRA.",
+                    "JIRA_NOT_CONFIGURED");
+            });
     }
 }

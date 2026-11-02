@@ -2,9 +2,11 @@ package com.causa.core.services;
 
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
+import com.causa.core.domain.JiraUser;
 import com.causa.core.domain.PageRequest;
 import com.causa.core.domain.PageResult;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -38,4 +40,21 @@ public interface DiagnosticService {
      * Returns a single diagnostic by its ID.
      */
     Optional<Diagnostic> getDiagnosticById(String diagnosticId);
+
+    /**
+     * Creates a Jira ticket for the alert behind the diagnostic, or returns the one that already
+     * exists for that alert. Throws {@link com.causa.common.exceptions.DiagnosticException} with
+     * errorType {@code JIRA_NOT_CONFIGURED}, {@code NOT_FOUND} or {@code JIRA_API_ERROR}.
+     */
+    JiraTicket createOrGetJiraTicket(String diagnosticId);
+
+    /**
+     * Returns Jira users assignable in the configured project matching {@code query} (all when blank).
+     * Throws {@link com.causa.common.exceptions.DiagnosticException} with errorType
+     * {@code JIRA_NOT_CONFIGURED} or {@code JIRA_API_ERROR}.
+     */
+    List<JiraUser> searchJiraUsers(String query);
+
+    /** Jira ticket URL and whether it existed before this call. */
+    record JiraTicket(String url, boolean alreadyExisted) {}
 }

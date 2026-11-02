@@ -191,6 +191,15 @@ public final class LogMessages {
         public static final String DIAGNOSTIC_GET_FOUND      = "Diagnostic retrieved successfully";
         public static final String DIAGNOSTIC_GET_NOT_FOUND  = "Diagnostic not found";
 
+        // Jira ticket API
+        public static final String JIRA_TICKET_REQUEST       = "POST /api/v1/diagnostics/{id}/ticket request received";
+        public static final String JIRA_TICKET_EXISTS        = "Jira ticket already exists for alert — returning existing URL";
+        public static final String JIRA_TICKET_CREATED       = "Jira ticket created and persisted";
+        public static final String JIRA_TICKET_RECOVERED     = "Existing Jira ticket found for alert — persisted its URL instead of creating a duplicate";
+        public static final String JIRA_NOT_CONFIGURED       = "Jira ticket creation refused — no active Jira integration configured";
+        public static final String JIRA_TICKET_FAILED        = "Jira ticket creation failed";
+        public static final String JIRA_USERS_REQUEST        = "GET /api/v1/diagnostics/jira/users request received";
+        public static final String JIRA_USERS_FAILED         = "Jira user search failed";
     }
 
     /**

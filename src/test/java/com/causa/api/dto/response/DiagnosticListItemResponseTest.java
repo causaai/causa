@@ -44,6 +44,30 @@ class DiagnosticListItemResponseTest {
     @Nested
     @DisplayName("from() Factory Tests")
     class FromFactoryTests {
+        @Test
+        @DisplayName("Should expose ticket_link and jira_configured")
+        void shouldMapTicketLinkAndJiraConfigured() {
+            Diagnostic d = Diagnostic.builder().diagnosticId("diag-1").alertId("alert-1")
+                    .status(DiagnosticStatus.COMPLETED).generatedAt(Instant.parse("2025-06-01T12:00:00Z"))
+                    .ticketLink("https://jira.example.com/browse/OPS-1").build();
+
+            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, buildAlert("alert-1"), "cluster", true);
+
+            assertEquals("https://jira.example.com/browse/OPS-1", response.ticketLink());
+            assertTrue(response.jiraConfigured());
+        }
+
+        @Test
+        @DisplayName("Should leave ticket_link null and jira_configured false when neither is set")
+        void shouldDefaultTicketLinkNullAndJiraNotConfigured() {
+            Diagnostic d = buildDiagnostic("diag-1", "alert-1", DiagnosticStatus.COMPLETED);
+
+            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, buildAlert("alert-1"), "cluster", false);
+
+            assertNull(response.ticketLink());
+            assertFalse(response.jiraConfigured());
+        }
+
 
         @Test
         @DisplayName("Should map diagnostic id and status")
@@ -51,7 +75,7 @@ class DiagnosticListItemResponseTest {
             Diagnostic d = buildDiagnostic("diag-1", "alert-1", DiagnosticStatus.COMPLETED);
             Alert a = buildAlert("alert-1");
 
-            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, a, "cluster-prod");
+            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, a, "cluster-prod", false);
 
             assertEquals("diag-1", response.id());
             assertEquals("COMPLETED", response.status());
@@ -63,7 +87,7 @@ class DiagnosticListItemResponseTest {
             Diagnostic d = buildDiagnostic("diag-1", "alert-1", DiagnosticStatus.COMPLETED);
             Alert a = buildAlert("alert-1");
 
-            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, a, "cluster-prod");
+            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, a, "cluster-prod", false);
 
             assertEquals("container-1", response.workloadName());
         }
@@ -74,7 +98,7 @@ class DiagnosticListItemResponseTest {
             Diagnostic d = buildDiagnostic("diag-1", "alert-1", DiagnosticStatus.COMPLETED);
             Alert a = buildAlert("alert-1");
 
-            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, a, "cluster-prod");
+            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, a, "cluster-prod", false);
 
             assertEquals("default", response.namespace());
         }
@@ -85,7 +109,7 @@ class DiagnosticListItemResponseTest {
             Diagnostic d = buildDiagnostic("diag-1", "alert-1", DiagnosticStatus.COMPLETED);
             Alert a = buildAlert("alert-1");
 
-            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, a, "cluster-prod");
+            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, a, "cluster-prod", false);
 
             assertEquals("critical", response.severity());
         }
@@ -96,7 +120,7 @@ class DiagnosticListItemResponseTest {
             Diagnostic d = buildDiagnostic("diag-1", "alert-1", DiagnosticStatus.PENDING);
             Alert a = buildAlert("alert-1");
 
-            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, a, "my-cluster");
+            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, a, "my-cluster", false);
 
             assertEquals("my-cluster", response.clusterName());
         }
@@ -107,7 +131,7 @@ class DiagnosticListItemResponseTest {
             Diagnostic d = buildDiagnostic("diag-1", "alert-1", DiagnosticStatus.PENDING);
             Alert a = buildAlert("alert-1");
 
-            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, a, null);
+            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, a, null, false);
 
             assertEquals("default", response.clusterName());
         }
@@ -118,7 +142,7 @@ class DiagnosticListItemResponseTest {
             Diagnostic d = buildDiagnostic("diag-1", "alert-1", DiagnosticStatus.PENDING);
             Alert a = buildAlert("alert-1");
 
-            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, a, "  ");
+            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, a, "  ", false);
 
             assertEquals("default", response.clusterName());
         }
@@ -128,7 +152,7 @@ class DiagnosticListItemResponseTest {
         void shouldHandleNullAlertGracefully() {
             Diagnostic d = buildDiagnostic("diag-1", "alert-orphan", DiagnosticStatus.FAILED);
 
-            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, null, "cluster");
+            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, null, "cluster", false);
 
             assertEquals("diag-1", response.id());
             assertNull(response.workloadName());
@@ -142,7 +166,7 @@ class DiagnosticListItemResponseTest {
             Diagnostic d = buildDiagnostic("diag-1", "alert-1", DiagnosticStatus.IN_PROGRESS);
             Alert a = buildAlert("alert-1");
 
-            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, a, "cluster");
+            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, a, "cluster", false);
 
             assertNull(response.issue());
         }
@@ -153,7 +177,7 @@ class DiagnosticListItemResponseTest {
             Diagnostic d = buildDiagnostic("diag-1", "alert-1", DiagnosticStatus.COMPLETED);
             Alert a = buildAlert("alert-1");
 
-            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, a, "cluster");
+            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, a, "cluster", false);
 
             assertEquals(Instant.parse("2025-06-01T12:00:00Z"), response.date());
         }
@@ -163,7 +187,7 @@ class DiagnosticListItemResponseTest {
         void shouldHandleNullDiagnosticStatus() {
             // status is required by builder — test status string serialization
             Diagnostic d = buildDiagnostic("diag-1", "alert-1", DiagnosticStatus.IN_PROGRESS);
-            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, null, "cluster");
+            DiagnosticListItemResponse response = DiagnosticListItemResponse.from(d, null, "cluster", false);
 
             assertEquals("IN_PROGRESS", response.status());
         }
