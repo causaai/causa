@@ -50,8 +50,9 @@ When an alert or incident investigation begins, execute the following diagnostic
 ```mermaid
 flowchart TD
     Start[Incident Alert Received] --> Phase1[Phase 1: Check Maintenance Windows]
-    Phase1 -->|Active Window Found| Maint[Classify as Planned Maintenance - Suppress Escalation]
+    Phase1 -->|Active Window Found| Cue[Note it as an extra clue about infra patching]
     Phase1 -->|No Active Window| Phase2[Phase 2: Triage Events & K8s Issues]
+    Cue --> Phase2
     
     Phase2 --> Phase3[Phase 3: Correlate Recent Deployments / Releases]
     Phase3 --> Phase4[Phase 4: Isolate Synthetic vs. Real User Traffic]
@@ -62,8 +63,8 @@ flowchart TD
 
 ---
 
-### Phase 1: Maintenance Window Check (False-Positive Guardrail)
-**Goal**: Check if the affected application or pod is currently undergoing planned maintenance to prevent false alarms.
+### Phase 1: Maintenance Window Check (Extra Clue Only)
+**Goal**: Find out if a maintenance window is active for the affected application or its infrastructure. Use this only as an extra clue. It does not decide anything by itself.
 
 * **Tool**: `manage_maintenance_windows`
 * **Operation**: `resource_type: "window", operation: "list_active"`
@@ -75,8 +76,11 @@ flowchart TD
   }
   ```
 * **LLM Reasoning Rule**:
-  - If `active_windows` contains the service name or application ID: Mark incident status as **`PLANNED_MAINTENANCE`**. Inform the user that downtime or latency is expected and suppress emergency escalation.
-  - If no active window exists: Proceed immediately to Phase 2.
+  - Maintenance windows are usually for infrastructure work, such as node or OS patching. This work normally does not interrupt application traffic. Application changes need a new release, which is checked in Phase 3.
+  - If `active_windows` contains the service name or application ID, report it as extra context in the findings. Do **not** label the incident as planned maintenance, and do **not** suggest lowering its priority or skipping escalation. An active window does not prove the incident is related.
+  - When a window is active, also look for signs of infrastructure patching in the Instana data (Phase 2 and Phase 5). Examples are node restarts, pod evictions or rescheduling, and host reboots around the same time.
+  - Only say the incident may be linked to maintenance if the Instana data shows such signs. Even then, present it as a possible cause and leave the decision to the user.
+  - Whether or not a window is active, continue to Phase 2.
 
 ---
 
