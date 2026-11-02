@@ -2,11 +2,18 @@ package com.causa.api.controllers;
 
 import com.causa.api.dto.response.DiagnosticDetailResponse;
 import com.causa.api.dto.response.DiagnosticListItemResponse;
+import com.causa.api.dto.request.JiraTicketRequest;
+import com.causa.api.dto.response.JiraTicketResponse;
+import com.causa.api.dto.response.JiraUserResponse;
 import com.causa.common.constants.AlertConstants.AlertSeverity;
 import com.causa.common.constants.AlertConstants.AlertStatus;
+import com.causa.common.constants.ConfigConstants.PlatformCategory;
 import com.causa.common.constants.DiagnosticConstants.DiagnosticStatus;
+import com.causa.common.exceptions.DiagnosticException;
+import com.causa.config.ExternalConfigCache;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
+import com.causa.core.domain.JiraTicketOptions;
 import com.causa.core.domain.PageRequest;
 import com.causa.core.domain.PageResult;
 import com.causa.core.ports.AlertRepository;
@@ -45,13 +52,19 @@ class DiagnosticsControllerTest {
     @Mock
     private AlertRepository alertRepository;
 
+    @Mock
+    private ExternalConfigCache externalConfigCache;
+
     private DiagnosticsController controller;
 
     private static final String CLUSTER_NAME = "test-cluster";
 
     @BeforeEach
     void setUp() {
-        controller = new DiagnosticsController(diagnosticService, alertRepository, CLUSTER_NAME);
+        // Return an empty integration list by default — jira_configured = false in all existing tests.
+        // lenient() because the 404 test exits before isJiraConfigured() is ever reached.
+        lenient().when(externalConfigCache.getByCategory(PlatformCategory.INTEGRATION)).thenReturn(List.of());
+        controller = new DiagnosticsController(diagnosticService, alertRepository, externalConfigCache, CLUSTER_NAME);
     }
 
     private static Diagnostic buildDiagnostic(String id, String alertId) {
@@ -60,6 +73,14 @@ class DiagnosticsControllerTest {
                 .alertId(alertId)
                 .status(DiagnosticStatus.COMPLETED)
                 .generatedAt(Instant.now())
+                .build();
+    }
+
+    private static com.causa.core.domain.ExternalConfig jiraConfig(boolean active) {
+        return com.causa.core.domain.ExternalConfig.builder()
+                .id("cfg-1").name("jira").platform("JIRA")
+                .category(PlatformCategory.INTEGRATION).isActive(active)
+                .authConfig(new com.causa.core.domain.AuthConfig(null, null, null, null, null, null, null, null))
                 .build();
     }
 
@@ -204,6 +225,21 @@ class DiagnosticsControllerTest {
         }
 
         @Test
+        @DisplayName("Should report jira_configured true only for an active JIRA integration")
+        void shouldReportJiraConfiguredOnlyWhenActive() {
+            when(diagnosticService.getDiagnosticById("d1")).thenReturn(Optional.of(buildDiagnostic("d1", "a1")));
+            when(alertRepository.findById("a1")).thenReturn(Optional.of(buildAlert("a1")));
+
+            when(externalConfigCache.getByCategory(PlatformCategory.INTEGRATION))
+                    .thenReturn(List.of(jiraConfig(true)));
+            assertTrue(((DiagnosticDetailResponse) controller.getDiagnostic("d1").getEntity()).jiraConfigured());
+
+            when(externalConfigCache.getByCategory(PlatformCategory.INTEGRATION))
+                    .thenReturn(List.of(jiraConfig(false)));
+            assertFalse(((DiagnosticDetailResponse) controller.getDiagnostic("d1").getEntity()).jiraConfigured());
+        }
+
+        @Test
         @DisplayName("Should return 404 when diagnostic not found")
         void shouldReturn404WhenDiagnosticNotFound() {
             when(diagnosticService.getDiagnosticById("nonexistent")).thenReturn(Optional.empty());
@@ -255,6 +291,98 @@ class DiagnosticsControllerTest {
 
             DiagnosticDetailResponse body = (DiagnosticDetailResponse) response.getEntity();
             assertEquals(CLUSTER_NAME, body.workloadInfo().clusterName());
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /api/v1/diagnostics/{id}/ticket
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("POST /api/v1/diagnostics/{id}/ticket")
+    class CreateJiraTicketTests {
+
+        private static final String URL = "https://acme.atlassian.net/browse/OPS-1";
+
+        @Test
+        @DisplayName("Should return 201 when a new ticket was created")
+        void shouldReturn201ForNewTicket() {
+            when(diagnosticService.createOrGetJiraTicket(eq("d1"), any()))
+                    .thenReturn(new DiagnosticService.JiraTicket(URL, false));
+
+            Response response = controller.createJiraTicket("d1", null);
+
+            assertEquals(201, response.getStatus());
+            assertEquals(JiraTicketResponse.created(URL), response.getEntity());
+        }
+
+        @Test
+        @DisplayName("Should return 200 when the ticket already existed")
+        void shouldReturn200ForExistingTicket() {
+            when(diagnosticService.createOrGetJiraTicket(eq("d1"), any()))
+                    .thenReturn(new DiagnosticService.JiraTicket(URL, true));
+
+            Response response = controller.createJiraTicket("d1", null);
+
+            assertEquals(200, response.getStatus());
+            assertEquals(JiraTicketResponse.existing(URL), response.getEntity());
+        }
+
+        @Test
+        @DisplayName("Should map DiagnosticException error types to 404, 422 and 502")
+        void shouldMapErrorsToStatusCodes() {
+            when(diagnosticService.createOrGetJiraTicket(eq("missing"), any()))
+                    .thenThrow(new DiagnosticException("not found", "NOT_FOUND"));
+            when(diagnosticService.createOrGetJiraTicket(eq("nojira"), any()))
+                    .thenThrow(new DiagnosticException("not configured", "JIRA_NOT_CONFIGURED"));
+            when(diagnosticService.createOrGetJiraTicket(eq("broken"), any()))
+                    .thenThrow(new DiagnosticException("Jira down", "JIRA_API_ERROR"));
+
+            assertEquals(404, controller.createJiraTicket("missing", null).getStatus());
+            assertEquals(422, controller.createJiraTicket("nojira", null).getStatus());
+            assertEquals(502, controller.createJiraTicket("broken", null).getStatus());
+        }
+
+        @Test
+        @DisplayName("Should pass form selections to the service and map INVALID_REQUEST to 400")
+        void shouldPassOptionsAndMapBadRequest() {
+            JiraTicketRequest request = new JiraTicketRequest("u1", true, false, true, "note");
+            when(diagnosticService.createOrGetJiraTicket("d1", new JiraTicketOptions("u1", true, false, true, "note")))
+                    .thenReturn(new DiagnosticService.JiraTicket(URL, false));
+            when(diagnosticService.createOrGetJiraTicket(eq("bad"), any()))
+                    .thenThrow(new DiagnosticException("too long", "INVALID_REQUEST"));
+
+            assertEquals(201, controller.createJiraTicket("d1", request).getStatus());
+            assertEquals(400, controller.createJiraTicket("bad", null).getStatus());
+        }
+    }
+
+    @Nested
+    @DisplayName("GET /api/v1/diagnostics/jira/users")
+    class SearchJiraUsersTests {
+
+        @Test
+        @DisplayName("Should return 200 with mapped users")
+        void shouldReturnUsers() {
+            when(diagnosticService.searchJiraUsers("an"))
+                    .thenReturn(List.of(new com.causa.core.domain.JiraUser("u1", "Ann Lee", "ann@x.com")));
+
+            Response response = controller.searchJiraUsers("an");
+
+            assertEquals(200, response.getStatus());
+            assertEquals(List.of(new JiraUserResponse("u1", "Ann Lee", "ann@x.com")), response.getEntity());
+        }
+
+        @Test
+        @DisplayName("Should map JIRA_NOT_CONFIGURED to 422 and other errors to 502")
+        void shouldMapErrors() {
+            when(diagnosticService.searchJiraUsers("nojira"))
+                    .thenThrow(new DiagnosticException("not configured", "JIRA_NOT_CONFIGURED"));
+            when(diagnosticService.searchJiraUsers("broken"))
+                    .thenThrow(new DiagnosticException("Jira down", "JIRA_API_ERROR"));
+
+            assertEquals(422, controller.searchJiraUsers("nojira").getStatus());
+            assertEquals(502, controller.searchJiraUsers("broken").getStatus());
         }
     }
 }

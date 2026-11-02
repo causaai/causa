@@ -1,13 +1,20 @@
 package com.causa.api.controllers;
 
+import com.causa.api.dto.request.JiraTicketRequest;
 import com.causa.api.dto.response.DiagnosticDetailResponse;
 import com.causa.api.dto.response.DiagnosticListItemResponse;
 import com.causa.api.dto.response.ErrorResponse;
+import com.causa.api.dto.response.JiraTicketResponse;
+import com.causa.api.dto.response.JiraUserResponse;
 import com.causa.common.constants.ApiConstants;
+import com.causa.common.constants.ConfigConstants.PlatformCategory;
+import com.causa.common.exceptions.DiagnosticException;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
+import com.causa.config.ExternalConfigCache;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
+import com.causa.core.domain.JiraTicketOptions;
 import com.causa.core.domain.PageRequest;
 import com.causa.core.domain.PageResult;
 import com.causa.core.ports.AlertRepository;
@@ -16,6 +23,7 @@ import jakarta.inject.Inject;
 import jakarta.validation.constraints.Size;
 import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
@@ -32,6 +40,8 @@ import java.util.Optional;
  *
  * <p>GET /api/v1/diagnostics        — paginated list of diagnostics (summary)
  * <p>GET /api/v1/diagnostics/{id}   — full diagnostic detail
+ * <p>POST /api/v1/diagnostics/{id}/ticket — create or return existing Jira ticket
+ * <p>GET /api/v1/diagnostics/jira/users — search assignable Jira users
  *
  * @since 0.0.1
  */
@@ -43,15 +53,18 @@ public class DiagnosticsController {
 
     private final DiagnosticService diagnosticService;
     private final AlertRepository alertRepository;
+    private final ExternalConfigCache externalConfigCache;
     private final String clusterName;
 
     @Inject
     public DiagnosticsController(DiagnosticService diagnosticService,
                                   AlertRepository alertRepository,
+                                  ExternalConfigCache externalConfigCache,
                                   @ConfigProperty(name = "causa.cluster.name", defaultValue = "default")
                                   String clusterName) {
         this.diagnosticService = diagnosticService;
         this.alertRepository   = alertRepository;
+        this.externalConfigCache = externalConfigCache;
         this.clusterName       = clusterName;
     }
 
@@ -74,10 +87,11 @@ public class DiagnosticsController {
         Diagnostic.Filter filter = new Diagnostic.Filter(workloadName, namespace);
         PageResult<Diagnostic> result = diagnosticService.listDiagnostics(filter, PageRequest.of(page, pageSize));
 
+        boolean jiraConfigured = isJiraConfigured();
         List<DiagnosticListItemResponse> items = result.items().stream()
             .map(d -> {
                 Alert alert = alertRepository.findById(d.getAlertId()).orElse(null);
-                return DiagnosticListItemResponse.from(d, alert, clusterName);
+                return DiagnosticListItemResponse.from(d, alert, clusterName, jiraConfigured);
             })
             .toList();
 
@@ -128,6 +142,103 @@ public class DiagnosticsController {
             .field("diagnosticId", diagnosticId)
             .log();
 
-        return Response.ok(DiagnosticDetailResponse.from(diagnostic, alert, clusterName)).build();
+        return Response.ok(DiagnosticDetailResponse.from(diagnostic, alert, clusterName, isJiraConfigured())).build();
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /api/v1/diagnostics/{id}/ticket
+    // -------------------------------------------------------------------------
+
+    @POST
+    @Path(ApiConstants.Paths.Diagnostics.TICKET)
+    public Response createJiraTicket(
+            @PathParam(ApiConstants.Paths.Diagnostics.PATH_PARAM) String diagnosticId,
+            JiraTicketRequest request) {
+
+        log.info(LogMessages.Diagnostic.JIRA_TICKET_REQUEST)
+            .field("diagnosticId", diagnosticId)
+            .log();
+
+        try {
+            DiagnosticService.JiraTicket ticket = diagnosticService.createOrGetJiraTicket(
+                diagnosticId, request == null ? JiraTicketOptions.defaults() : request.toOptions());
+
+            return ticket.alreadyExisted()
+                ? Response.ok(JiraTicketResponse.existing(ticket.url())).build()
+                : Response.status(Response.Status.CREATED).entity(JiraTicketResponse.created(ticket.url())).build();
+
+        } catch (DiagnosticException e) {
+            return switch (e.getErrorType()) {
+                case "JIRA_NOT_CONFIGURED" -> {
+                    log.warn(LogMessages.Diagnostic.JIRA_NOT_CONFIGURED)
+                        .field("diagnosticId", diagnosticId)
+                        .log();
+                    yield Response.status(422)
+                        .entity(ErrorResponse.of(422, "Unprocessable Entity", e.getMessage()))
+                        .build();
+                }
+                case "INVALID_REQUEST" -> Response.status(Response.Status.BAD_REQUEST)
+                    .entity(ErrorResponse.of(400, "Bad Request", e.getMessage()))
+                    .build();
+                case "NOT_FOUND" -> Response.status(Response.Status.NOT_FOUND)
+                    .entity(ErrorResponse.of(404, "Not Found", e.getMessage()))
+                    .build();
+                default -> {
+                    log.warn(LogMessages.Diagnostic.JIRA_TICKET_FAILED)
+                        .field("diagnosticId", diagnosticId)
+                        .field("errorType", e.getErrorType())
+                        .field("message", e.getMessage())
+                        .log();
+                    yield Response.status(502)
+                        .entity(ErrorResponse.of(502, "Bad Gateway", e.getMessage()))
+                        .build();
+                }
+            };
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /api/v1/diagnostics/jira/users
+    // -------------------------------------------------------------------------
+
+    @GET
+    @Path(ApiConstants.Paths.Diagnostics.JIRA_USERS)
+    public Response searchJiraUsers(
+            @QueryParam(ApiConstants.Paths.Diagnostics.QUERY_TEXT) @Size(max = 255) String query) {
+
+        log.info(LogMessages.Diagnostic.JIRA_USERS_REQUEST).log();
+
+        try {
+            List<JiraUserResponse> users = diagnosticService.searchJiraUsers(query).stream()
+                .map(JiraUserResponse::from)
+                .toList();
+            return Response.ok(users).build();
+
+        } catch (DiagnosticException e) {
+            if ("JIRA_NOT_CONFIGURED".equals(e.getErrorType())) {
+                return Response.status(422)
+                    .entity(ErrorResponse.of(422, "Unprocessable Entity", e.getMessage()))
+                    .build();
+            }
+            log.warn(LogMessages.Diagnostic.JIRA_USERS_FAILED)
+                .field("errorType", e.getErrorType())
+                .field("message", e.getMessage())
+                .log();
+            return Response.status(502)
+                .entity(ErrorResponse.of(502, "Bad Gateway", e.getMessage()))
+                .build();
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    /** True when an active JIRA integration exists; read from the in-memory cache, no DB call. */
+    private boolean isJiraConfigured() {
+        return externalConfigCache
+            .getByCategory(PlatformCategory.INTEGRATION)
+            .stream()
+            .anyMatch(c -> "JIRA".equals(c.getPlatform()) && c.isActive());
     }
 }
