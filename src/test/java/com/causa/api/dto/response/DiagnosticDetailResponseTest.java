@@ -199,6 +199,81 @@ class DiagnosticDetailResponseTest {
         }
 
         @Test
+        @DisplayName("Should return the persisted validation score as rca_confidence_score")
+        void shouldReturnValidationScoreWhenPersisted() {
+            Diagnostic d = Diagnostic.builder()
+                    .diagnosticId("d1")
+                    .alertId("a1")
+                    .status(DiagnosticStatus.COMPLETED)
+                    .generatedAt(Instant.now())
+                    .confidenceScore(0.62f)  // validation score, differs from the RCA's 0.95
+                    .rca(rcaWithScore(0.95))
+                    .build();
+
+            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, null, "cluster");
+
+            assertEquals(0.62, response.diagnosis().rcaConfidenceScore());
+        }
+
+        @Test
+        @DisplayName("Should fall back to the RCA-generated score when no score is persisted")
+        void shouldFallBackToRcaScoreWhenNoPersistedScore() {
+            Diagnostic d = Diagnostic.builder()
+                    .diagnosticId("d1")
+                    .alertId("a1")
+                    .status(DiagnosticStatus.COMPLETED)
+                    .generatedAt(Instant.now())
+                    .rca(rcaWithScore(0.95))
+                    .build();
+
+            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, null, "cluster");
+
+            assertEquals(0.95, response.diagnosis().rcaConfidenceScore());
+        }
+
+        @Test
+        @DisplayName("Should return null score when neither a persisted nor an RCA score exists")
+        void shouldReturnNullScoreWhenNoneAvailable() {
+            RootCauseAnalysis rca = new RootCauseAnalysis(
+                    "Title", null, null, null, null, null, null, null, null, null, null);
+            Diagnostic d = Diagnostic.builder()
+                    .diagnosticId("d1")
+                    .alertId("a1")
+                    .status(DiagnosticStatus.COMPLETED)
+                    .generatedAt(Instant.now())
+                    .rca(rca)
+                    .build();
+
+            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, null, "cluster");
+
+            assertNull(response.diagnosis().rcaConfidenceScore());
+        }
+
+        @Test
+        @DisplayName("Should keep the summary text from the RCA when the validation score is used")
+        void shouldKeepSummaryTextWhenValidationScoreUsed() {
+            Diagnostic d = Diagnostic.builder()
+                    .diagnosticId("d1")
+                    .alertId("a1")
+                    .status(DiagnosticStatus.COMPLETED)
+                    .generatedAt(Instant.now())
+                    .confidenceScore(0.5f)
+                    .rca(rcaWithScore(0.95))
+                    .build();
+
+            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, null, "cluster");
+
+            assertEquals("summary", response.diagnosis().confidenceSummaryText());
+        }
+
+        private RootCauseAnalysis rcaWithScore(double score) {
+            return new RootCauseAnalysis(
+                    "Title", null, null, null, null, null, null, null, null,
+                    new RootCauseAnalysis.ConfidenceSummary(score, "summary"),
+                    null);
+        }
+
+        @Test
         @DisplayName("Should map recommendations from RCA")
         void shouldMapRecommendationsFromRca() {
             RootCauseAnalysis rca = new RootCauseAnalysis(

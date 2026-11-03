@@ -1,6 +1,11 @@
 package com.causa.core.services.impl;
 
 import com.causa.common.constants.AlertConstants.AlertSeverity;
+import com.causa.core.domain.RootCauseAnalysis;
+import com.causa.core.domain.validation.Assertion;
+import com.causa.core.domain.validation.DualValidationResult;
+import com.causa.core.domain.validation.ValidatedRCA;
+import com.causa.core.domain.validation.ValidationResult;
 import com.causa.common.constants.AlertConstants.AlertStatus;
 import com.causa.common.constants.DiagnosticConstants.DiagnosticStatus;
 import com.causa.core.domain.Alert;
@@ -270,6 +275,64 @@ class DiagnosticServiceImplTest {
             Optional<Diagnostic> result = diagnosticService.getDiagnosticById("missing");
 
             assertTrue(result.isEmpty());
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // resolveValidationScore
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("resolveValidationScore Tests")
+    class ResolveValidationScoreTests {
+
+        private RootCauseAnalysis rca() {
+            return new RootCauseAnalysis(
+                    "Title", null, null, null, null, null, null, null, null, null, null);
+        }
+
+        private ValidationResult result(double confidence) {
+            Assertion assertion = Assertion.of(
+                    "a1", "Container was OOMKilled",
+                    Assertion.AssertionType.OBSERVATION, Assertion.AssertionSource.ROOT_CAUSE);
+            return ValidationResult.supported(assertion, confidence, List.of(), "ok");
+        }
+
+        @Test
+        @DisplayName("Should use the dual validation final verdict confidence when available")
+        void shouldUseFinalVerdictConfidence() {
+            DualValidationResult dual = new DualValidationResult(
+                    null, null,
+                    new DualValidationResult.FinalVerdict(
+                            ValidationResult.ValidationStatus.SUPPORTED, 0.81,
+                            DualValidationResult.FinalVerdict.AggregationStrategy.WEIGHTED_AVERAGE, "ok"));
+            ValidatedRCA validated = ValidatedRCA.builder()
+                    .originalRca(rca())
+                    .addValidationResult(result(0.4))
+                    .dualValidation(dual)
+                    .build();
+
+            assertEquals(0.81, diagnosticService.resolveValidationScore(validated).getAsDouble(), 1e-9);
+        }
+
+        @Test
+        @DisplayName("Should fall back to the average assertion confidence without dual validation")
+        void shouldFallBackToAverageConfidence() {
+            ValidatedRCA validated = ValidatedRCA.builder()
+                    .originalRca(rca())
+                    .addValidationResult(result(0.6))
+                    .addValidationResult(result(0.8))
+                    .build();
+
+            assertEquals(0.7, diagnosticService.resolveValidationScore(validated).getAsDouble(), 1e-9);
+        }
+
+        @Test
+        @DisplayName("Should return empty when nothing was validated")
+        void shouldReturnEmptyWhenNothingValidated() {
+            ValidatedRCA validated = ValidatedRCA.builder().originalRca(rca()).build();
+
+            assertTrue(diagnosticService.resolveValidationScore(validated).isEmpty());
         }
     }
 }
