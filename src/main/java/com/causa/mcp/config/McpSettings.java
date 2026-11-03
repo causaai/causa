@@ -75,7 +75,7 @@ public record McpSettings(@NotEmpty Map<String, @NotNull @Valid ServerConfig> mc
             @NotBlank String name,
             String contextKey,
             String description,
-            Map<String, String> arguments) {
+            Map<String, Object> arguments) {
 
         public ToolConfig {
             arguments = arguments != null ? Map.copyOf(arguments) : Map.of();
