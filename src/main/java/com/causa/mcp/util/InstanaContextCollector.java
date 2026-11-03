@@ -109,6 +109,9 @@ public final class InstanaContextCollector {
             String filtered = (namespace != null && !namespace.isEmpty())
                     ? filterEventsByNamespace(raw, namespace)
                     : raw;
+            if (filtered == null) {
+                return;
+            }
 
             String formatted = McpResponseFormatter.format(
                     client.getServerName(), tool.name(), filtered);
@@ -125,17 +128,18 @@ public final class InstanaContextCollector {
     static String filterEventsByNamespace(String eventsJson, String namespace) {
         try {
             JsonNode root = OBJECT_MAPPER.readTree(eventsJson);
-            if (!root.has("results")) {
-                return eventsJson;
+            JsonNode resultsNode = root.path("results");
+            if (!resultsNode.isObject()) {
+                return null;
             }
-            ObjectNode results = (ObjectNode) root.path("results");
+            ObjectNode results = (ObjectNode) resultsNode;
 
             filterArray(results, "events", namespace);
             filterProblemAnalyses(results, namespace);
 
             return OBJECT_MAPPER.writeValueAsString(root);
         } catch (Exception e) {
-            return eventsJson;
+            return null;
         }
     }
 
@@ -161,12 +165,12 @@ public final class InstanaContextCollector {
         }
         ArrayNode filtered = OBJECT_MAPPER.createArrayNode();
         for (JsonNode analysis : analyses) {
-            ArrayNode sampleEvents = (ArrayNode) analysis.path("sample_events");
-            if (!sampleEvents.isArray()) {
+            JsonNode sampleEventsNode = analysis.path("sample_events");
+            if (!sampleEventsNode.isArray()) {
                 continue;
             }
             ArrayNode filteredSamples = OBJECT_MAPPER.createArrayNode();
-            for (JsonNode sample : sampleEvents) {
+            for (JsonNode sample : sampleEventsNode) {
                 String label = sample.path("entityLabel").asText("");
                 if (label.startsWith(namespace + "/")) {
                     filteredSamples.add(sample);
