@@ -1,6 +1,7 @@
 package com.causa.mcp.util;
 
 import com.causa.common.constants.McpConstants;
+import com.causa.common.logging.CausaLogger;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.DiagnosticContext;
 import com.causa.mcp.McpClient;
@@ -11,7 +12,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
-import java.util.Iterator;
 import java.util.Map;
 
 /**
@@ -30,6 +30,7 @@ import java.util.Map;
  */
 public final class InstanaContextCollector {
 
+    private static final CausaLogger log = CausaLogger.getLogger(InstanaContextCollector.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private InstanaContextCollector() {}
@@ -113,7 +114,11 @@ public final class InstanaContextCollector {
                     client.getServerName(), tool.name(), filtered);
             builder.put(tool.contextKey(), formatted);
         } catch (Exception e) {
-            // consistent with processTool — one bad tool must not affect others
+            log.warn("MCP tool processing failed")
+                    .field("server", client.getServerName())
+                    .field("tool", tool.name())
+                    .field("error", e.getMessage())
+                    .log();
         }
     }
 
