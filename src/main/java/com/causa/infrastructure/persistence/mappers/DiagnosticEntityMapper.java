@@ -28,6 +28,7 @@ import java.time.Instant;
  *   validationData     ↔  validationData JSONB
  *   allEvidence        ↔  allEvidence JSONB
  *   evidence           ↔  evidence JSONB
+ *   ticketLink         ↔  ticket_link TEXT
  * </pre>
  *
  * @since 0.0.1
@@ -109,6 +110,10 @@ public final class DiagnosticEntityMapper {
             catch (Exception ignored) {}
         }
 
+        // ticketLink — mapped for inserts only; the column is updatable=false on the
+        // entity, so merge() never overwrites a stored link with null
+        entity.setTicketLink(d.getTicketLink());
+
         return entity;
     }
 
@@ -171,6 +176,9 @@ public final class DiagnosticEntityMapper {
             try { b.evidence(MAPPER.writeValueAsString(e.getEvidence())); }
             catch (Exception ignored) {}
         }
+
+        // ticketLink — plain TEXT column, pass through as-is
+        b.ticketLink(e.getTicketLink());
 
         return b.build();
     }
