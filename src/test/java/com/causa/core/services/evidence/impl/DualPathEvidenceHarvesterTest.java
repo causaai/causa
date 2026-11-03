@@ -105,7 +105,7 @@ class DualPathEvidenceHarvesterTest {
         new RcaFinding("diag_test", AnomalyType.OOM_KILLED, "Container OOM killed");
 
     private DualPathEvidenceHarvester wiredHarvester() {
-        McpSourceResolver resolver = new McpSourceResolver(new McpRegistry(null));
+        McpSourceResolver resolver = new McpSourceResolver(new McpRegistry(null, null));
         DualPathEvidenceHarvester wired = new DualPathEvidenceHarvester();
         wired.pathAMapper = new PathAEvidenceMapper(resolver);
         wired.pathBMapper = new PathBEvidenceMapper(resolver);
