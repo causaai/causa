@@ -23,6 +23,10 @@ import java.util.Optional;
 /**
  * Jira REST client (outbound adapter). Stateless: duplicate prevention is the caller's job.
  *
+ * <p>The supplied {@link ExternalConfig} must carry decrypted credentials, as served by
+ * {@code ExternalConfigCache}. The base URL must be HTTPS (plain HTTP only for loopback hosts),
+ * so credentials are never sent unencrypted over the network.
+ *
  * <p>The deployment flavour follows {@code auth_config.authType}:
  * {@code PAT} = Server/Data Center (Bearer token, REST v2, plain-text description);
  * anything else (e.g. {@code API_TOKEN}) = Atlassian Cloud (Basic username:token, REST v3, ADF description).
@@ -37,7 +41,7 @@ public class JiraClient {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final Duration     TIMEOUT = Duration.ofSeconds(10);
     private static final String       ALERT_LABEL_PREFIX = "causa-alert-";
-    private static final String       ISSUE_TYPE = "Task";
+    private static final String       DEFAULT_ISSUE_TYPE = "Task";
 
     private enum Flavor {
         CLOUD("/rest/api/3", "/search/jql"),
@@ -82,14 +86,14 @@ public class JiraClient {
         String authHeader = buildAuthHeader(jiraConfig, flavor);
         String projectKey = resolveProjectKey(jiraConfig);
 
-        String requestBody = buildRequestBody(projectKey, diagnostic, flavor);
+        String requestBody = buildRequestBody(projectKey, resolveIssueType(jiraConfig), diagnostic, flavor);
 
         log.info("Creating Jira ticket")
             .field("project", projectKey)
             .field("diagnosticId", diagnostic.getDiagnosticId())
             .log();
 
-        String responseBody = post(baseUrl.stripTrailing() + flavor.apiPath + "/issue", authHeader, requestBody);
+        String responseBody = post(baseUrl + flavor.apiPath + "/issue", authHeader, requestBody);
         return extractBrowseUrl(baseUrl, responseBody);
     }
 
@@ -108,7 +112,7 @@ public class JiraClient {
         body.put("maxResults", 1);
         body.putArray("fields").add("key");
 
-        String responseBody = post(baseUrl.stripTrailing() + flavor.apiPath + flavor.searchPath, authHeader, body.toString());
+        String responseBody = post(baseUrl + flavor.apiPath + flavor.searchPath, authHeader, body.toString());
         try {
             JsonNode issues = MAPPER.readTree(responseBody).path("issues");
             if (!issues.isArray() || issues.isEmpty()) {
@@ -117,7 +121,7 @@ public class JiraClient {
             String issueKey = issues.get(0).path("key").asText();
             return issueKey.isBlank()
                 ? Optional.empty()
-                : Optional.of(baseUrl.stripTrailing() + "/browse/" + issueKey);
+                : Optional.of(baseUrl + "/browse/" + issueKey);
         } catch (Exception e) {
             throw new DiagnosticException(
                 "Failed to parse Jira search response: " + e.getMessage(), "JIRA_API_ERROR", e);
@@ -165,6 +169,10 @@ public class JiraClient {
         }
     }
 
+    /**
+     * Returns the configured base URL without trailing slashes. Rejects non-HTTPS URLs so the
+     * auth header is never sent in clear text; plain HTTP is tolerated only for loopback hosts.
+     */
     private static String resolveBaseUrl(ExternalConfig config) {
         String url = config.getUrl();
         if (url == null || url.isBlank()) {
@@ -173,7 +181,27 @@ public class JiraClient {
                 + "Set the 'url' field via PUT /api/v1/configs/integrations/JIRA.",
                 "JIRA_CONFIG_INCOMPLETE");
         }
-        return url;
+        String normalized = url.strip().replaceAll("/+$", "");
+
+        URI uri;
+        try {
+            uri = URI.create(normalized);
+        } catch (IllegalArgumentException e) {
+            throw new DiagnosticException("Jira base URL is not a valid URL.", "JIRA_CONFIG_INVALID");
+        }
+        boolean https    = "https".equalsIgnoreCase(uri.getScheme());
+        boolean loopback = "http".equalsIgnoreCase(uri.getScheme()) && isLoopbackHost(uri.getHost());
+        if (!https && !loopback) {
+            throw new DiagnosticException(
+                "Jira base URL must use https:// so credentials are not sent unencrypted.",
+                "JIRA_CONFIG_INVALID");
+        }
+        return normalized;
+    }
+
+    private static boolean isLoopbackHost(String host) {
+        return "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host)
+            || "[::1]".equals(host) || "::1".equals(host);
     }
 
     private static String buildAuthHeader(ExternalConfig config, Flavor flavor) {
@@ -207,8 +235,17 @@ public class JiraClient {
         return key.toString();
     }
 
+    /** Issue type from {@code additional_config.issueType}, defaulting to {@code Task}. */
+    private static String resolveIssueType(ExternalConfig config) {
+        Object type = config.getAdditionalConfig() != null
+            ? config.getAdditionalConfig().get("issueType")
+            : null;
+        return type == null || type.toString().isBlank() ? DEFAULT_ISSUE_TYPE : type.toString().strip();
+    }
+
     /** Issue payload; Cloud needs the description as Atlassian Document Format, Server as plain text. */
-    private static String buildRequestBody(String projectKey, Diagnostic diagnostic, Flavor flavor) {
+    private static String buildRequestBody(String projectKey, String issueType,
+                                           Diagnostic diagnostic, Flavor flavor) {
         try {
             RootCauseAnalysis rca = diagnostic.getRca();
             String summary     = rca != null && !isBlank(rca.issueTitle())
@@ -223,7 +260,7 @@ public class JiraClient {
             fields.putObject("project").put("key", projectKey);
             fields.put("summary", summary);
             fields.putArray("labels").add(alertLabel(diagnostic.getAlertId()));
-            fields.putObject("issuetype").put("name", ISSUE_TYPE);
+            fields.putObject("issuetype").put("name", issueType);
             if (flavor == Flavor.CLOUD) {
                 fields.set("description", adfDocument(description));
             } else {
@@ -258,7 +295,7 @@ public class JiraClient {
                     "Jira response did not contain an issue key: " + truncate(responseBody, 200),
                     "JIRA_API_ERROR");
             }
-            return baseUrl.stripTrailing() + "/browse/" + issueKey;
+            return baseUrl + "/browse/" + issueKey;
         } catch (DiagnosticException de) {
             throw de;
         } catch (Exception e) {
@@ -269,8 +306,10 @@ public class JiraClient {
 
     private static boolean isBlank(String s) { return s == null || s.isBlank(); }
 
+    /** Truncates and strips control characters (CR/LF etc.) so remote text cannot forge log lines. */
     private static String truncate(String s, int max) {
         if (s == null) return "";
-        return s.length() <= max ? s : s.substring(0, max) + "…";
+        String clean = s.replaceAll("\\p{Cntrl}", " ");
+        return clean.length() <= max ? clean : clean.substring(0, max) + "…";
     }
 }

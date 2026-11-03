@@ -62,10 +62,10 @@ public class ConfigRequestValidator {
         "DATADOG", ExternalRules.of(true, true,  List.of("apiKey", "appKey"), List.of()),
         "INSTANA", ExternalRules.of(true, true,  List.of("token"),            List.of()),
         "OTHER",   ExternalRules.of(true, true,  List.of("token"),            List.of()),
-        // Integrations — name required; url required for Slack (incoming webhook URL),
-        // optional for Jira and GitHub (url is nullable in schema)
+        // Integrations — name required; url required for Slack (incoming webhook URL) and
+        // Jira (base URL the ticket client calls), optional for GitHub (url is nullable in schema)
         "SLACK",   ExternalRules.of(true, true,  List.of("token"),            List.of("channel")),
-        "JIRA",    ExternalRules.of(true, false, List.of("username", "token"), List.of("projectName")),
+        "JIRA",    ExternalRules.of(true, true,  List.of("username", "token"), List.of("projectName")),
         "GITHUB",  ExternalRules.of(true, false, List.of("token"),             List.of("ownerRepo"))
     );
 

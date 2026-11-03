@@ -204,20 +204,30 @@ class ConfigRequestValidatorTest {
     class ExternalJiraTests {
 
         @Test
-        @DisplayName("passes for valid JIRA request (url optional)")
+        @DisplayName("passes for valid JIRA request")
         void passes_validJira() {
             AuthConfig auth = new AuthConfig("API_TOKEN", null, null, "jira-token", null, null, "bot@example.com", null);
             Map<String, Object> additional = new HashMap<>();
             additional.put("projectName", "OPS");
-            ExternalConfigRequest req = externalRequest("jira-prod", null, auth, additional);
+            ExternalConfigRequest req = externalRequest("jira-prod", "https://acme.atlassian.net", auth, additional);
             assertThatNoException().isThrownBy(() -> validator.validateExternal("JIRA", req));
+        }
+
+        @Test
+        @DisplayName("throws when url missing for JIRA")
+        void throws_missingUrl() {
+            AuthConfig auth = new AuthConfig("API_TOKEN", null, null, "jira-token", null, null, "bot@example.com", null);
+            ExternalConfigRequest req = externalRequest("jira-prod", null, auth, Map.of("projectName", "OPS"));
+            assertThatThrownBy(() -> validator.validateExternal("JIRA", req))
+                .isInstanceOf(ConfigException.class)
+                .hasMessageContaining("url");
         }
 
         @Test
         @DisplayName("throws when projectName missing for JIRA")
         void throws_missingProjectName() {
             AuthConfig auth = new AuthConfig("API_TOKEN", null, null, "jira-token", null, null, "bot@example.com", null);
-            ExternalConfigRequest req = externalRequest("jira-prod", null, auth, Map.of());
+            ExternalConfigRequest req = externalRequest("jira-prod", "https://acme.atlassian.net", auth, Map.of());
             assertThatThrownBy(() -> validator.validateExternal("JIRA", req))
                 .isInstanceOf(ConfigException.class)
                 .hasMessageContaining("projectName");

@@ -157,6 +157,54 @@ class JiraClientTest {
     }
 
     @Test
+    @DisplayName("Trailing slashes on the base URL are stripped from API and browse URLs")
+    void trailingSlashStripped() {
+        ExternalConfig cfg = ExternalConfig.builder()
+                .id("cfg-1").name("jira").category(PlatformCategory.INTEGRATION).platform("JIRA")
+                .url(baseUrl + "//")
+                .authConfig(new AuthConfig("PAT", null, null, "tok", null, null, null, null))
+                .additionalConfig(Map.of("projectName", "KRUIZE"))
+                .build();
+
+        String url = client.createTicket(cfg, diagnostic());
+
+        assertEquals(baseUrl + "/browse/KRUIZE-1", url);
+        assertEquals("/rest/api/2/issue", path.get());
+    }
+
+    @Test
+    @DisplayName("additional_config.issueType overrides the default issue type")
+    void configuredIssueTypeIsUsed() throws Exception {
+        ExternalConfig cfg = ExternalConfig.builder()
+                .id("cfg-1").name("jira").category(PlatformCategory.INTEGRATION).platform("JIRA")
+                .url(baseUrl)
+                .authConfig(new AuthConfig("PAT", null, null, "tok", null, null, null, null))
+                .additionalConfig(Map.of("projectName", "KRUIZE", "issueType", "Bug"))
+                .build();
+
+        client.createTicket(cfg, diagnostic());
+
+        assertEquals("Bug", MAPPER.readTree(body.get()).path("fields").path("issuetype").path("name").asText());
+    }
+
+    @Test
+    @DisplayName("Non-HTTPS, non-loopback base URL is rejected before any request is sent")
+    void nonHttpsRemoteUrlRejected() {
+        ExternalConfig cfg = ExternalConfig.builder()
+                .id("cfg-1").name("jira").category(PlatformCategory.INTEGRATION).platform("JIRA")
+                .url("http://jira.example.com")
+                .authConfig(new AuthConfig("PAT", null, null, "tok", null, null, null, null))
+                .additionalConfig(Map.of("projectName", "KRUIZE"))
+                .build();
+
+        DiagnosticException ex = assertThrows(DiagnosticException.class,
+                () -> client.createTicket(cfg, diagnostic()));
+
+        assertEquals("JIRA_CONFIG_INVALID", ex.getErrorType());
+        assertNull(path.get());
+    }
+
+    @Test
     @DisplayName("Cloud config without username is rejected")
     void cloudRequiresUsername() {
         DiagnosticException ex = assertThrows(DiagnosticException.class,
