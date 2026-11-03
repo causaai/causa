@@ -135,8 +135,15 @@ public class McpRegistry {
             McpSettings.ServerConfig config, Map<String, String> extraTokens) {
         Alert.WorkloadInfo workload = alert.getWorkloadInfo();
         java.time.Instant alertTs = alert.getAlertTimestamp();
+        return resolveMap(template, workload, alertTs, extraTokens, config);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> resolveMap(Map<String, Object> map, Alert.WorkloadInfo workload,
+            java.time.Instant alertTs, Map<String, String> extraTokens,
+            McpSettings.ServerConfig config) {
         Map<String, Object> resolved = new HashMap<>();
-        template.forEach((key, value) -> {
+        map.forEach((key, value) -> {
             Object resolvedValue = resolveValue(value, workload, alertTs, extraTokens, config);
             if (resolvedValue instanceof String strValue && strValue.contains("${alertTimestamp")) {
                 return;
@@ -153,10 +160,7 @@ public class McpRegistry {
         if (value instanceof String strValue) {
             return resolveString(strValue, workload, alertTs, extraTokens, config);
         } else if (value instanceof Map<?, ?> mapValue) {
-            Map<String, Object> nested = new HashMap<>();
-            ((Map<String, Object>) mapValue).forEach((k, v) ->
-                    nested.put(k, resolveValue(v, workload, alertTs, extraTokens, config)));
-            return nested;
+            return resolveMap((Map<String, Object>) mapValue, workload, alertTs, extraTokens, config);
         } else if (value instanceof List<?> listValue) {
             return listValue.stream()
                     .map(e -> resolveValue(e, workload, alertTs, extraTokens, config))
