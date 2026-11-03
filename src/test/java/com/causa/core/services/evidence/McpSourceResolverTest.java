@@ -30,7 +30,7 @@ class McpSourceResolverTest {
         McpSettings settings = new ObjectMapper()
             .readValue(new File(SHIPPED_CLUSTER_CONFIG), McpSettings.class);
 
-        McpRegistry registry = new McpRegistry(null);
+        McpRegistry registry = new McpRegistry(null, null);
         registry.init(settings);
         McpSourceResolver resolver = new McpSourceResolver(registry);
 
@@ -47,7 +47,7 @@ class McpSourceResolverTest {
      */
     @Test
     void doesNotCacheTheTableBuiltFromAnUninitialisedRegistry() {
-        McpRegistry registry = new McpRegistry(null);
+        McpRegistry registry = new McpRegistry(null, null);
         McpSourceResolver resolver = new McpSourceResolver(registry);
 
         assertThat(resolver.resolve("POD_STATUS")).isEqualTo("unknown");
