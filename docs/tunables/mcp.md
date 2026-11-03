@@ -209,7 +209,7 @@ are stored in the `external_configs` database table:
 | Column | Value |
 |---|---|
 | `platform` | `INSTANA` |
-| `category` | `INTEGRATION` |
+| `category` | `OBSERVABILITY` |
 | `name` | `mcp` |
 | `url` | Instana instance URL (e.g. `https://maroon-tenant.instana.io/`) |
 | `authConfig.token` | Instana API key (AES-256-GCM encrypted in DB) |
