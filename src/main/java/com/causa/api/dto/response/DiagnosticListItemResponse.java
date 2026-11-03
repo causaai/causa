@@ -6,6 +6,7 @@ import com.causa.core.domain.RootCauseAnalysis;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
  * Diagnostic list-item DTO — returned by GET /api/v1/diagnostics.
@@ -46,12 +47,12 @@ public record DiagnosticListItemResponse(
     @JsonProperty("ticket_link")
     String ticketLink,
 
-    @JsonProperty("jira_configured")
-    boolean jiraConfigured
+    @JsonProperty("ticket_tracker")
+    List<String> ticketTracker
 
 ) {
     public static DiagnosticListItemResponse from(Diagnostic diagnostic, Alert alert,
-                                                   String clusterName, boolean jiraConfigured) {
+                                                   String clusterName, List<String> ticketTracker) {
         RootCauseAnalysis rca = diagnostic.getRca();
         String issueTitle   = rca != null ? rca.issueTitle()   : null;
         String issueSummary = rca != null ? rca.issueSummary() : null;
@@ -72,7 +73,7 @@ public record DiagnosticListItemResponse(
             cluster,
             diagnostic.getGeneratedAt(),
             diagnostic.getTicketLink(),
-            jiraConfigured
+            ticketTracker
         );
     }
 }

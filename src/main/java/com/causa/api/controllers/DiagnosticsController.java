@@ -11,6 +11,7 @@ import com.causa.common.logging.LogMessages;
 import com.causa.config.ExternalConfigCache;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
+import com.causa.core.domain.ExternalConfig;
 import com.causa.core.domain.PageRequest;
 import com.causa.core.domain.PageResult;
 import com.causa.core.ports.AlertRepository;
@@ -29,6 +30,8 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Diagnostics Controller
@@ -80,11 +83,11 @@ public class DiagnosticsController {
         Diagnostic.Filter filter = new Diagnostic.Filter(workloadName, namespace);
         PageResult<Diagnostic> result = diagnosticService.listDiagnostics(filter, PageRequest.of(page, pageSize));
 
-        boolean jiraConfigured = isJiraConfigured();
+        List<String> ticketTracker = getTicketTrackers();
         List<DiagnosticListItemResponse> items = result.items().stream()
             .map(d -> {
                 Alert alert = alertRepository.findById(d.getAlertId()).orElse(null);
-                return DiagnosticListItemResponse.from(d, alert, clusterName, jiraConfigured);
+                return DiagnosticListItemResponse.from(d, alert, clusterName, ticketTracker);
             })
             .toList();
 
@@ -135,18 +138,33 @@ public class DiagnosticsController {
             .field("diagnosticId", diagnosticId)
             .log();
 
-        return Response.ok(DiagnosticDetailResponse.from(diagnostic, alert, clusterName, isJiraConfigured())).build();
+        return Response.ok(DiagnosticDetailResponse.from(diagnostic, alert, clusterName, getTicketTrackers())).build();
     }
 
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 
-    /** True when an active JIRA integration exists; read from the in-memory cache, no DB call. */
-    private boolean isJiraConfigured() {
-        return externalConfigCache
+    /**
+     * Integration platforms that can act as a ticket tracker, in the order they are reported.
+     * Add an entry here (e.g. GITHUB) once its ticket creation is supported.
+     */
+    private static final List<IntegrationPlatform> TICKET_TRACKERS = List.of(IntegrationPlatform.JIRA);
+
+    /**
+     * Names of the ticket trackers with an active integration (e.g. {@code ["JIRA"]}), empty when none;
+     * read from the in-memory cache, no DB call.
+     */
+    private List<String> getTicketTrackers() {
+        Set<String> active = externalConfigCache
             .getByCategory(PlatformCategory.INTEGRATION)
             .stream()
-            .anyMatch(c -> IntegrationPlatform.JIRA.name().equalsIgnoreCase(c.getPlatform()) && c.isActive());
+            .filter(ExternalConfig::isActive)
+            .map(c -> c.getPlatform().toUpperCase())
+            .collect(Collectors.toSet());
+        return TICKET_TRACKERS.stream()
+            .map(IntegrationPlatform::name)
+            .filter(active::contains)
+            .toList();
     }
 }

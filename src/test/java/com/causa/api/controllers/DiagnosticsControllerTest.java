@@ -58,8 +58,8 @@ class DiagnosticsControllerTest {
 
     @BeforeEach
     void setUp() {
-        // Return an empty integration list by default — jira_configured = false in all existing tests.
-        // lenient() because the 404 test exits before isJiraConfigured() is ever reached.
+        // Return an empty integration list by default — ticket_tracker is empty in all existing tests.
+        // lenient() because the 404 test exits before getTicketTrackers() is ever reached.
         lenient().when(externalConfigCache.getByCategory(PlatformCategory.INTEGRATION)).thenReturn(List.of());
         controller = new DiagnosticsController(diagnosticService, alertRepository, externalConfigCache, CLUSTER_NAME);
     }
@@ -222,18 +222,20 @@ class DiagnosticsControllerTest {
         }
 
         @Test
-        @DisplayName("Should report jira_configured true only for an active JIRA integration")
-        void shouldReportJiraConfiguredOnlyWhenActive() {
+        @DisplayName("Should list JIRA in ticket_tracker only for an active JIRA integration")
+        void shouldListJiraInTicketTrackerOnlyWhenActive() {
             when(diagnosticService.getDiagnosticById("d1")).thenReturn(Optional.of(buildDiagnostic("d1", "a1")));
             when(alertRepository.findById("a1")).thenReturn(Optional.of(buildAlert("a1")));
 
             when(externalConfigCache.getByCategory(PlatformCategory.INTEGRATION))
                     .thenReturn(List.of(jiraConfig(true)));
-            assertTrue(((DiagnosticDetailResponse) controller.getDiagnostic("d1").getEntity()).jiraConfigured());
+            assertEquals(List.of("JIRA"),
+                    ((DiagnosticDetailResponse) controller.getDiagnostic("d1").getEntity()).ticketTracker());
 
             when(externalConfigCache.getByCategory(PlatformCategory.INTEGRATION))
                     .thenReturn(List.of(jiraConfig(false)));
-            assertFalse(((DiagnosticDetailResponse) controller.getDiagnostic("d1").getEntity()).jiraConfigured());
+            assertEquals(List.of(),
+                    ((DiagnosticDetailResponse) controller.getDiagnostic("d1").getEntity()).ticketTracker());
         }
 
         @Test

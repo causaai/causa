@@ -55,8 +55,8 @@ public record DiagnosticDetailResponse(
     @JsonProperty("ticket_link")
     String ticketLink,
 
-    @JsonProperty("jira_configured")
-    boolean jiraConfigured
+    @JsonProperty("ticket_tracker")
+    List<String> ticketTracker
 
 ) {
 
@@ -134,7 +134,7 @@ public record DiagnosticDetailResponse(
     // -------------------------------------------------------------------------
 
     public static DiagnosticDetailResponse from(Diagnostic diagnostic, Alert alert,
-                                                 String clusterName, boolean jiraConfigured) {
+                                                 String clusterName, List<String> ticketTracker) {
         String cluster = (clusterName != null && !clusterName.isBlank()) ? clusterName : "default";
 
         // workload_info — all fields from Alert.WorkloadInfo; workload_name = denormalised column
@@ -200,7 +200,7 @@ public record DiagnosticDetailResponse(
             diagnosisInfo,
             diagnostic.getValidationResult(),
             diagnostic.getTicketLink(),
-            jiraConfigured
+            ticketTracker
         );
     }
 
