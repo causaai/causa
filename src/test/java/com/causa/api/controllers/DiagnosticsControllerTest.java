@@ -8,7 +8,9 @@ import com.causa.common.constants.ConfigConstants.PlatformCategory;
 import com.causa.common.constants.DiagnosticConstants.DiagnosticStatus;
 import com.causa.config.ExternalConfigCache;
 import com.causa.core.domain.Alert;
+import com.causa.core.domain.AuthConfig;
 import com.causa.core.domain.Diagnostic;
+import com.causa.core.domain.ExternalConfig;
 import com.causa.core.domain.PageRequest;
 import com.causa.core.domain.PageResult;
 import com.causa.core.ports.AlertRepository;
@@ -71,11 +73,11 @@ class DiagnosticsControllerTest {
                 .build();
     }
 
-    private static com.causa.core.domain.ExternalConfig jiraConfig(boolean active) {
-        return com.causa.core.domain.ExternalConfig.builder()
+    private static ExternalConfig jiraConfig(boolean active) {
+        return ExternalConfig.builder()
                 .id("cfg-1").name("jira").platform("JIRA")
                 .category(PlatformCategory.INTEGRATION).isActive(active)
-                .authConfig(new com.causa.core.domain.AuthConfig(null, null, null, null, null, null, null, null))
+                .authConfig(new AuthConfig(null, null, null, null, null, null, null, null))
                 .build();
     }
 

@@ -4,6 +4,7 @@ import com.causa.api.dto.response.DiagnosticDetailResponse;
 import com.causa.api.dto.response.DiagnosticListItemResponse;
 import com.causa.api.dto.response.ErrorResponse;
 import com.causa.common.constants.ApiConstants;
+import com.causa.common.constants.ConfigConstants.IntegrationPlatform;
 import com.causa.common.constants.ConfigConstants.PlatformCategory;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
@@ -146,6 +147,6 @@ public class DiagnosticsController {
         return externalConfigCache
             .getByCategory(PlatformCategory.INTEGRATION)
             .stream()
-            .anyMatch(c -> "JIRA".equals(c.getPlatform()) && c.isActive());
+            .anyMatch(c -> IntegrationPlatform.JIRA.name().equalsIgnoreCase(c.getPlatform()) && c.isActive());
     }
 }
