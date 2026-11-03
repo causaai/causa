@@ -780,8 +780,15 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             // Rank and deduplicate the harvested evidence (if ranker available)
             if (evidenceRanker.isPresent() && harvestedEvidence != null && !harvestedEvidence.isEmpty()) {
                 try {
-                    // Validation status drives the ranker's refuting-priority rule.
-                    String validationStatus = determineValidationResult(validatedRCA);
+                    // Get validation score and status
+                    double validationScore = validatedRCA.dualValidation() != null ?
+                        validatedRCA.dualValidation().finalVerdict().confidence() :
+                        validatedRCA.summary().averageConfidence();
+
+                    if (!allEvidence.isEmpty()) {
+                        // Get validation score and status
+                        double validationScore = resolveValidationScore(validatedRCA)
+                            .orElse(validatedRCA.summary().averageConfidence());
 
                     // Build RCA summary
                     RcaSummary rcaSummary = new RcaSummary(
@@ -891,13 +898,20 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                 }
             }
 
+            // Validation score replaces the RCA-generation score set by persistCompletedDiagnostic;
+            // when validation produced no score, the RCA's score is kept
+            java.util.OptionalDouble validationScore = resolveValidationScore(validatedRCA);
+            Float confidenceScore = validationScore.isPresent()
+                ? Float.valueOf((float) validationScore.getAsDouble())
+                : base.getConfidenceScore();
+
             // Layer validation fields on top of the already-persisted base diagnostic
             Diagnostic updated = Diagnostic.builder()
                 .diagnosticId(base.getDiagnosticId())
                 .alertId(base.getAlertId())
                 .status(base.getStatus())
                 .generatedAt(base.getGeneratedAt())
-                .confidenceScore(base.getConfidenceScore())
+                .confidenceScore(confidenceScore)
                 .faultDomain(base.getFaultDomain())
                 .rca(base.getRca())
                 .validationResult(validationResult)
@@ -1040,6 +1054,24 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                 .generatedAt(diagnostic.getGeneratedAt())
                 .build();
         }
+    }
+
+    /**
+     * Resolves the validation score (0.0 - 1.0): the final verdict's confidence when dual
+     * validation ran, otherwise the average assertion confidence.
+     *
+     * <p>Empty when validation produced nothing to score (validator unavailable, or no
+     * assertions validated). The average of no results is 0.0, which would read as "0%
+     * confidence" rather than "not validated", so it is deliberately not returned.
+     */
+    java.util.OptionalDouble resolveValidationScore(ValidatedRCA validatedRCA) {
+        if (validatedRCA.dualValidation() != null) {
+            return java.util.OptionalDouble.of(validatedRCA.dualValidation().finalVerdict().confidence());
+        }
+        if (!validatedRCA.validationResults().isEmpty()) {
+            return java.util.OptionalDouble.of(validatedRCA.summary().averageConfidence());
+        }
+        return java.util.OptionalDouble.empty();
     }
 
     /**

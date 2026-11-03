@@ -153,7 +153,15 @@ public record DiagnosticDetailResponse(
 
         DiagnosisInfo diagnosisInfo = null;
         if (rca != null) {
-            Double rcaScore    = rca.confidenceSummary() != null ? rca.confidenceSummary().rcaConfidenceScore() : null;
+            // Persisted score is the validation score once validation has run; before that (or if
+            // validation failed) fall back to the score the LLM generated with the RCA.
+            Double rcaScore;
+            if (diagnostic.getConfidenceScore() != null) {
+                // Float.toString avoids float-widening noise (0.85f -> 0.8500000238...)
+                rcaScore = Double.parseDouble(Float.toString(diagnostic.getConfidenceScore()));
+            } else {
+                rcaScore = rca.confidenceSummary() != null ? rca.confidenceSummary().rcaConfidenceScore() : null;
+            }
             String summaryText = rca.confidenceSummary() != null ? rca.confidenceSummary().summaryText()        : null;
 
             List<RecommendationInfo> recommendations = null;
