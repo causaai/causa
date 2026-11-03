@@ -255,7 +255,7 @@
           "arguments": {
             "resource_type": "configuration",
             "operation": "get_all",
-            "params": { "page_size": 10 }
+            "params": { "page_size": 10, "query": "${containerName}" }
           }
         },
         {

@@ -33,6 +33,7 @@ public class McpClient {
     private final McpSettings.ServerConfig config;
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private volatile Map<String, String> runtimeHeaders = Map.of();
 
     public McpClient(String serverName, McpSettings.ServerConfig config) {
         this.serverName = serverName;
@@ -60,7 +61,9 @@ public class McpClient {
 
             HttpResponse<Void> response = httpClient.send(request, HttpResponse.BodyHandlers.discarding());
             long latency = System.currentTimeMillis() - startTime;
-            boolean isHealthy = response.statusCode() >= 200 && response.statusCode() < 300;
+            int statusCode = response.statusCode();
+            boolean isHealthy = (statusCode >= 200 && statusCode < 300)
+                    || (statusCode == 405 && McpConstants.Instana.SERVER_NAME.equals(serverName));
 
             ComponentHealthDto.Builder builder = ComponentHealthDto.builder()
                     .status(isHealthy
@@ -95,19 +98,14 @@ public class McpClient {
 
     /**
      * Calls an MCP tool via JSON-RPC 2.0/SSE and returns its extracted text payload, or
-     * {@code null} on any failure.
+     * {@code null} on any failure. Supports nested argument maps — nested {@code Map} values
+     * are serialised as JSON objects, {@code List} values as arrays, and string
+     * {@code "true"}/{@code "false"} values are coerced to booleans for backward compatibility.
      */
-    public String callTool(String toolName, Map<String, String> arguments) {
+    public String callTool(String toolName, Map<String, ?> arguments) {
         try {
             String sessionId = initializeMcpSession();
-            ObjectNode args = objectMapper.createObjectNode();
-            arguments.forEach((key, value) -> {
-                if ("true".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value)) {
-                    args.put(key, Boolean.parseBoolean(value));
-                } else {
-                    args.put(key, value);
-                }
-            });
+            ObjectNode args = toObjectNode(arguments);
             JsonNode result = callMcpTool(sessionId, toolName, args);
             return extractTextFromContent(result);
         } catch (Exception e) {
@@ -119,6 +117,42 @@ public class McpClient {
                     .log();
             return null;
         }
+    }
+
+    public void setRuntimeHeaders(Map<String, String> headers) {
+        this.runtimeHeaders = headers != null ? Map.copyOf(headers) : Map.of();
+    }
+
+    private HttpRequest.Builder newRequestBuilder(String sessionId) {
+        HttpRequest.Builder builder = HttpRequest.newBuilder()
+                .uri(URI.create(config.url()))
+                .header(McpConstants.Headers.CONTENT_TYPE, McpConstants.Headers.CONTENT_TYPE_JSON)
+                .header(McpConstants.Headers.ACCEPT, McpConstants.Headers.ACCEPT_VALUE);
+        config.headers().forEach(builder::header);
+        runtimeHeaders.forEach(builder::header);
+        if (sessionId != null) {
+            builder.header(McpConstants.Headers.MCP_SESSION_ID, sessionId);
+        }
+        return builder;
+    }
+
+    @SuppressWarnings("unchecked")
+    private ObjectNode toObjectNode(Map<String, ?> map) {
+        ObjectNode node = objectMapper.createObjectNode();
+        map.forEach((key, value) -> {
+            if (value instanceof String strValue) {
+                if ("true".equalsIgnoreCase(strValue) || "false".equalsIgnoreCase(strValue)) {
+                    node.put(key, Boolean.parseBoolean(strValue));
+                } else {
+                    node.put(key, strValue);
+                }
+            } else if (value instanceof Map<?, ?> mapValue) {
+                node.set(key, toObjectNode((Map<String, ?>) mapValue));
+            } else {
+                node.set(key, objectMapper.valueToTree(value));
+            }
+        });
+        return node;
     }
 
     private String initializeMcpSession() throws Exception {
@@ -138,10 +172,7 @@ public class McpClient {
         initRequest.set(McpConstants.JsonRpc.FIELD_PARAMS, params);
 
         int timeoutMs = config.timeoutMs();
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(config.url()))
-                .header(McpConstants.Headers.CONTENT_TYPE, McpConstants.Headers.CONTENT_TYPE_JSON)
-                .header(McpConstants.Headers.ACCEPT, McpConstants.Headers.ACCEPT_VALUE)
+        HttpRequest request = newRequestBuilder(null)
                 .POST(HttpRequest.BodyPublishers.ofString(initRequest.toString()))
                 .timeout(Duration.ofMillis(timeoutMs))
                 .build();
@@ -163,11 +194,7 @@ public class McpClient {
         notification.put(McpConstants.JsonRpc.FIELD_JSONRPC, McpConstants.JsonRpc.VERSION);
         notification.put(McpConstants.JsonRpc.FIELD_METHOD, McpConstants.JsonRpc.METHOD_NOTIFICATIONS_INITIALIZED);
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(config.url()))
-                .header(McpConstants.Headers.CONTENT_TYPE, McpConstants.Headers.CONTENT_TYPE_JSON)
-                .header(McpConstants.Headers.ACCEPT, McpConstants.Headers.ACCEPT_VALUE)
-                .header(McpConstants.Headers.MCP_SESSION_ID, sessionId)
+        HttpRequest request = newRequestBuilder(sessionId)
                 .POST(HttpRequest.BodyPublishers.ofString(notification.toString()))
                 .timeout(Duration.ofMillis(timeoutMs))
                 .build();
@@ -186,11 +213,7 @@ public class McpClient {
         params.set(McpConstants.JsonRpc.PARAM_ARGUMENTS, arguments);
         toolRequest.set(McpConstants.JsonRpc.FIELD_PARAMS, params);
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(config.url()))
-                .header(McpConstants.Headers.CONTENT_TYPE, McpConstants.Headers.CONTENT_TYPE_JSON)
-                .header(McpConstants.Headers.ACCEPT, McpConstants.Headers.ACCEPT_VALUE)
-                .header(McpConstants.Headers.MCP_SESSION_ID, sessionId)
+        HttpRequest request = newRequestBuilder(sessionId)
                 .POST(HttpRequest.BodyPublishers.ofString(toolRequest.toString()))
                 .timeout(Duration.ofMillis(config.timeoutMs()))
                 .build();

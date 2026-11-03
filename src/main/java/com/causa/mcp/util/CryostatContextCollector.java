@@ -46,7 +46,7 @@ public final class CryostatContextCollector {
 
         String namespace = alert.getWorkloadInfo().namespace();
         String podName = alert.getWorkloadInfo().podName();
-        Map<String, String> discoveryArgs = McpRegistry.resolveArguments(
+        Map<String, Object> discoveryArgs = McpRegistry.resolveArguments(
                 discoveryTool.arguments(), alert, client.getConfig(), Map.of());
         String discoveryRaw = client.callTool(discoveryTool.name(), discoveryArgs);
         String discoveryKey = contextKey(discoveryTool, DISCOVERY_CONTEXT_KEY);
@@ -68,7 +68,7 @@ public final class CryostatContextCollector {
         Map<String, String> extraTokens = Map.of(
                 "fromTimestamp", from.toString(),
                 "toTimestamp", to.toString());
-        Map<String, String> reportArgs = McpRegistry.resolveArguments(
+        Map<String, Object> reportArgs = McpRegistry.resolveArguments(
                 reportTool.arguments(), alert, client.getConfig(), extraTokens);
         String reportRaw = client.callTool(reportTool.name(), reportArgs);
         String analysisKey = contextKey(reportTool, ANALYSIS_CONTEXT_KEY);
