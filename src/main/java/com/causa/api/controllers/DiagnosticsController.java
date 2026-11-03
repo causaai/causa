@@ -4,10 +4,14 @@ import com.causa.api.dto.response.DiagnosticDetailResponse;
 import com.causa.api.dto.response.DiagnosticListItemResponse;
 import com.causa.api.dto.response.ErrorResponse;
 import com.causa.common.constants.ApiConstants;
+import com.causa.common.constants.ConfigConstants.IntegrationPlatform;
+import com.causa.common.constants.ConfigConstants.PlatformCategory;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
+import com.causa.config.ExternalConfigCache;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
+import com.causa.core.domain.ExternalConfig;
 import com.causa.core.domain.PageRequest;
 import com.causa.core.domain.PageResult;
 import com.causa.core.ports.AlertRepository;
@@ -26,6 +30,8 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Diagnostics Controller
@@ -43,15 +49,18 @@ public class DiagnosticsController {
 
     private final DiagnosticService diagnosticService;
     private final AlertRepository alertRepository;
+    private final ExternalConfigCache externalConfigCache;
     private final String clusterName;
 
     @Inject
     public DiagnosticsController(DiagnosticService diagnosticService,
                                   AlertRepository alertRepository,
+                                  ExternalConfigCache externalConfigCache,
                                   @ConfigProperty(name = "causa.cluster.name", defaultValue = "default")
                                   String clusterName) {
         this.diagnosticService = diagnosticService;
         this.alertRepository   = alertRepository;
+        this.externalConfigCache = externalConfigCache;
         this.clusterName       = clusterName;
     }
 
@@ -74,10 +83,11 @@ public class DiagnosticsController {
         Diagnostic.Filter filter = new Diagnostic.Filter(workloadName, namespace);
         PageResult<Diagnostic> result = diagnosticService.listDiagnostics(filter, PageRequest.of(page, pageSize));
 
+        List<String> ticketTracker = getTicketTrackers();
         List<DiagnosticListItemResponse> items = result.items().stream()
             .map(d -> {
                 Alert alert = alertRepository.findById(d.getAlertId()).orElse(null);
-                return DiagnosticListItemResponse.from(d, alert, clusterName);
+                return DiagnosticListItemResponse.from(d, alert, clusterName, ticketTracker);
             })
             .toList();
 
@@ -128,6 +138,33 @@ public class DiagnosticsController {
             .field("diagnosticId", diagnosticId)
             .log();
 
-        return Response.ok(DiagnosticDetailResponse.from(diagnostic, alert, clusterName)).build();
+        return Response.ok(DiagnosticDetailResponse.from(diagnostic, alert, clusterName, getTicketTrackers())).build();
+    }
+
+    // -------------------------------------------------------------------------
+    // Helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Integration platforms that can act as a ticket tracker, in the order they are reported.
+     * Add an entry here (e.g. GITHUB) once its ticket creation is supported.
+     */
+    private static final List<IntegrationPlatform> TICKET_TRACKERS = List.of(IntegrationPlatform.JIRA);
+
+    /**
+     * Names of the ticket trackers with an active integration (e.g. {@code ["JIRA"]}), empty when none;
+     * read from the in-memory cache, no DB call.
+     */
+    private List<String> getTicketTrackers() {
+        Set<String> active = externalConfigCache
+            .getByCategory(PlatformCategory.INTEGRATION)
+            .stream()
+            .filter(ExternalConfig::isActive)
+            .map(c -> c.getPlatform().toUpperCase())
+            .collect(Collectors.toSet());
+        return TICKET_TRACKERS.stream()
+            .map(IntegrationPlatform::name)
+            .filter(active::contains)
+            .toList();
     }
 }

@@ -4,9 +4,13 @@ import com.causa.api.dto.response.DiagnosticDetailResponse;
 import com.causa.api.dto.response.DiagnosticListItemResponse;
 import com.causa.common.constants.AlertConstants.AlertSeverity;
 import com.causa.common.constants.AlertConstants.AlertStatus;
+import com.causa.common.constants.ConfigConstants.PlatformCategory;
 import com.causa.common.constants.DiagnosticConstants.DiagnosticStatus;
+import com.causa.config.ExternalConfigCache;
 import com.causa.core.domain.Alert;
+import com.causa.core.domain.AuthConfig;
 import com.causa.core.domain.Diagnostic;
+import com.causa.core.domain.ExternalConfig;
 import com.causa.core.domain.PageRequest;
 import com.causa.core.domain.PageResult;
 import com.causa.core.ports.AlertRepository;
@@ -45,13 +49,19 @@ class DiagnosticsControllerTest {
     @Mock
     private AlertRepository alertRepository;
 
+    @Mock
+    private ExternalConfigCache externalConfigCache;
+
     private DiagnosticsController controller;
 
     private static final String CLUSTER_NAME = "test-cluster";
 
     @BeforeEach
     void setUp() {
-        controller = new DiagnosticsController(diagnosticService, alertRepository, CLUSTER_NAME);
+        // Return an empty integration list by default — ticket_tracker is empty in all existing tests.
+        // lenient() because the 404 test exits before getTicketTrackers() is ever reached.
+        lenient().when(externalConfigCache.getByCategory(PlatformCategory.INTEGRATION)).thenReturn(List.of());
+        controller = new DiagnosticsController(diagnosticService, alertRepository, externalConfigCache, CLUSTER_NAME);
     }
 
     private static Diagnostic buildDiagnostic(String id, String alertId) {
@@ -60,6 +70,14 @@ class DiagnosticsControllerTest {
                 .alertId(alertId)
                 .status(DiagnosticStatus.COMPLETED)
                 .generatedAt(Instant.now())
+                .build();
+    }
+
+    private static ExternalConfig jiraConfig(boolean active) {
+        return ExternalConfig.builder()
+                .id("cfg-1").name("jira").platform("JIRA")
+                .category(PlatformCategory.INTEGRATION).isActive(active)
+                .authConfig(new AuthConfig(null, null, null, null, null, null, null, null))
                 .build();
     }
 
@@ -201,6 +219,23 @@ class DiagnosticsControllerTest {
             DiagnosticDetailResponse body = (DiagnosticDetailResponse) response.getEntity();
             assertEquals("diag-abc", body.id());
             assertEquals("COMPLETED", body.status());
+        }
+
+        @Test
+        @DisplayName("Should list JIRA in ticket_tracker only for an active JIRA integration")
+        void shouldListJiraInTicketTrackerOnlyWhenActive() {
+            when(diagnosticService.getDiagnosticById("d1")).thenReturn(Optional.of(buildDiagnostic("d1", "a1")));
+            when(alertRepository.findById("a1")).thenReturn(Optional.of(buildAlert("a1")));
+
+            when(externalConfigCache.getByCategory(PlatformCategory.INTEGRATION))
+                    .thenReturn(List.of(jiraConfig(true)));
+            assertEquals(List.of("JIRA"),
+                    ((DiagnosticDetailResponse) controller.getDiagnostic("d1").getEntity()).ticketTracker());
+
+            when(externalConfigCache.getByCategory(PlatformCategory.INTEGRATION))
+                    .thenReturn(List.of(jiraConfig(false)));
+            assertEquals(List.of(),
+                    ((DiagnosticDetailResponse) controller.getDiagnostic("d1").getEntity()).ticketTracker());
         }
 
         @Test

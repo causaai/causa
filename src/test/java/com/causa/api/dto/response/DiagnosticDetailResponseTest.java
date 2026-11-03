@@ -47,6 +47,30 @@ class DiagnosticDetailResponseTest {
     @Nested
     @DisplayName("from() Factory Tests")
     class FromFactoryTests {
+        @Test
+        @DisplayName("Should expose ticket_link and ticket_tracker")
+        void shouldMapTicketLinkAndTicketTracker() {
+            Diagnostic d = Diagnostic.builder().diagnosticId("diag-1").alertId("alert-1")
+                    .status(DiagnosticStatus.COMPLETED).generatedAt(Instant.parse("2025-06-01T12:00:00Z"))
+                    .ticketLink("https://jira.example.com/browse/OPS-1").build();
+
+            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, buildAlert("alert-1"), "cluster", List.of("JIRA"));
+
+            assertEquals("https://jira.example.com/browse/OPS-1", response.ticketLink());
+            assertEquals(List.of("JIRA"), response.ticketTracker());
+        }
+
+        @Test
+        @DisplayName("Should leave ticket_link null and ticket_tracker empty when neither is set")
+        void shouldDefaultTicketLinkNullAndTicketTrackerEmpty() {
+            Diagnostic d = buildDiagnostic("diag-1", "alert-1", DiagnosticStatus.COMPLETED);
+
+            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, buildAlert("alert-1"), "cluster", List.of());
+
+            assertNull(response.ticketLink());
+            assertEquals(List.of(), response.ticketTracker());
+        }
+
 
         @Test
         @DisplayName("Should map diagnostic id and status")
@@ -54,7 +78,7 @@ class DiagnosticDetailResponseTest {
             Diagnostic d = buildDiagnostic("diag-abc", "alert-abc", DiagnosticStatus.COMPLETED);
             Alert a = buildAlert("alert-abc");
 
-            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, a, "my-cluster");
+            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, a, "my-cluster", List.of());
 
             assertEquals("diag-abc", response.id());
             assertEquals("COMPLETED", response.status());
@@ -64,7 +88,7 @@ class DiagnosticDetailResponseTest {
         @DisplayName("Should map alertId from diagnostic")
         void shouldMapAlertId() {
             Diagnostic d = buildDiagnostic("diag-abc", "alert-abc", DiagnosticStatus.COMPLETED);
-            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, null, "cluster");
+            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, null, "cluster", List.of());
 
             assertEquals("alert-abc", response.alertId());
         }
@@ -75,7 +99,7 @@ class DiagnosticDetailResponseTest {
             Diagnostic d = buildDiagnostic("diag-abc", "alert-abc", DiagnosticStatus.COMPLETED);
             Alert a = buildAlert("alert-abc");
 
-            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, a, "cluster");
+            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, a, "cluster", List.of());
 
             assertEquals("HighMemory", response.alertName());
         }
@@ -86,7 +110,7 @@ class DiagnosticDetailResponseTest {
             Diagnostic d = buildDiagnostic("d", "a", DiagnosticStatus.COMPLETED);
             Alert a = buildAlert("a");
 
-            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, a, "cluster");
+            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, a, "cluster", List.of());
 
             assertEquals("critical", response.severity());
         }
@@ -97,7 +121,7 @@ class DiagnosticDetailResponseTest {
             Diagnostic d = buildDiagnostic("d", "a", DiagnosticStatus.COMPLETED);
             Alert a = buildAlert("a");
 
-            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, a, "cluster");
+            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, a, "cluster", List.of());
 
             assertEquals(Instant.parse("2025-06-01T11:55:00Z"), response.alertReceivedAt());
         }
@@ -108,7 +132,7 @@ class DiagnosticDetailResponseTest {
             Diagnostic d = buildDiagnostic("d", "a", DiagnosticStatus.COMPLETED);
             Alert a = buildAlert("a");
 
-            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, a, "my-cluster");
+            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, a, "my-cluster", List.of());
 
             assertNotNull(response.workloadInfo());
             assertEquals("pod-x", response.workloadInfo().podName());
@@ -123,7 +147,7 @@ class DiagnosticDetailResponseTest {
         void shouldHandleNullAlertGracefully() {
             Diagnostic d = buildDiagnostic("diag-1", "alert-orphan", DiagnosticStatus.FAILED);
 
-            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, null, "cluster");
+            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, null, "cluster", List.of());
 
             assertEquals("diag-1", response.id());
             assertNull(response.alertName());
@@ -138,7 +162,7 @@ class DiagnosticDetailResponseTest {
             Diagnostic d = buildDiagnostic("diag-1", "alert-1", DiagnosticStatus.IN_PROGRESS);
             Alert a = buildAlert("alert-1");
 
-            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, a, "cluster");
+            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, a, "cluster", List.of());
 
             assertNull(response.diagnosis());
         }
@@ -149,7 +173,7 @@ class DiagnosticDetailResponseTest {
             Diagnostic d = buildDiagnostic("d", "a", DiagnosticStatus.PENDING);
             Alert a = buildAlert("a");
 
-            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, a, "");
+            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, a, "", List.of());
 
             assertEquals("default", response.workloadInfo().clusterName());
         }
@@ -187,7 +211,7 @@ class DiagnosticDetailResponseTest {
                     .build();
 
             Alert a = buildAlert("alert-1");
-            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, a, "cluster");
+            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, a, "cluster", List.of());
 
             assertNotNull(response.diagnosis());
             assertEquals("CPU Resource Exhaustion", response.diagnosis().issueTitle());
@@ -223,7 +247,7 @@ class DiagnosticDetailResponseTest {
                     .rca(rca)
                     .build();
 
-            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, null, "cluster");
+            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, null, "cluster", List.of());
 
             assertNotNull(response.diagnosis().recommendations());
             assertEquals(2, response.diagnosis().recommendations().size());
@@ -301,7 +325,7 @@ class DiagnosticDetailResponseTest {
                     .allEvidence(allEvidence)
                     .build();
 
-            return DiagnosticDetailResponse.from(d, null, "cluster").diagnosis();
+            return DiagnosticDetailResponse.from(d, null, "cluster", List.of()).diagnosis();
         }
     }
 }
