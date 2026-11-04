@@ -1,9 +1,13 @@
 package com.causa.core.services.validation.impl;
 
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
+import com.causa.common.constants.ConfigConstants;
+import com.causa.common.constants.LLMConstants;
 import com.causa.common.constants.PromptConstants;
 import com.causa.common.logging.CausaLogger;
 import com.causa.config.LlmConfigCache;
@@ -31,13 +35,23 @@ import java.util.List;
 /**
  * Evidence ranking and deduplication with smart routing optimization.
  *
- * <p>Ranks PATH A evidence (from assertion validation). PATH B evidence (from rule engine)
- * bypasses ranking and goes directly to EvidenceItem storage.
+ * <p>Ranks all collected evidence from both paths — PATH A (assertion validation) and PATH B
+ * (rule engine) — as a single pool. Nothing bypasses ranking: the harvested evidence is handed
+ * here after validation status and score are finalized, and the ranked result is the final set.
  *
- * <p>For ≤3 items: sorts by existing relevanceScore (no additional LLM call).
- * For >3 items: uses LLM for intelligent ranking and deduplication.
+ * <p>Every non-empty set goes through the LLM so duplicates are merged before ranking — a set of
+ * two identical facts is exactly where deduplication matters, so there is no item-count shortcut.
+ * The deterministic sort by {@code relevanceScore} survives only as the fallback when the LLM call
+ * fails.
  *
- * <p>Note: relevanceScore is set during assertion validation by LLM or rule-based matcher.
+ * <p>Division of labour: the LLM only deduplicates and assigns a per-item RCA <em>relevance</em>
+ * score. The final ordering — {@code finalScore = 0.2 × strength + 0.8 × relevance}, sorted and
+ * capped at {@value #MAX_RANKED_ITEMS} — is computed here in code (see {@link #computeRanking}).
+ * The model does not reliably apply that arithmetic, so keeping it in code makes strength
+ * authoritative and the ranking deterministic.
+ *
+ * <p>Note: relevanceScore (the "strength" term) is set during assertion validation by LLM or
+ * rule-based matcher.
  *
  * @since 0.0.1
  */
@@ -45,8 +59,19 @@ import java.util.List;
 public class LlmEvidenceRanker implements EvidenceRanker {
 
     private static final CausaLogger log = CausaLogger.getLogger(LlmEvidenceRanker.class);
-    private static final int LLM_THRESHOLD = 3;
     private static final int MAX_RANKED_ITEMS = 20;
+
+    // Final ranking score = STRENGTH_WEIGHT × strength + RELEVANCE_WEIGHT × relevance.
+    // The LLM supplies relevance only; this arithmetic runs in code (see computeRanking) so
+    // strength provably counts rather than being left to the model, which does not apply it.
+    //
+    // Weights: relevance leads, strength refines. Relevance is quantized to tiers 0.25 apart, so
+    // one tier gap is 0.8 × 0.25 = 0.20 — exactly the full strength swing (0.2 × 1.0). Strength
+    // therefore orders items WITHIN a relevance tier and can reach, but never vault past, the next
+    // tier. That keeps "closeness to root cause" the primary ordering principle while strength stays
+    // a meaningful secondary (a 0.9-vs-0.1 strength gap is a 0.16 spread within a tier).
+    private static final double STRENGTH_WEIGHT = 0.2;
+    private static final double RELEVANCE_WEIGHT = 0.8;
 
     private final ChatModelFactory chatModelFactory;
     private final ObjectMapper objectMapper;
@@ -94,27 +119,21 @@ public class LlmEvidenceRanker implements EvidenceRanker {
                 .log();
         });
 
-        // Smart routing: ≤3 items = skip LLM ranking, sort by existing relevanceScore
-        // (relevanceScore was already calculated during assertion validation)
-        if (statementEvidence.size() <= LLM_THRESHOLD) {
-            log.info("Skipping LLM ranking (≤" + LLM_THRESHOLD + " items), sorting by existing relevanceScore")
-                .log();
-
-            List<String> rankedIds = statementEvidence.stream()
-                .sorted(Comparator.comparingDouble(ValidationEvidence::relevanceScore).reversed())
-                .limit(MAX_RANKED_ITEMS)
-                .map(ValidationEvidence::id)
-                .toList();
-
-            EvidenceRankingResponse response = new EvidenceRankingResponse(rankedIds, "Sorted by relevanceScore (no LLM ranking)");
-            logRankingResults(statementEvidence, response, "Deterministic (≤3 items)");
-            return response;
+        // Nothing to rank — return empty rather than calling the LLM with no evidence.
+        if (statementEvidence.isEmpty()) {
+            return new EvidenceRankingResponse(List.of(), "No evidence to rank");
         }
 
-        // >3 items: use LLM for intelligent ranking and deduplication
+        // Every non-empty set is deduplicated and ranked by the LLM — no item-count shortcut,
+        // since a pair of identical facts is exactly where deduplication matters.
         return rankWithLlm(rca, statementEvidence, validationScore, validationStatus);
     }
 
+    /**
+     * Runs the LLM ranking path: build prompt → call model → parse, falling back to a deterministic
+     * sort by {@code relevanceScore} if the call or parse fails. Invoked for every non-empty set by
+     * {@link #rankAndDeduplicate}.
+     */
     private EvidenceRankingResponse rankWithLlm(
             RcaSummary rca,
             List<ValidationEvidence> evidenceList,
@@ -122,8 +141,17 @@ public class LlmEvidenceRanker implements EvidenceRanker {
             String validationStatus) {
 
         try {
-            PromptTemplateLoader.PromptTemplate template = promptTemplateLoader.loadTemplate(resolveProvider(), "");
+            String provider = resolveProvider();
+            PromptTemplateLoader.PromptTemplate template = promptTemplateLoader.loadTemplate(provider, "");
             String compactPrompt = buildCompactPrompt(template, rca, evidenceList, validationScore, validationStatus);
+
+            // Record exactly which prompt was resolved — proof of identity, so a provider mismatch or
+            // silent fallback can never be mistaken for a passing run.
+            log.info("Evidence ranking prompt selected")
+                .field("name", template.name())
+                .field("version", template.version())
+                .field("provider", provider)
+                .log();
 
             log.info("Calling LLM for evidence ranking")
                 .field("evidenceCount", evidenceList.size())
@@ -148,7 +176,18 @@ public class LlmEvidenceRanker implements EvidenceRanker {
                 .field("responsePreview", responseText.substring(0, Math.min(200, responseText.length())))
                 .log();
 
-            EvidenceRankingResponse rankingResponse = parseResponse(responseText);
+            // The LLM returns only {id, relevance} per non-duplicate item — it does not sort or cap.
+            Map<String, Double> relevanceById = parseRelevanceScores(responseText);
+            if (relevanceById.isEmpty()) {
+                // A well-formed response with no usable scores is as unusable as a parse failure —
+                // route it to the deterministic fallback rather than returning an empty ranking.
+                throw new IllegalStateException("LLM returned no evidence relevance scores");
+            }
+
+            // Scoring, sorting and the top-N cap all happen here in code so strength provably counts.
+            List<String> rankedIds = computeRanking(evidenceList, relevanceById, MAX_RANKED_ITEMS);
+            EvidenceRankingResponse rankingResponse = new EvidenceRankingResponse(
+                rankedIds, "LLM relevance + code-side scoring (0.2×strength + 0.8×relevance)");
 
             // Log output ranking results
             logRankingResults(evidenceList, rankingResponse, "LLM");
@@ -174,10 +213,24 @@ public class LlmEvidenceRanker implements EvidenceRanker {
     }
 
     private String resolveProvider() {
-        String providerName = llmConfigCache.getActive()
-            .map(config -> config.getProvider().name())
-            .orElse("anthropic");
-        return providerName.toLowerCase().replace("_", "-");
+        return llmConfigCache.getActive()
+            .map(config -> toTemplateProvider(config.getProvider()))
+            .orElse(LLMConstants.Provider.ANTHROPIC);
+    }
+
+    /**
+     * Maps the stored provider enum onto the provider id used in the prompt template YAML.
+     *
+     * <p>VERTEX_AI serves Anthropic models on Vertex, so it must resolve to the
+     * {@code "vertex-ai-anthropic"} template entry — the bare enum name ({@code "vertex-ai"}) matches
+     * nothing in the template and would silently force the default fallback.
+     */
+    private static String toTemplateProvider(ConfigConstants.LlmProvider provider) {
+        return switch (provider) {
+            case VERTEX_AI -> LLMConstants.Provider.VERTEX_AI_ANTHROPIC;
+            case ANTHROPIC -> LLMConstants.Provider.ANTHROPIC;
+            case BOB -> LLMConstants.Provider.IBM_BOB;
+        };
     }
 
     private String buildCompactPrompt(
@@ -188,7 +241,7 @@ public class LlmEvidenceRanker implements EvidenceRanker {
             String validationStatus) {
 
         // Evidence format: "ID: statement [strength: score]"
-        // Strength = assertion-level relevanceScore (used in formula: 0.4 × strength + 0.6 × relevance)
+        // Strength = assertion-level relevanceScore (used in formula: 0.2 × strength + 0.8 × relevance)
         String evidenceCompact = evidenceList.stream()
             .map(ev -> String.format("%s: %s [strength: %.2f]", ev.id(), ev.statement(), ev.relevanceScore()))
             .collect(Collectors.joining("\n"));
@@ -200,7 +253,15 @@ public class LlmEvidenceRanker implements EvidenceRanker {
             .replace("{{evidence_compact}}", evidenceCompact);
     }
 
-    private EvidenceRankingResponse parseResponse(String response) throws JsonProcessingException {
+    /**
+     * Parses the LLM response into a map of evidence id → RCA relevance score (0.0–1.0).
+     *
+     * <p>The LLM only deduplicates and scores relevance; it neither sorts nor caps. Items it merged
+     * as duplicates are simply absent from the returned map. The final ranking is computed from this
+     * map in {@link #computeRanking}. Insertion order is preserved (a {@link LinkedHashMap}) so the
+     * sort is a stable reordering of what the model returned.
+     */
+    private Map<String, Double> parseRelevanceScores(String response) throws JsonProcessingException {
         // Extract JSON from response - robust handling of markdown, mixed text, and embedded JSON
         String jsonStr = response.trim();
 
@@ -224,14 +285,14 @@ public class LlmEvidenceRanker implements EvidenceRanker {
             }
         }
 
-        // Strategy 2: Look for JSON object with rankedEvidenceIds field
+        // Strategy 2: Look for JSON object with evidenceScores field
         if (!jsonStr.startsWith("{")) {
             // First try to find the exact pattern we expect
-            int jsonStart = jsonStr.indexOf("{\"rankedEvidenceIds\"");
+            int jsonStart = jsonStr.indexOf("{\"evidenceScores\"");
 
             // If not found, try with spaces
             if (jsonStart == -1) {
-                jsonStart = jsonStr.indexOf("{ \"rankedEvidenceIds\"");
+                jsonStart = jsonStr.indexOf("{ \"evidenceScores\"");
             }
 
             // If still not found, just find the first opening brace
@@ -266,14 +327,56 @@ public class LlmEvidenceRanker implements EvidenceRanker {
             .log();
 
         JsonNode json = objectMapper.readTree(jsonStr);
-        List<String> rankedIds = objectMapper.convertValue(
-            json.get("rankedEvidenceIds"),
-            objectMapper.getTypeFactory().constructCollectionType(List.class, String.class)
-        );
+        JsonNode scores = json.get("evidenceScores");
 
-        String reasoning = json.has("reasoning") ? json.get("reasoning").asText() : "LLM ranking";
+        Map<String, Double> relevanceById = new LinkedHashMap<>();
+        if (scores != null && scores.isArray()) {
+            for (JsonNode item : scores) {
+                JsonNode idNode = item.get("id");
+                JsonNode relevanceNode = item.get("relevance");
+                if (idNode != null && relevanceNode != null) {
+                    relevanceById.put(idNode.asText(), relevanceNode.asDouble());
+                }
+            }
+        }
 
-        return new EvidenceRankingResponse(rankedIds, reasoning);
+        return relevanceById;
+    }
+
+    /**
+     * Computes the final evidence ranking in code: {@code finalScore = 0.2 × strength + 0.8 ×
+     * relevance}, sorted descending, capped at {@code cap} items.
+     *
+     * <p>Strength is the assertion-level {@code relevanceScore} carried on each input item;
+     * relevance is the per-item RCA score the LLM returned. Running this arithmetic here — rather
+     * than trusting the model to apply it — makes strength authoritative and the ordering
+     * deterministic and unit-testable. Ids the LLM omitted (merged duplicates) and ids with no
+     * matching input item are dropped.
+     *
+     * <p>Package-private and static so the formula can be exercised directly, without an LLM call.
+     */
+    static List<String> computeRanking(
+            List<ValidationEvidence> evidenceList,
+            Map<String, Double> relevanceById,
+            int cap) {
+
+        Map<String, ValidationEvidence> byId = evidenceList.stream()
+            .collect(Collectors.toMap(ValidationEvidence::id, ev -> ev, (a, b) -> a, LinkedHashMap::new));
+
+        return relevanceById.entrySet().stream()
+            .filter(e -> byId.containsKey(e.getKey()))
+            .sorted(Comparator.comparingDouble(
+                    (Map.Entry<String, Double> e) ->
+                        finalScore(byId.get(e.getKey()).relevanceScore(), e.getValue()))
+                .reversed())
+            .limit(cap)
+            .map(Map.Entry::getKey)
+            .toList();
+    }
+
+    /** Final ranking score — strength and relevance combined, strength weighted at 0.4. */
+    static double finalScore(double strength, double relevance) {
+        return STRENGTH_WEIGHT * strength + RELEVANCE_WEIGHT * relevance;
     }
 
     /**

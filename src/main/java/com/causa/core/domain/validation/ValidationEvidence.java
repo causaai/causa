@@ -135,6 +135,12 @@ public record ValidationEvidence(
         /** Kubernetes pod status or events */
         KUBERNETES_EVENT,
 
+        /** Pod status (phase, conditions) */
+        POD_STATUS,
+
+        /** Container status (exit code, termination reason, resource limits) */
+        CONTAINER_STATUS,
+
         /** Pod log entry */
         POD_LOG,
 
