@@ -174,7 +174,11 @@ public class LlmEvidenceRanker implements EvidenceRanker {
                 .field("responsePreview", responseText.substring(0, Math.min(200, responseText.length())))
                 .log();
 
-            EvidenceRankingResponse rankingResponse = sanitize(parseResponse(responseText), evidenceList);
+            Map<String, Double> relevanceById = parseRelevanceScores(responseText);
+            List<String> rankedIds = computeRanking(evidenceList, relevanceById, MAX_RANKED_ITEMS);
+            EvidenceRankingResponse rankingResponse = sanitize(
+                new EvidenceRankingResponse(rankedIds, "LLM relevance scoring + code-computed ranking"),
+                evidenceList);
 
             // Log output ranking results
             logRankingResults(evidenceList, rankingResponse, "LLM");
@@ -314,23 +318,17 @@ public class LlmEvidenceRanker implements EvidenceRanker {
             .log();
 
         JsonNode json = objectMapper.readTree(jsonStr);
-        JsonNode idsNode = json.get("rankedEvidenceIds");
-        if (idsNode == null || !idsNode.isArray()) {
-            throw new IllegalStateException("LLM response is missing the 'rankedEvidenceIds' array");
+        JsonNode scores = json.get("evidenceScores");
+        if (scores == null || !scores.isArray()) {
+            throw new IllegalStateException("LLM response is missing the 'evidenceScores' array");
         }
-        List<String> rankedIds = objectMapper.convertValue(
-            idsNode,
-            objectMapper.getTypeFactory().constructCollectionType(List.class, String.class)
-        );
 
         Map<String, Double> relevanceById = new LinkedHashMap<>();
-        if (scores != null && scores.isArray()) {
-            for (JsonNode item : scores) {
-                JsonNode idNode = item.get("id");
-                JsonNode relevanceNode = item.get("relevance");
-                if (idNode != null && relevanceNode != null) {
-                    relevanceById.put(idNode.asText(), relevanceNode.asDouble());
-                }
+        for (JsonNode item : scores) {
+            JsonNode idNode = item.get("id");
+            JsonNode relevanceNode = item.get("relevance");
+            if (idNode != null && relevanceNode != null) {
+                relevanceById.put(idNode.asText(), relevanceNode.asDouble());
             }
         }
 
