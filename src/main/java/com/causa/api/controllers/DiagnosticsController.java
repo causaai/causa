@@ -3,9 +3,11 @@ package com.causa.api.controllers;
 import com.causa.api.dto.response.DiagnosticDetailResponse;
 import com.causa.api.dto.response.DiagnosticListItemResponse;
 import com.causa.api.dto.response.ErrorResponse;
+import com.causa.api.dto.response.JiraTicketResponse;
 import com.causa.common.constants.ApiConstants;
 import com.causa.common.constants.ConfigConstants.IntegrationPlatform;
 import com.causa.common.constants.ConfigConstants.PlatformCategory;
+import com.causa.common.exceptions.DiagnosticException;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
 import com.causa.config.ExternalConfigCache;
@@ -20,6 +22,7 @@ import jakarta.inject.Inject;
 import jakarta.validation.constraints.Size;
 import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
@@ -139,6 +142,53 @@ public class DiagnosticsController {
             .log();
 
         return Response.ok(DiagnosticDetailResponse.from(diagnostic, alert, clusterName, getTicketTrackers())).build();
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /api/v1/diagnostics/{id}/ticket
+    // -------------------------------------------------------------------------
+
+    @POST
+    @Path(ApiConstants.Paths.Diagnostics.TICKET)
+    public Response createJiraTicket(
+            @PathParam(ApiConstants.Paths.Diagnostics.PATH_PARAM) String diagnosticId) {
+
+        log.info(LogMessages.Diagnostic.JIRA_TICKET_REQUEST)
+            .field("diagnosticId", diagnosticId)
+            .log();
+
+        try {
+            DiagnosticService.JiraTicket ticket = diagnosticService.createOrGetJiraTicket(diagnosticId);
+
+            return ticket.alreadyExisted()
+                ? Response.ok(JiraTicketResponse.existing(ticket.url())).build()
+                : Response.status(Response.Status.CREATED).entity(JiraTicketResponse.created(ticket.url())).build();
+
+        } catch (DiagnosticException e) {
+            return switch (e.getErrorType()) {
+                case "JIRA_NOT_CONFIGURED" -> {
+                    log.warn(LogMessages.Diagnostic.JIRA_NOT_CONFIGURED)
+                        .field("diagnosticId", diagnosticId)
+                        .log();
+                    yield Response.status(422)
+                        .entity(ErrorResponse.of(422, "Unprocessable Entity", e.getMessage()))
+                        .build();
+                }
+                case "NOT_FOUND" -> Response.status(Response.Status.NOT_FOUND)
+                    .entity(ErrorResponse.of(404, "Not Found", e.getMessage()))
+                    .build();
+                default -> {
+                    log.warn(LogMessages.Diagnostic.JIRA_TICKET_FAILED)
+                        .field("diagnosticId", diagnosticId)
+                        .field("errorType", e.getErrorType())
+                        .field("message", e.getMessage())
+                        .log();
+                    yield Response.status(502)
+                        .entity(ErrorResponse.of(502, "Bad Gateway", e.getMessage()))
+                        .build();
+                }
+            };
+        }
     }
 
     // -------------------------------------------------------------------------
