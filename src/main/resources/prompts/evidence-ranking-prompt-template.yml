@@ -48,9 +48,6 @@ prompts:
       Keep related items.
       When unsure, KEEP BOTH — wrongly dropping evidence is worse than keeping a near-duplicate.
 
-      Rule: Merge duplicates. Keep related items.
-      When unsure, KEEP BOTH — wrongly dropping evidence is worse than keeping a near-duplicate.
-
       Which duplicate to keep (in order):
         1. The most specific (concrete values, names, timestamps)
         2. The one most directly tied to the RCA root cause

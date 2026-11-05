@@ -920,7 +920,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             log.info("Diagnostic updated with validation results")
                 .field(LogFields.DIAGNOSTIC_ID, diagnostic.getDiagnosticId())
                 .field(ValidationConstants.LogFields.VALIDATION_RESULT, validationResult)
-                .field(ValidationConstants.LogFields.CONFIDENCE_SCORE, validatedRCA.summary().averageConfidence())
+                .field(ValidationConstants.LogFields.CONFIDENCE_SCORE, confidenceScore)
                 .log();
 
             return updated;
