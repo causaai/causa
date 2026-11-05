@@ -4,7 +4,7 @@ import com.causa.common.constants.ContextConstants;
 import com.causa.common.constants.EvidenceConstants.Ids;
 import com.causa.common.constants.EvidenceConstants.Snippet;
 import com.causa.common.constants.EvidenceConstants.StrengthBands;
-import com.causa.core.domain.validation.Evidence;
+import com.causa.core.domain.validation.ValidationEvidence;
 import com.causa.core.domain.validation.EvidenceItem;
 import com.causa.core.domain.validation.EvidenceItem.EvidenceStrength;
 import com.causa.core.domain.validation.ValidationResult;
@@ -66,13 +66,13 @@ public class PathAEvidenceMapper {
         List<EvidenceItem> items = new ArrayList<>();
         int index = 0;
 
-        for (Evidence evidence : result.supportingEvidence()) {
+        for (ValidationEvidence evidence : result.supportingEvidence()) {
             if (carriesNoData(evidence.snippet())) {
                 continue;
             }
             items.add(toItem(result, evidence, ++index));
         }
-        for (Evidence evidence : result.refutingEvidence()) {
+        for (ValidationEvidence evidence : result.refutingEvidence()) {
             if (carriesNoData(evidence.snippet())) {
                 continue;
             }
@@ -82,7 +82,7 @@ public class PathAEvidenceMapper {
         return items;
     }
 
-    private EvidenceItem toItem(ValidationResult result, Evidence evidence, int index) {
+    private EvidenceItem toItem(ValidationResult result, ValidationEvidence evidence, int index) {
         return EvidenceItem.builder()
             .id(evidenceId(result, index))
             .source(sourceResolver.resolve(evidence.source()))
@@ -111,7 +111,7 @@ public class PathAEvidenceMapper {
      * fallback: it is the claim under test, and an item that restated the claim as its own
      * justification would read as though it had settled it.
      */
-    private String explanationOf(Evidence evidence, ValidationResult result) {
+    private String explanationOf(ValidationEvidence evidence, ValidationResult result) {
         if (evidence.explanation() != null && !evidence.explanation().isBlank()) {
             return evidence.explanation();
         }
@@ -144,7 +144,7 @@ public class PathAEvidenceMapper {
         return EvidenceStrength.CIRCUMSTANTIAL;
     }
 
-    private EvidenceItem.EvidenceType typeOf(Evidence.EvidenceType type) {
+    private EvidenceItem.EvidenceType typeOf(ValidationEvidence.EvidenceType type) {
         if (type == null) {
             return EvidenceItem.EvidenceType.OTHER;
         }
