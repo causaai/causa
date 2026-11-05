@@ -60,7 +60,7 @@ curl http://localhost:8080/api/v1/configs
       "id": "ext_cnf_def456",
       "platform": "SLACK",
       "name": "slack-alerts",
-      "url": "https://hooks.slack.com/services/...",
+      "url": "<SLACK_WEBHOOK_URL>",
       "is_active": true,
       "auth_config": {
         "authType": "WEBHOOK",
@@ -115,7 +115,7 @@ curl http://localhost:8080/api/v1/configs/generic
 curl 'http://localhost:8080/api/v1/configs/generic?category=alerts'
 ```
 
-**Valid `category` values:** `alerts`, `cluster`
+**Valid `category` values:** `alerts`, `cluster`, `data`
 
 #### Response
 
@@ -204,8 +204,11 @@ Returns `204 No Content` on success. Returns `400` for unknown or env-only keys.
 | `ALERT_COOLDOWN_CLEANUP_INTERVAL` | `alerts` | string | Yes |
 | `CLUSTER_NAME` | `cluster` | string | Yes |
 | `CLUSTER_TYPE` | `cluster` | string | **No** (env-only) |
+| `DATA_RETENTION_DAYS` | `data` | integer | Yes |
 
 `CLUSTER_TYPE` must be set via environment variable or ConfigMap before startup. It cannot be updated or deleted through the API.
+
+`DATA_RETENTION_DAYS` is seeded from the `DATA_RETENTION_DAYS` environment variable (if set) and can be updated at runtime. Currently the value is only stored and returned by the Config API; no retention or purge job reads it yet, so changing it does not delete or retain any data.
 
 ---
 
@@ -238,8 +241,8 @@ curl -X PUT http://localhost:8080/api/v1/configs/observability/DATADOG \
     "is_active": true,
     "auth_config": {
       "authType": "API_KEY",
-      "apiKey": "dd-api-key-here",
-      "appKey": "dd-app-key-here"
+      "apiKey": "<DATADOG_API_KEY>",
+      "appKey": "<DATADOG_APP_KEY>"
     }
   }'
 ```
@@ -308,7 +311,7 @@ curl -X PUT http://localhost:8080/api/v1/configs/llm/ANTHROPIC \
     "is_active": true,
     "auth_config": {
       "authType": "API_KEY",
-      "apiKey": "sk-ant-api03-..."
+      "apiKey": "<ANTHROPIC_API_KEY>"
     }
   }'
 ```
@@ -391,11 +394,11 @@ curl -X PUT http://localhost:8080/api/v1/configs/integrations/SLACK \
   -H 'Content-Type: application/json' \
   -d '{
     "name": "slack-alerts",
-    "url": "https://hooks.slack.com/services/...",
+    "url": "<SLACK_WEBHOOK_URL>",
     "is_active": true,
     "auth_config": {
       "authType": "WEBHOOK",
-      "token": "xoxb-..."
+      "token": "<SLACK_BOT_TOKEN>"
     },
     "additional_config": {
       "channel": "#rca-alerts"
@@ -413,7 +416,7 @@ curl -X PUT http://localhost:8080/api/v1/configs/integrations/JIRA \
     "auth_config": {
       "authType": "API_TOKEN",
       "username": "bot@example.com",
-      "token": "jira-api-token"
+      "token": "<JIRA_API_TOKEN>"
     },
     "additional_config": {
       "projectName": "OPS",

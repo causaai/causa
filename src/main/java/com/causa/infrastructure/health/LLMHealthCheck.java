@@ -17,7 +17,7 @@ import org.eclipse.microprofile.health.Readiness;
  * Reports UP when the LLM provider is initialized and responsive.
  *
  * <p>Kubernetes uses this to determine if the pod should receive traffic.
- * TODO: cleanup this when config is ready 
+ *
  * @since 0.0.1
  */
 public class LLMHealthCheck implements HealthCheck {

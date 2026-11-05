@@ -44,7 +44,7 @@ Each tunable in the guides below lists **every layer it is available at** so you
 
 | Table | Managed via | Contents |
 |---|---|---|
-| `generic_configs` | `PUT /api/v1/configs/generic` | Alert tuning, cluster identity |
+| `generic_configs` | `PUT /api/v1/configs/generic` | Alert tuning, cluster identity, data retention days |
 | `llm_configs` | `PUT /api/v1/configs/llm/{provider}` | LLM provider settings, credentials, inference params |
 | `external_configs` | `PUT /api/v1/configs/observability/{platform}` and `PUT /api/v1/configs/integrations/{platform}` | Observability (Datadog, Instana) and integration (Slack, Jira, GitHub) configs |
 
