@@ -56,10 +56,12 @@ public class LlmEvidenceRanker implements EvidenceRanker {
         // TODO: Add LLM call with prompt template
         // TODO: Add response parsing and validation
 
-        // Placeholder: return all evidence IDs sorted by relevance score
+        // Placeholder: return all evidence sources sorted by relevance score.
+        // (Evidence has no id field; source is the available string identifier. This whole
+        // placeholder is replaced by the real ranker when the evidence-ranking PR lands.)
         List<String> rankedIds = evidenceList.stream()
             .sorted(Comparator.comparingDouble(Evidence::relevanceScore).reversed())
-            .map(Evidence::id)
+            .map(Evidence::source)
             .toList();
 
         return new EvidenceRankingResponse(rankedIds, "Placeholder - not implemented");
