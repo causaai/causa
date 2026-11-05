@@ -781,14 +781,9 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             if (evidenceRanker.isPresent() && harvestedEvidence != null && !harvestedEvidence.isEmpty()) {
                 try {
                     // Get validation score and status
-                    double validationScore = validatedRCA.dualValidation() != null ?
-                        validatedRCA.dualValidation().finalVerdict().confidence() :
-                        validatedRCA.summary().averageConfidence();
-
-                    if (!allEvidence.isEmpty()) {
-                        // Get validation score and status
-                        double validationScore = resolveValidationScore(validatedRCA)
-                            .orElse(validatedRCA.summary().averageConfidence());
+                    double validationScore = resolveValidationScore(validatedRCA)
+                        .orElse(validatedRCA.summary().averageConfidence());
+                    String validationStatus = validationResult;
 
                     // Build RCA summary
                     RcaSummary rcaSummary = new RcaSummary(

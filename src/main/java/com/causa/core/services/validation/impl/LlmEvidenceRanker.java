@@ -332,15 +332,19 @@ public class LlmEvidenceRanker implements EvidenceRanker {
 
         JsonNode json = objectMapper.readTree(jsonStr);
         JsonNode scores = json.get("evidenceScores");
+<<<<<<< HEAD
+=======
+        if (scores == null || !scores.isArray()) {
+            throw new IllegalStateException("LLM response is missing the 'evidenceScores' array");
+        }
+>>>>>>> 5537d20 (fix the errors missed while rebasing)
 
         Map<String, Double> relevanceById = new LinkedHashMap<>();
-        if (scores != null && scores.isArray()) {
-            for (JsonNode item : scores) {
-                JsonNode idNode = item.get("id");
-                JsonNode relevanceNode = item.get("relevance");
-                if (idNode != null && relevanceNode != null) {
-                    relevanceById.put(idNode.asText(), relevanceNode.asDouble());
-                }
+        for (JsonNode item : scores) {
+            JsonNode idNode = item.get("id");
+            JsonNode relevanceNode = item.get("relevance");
+            if (idNode != null && relevanceNode != null) {
+                relevanceById.put(idNode.asText(), relevanceNode.asDouble());
             }
         }
 
