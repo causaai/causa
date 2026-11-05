@@ -168,14 +168,14 @@ public class RcaValidatorImpl implements RcaValidator {
                 .field("assertionCount", assertions.size())
                 .log();
 
-            Map<String, List<Evidence>> evidenceMap = evidenceMatcher.findEvidenceForAll(
+            Map<String, List<ValidationEvidence>> evidenceMap = evidenceMatcher.findEvidenceForAll(
                 assertions,
                 diagnosticContext
             );
 
             assertionValidationResults = new ArrayList<>();
             for (Assertion assertion : assertions) {
-                List<Evidence> evidence = evidenceMap.getOrDefault(assertion.id(), List.of());
+                List<ValidationEvidence> evidence = evidenceMap.getOrDefault(assertion.id(), List.of());
                 ValidationResult result = validateAssertion(assertion, evidence, minimumConfidence);
                 assertionValidationResults.add(result);
             }
@@ -308,7 +308,7 @@ public class RcaValidatorImpl implements RcaValidator {
      */
     private ValidationResult validateAssertion(
         Assertion assertion,
-        List<Evidence> evidence,
+        List<ValidationEvidence> evidence,
         double minimumConfidence
     ) {
         log.debug("Validating assertion")
@@ -328,8 +328,8 @@ public class RcaValidatorImpl implements RcaValidator {
         }
 
         // Separate supporting vs refuting evidence
-        List<Evidence> supportingEvidence = new ArrayList<>();
-        List<Evidence> refutingEvidence = new ArrayList<>();
+        List<ValidationEvidence> supportingEvidence = new ArrayList<>();
+        List<ValidationEvidence> refutingEvidence = new ArrayList<>();
 
         // For now, all found evidence is considered supporting
         // Future: Implement contradiction detection
@@ -359,8 +359,8 @@ public class RcaValidatorImpl implements RcaValidator {
      * Calculates confidence score based on evidence.
      */
     private double calculateConfidence(
-        List<Evidence> supporting,
-        List<Evidence> refuting
+        List<ValidationEvidence> supporting,
+        List<ValidationEvidence> refuting
     ) {
         if (supporting.isEmpty() && refuting.isEmpty()) {
             return 0.0;
@@ -368,13 +368,13 @@ public class RcaValidatorImpl implements RcaValidator {
 
         // Calculate weighted support score
         double supportScore = supporting.stream()
-            .mapToDouble(Evidence::relevanceScore)
+            .mapToDouble(ValidationEvidence::relevanceScore)
             .average()
             .orElse(0.0);
 
         // Calculate weighted refute score
         double refuteScore = refuting.stream()
-            .mapToDouble(Evidence::relevanceScore)
+            .mapToDouble(ValidationEvidence::relevanceScore)
             .average()
             .orElse(0.0);
 
