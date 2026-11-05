@@ -11,22 +11,18 @@ import com.causa.common.constants.LLMConstants;
 import com.causa.common.constants.PromptConstants;
 import com.causa.common.logging.CausaLogger;
 import com.causa.config.LlmConfigCache;
+import com.causa.core.domain.LLMRequest;
+import com.causa.core.domain.LLMResponse;
 import com.causa.core.domain.validation.ValidationEvidence;
 import com.causa.core.domain.validation.EvidenceRankingRequest.RcaSummary;
 import com.causa.core.domain.validation.EvidenceRankingResponse;
+import com.causa.core.ports.llm.PromptSender;
 import com.causa.core.services.PromptTemplateLoader;
 import com.causa.core.services.validation.EvidenceRanker;
-import com.causa.llm.ChatModelFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import dev.langchain4j.data.message.ChatMessage;
-import dev.langchain4j.data.message.SystemMessage;
-import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.model.chat.ChatModel;
-import dev.langchain4j.model.chat.request.ChatRequest;
-import dev.langchain4j.model.chat.response.ChatResponse;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -73,17 +69,17 @@ public class LlmEvidenceRanker implements EvidenceRanker {
     private static final double STRENGTH_WEIGHT = 0.2;
     private static final double RELEVANCE_WEIGHT = 0.8;
 
-    private final ChatModelFactory chatModelFactory;
+    private final PromptSender promptSender;
     private final ObjectMapper objectMapper;
     private final PromptTemplateLoader promptTemplateLoader;
     private final LlmConfigCache llmConfigCache;
 
     @Inject
     public LlmEvidenceRanker(
-            ChatModelFactory chatModelFactory,
+            PromptSender promptSender,
             ObjectMapper objectMapper,
             LlmConfigCache llmConfigCache) {
-        this.chatModelFactory = chatModelFactory;
+        this.promptSender = promptSender;
         this.objectMapper = objectMapper;
         this.llmConfigCache = llmConfigCache;
         this.promptTemplateLoader = new PromptTemplateLoader(PromptConstants.TEMPLATE_PATH_EVIDENCE_RANKING);
@@ -157,20 +153,22 @@ public class LlmEvidenceRanker implements EvidenceRanker {
                 .field("evidenceCount", evidenceList.size())
                 .log();
 
-            // Build chat request with system and user messages
-            List<ChatMessage> messages = List.of(
-                SystemMessage.from(template.systemPrompt()),
-                UserMessage.from(compactPrompt)
-            );
-
-            ChatRequest chatRequest = ChatRequest.builder()
-                .messages(messages)
+            // Send via the PromptSender port so ranking works for every configured provider —
+            // Bob (shell) as well as Anthropic/Vertex — rather than only the providers
+            // ChatModelFactory can build. Skills are disabled: ranking is a pure scoring call
+            // and must not trigger the tool/skill loop.
+            LLMRequest request = LLMRequest.builder(compactPrompt)
+                .systemPrompt(template.systemPrompt())
+                .enableSkills(false)
                 .build();
 
-            ChatModel model = chatModelFactory.chatModel();
-            ChatResponse response = model.chat(chatRequest);
+            LLMResponse llmResponse = promptSender.send(request);
+            String responseText = llmResponse.responseText();
+            if (responseText == null || responseText.isBlank()) {
+                // Treat an empty response like a parse failure — route to the deterministic fallback.
+                throw new IllegalStateException("LLM returned an empty ranking response");
+            }
 
-            String responseText = response.aiMessage().text();
             log.info("LLM response received")
                 .field("responseLength", responseText.length())
                 .field("responsePreview", responseText.substring(0, Math.min(200, responseText.length())))
