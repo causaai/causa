@@ -1031,13 +1031,11 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                 .exception(e)
                 .log();
 
-            // Return original diagnostic with FAILED status
-            return Diagnostic.builder()
-                .diagnosticId(diagnostic.getDiagnosticId())
-                .alertId(diagnostic.getAlertId())
-                .status(DiagnosticStatus.FAILED)
-                .generatedAt(diagnostic.getGeneratedAt())
-                .build();
+            // Surface the failure to the pipeline caller: the base RCA may already be persisted as
+            // COMPLETED, so returning an unpersisted FAILED object would leave the DB inconsistent.
+            // runPipelineAsync's catch block persists the FAILED status.
+            throw new IllegalStateException(
+                "Failed to persist validation results for diagnostic " + diagnostic.getDiagnosticId(), e);
         }
     }
 
