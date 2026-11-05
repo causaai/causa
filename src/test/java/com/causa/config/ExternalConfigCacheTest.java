@@ -1,6 +1,7 @@
 package com.causa.config;
 
 import com.causa.common.constants.ConfigConstants.PlatformCategory;
+import com.causa.common.utils.EncryptionUtils;
 import com.causa.core.domain.AuthConfig;
 import com.causa.core.domain.ExternalConfig;
 import com.causa.core.ports.ExternalConfigRepository;
@@ -175,6 +176,53 @@ class ExternalConfigCacheTest {
 
             // One call per PlatformCategory enum value (OBSERVABILITY + INTEGRATION = 2)
             verify(repository, times(PlatformCategory.values().length)).findByCategory(any());
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Decryption of sensitive auth fields
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("sensitive auth field decryption")
+    class DecryptionTests {
+
+        private ExternalConfig jira(String token) {
+            return ExternalConfig.builder()
+                .id("ext_cnf_jira")
+                .category(PlatformCategory.INTEGRATION)
+                .platform("JIRA")
+                .name("jira")
+                .isActive(true)
+                .authConfig(new AuthConfig("PAT", null, null, token, null, null, "me@example.com", null))
+                .build();
+        }
+
+        @Test
+        @DisplayName("stores the Jira token decrypted and leaves non-sensitive fields untouched")
+        void decryptsJiraToken() {
+            when(repository.findByCategory(PlatformCategory.OBSERVABILITY)).thenReturn(List.of());
+            when(repository.findByCategory(PlatformCategory.INTEGRATION))
+                .thenReturn(List.of(jira(EncryptionUtils.encrypt("plain-token"))));
+
+            cache.refresh();
+
+            ExternalConfig cached = cache.getByCategory(PlatformCategory.INTEGRATION).get(0);
+            assertThat(cached.getAuthConfig().token()).isEqualTo("plain-token");
+            assertThat(cached.getAuthConfig().username()).isEqualTo("me@example.com");
+            assertThat(cached.getAuthConfig().authType()).isEqualTo("PAT");
+        }
+
+        @Test
+        @DisplayName("keeps a value unchanged when it is not decryptable (legacy plaintext)")
+        void keepsUndecryptableValue() {
+            when(repository.findByCategory(PlatformCategory.OBSERVABILITY)).thenReturn(List.of());
+            when(repository.findByCategory(PlatformCategory.INTEGRATION)).thenReturn(List.of(jira("not-encrypted")));
+
+            cache.refresh();
+
+            assertThat(cache.getByCategory(PlatformCategory.INTEGRATION).get(0).getAuthConfig().token())
+                .isEqualTo("not-encrypted");
         }
     }
 }

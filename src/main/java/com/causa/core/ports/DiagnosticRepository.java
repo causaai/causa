@@ -31,4 +31,16 @@ public interface DiagnosticRepository {
      * @return a paginated result containing diagnostics and total count
      */
     PageResult<Diagnostic> search(Diagnostic.Filter filter, PageRequest pageRequest);
+
+    /**
+     * Takes a transaction-scoped lock for the alert, blocking until available. Must be called inside
+     * a transaction; released on commit/rollback. Serialises ticket creation per alert.
+     */
+    void lockAlertForTicketCreation(String alertId);
+
+    /** Returns the first non-null {@code ticket_link} across all diagnostics of the alert. */
+    Optional<String> findTicketLinkByAlertId(String alertId);
+
+    /** Stores the Jira URL on the diagnostic row only if {@code ticket_link} is still NULL. */
+    void updateTicketLink(String diagnosticId, String ticketUrl);
 }
