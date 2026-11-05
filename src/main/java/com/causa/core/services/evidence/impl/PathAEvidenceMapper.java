@@ -150,6 +150,8 @@ public class PathAEvidenceMapper {
         }
         return switch (type) {
             case KUBERNETES_EVENT -> EvidenceItem.EvidenceType.KUBERNETES_EVENT;
+            case POD_STATUS -> EvidenceItem.EvidenceType.POD_STATUS;
+            case CONTAINER_STATUS -> EvidenceItem.EvidenceType.CONTAINER_STATUS;
             case POD_LOG -> EvidenceItem.EvidenceType.LOG_ENTRY;
             case METRIC -> EvidenceItem.EvidenceType.METRIC;
             case KRUIZE_RECOMMENDATION -> EvidenceItem.EvidenceType.RECOMMENDATION;

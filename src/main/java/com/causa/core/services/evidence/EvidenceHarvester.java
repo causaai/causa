@@ -35,12 +35,12 @@ public interface EvidenceHarvester {
      * or an unrecognised source yields a recorded gap rather than a failure. Evidence
      * collection is additive to a diagnostic and must not be able to fail one.
      *
-     * @param finding           the RCA finding evidence is collected for
-     * @param validatedRca      the completed validation, carrying both paths; may be null
-     * @param diagnosticContext the rendered MCP context both paths were run against, used to
-     *                          recover the source text behind each piece of evidence; may be null
+     * <p>Takes no diagnostic context: each path carries its own source text. PATH A quotes
+     * the snippet the LLM returned, and a PATH B signal carries the line it was read from.
+     *
+     * @param finding      the RCA finding evidence is collected for
+     * @param validatedRca the completed validation, carrying both paths; may be null
      * @return the collected evidence, empty when there was nothing to harvest
      */
-    EvidenceCollectionResult harvest(RcaFinding finding, ValidatedRCA validatedRca,
-                                     String diagnosticContext);
+    EvidenceCollectionResult harvest(RcaFinding finding, ValidatedRCA validatedRca);
 }
