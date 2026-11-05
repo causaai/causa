@@ -1,12 +1,24 @@
 package com.causa.api.dto.response;
 
+import com.causa.common.logging.CausaLogger;
+import com.causa.common.logging.LogMessages;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
 import com.causa.core.domain.RootCauseAnalysis;
+import com.causa.core.domain.validation.EvidenceItem;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Diagnostic detail DTO — returned by GET /api/v1/diagnostics/{id}.
@@ -47,6 +59,22 @@ public record DiagnosticDetailResponse(
 
 ) {
 
+    private static final CausaLogger log = CausaLogger.getLogger(DiagnosticDetailResponse.class);
+
+    /**
+     * Reader for the stored evidence JSON.
+     *
+     * <p>JavaTimeModule is not optional: {@code EvidenceItem.collectedAt} is an {@link Instant},
+     * and a bare ObjectMapper cannot read one. Unknown properties are ignored so an evidence
+     * model that gains a field stays readable against rows written before it existed.
+     */
+    private static final ObjectMapper MAPPER = new ObjectMapper()
+        .registerModule(new JavaTimeModule())
+        .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
+    private static final TypeReference<List<EvidenceItem>> EVIDENCE_ITEMS =
+        new TypeReference<>() {};
+
     // -------------------------------------------------------------------------
     // Nested records
     // -------------------------------------------------------------------------
@@ -62,17 +90,17 @@ public record DiagnosticDetailResponse(
     /**
      * Evidence - UI Model (5 fields).
      *
-     * <p>User-friendly evidence for API response. Selected from top 3-5
-     * EvidenceItems by priority and transformed for display.
+     * <p>User-friendly evidence for API response: every collected EvidenceItem, transformed
+     * for display. Narrowing to the few that matter waits on the ranking design.
      *
      * @since 0.0.1
      */
     public record Evidence(
-        @JsonProperty("supportingEvidence") String supportingEvidence,
-        @JsonProperty("explanation")        String explanation,
-        @JsonProperty("source")             String source,
-        @JsonProperty("rawSnippet")         String rawSnippet,
-        @JsonProperty("reliability")        String reliability
+        @JsonProperty("supporting_evidence") String supportingEvidence,
+        @JsonProperty("explanation")         String explanation,
+        @JsonProperty("source")              String source,
+        @JsonProperty("raw_snippet")         String rawSnippet,
+        @JsonProperty("evidence_strength")   String evidenceStrength
     ) {}
 
     public record DiagnosisInfo(
@@ -125,7 +153,15 @@ public record DiagnosticDetailResponse(
 
         DiagnosisInfo diagnosisInfo = null;
         if (rca != null) {
-            Double rcaScore    = rca.confidenceSummary() != null ? rca.confidenceSummary().rcaConfidenceScore() : null;
+            // Persisted score is the validation score once validation has run; before that (or if
+            // validation failed) fall back to the score the LLM generated with the RCA.
+            Double rcaScore;
+            if (diagnostic.getConfidenceScore() != null) {
+                // Float.toString avoids float-widening noise (0.85f -> 0.8500000238...)
+                rcaScore = Double.parseDouble(Float.toString(diagnostic.getConfidenceScore()));
+            } else {
+                rcaScore = rca.confidenceSummary() != null ? rca.confidenceSummary().rcaConfidenceScore() : null;
+            }
             String summaryText = rca.confidenceSummary() != null ? rca.confidenceSummary().summaryText()        : null;
 
             List<RecommendationInfo> recommendations = null;
@@ -142,8 +178,13 @@ public record DiagnosticDetailResponse(
                     .toList();
             }
 
-            // TODO: Once validation pipeline is integrated, transform EvidenceItem -> Evidence
-            // For now, validationEvidences is null; existing RCA evidences are preserved
+            // Prefer ranked ordering when the pipeline produced rankedEvidenceIds;
+            // otherwise render all collected evidence in stored order.
+            List<Evidence> validationEvidences = buildRankedEvidenceList(diagnostic);
+            if (validationEvidences == null) {
+                validationEvidences = toValidationEvidences(diagnostic.getAllEvidence());
+            }
+
             diagnosisInfo = new DiagnosisInfo(
                 rca.issueTitle(),
                 rca.issueSummary(),
@@ -152,7 +193,7 @@ public record DiagnosticDetailResponse(
                 rca.anomalyType() != null ? rca.anomalyType().name() : null,
                 rca.rootCause(),
                 rca.evidences(),  // LLM-generated evidences (backward compatible)
-                null,  // validationEvidences - will be populated from allEvidence in future
+                validationEvidences,  // Ranked (or all) validation evidences
                 rca.supportingLogs(),
                 rcaScore,
                 summaryText,
@@ -171,6 +212,125 @@ public record DiagnosticDetailResponse(
             workloadInfo,
             diagnosisInfo,
             diagnostic.getValidationResult()
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // Evidence rendering
+    // -------------------------------------------------------------------------
+
+    /**
+     * Renders the stored evidence harvest into the UI model.
+     *
+     * <p>Malformed or absent stored JSON yields null rather than failing the request —
+     * evidence is supplementary to a diagnosis, never a precondition for reading it.
+     */
+    private static List<Evidence> toValidationEvidences(String evidenceJson) {
+        List<EvidenceItem> items = parseEvidenceItems(evidenceJson);
+        if (items == null || items.isEmpty()) {
+            return null;
+        }
+        return items.stream().map(DiagnosticDetailResponse::toEvidence).toList();
+    }
+
+    /**
+     * Builds the ranked evidence list from the stored harvest using the {@code rankedEvidenceIds}
+     * produced by the evidence ranking agent.
+     *
+     * <p>The ranker ranks all evidence from both paths (PATH A and PATH B), so its output is the
+     * final, ordered set. This method simply renders {@code rankedEvidenceIds} in order; IDs with
+     * no matching stored item are skipped. Returns null when no ranking is present, so the caller
+     * can fall back to rendering all evidence in stored order.
+     */
+    private static List<Evidence> buildRankedEvidenceList(Diagnostic diagnostic) {
+        List<String> rankedIds = extractRankedIds(diagnostic.getValidationData());
+        if (rankedIds == null || rankedIds.isEmpty()) {
+            return null;  // No ranking available — caller falls back to stored order
+        }
+
+        List<EvidenceItem> allEvidence = parseEvidenceItems(diagnostic.getAllEvidence());
+        if (allEvidence == null || allEvidence.isEmpty()) {
+            return null;  // No evidence available
+        }
+
+        Map<String, EvidenceItem> evidenceById = allEvidence.stream()
+            .collect(Collectors.toMap(
+                EvidenceItem::id,
+                item -> item,
+                (existing, replacement) -> existing,  // Keep first if duplicates
+                LinkedHashMap::new
+            ));
+
+        List<Evidence> rankedEvidence = new ArrayList<>();
+        for (String id : rankedIds) {
+            EvidenceItem item = evidenceById.get(id);
+            if (item != null) {
+                rankedEvidence.add(toEvidence(item));
+            }
+        }
+
+        return rankedEvidence.isEmpty() ? null : rankedEvidence;
+    }
+
+    /**
+     * Extracts {@code rankedEvidenceIds} from the validationData JSONB, or null if absent.
+     */
+    private static List<String> extractRankedIds(String validationDataJson) {
+        if (validationDataJson == null || validationDataJson.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode rankedIdsNode = MAPPER.readTree(validationDataJson).get("rankedEvidenceIds");
+            if (rankedIdsNode == null || !rankedIdsNode.isArray()) {
+                return null;
+            }
+            return MAPPER.convertValue(rankedIdsNode, new TypeReference<List<String>>() {});
+        } catch (Exception e) {
+            // Silently fail - ranking is optional
+            return null;
+        }
+    }
+
+    /**
+     * Parses the stored evidence harvest JSON to EvidenceItems, or null on absence/failure.
+     *
+     * <p>A parse failure is logged, not swallowed silently: it is otherwise indistinguishable
+     * from a diagnostic that collected no evidence at all.
+     */
+    private static List<EvidenceItem> parseEvidenceItems(String evidenceJson) {
+        if (evidenceJson == null || evidenceJson.isBlank()) {
+            return null;
+        }
+        try {
+            return MAPPER.readValue(evidenceJson, EVIDENCE_ITEMS);
+        } catch (Exception e) {
+            log.warn(LogMessages.Evidence.RENDERING_FAILED)
+                .exception(e)
+                .log();
+            return null;
+        }
+    }
+
+    /**
+     * Maps one stored item onto the UI model.
+     *
+     * <p>{@code supportingEvidence} carries the one-line statement of what was observed and
+     * {@code explanation} argues why that settles the point. {@code rawSnippet} is the verbatim
+     * source text behind the statement, so the reader can check it rather than take it on trust.
+     *
+     * <p>Rule-derived items have no statement — no narrator wrote one — and the snippet stands
+     * in. Repeating it is honest: the snippet is all that was observed.
+     */
+    private static Evidence toEvidence(EvidenceItem item) {
+        String statement = item.statement() != null && !item.statement().isBlank()
+            ? item.statement()
+            : item.rawSnippet();
+        return new Evidence(
+            statement,
+            item.explanation(),
+            item.type() != null ? item.type().name() : "OTHER",
+            item.rawSnippet(),
+            item.strength() == null ? "WEAK" : item.strength().name()
         );
     }
 }

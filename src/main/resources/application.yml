@@ -138,6 +138,10 @@ causa:
     ignore-namespaces: ${CAUSA_ALERT_IGNORE_NS:kube-system,istio-system}
     cooldown-cleanup-interval: ${CAUSA_ALERT_COOLDOWN_CLEANUP_INTERVAL:5m}
 
+  # Data Configuration
+  data:
+    retention-days: ${DATA_RETENTION_DAYS:30}
+
   mcp:
     kubernetes:
       endpoint: ${CAUSA_MCP_K8S_ENDPOINT:http://kubernetes-mcp-server:8080}

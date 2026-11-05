@@ -199,6 +199,81 @@ class DiagnosticDetailResponseTest {
         }
 
         @Test
+        @DisplayName("Should return the persisted validation score as rca_confidence_score")
+        void shouldReturnValidationScoreWhenPersisted() {
+            Diagnostic d = Diagnostic.builder()
+                    .diagnosticId("d1")
+                    .alertId("a1")
+                    .status(DiagnosticStatus.COMPLETED)
+                    .generatedAt(Instant.now())
+                    .confidenceScore(0.62f)  // validation score, differs from the RCA's 0.95
+                    .rca(rcaWithScore(0.95))
+                    .build();
+
+            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, null, "cluster");
+
+            assertEquals(0.62, response.diagnosis().rcaConfidenceScore());
+        }
+
+        @Test
+        @DisplayName("Should fall back to the RCA-generated score when no score is persisted")
+        void shouldFallBackToRcaScoreWhenNoPersistedScore() {
+            Diagnostic d = Diagnostic.builder()
+                    .diagnosticId("d1")
+                    .alertId("a1")
+                    .status(DiagnosticStatus.COMPLETED)
+                    .generatedAt(Instant.now())
+                    .rca(rcaWithScore(0.95))
+                    .build();
+
+            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, null, "cluster");
+
+            assertEquals(0.95, response.diagnosis().rcaConfidenceScore());
+        }
+
+        @Test
+        @DisplayName("Should return null score when neither a persisted nor an RCA score exists")
+        void shouldReturnNullScoreWhenNoneAvailable() {
+            RootCauseAnalysis rca = new RootCauseAnalysis(
+                    "Title", null, null, null, null, null, null, null, null, null, null);
+            Diagnostic d = Diagnostic.builder()
+                    .diagnosticId("d1")
+                    .alertId("a1")
+                    .status(DiagnosticStatus.COMPLETED)
+                    .generatedAt(Instant.now())
+                    .rca(rca)
+                    .build();
+
+            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, null, "cluster");
+
+            assertNull(response.diagnosis().rcaConfidenceScore());
+        }
+
+        @Test
+        @DisplayName("Should keep the summary text from the RCA when the validation score is used")
+        void shouldKeepSummaryTextWhenValidationScoreUsed() {
+            Diagnostic d = Diagnostic.builder()
+                    .diagnosticId("d1")
+                    .alertId("a1")
+                    .status(DiagnosticStatus.COMPLETED)
+                    .generatedAt(Instant.now())
+                    .confidenceScore(0.5f)
+                    .rca(rcaWithScore(0.95))
+                    .build();
+
+            DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, null, "cluster");
+
+            assertEquals("summary", response.diagnosis().confidenceSummaryText());
+        }
+
+        private RootCauseAnalysis rcaWithScore(double score) {
+            return new RootCauseAnalysis(
+                    "Title", null, null, null, null, null, null, null, null,
+                    new RootCauseAnalysis.ConfidenceSummary(score, "summary"),
+                    null);
+        }
+
+        @Test
         @DisplayName("Should map recommendations from RCA")
         void shouldMapRecommendationsFromRca() {
             RootCauseAnalysis rca = new RootCauseAnalysis(
@@ -228,6 +303,80 @@ class DiagnosticDetailResponseTest {
             assertNotNull(response.diagnosis().recommendations());
             assertEquals(2, response.diagnosis().recommendations().size());
             assertEquals("Root Cause Fix", response.diagnosis().recommendations().get(0).solutionType());
+        }
+    }
+
+    @Nested
+    @DisplayName("Evidence Rendering Tests")
+    class EvidenceRenderingTests {
+
+        @Test
+        @DisplayName("renders stored evidence into the UI model")
+        void shouldRenderStoredEvidence() {
+            String stored = """
+                [{
+                  "id": "pathB.exit.code",
+                  "source": "kubernetes",
+                  "type": "CONTAINER_STATUS",
+                  "strength": "DEFINITIVE",
+                  "rawSnippet": "Exit Code: 137",
+                  "statement": "Container terminated with exit code 137",
+                  "explanation": "Required: Exit code 137 observed",
+                  "confidence": 0.95,
+                  "collectedAt": "2026-10-12T09:00:00Z"
+                }]""";
+
+            List<DiagnosticDetailResponse.Evidence> evidences =
+                diagnosisWithEvidence(stored).validationEvidences();
+
+            assertEquals(1, evidences.size());
+            DiagnosticDetailResponse.Evidence e = evidences.get(0);
+            assertEquals("Container terminated with exit code 137", e.supportingEvidence());
+            assertEquals("Required: Exit code 137 observed", e.explanation());
+            assertEquals("CONTAINER_STATUS", e.source());
+            assertEquals("Exit Code: 137", e.rawSnippet());
+            assertEquals("DEFINITIVE", e.evidenceStrength());
+        }
+
+        /** Rule-derived items carry no statement — no narrator wrote one — so the snippet stands in. */
+        @Test
+        @DisplayName("falls back to the snippet when no statement was written")
+        void shouldFallBackToSnippet() {
+            String stored = """
+                [{"id": "pathB.heap", "rawSnippet": "heap.usage.trend: INCREASING"}]""";
+
+            assertEquals("heap.usage.trend: INCREASING",
+                    diagnosisWithEvidence(stored).validationEvidences().get(0).supportingEvidence());
+        }
+
+        /**
+         * A diagnosis whose evidence cannot be read must still be readable. Null, blank and
+         * malformed stored JSON all render as no evidence rather than a failed request.
+         */
+        @Test
+        @DisplayName("renders no evidence rather than failing on unreadable JSON")
+        void shouldNotFailOnUnreadableEvidence() {
+            assertNull(diagnosisWithEvidence(null).validationEvidences());
+            assertNull(diagnosisWithEvidence("  ").validationEvidences());
+            assertNull(diagnosisWithEvidence("{not json").validationEvidences());
+        }
+
+        private DiagnosticDetailResponse.DiagnosisInfo diagnosisWithEvidence(String allEvidence) {
+            RootCauseAnalysis rca = new RootCauseAnalysis(
+                    "Container OOM killed", null, null, null,
+                    RootCauseAnalysis.AnomalyType.OOM_KILLED, null, null, null, null,
+                    new RootCauseAnalysis.ConfidenceSummary(0.9, "summary"), null);
+
+            Diagnostic d = Diagnostic.builder()
+                    .diagnosticId("d1")
+                    .alertId("a1")
+                    .status(DiagnosticStatus.COMPLETED)
+                    .generatedAt(Instant.parse("2025-06-01T12:00:00Z"))
+                    .rca(rca)
+                    .allEvidence(allEvidence)
+                    .build();
+
+            return DiagnosticDetailResponse.from(d, null, "cluster").diagnosis();
         }
     }
 }

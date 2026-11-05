@@ -6,7 +6,7 @@ import com.causa.core.domain.RootCauseAnalysis.AnomalyType;
 import com.causa.core.domain.validation.Assertion;
 import com.causa.core.domain.validation.Assertion.AssertionSource;
 import com.causa.core.domain.validation.Assertion.AssertionType;
-import com.causa.core.domain.validation.Evidence;
+import com.causa.core.domain.validation.ValidationEvidence;
 import com.causa.core.domain.validation.EvidenceItem;
 import com.causa.core.domain.validation.EvidenceItem.EvidenceStrength;
 import com.causa.core.domain.validation.ValidationResult;
@@ -35,9 +35,9 @@ class PathAEvidenceMapperTest {
 
     @Test
     void carriesTheQuoteItsSourceAndItsNarrationThrough() {
-        Evidence evidence = Evidence.of(
+        ValidationEvidence evidence = ValidationEvidence.of(
             "POD_STATUS",
-            Evidence.EvidenceType.KUBERNETES_EVENT,
+            ValidationEvidence.EvidenceType.KUBERNETES_EVENT,
             "Exit Code: 137",
             "The container exited with 137.",
             "137 is SIGKILL, which the kernel sends on an OOM kill.",
@@ -107,9 +107,9 @@ class PathAEvidenceMapperTest {
      */
     @Test
     void dropsEvidenceThatQuotesAnEmptySection() {
-        Evidence empty = Evidence.of(
+        ValidationEvidence empty = ValidationEvidence.of(
             "GC_ANALYSIS",
-            Evidence.EvidenceType.GC_ANALYSIS,
+            ValidationEvidence.EvidenceType.GC_ANALYSIS,
             "GC_ANALYSIS: No Data Available",
             0.9
         );
@@ -144,8 +144,8 @@ class PathAEvidenceMapperTest {
      */
     @Test
     void fallsBackToTheAssertionExplanationButNeverTheAssertionText() {
-        Evidence unnarrated = Evidence.of(
-            "POD_STATUS", Evidence.EvidenceType.KUBERNETES_EVENT, "Exit Code: 137", 0.9);
+        ValidationEvidence unnarrated = ValidationEvidence.of(
+            "POD_STATUS", ValidationEvidence.EvidenceType.KUBERNETES_EVENT, "Exit Code: 137", 0.9);
 
         EvidenceItem item = onlyItem(
             ValidationResult.supported(assertion(), 0.9, List.of(unnarrated), "every signal agrees"));
@@ -158,8 +158,8 @@ class PathAEvidenceMapperTest {
     void truncatesASnippetTooLongToStore() {
         String huge = "x".repeat(Snippet.MAX_LENGTH + 500);
 
-        String stored = onlyItem(supported(Evidence.of(
-            "POD LOGS (recent)", Evidence.EvidenceType.POD_LOG, huge, 0.9))).rawSnippet();
+        String stored = onlyItem(supported(ValidationEvidence.of(
+            "POD LOGS (recent)", ValidationEvidence.EvidenceType.POD_LOG, huge, 0.9))).rawSnippet();
 
         assertThat(stored).hasSize(Snippet.MAX_LENGTH)
             .endsWith(Snippet.TRUNCATION_SUFFIX);
@@ -196,17 +196,17 @@ class PathAEvidenceMapperTest {
                 .toList());
     }
 
-    private static ValidationResult supported(Evidence evidence) {
+    private static ValidationResult supported(ValidationEvidence evidence) {
         return ValidationResult.supported(assertion(), 0.9, List.of(evidence), "because");
     }
 
-    private static Evidence quoting(String source) {
-        return Evidence.of(source, Evidence.EvidenceType.KUBERNETES_EVENT, "Exit Code: 137",
+    private static ValidationEvidence quoting(String source) {
+        return ValidationEvidence.of(source, ValidationEvidence.EvidenceType.KUBERNETES_EVENT, "Exit Code: 137",
             "exited 137", "SIGKILL", 0.9);
     }
 
-    private static Evidence scoring(double relevance) {
-        return Evidence.of("POD_STATUS", Evidence.EvidenceType.KUBERNETES_EVENT,
+    private static ValidationEvidence scoring(double relevance) {
+        return ValidationEvidence.of("POD_STATUS", ValidationEvidence.EvidenceType.KUBERNETES_EVENT,
             "Exit Code: 137", "exited 137", "SIGKILL", relevance);
     }
 
