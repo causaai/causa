@@ -1,0 +1,66 @@
+name: Update POM Version and Open PRs
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'New Causa version (e.g., 0.0.8)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-version-and-open-prs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: mvp_demo
+          fetch-depth: 0
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'maven'
+
+      - name: Update pom.xml version
+        run: |
+          mvn versions:set -DnewVersion=${{ inputs.version }} -DgenerateBackupPoms=false
+
+      # Uses peter-evans/create-pull-request@v8 to detect pom.xml changes, commit, and create the PR
+      - name: Create Pull Request to mvp_demo
+        id: cpr
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: mvp_demo
+          branch: "bump-version-${{ inputs.version }}"
+          commit-message: "chore(release): bump pom.xml version to ${{ inputs.version }}"
+          committer: "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+          author: "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
+          title: "chore: update pom.xml version to ${{ inputs.version }}"
+          body: "Automated PR updating Causa version to `${{ inputs.version }}` targeting `mvp_demo`."
+          delete-branch: true
+
+      # Opens downstream PR from mvp_demo into main if not already present
+      - name: Create PR from mvp_demo to main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EXISTING_PR=$(gh pr list --base main --head mvp_demo --state open --json number --jq '.[0].number')
+          if [ -n "$EXISTING_PR" ]; then
+            echo "An open PR from mvp_demo to main already exists (#$EXISTING_PR). Skipping creation."
+          else
+            gh pr create \
+              --base main \
+              --head mvp_demo \
+              --title "merge: sync mvp_demo into main" \
+              --body "Automated pull request to promote updates from \`mvp_demo\` to \`main\`."
+          fi
