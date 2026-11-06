@@ -1,0 +1,71 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches:
+      - '**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-push:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Normalize branch name for Docker tag
+        id: normalize-branch
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
+        run: |
+          STRIPPED="${BRANCH_NAME}"
+          if [[ "$STRIPPED" =~ ^[Ff][Ee][Aa][Tt][Uu][Rr][Ee]/(.*)$ ]]; then
+            STRIPPED="${BASH_REMATCH[1]}"
+          fi
+          NORMALIZED_TAG=$(echo "$STRIPPED" | sed -E 's#[ /]+#-#g' | tr '[:upper:]' '[:lower:]')
+          echo "tag=${NORMALIZED_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Original branch: ${BRANCH_NAME}"
+          echo "Normalized tag: ${NORMALIZED_TAG}"
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build package with Maven
+        run: |
+          chmod +x ./mvnw
+          ./mvnw clean package -DskipTests -Dquarkus.container-image.build=false
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Quay.io
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_USERNAME || secrets.QUAY_ROBOT_NAME || secrets.QUAY_USER }}
+          password: ${{ secrets.QUAY_ROBOT_TOKEN || secrets.QUAY_PASSWORD || secrets.QUAY_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: src/main/docker/Dockerfile.jvm
+          platforms: linux/amd64,linux/arm64
+          push: true
+          provenance: false
+          tags: quay.io/causaaihub:${{ steps.normalize-branch.outputs.tag }}
