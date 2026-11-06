@@ -48,7 +48,7 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          ./mvnw -B -ntp versions:set -DnewVersion="$VERSION" -DgenerateBackupPoms=false
+          mvn -B -ntp versions:set -DnewVersion="$VERSION" -DgenerateBackupPoms=false
 
       # Uses peter-evans/create-pull-request to detect pom.xml changes, commit, and create the PR
       - name: Create Pull Request to mvp_demo
