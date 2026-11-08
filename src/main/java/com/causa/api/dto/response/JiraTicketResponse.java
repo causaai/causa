@@ -9,18 +9,18 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 public record JiraTicketResponse(
 
-    @JsonProperty("ticket_url")
-    String ticketUrl,
+    @JsonProperty("ticket_link")
+    String ticketLink,
 
     @JsonProperty("already_existed")
     boolean alreadyExisted
 
 ) {
-    public static JiraTicketResponse created(String ticketUrl) {
-        return new JiraTicketResponse(ticketUrl, false);
+    public static JiraTicketResponse created(String ticketLink) {
+        return new JiraTicketResponse(ticketLink, false);
     }
 
-    public static JiraTicketResponse existing(String ticketUrl) {
-        return new JiraTicketResponse(ticketUrl, true);
+    public static JiraTicketResponse existing(String ticketLink) {
+        return new JiraTicketResponse(ticketLink, true);
     }
 }

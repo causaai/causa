@@ -974,6 +974,23 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             .field("diagnosticId", diagnosticId)
             .log();
 
+        Diagnostic diagnostic = diagnosticRepository.findById(diagnosticId)
+            .orElseThrow(() -> new DiagnosticException(
+                "Diagnostic not found: " + diagnosticId, "NOT_FOUND"));
+        String alertId = diagnostic.getAlertId();
+
+        diagnosticRepository.lockAlertForTicketCreation(alertId);
+
+        Optional<String> existing = diagnosticRepository.findTicketLinkByAlertId(alertId);
+        if (existing.isPresent()) {
+            log.info(LogMessages.Diagnostic.JIRA_TICKET_EXISTS)
+                .field("diagnosticId", diagnosticId)
+                .field("alertId", alertId)
+                .log();
+            return new JiraTicket(existing.get(), true);
+        }
+
+        // Only creating (or recovering) a ticket needs Jira; an already-stored link is returned above
         ExternalConfig jiraConfig = externalConfigCache
             .getByCategory(PlatformCategory.INTEGRATION)
             .stream()
@@ -991,22 +1008,6 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                 "JIRA_NOT_CONFIGURED");
         }
 
-        Diagnostic diagnostic = diagnosticRepository.findById(diagnosticId)
-            .orElseThrow(() -> new DiagnosticException(
-                "Diagnostic not found: " + diagnosticId, "NOT_FOUND"));
-        String alertId = diagnostic.getAlertId();
-
-        diagnosticRepository.lockAlertForTicketCreation(alertId);
-
-        Optional<String> existing = diagnosticRepository.findTicketLinkByAlertId(alertId);
-        if (existing.isPresent()) {
-            log.info(LogMessages.Diagnostic.JIRA_TICKET_EXISTS)
-                .field("diagnosticId", diagnosticId)
-                .field("alertId", alertId)
-                .log();
-            return new JiraTicket(existing.get(), true);
-        }
-
         // Jira may already hold a ticket whose URL was never saved (e.g. crash after creating it)
         Optional<String> inJira = jiraClient.findTicketByAlertId(jiraConfig, alertId);
         if (inJira.isPresent()) {
@@ -1014,19 +1015,19 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             log.info(LogMessages.Diagnostic.JIRA_TICKET_RECOVERED)
                 .field("diagnosticId", diagnosticId)
                 .field("alertId", alertId)
-                .field("ticketUrl", inJira.get())
+                .field("ticketLink", inJira.get())
                 .log();
             return new JiraTicket(inJira.get(), true);
         }
 
-        String ticketUrl = jiraClient.createTicket(jiraConfig, diagnostic);
-        diagnosticRepository.updateTicketLink(diagnosticId, ticketUrl);
+        String ticketLink = jiraClient.createTicket(jiraConfig, diagnostic);
+        diagnosticRepository.updateTicketLink(diagnosticId, ticketLink);
 
         log.info(LogMessages.Diagnostic.JIRA_TICKET_CREATED)
             .field("diagnosticId", diagnosticId)
-            .field("ticketUrl", ticketUrl)
+            .field("ticketLink", ticketLink)
             .log();
 
-        return new JiraTicket(ticketUrl, false);
+        return new JiraTicket(ticketLink, false);
     }
 }

@@ -307,7 +307,8 @@ class DiagnosticServiceImplTest {
                     .category(PlatformCategory.INTEGRATION)
                     .isActive(true)
                     .build();
-            when(externalConfigCache.getByCategory(PlatformCategory.INTEGRATION)).thenReturn(List.of(jiraConfig));
+            // lenient: paths that return a stored link (or 404) never look up the Jira config
+            lenient().when(externalConfigCache.getByCategory(PlatformCategory.INTEGRATION)).thenReturn(List.of(jiraConfig));
         }
 
         @Test
@@ -375,12 +376,40 @@ class DiagnosticServiceImplTest {
         @DisplayName("Should throw JIRA_NOT_CONFIGURED when no active Jira integration exists")
         void shouldThrowWhenJiraNotConfigured() {
             when(externalConfigCache.getByCategory(PlatformCategory.INTEGRATION)).thenReturn(List.of());
+            when(diagnosticRepository.findById("d1"))
+                    .thenReturn(Optional.of(buildDiagnostic("d1", "alert-1", DiagnosticStatus.COMPLETED)));
+            when(diagnosticRepository.findTicketLinkByAlertId("alert-1")).thenReturn(Optional.empty());
 
             DiagnosticException ex = assertThrows(DiagnosticException.class,
                     () -> diagnosticService.createOrGetJiraTicket("d1"));
 
             assertEquals("JIRA_NOT_CONFIGURED", ex.getErrorType());
-            verify(diagnosticRepository, never()).lockAlertForTicketCreation(any());
+            verifyNoInteractions(jiraClient);
+        }
+
+        @Test
+        @DisplayName("Should return the stored ticket link even when Jira is no longer configured")
+        void shouldReturnStoredLinkWhenJiraNotConfigured() {
+            lenient().when(externalConfigCache.getByCategory(PlatformCategory.INTEGRATION)).thenReturn(List.of());
+            when(diagnosticRepository.findById("d1"))
+                    .thenReturn(Optional.of(buildDiagnostic("d1", "alert-1", DiagnosticStatus.COMPLETED)));
+            when(diagnosticRepository.findTicketLinkByAlertId("alert-1")).thenReturn(Optional.of(TICKET_URL));
+
+            assertEquals(new DiagnosticService.JiraTicket(TICKET_URL, true),
+                    diagnosticService.createOrGetJiraTicket("d1"));
+            verifyNoInteractions(jiraClient);
+        }
+
+        @Test
+        @DisplayName("Should throw NOT_FOUND for an unknown diagnostic even when Jira is not configured")
+        void shouldThrowNotFoundWhenJiraNotConfigured() {
+            lenient().when(externalConfigCache.getByCategory(PlatformCategory.INTEGRATION)).thenReturn(List.of());
+            when(diagnosticRepository.findById("missing")).thenReturn(Optional.empty());
+
+            DiagnosticException ex = assertThrows(DiagnosticException.class,
+                    () -> diagnosticService.createOrGetJiraTicket("missing"));
+
+            assertEquals("NOT_FOUND", ex.getErrorType());
         }
     }
 }

@@ -330,6 +330,33 @@ class DiagnosticsControllerTest {
         }
 
         @Test
+        @DisplayName("Should serialize the ticket URL as ticket_link")
+        void shouldSerializeTicketLink() throws Exception {
+            String json = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .writeValueAsString(JiraTicketResponse.created(URL));
+
+            assertTrue(json.contains("\"ticket_link\":\"" + URL + "\""));
+            assertFalse(json.contains("ticket_url"));
+        }
+
+        @Test
+        @DisplayName("Should map Jira config errors to 422 and hide upstream details on 502")
+        void shouldMapConfigErrorsAndHideUpstreamDetails() {
+            when(diagnosticService.createOrGetJiraTicket("incomplete"))
+                    .thenThrow(new DiagnosticException("missing url", "JIRA_CONFIG_INCOMPLETE"));
+            when(diagnosticService.createOrGetJiraTicket("invalid"))
+                    .thenThrow(new DiagnosticException("bad url", "JIRA_CONFIG_INVALID"));
+            when(diagnosticService.createOrGetJiraTicket("leaky"))
+                    .thenThrow(new DiagnosticException("upstream body: secret-detail", "JIRA_API_ERROR"));
+
+            assertEquals(422, controller.createJiraTicket("incomplete").getStatus());
+            assertEquals(422, controller.createJiraTicket("invalid").getStatus());
+            Response leaky = controller.createJiraTicket("leaky");
+            assertEquals(502, leaky.getStatus());
+            assertFalse(leaky.getEntity().toString().contains("secret-detail"));
+        }
+
+        @Test
         @DisplayName("Should map DiagnosticException error types to 404, 422 and 502")
         void shouldMapErrorsToStatusCodes() {
             when(diagnosticService.createOrGetJiraTicket("missing"))

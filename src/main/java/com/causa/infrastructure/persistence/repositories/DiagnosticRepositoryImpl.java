@@ -126,11 +126,11 @@ public class DiagnosticRepositoryImpl implements DiagnosticRepository {
 
     @Override
     @Transactional
-    public void updateTicketLink(String diagnosticId, String ticketUrl) {
+    public void updateTicketLink(String diagnosticId, String ticketLink) {
         em.createNativeQuery(
                 "UPDATE diagnostics SET ticket_link = :url, updated_at = CURRENT_TIMESTAMP " +
                 "WHERE id = :id AND ticket_link IS NULL")
-            .setParameter("url", ticketUrl)
+            .setParameter("url", ticketLink)
             .setParameter("id", diagnosticId)
             .executeUpdate();
     }

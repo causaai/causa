@@ -19,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 /**
  * Jira REST client (outbound adapter). Stateless: duplicate prevention is the caller's job.
@@ -42,6 +43,7 @@ public class JiraClient {
     private static final Duration     TIMEOUT = Duration.ofSeconds(10);
     private static final String       ALERT_LABEL_PREFIX = "causa-alert-";
     private static final String       DEFAULT_ISSUE_TYPE = "Task";
+    private static final Pattern      PROJECT_KEY_PATTERN = Pattern.compile("[A-Za-z][A-Za-z0-9_]{0,254}");
 
     private enum Flavor {
         CLOUD("/rest/api/3", "/search/jql"),
@@ -223,6 +225,11 @@ public class JiraClient {
             (username + ":" + token).getBytes(StandardCharsets.UTF_8));
     }
 
+    /**
+     * Returns the Jira project key. It is interpolated into a JQL query, so it must match Jira's
+     * project-key syntax (letters, digits, underscore; starts with a letter) — anything else,
+     * e.g. quotes or JQL operators, is rejected.
+     */
     private static String resolveProjectKey(ExternalConfig config) {
         Object key = config.getAdditionalConfig() != null
             ? config.getAdditionalConfig().get("projectName")
@@ -232,7 +239,13 @@ public class JiraClient {
                 "Jira config is missing additional_config.projectName.",
                 "JIRA_CONFIG_INCOMPLETE");
         }
-        return key.toString();
+        String projectKey = key.toString().strip();
+        if (!PROJECT_KEY_PATTERN.matcher(projectKey).matches()) {
+            throw new DiagnosticException(
+                "additional_config.projectName is not a valid Jira project key.",
+                "JIRA_CONFIG_INVALID");
+        }
+        return projectKey;
     }
 
     /** Issue type from {@code additional_config.issueType}, defaulting to {@code Task}. */

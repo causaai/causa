@@ -174,6 +174,16 @@ public class DiagnosticsController {
                         .entity(ErrorResponse.of(422, "Unprocessable Entity", e.getMessage()))
                         .build();
                 }
+                // These messages are fixed strings built by JiraClient, so they are safe to return.
+                case "JIRA_CONFIG_INCOMPLETE", "JIRA_CONFIG_INVALID" -> {
+                    log.warn(LogMessages.Diagnostic.JIRA_TICKET_FAILED)
+                        .field("diagnosticId", diagnosticId)
+                        .field("errorType", e.getErrorType())
+                        .log();
+                    yield Response.status(422)
+                        .entity(ErrorResponse.of(422, "Unprocessable Entity", e.getMessage()))
+                        .build();
+                }
                 case "NOT_FOUND" -> Response.status(Response.Status.NOT_FOUND)
                     .entity(ErrorResponse.of(404, "Not Found", e.getMessage()))
                     .build();
@@ -183,8 +193,10 @@ public class DiagnosticsController {
                         .field("errorType", e.getErrorType())
                         .field("message", e.getMessage())
                         .log();
+                    // The exception message may carry upstream response content — log it, don't return it
                     yield Response.status(502)
-                        .entity(ErrorResponse.of(502, "Bad Gateway", e.getMessage()))
+                        .entity(ErrorResponse.of(502, "Bad Gateway",
+                            "Failed to create the Jira ticket. See server logs for details."))
                         .build();
                 }
             };
