@@ -19,6 +19,7 @@ import com.causa.common.logging.CausaLogger;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -178,7 +179,9 @@ public class McpRegistry {
                 .replace("${namespace}", orEmpty(workload.namespace()))
                 .replace("${containerName}", orEmpty(workload.containerName()));
         if (alertTs != null) {
-            Instant ts = alertTs.truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+            Instant ts = "seconds".equals(config.metadata().get(McpConstants.Instana.METADATA_TIMESTAMP_PRECISION))
+                    ? alertTs.truncatedTo(ChronoUnit.SECONDS)
+                    : alertTs;
             result = result
                     .replace("${alertTimestamp}", ts.toString())
                     .replace("${alertTimestampMinus15m}", ts.minusSeconds(900).toString())
