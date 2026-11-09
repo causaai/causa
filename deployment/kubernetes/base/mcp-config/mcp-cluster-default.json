@@ -98,7 +98,7 @@
       "alwaysAllow": ["manage_events", "manage_releases", "manage_applications", "manage_infrastructure", "manage_synthetics", "manage_slo"],
       "healthCheck": { "url": "http://instana-mcp-server:8080/mcp", "timeoutMs": 10000 },
       "timeoutMs": 30000,
-      "metadata": {},
+      "metadata": { "timestampPrecision": "seconds" },
       "description": "Instana MCP — K8s events, Golden Signals, JVM snapshots, infra metrics, releases, SLO reports, synthetic tests from IBM Instana APM",
       "tools": [
         {
