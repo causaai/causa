@@ -18,6 +18,7 @@ import com.causa.mcp.util.McpResponseFormatter;
 import com.causa.common.logging.CausaLogger;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import java.time.Instant;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -177,9 +178,11 @@ public class McpRegistry {
                 .replace("${namespace}", orEmpty(workload.namespace()))
                 .replace("${containerName}", orEmpty(workload.containerName()));
         if (alertTs != null) {
+            Instant ts = alertTs.truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
             result = result
-                    .replace("${alertTimestamp}", alertTs.toString())
-                    .replace("${alertTimestampMinus15m}", alertTs.minusSeconds(900).toString());
+                    .replace("${alertTimestamp}", ts.toString())
+                    .replace("${alertTimestampMinus15m}", ts.minusSeconds(900).toString())
+                    .replace("${alertTimestampMinus1h}", ts.minusSeconds(3600).toString());
         }
         for (Map.Entry<String, String> extra : extraTokens.entrySet()) {
             result = result.replace("${" + extra.getKey() + "}", orEmpty(extra.getValue()));
