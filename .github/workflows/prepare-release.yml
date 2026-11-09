@@ -1,4 +1,4 @@
-name: Update POM Version and Open PRs
+name: Prepare release
 
 on:
   workflow_dispatch:
