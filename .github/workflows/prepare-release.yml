@@ -80,6 +80,6 @@ jobs:
             gh pr create \
               --base main \
               --head mvp_demo \
-              --title "Merge: sync mvp_demo into main" \
-              --body "Automated pull request to promote updates from \`mvp_demo\` to \`main\`."
+              --title "Merge: sync mvp_demo into main for release ${{ inputs.version }}" \
+              --body "Automated pull request to promote updates from \`mvp_demo\` to \`main\` for release \`${{ inputs.version }}\`."
           fi
