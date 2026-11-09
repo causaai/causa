@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Handles Instana tools that require chaining or post-processing — all other
@@ -36,18 +37,24 @@ public final class InstanaContextCollector {
 
     private InstanaContextCollector() {}
 
-    /** Context keys that must be scoped to the alert pod; skipped when the pod identity is unknown. */
-    private static final Set<String> POD_SCOPED_KEYS = Set.of(
-            "INSTANA_K8S_EVENTS", "INSTANA_SNAPSHOTS", "INSTANA_SNAPSHOT_DETAIL", "INSTANA_JVM_METRICS",
-            "INSTANA_INFRA_ALERTS");
+    /** {@code manage_infrastructure} operations that must be scoped to the alert pod. */
+    private static final Set<String> POD_SCOPED_INFRA_OPERATIONS = Set.of(
+            McpConstants.Instana.OP_GET_SNAPSHOTS, McpConstants.Instana.OP_GET_SNAPSHOT,
+            McpConstants.Instana.OP_GET_ENTITIES, McpConstants.Instana.OP_FIND_ACTIVE);
+
+    /** Kubernetes pod name (DNS-1123 subdomain) and namespace (DNS-1123 label) formats. */
+    private static final Pattern POD_NAME_FORMAT = Pattern.compile("[a-z0-9]([-a-z0-9.]{0,251}[a-z0-9])?");
+    private static final Pattern NAMESPACE_FORMAT = Pattern.compile("[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?");
 
     public static void collect(McpClient client, Alert alert, DiagnosticContext.Builder builder) {
         Alert.WorkloadInfo workload = alert.getWorkloadInfo();
+        // Pod and namespace are interpolated into Instana queries, so anything that is not a valid
+        // Kubernetes name (e.g. containing quotes or operators) is treated as "pod unknown".
         boolean podKnown = workload != null
-                && workload.podName() != null && !workload.podName().isBlank()
-                && workload.namespace() != null && !workload.namespace().isBlank();
+                && workload.podName() != null && POD_NAME_FORMAT.matcher(workload.podName()).matches()
+                && workload.namespace() != null && NAMESPACE_FORMAT.matcher(workload.namespace()).matches();
         if (!podKnown) {
-            log.warn("Alert has no pod/namespace — skipping pod-scoped Instana tools").log();
+            log.warn("Alert has no valid pod/namespace — skipping pod-scoped Instana tools").log();
         }
 
         String snapshotsResult = null;
@@ -59,7 +66,7 @@ public final class InstanaContextCollector {
         for (McpSettings.ToolConfig tool : client.getConfig().tools()) {
             String operation = getOperation(tool);
 
-            if (!podKnown && POD_SCOPED_KEYS.contains(tool.contextKey())) {
+            if (!podKnown && isPodScoped(tool, operation)) {
                 continue;
             }
 
@@ -111,6 +118,16 @@ public final class InstanaContextCollector {
                         Map.of("sloId", sloId), builder);
             }
         }
+    }
+
+    /** Decided from the tool identity, not the configurable {@code contextKey}. */
+    private static boolean isPodScoped(McpSettings.ToolConfig tool, String operation) {
+        if (operation == null) {
+            return false;
+        }
+        return McpConstants.Instana.OP_GET_KUBERNETES_INFO_EVENTS.equals(operation)
+                || (McpConstants.Tools.INSTANA_MANAGE_INFRASTRUCTURE.equals(tool.name())
+                        && POD_SCOPED_INFRA_OPERATIONS.contains(operation));
     }
 
     /**
@@ -185,24 +202,51 @@ public final class InstanaContextCollector {
         }
     }
 
+    /** A config applies only when its filter is empty or definitely matches this pod. */
     private static boolean appliesToPod(JsonNode expression, String podName, String namespace) {
-        boolean noFilter = expression.isMissingNode() || expression.isNull()
-                || ("EXPRESSION".equals(expression.path("type").asText())
-                        && expression.path("elements").isEmpty());
-        return noFilter || hasPodTarget(expression, podName, namespace);
+        if (expression.isMissingNode() || expression.isNull()) {
+            return true;
+        }
+        return Boolean.TRUE.equals(evaluate(expression, podName, namespace));
     }
 
-    private static boolean hasPodTarget(JsonNode node, String podName, String namespace) {
+    /**
+     * Evaluates a tag filter expression against the alert pod. Returns {@code TRUE}/{@code FALSE}
+     * when decidable from the pod name and namespace, or {@code null} (unknown) when the filter
+     * depends on a tag or operator we cannot evaluate. Unknown never counts as a match.
+     */
+    private static Boolean evaluate(JsonNode node, String podName, String namespace) {
         if ("EXPRESSION".equals(node.path("type").asText())) {
+            boolean isAnd = !"OR".equals(node.path("logicalOperator").asText("AND"));
+            boolean unknown = false;
             for (JsonNode element : node.path("elements")) {
-                if (hasPodTarget(element, podName, namespace)) {
-                    return true;
+                Boolean result = evaluate(element, podName, namespace);
+                if (result == null) {
+                    unknown = true;
+                } else if (result != isAnd) {
+                    return result; // AND short-circuits on false, OR on true
                 }
             }
-            return false;
+            return unknown ? null : isAnd; // empty AND = true, empty OR = false
         }
-        String value = node.path("value").asText(node.path("stringValue").asText(""));
-        return value.equals(podName) || value.equals(namespace);
+        String actual;
+        switch (node.path("name").asText("")) {
+            case "kubernetes.pod.name" -> actual = podName;
+            case "kubernetes.namespace.name" -> actual = namespace;
+            default -> {
+                return null;
+            }
+        }
+        String expected = node.path("value").asText(node.path("stringValue").asText(""));
+        return switch (node.path("operator").asText("")) {
+            case "EQUALS" -> actual.equals(expected);
+            case "NOT_EQUAL" -> !actual.equals(expected);
+            case "CONTAINS" -> actual.contains(expected);
+            case "NOT_CONTAIN" -> !actual.contains(expected);
+            case "STARTS_WITH" -> actual.startsWith(expected);
+            case "ENDS_WITH" -> actual.endsWith(expected);
+            default -> null;
+        };
     }
 
     /**
@@ -222,6 +266,7 @@ public final class InstanaContextCollector {
             if (raw == null) {
                 return;
             }
+            warnIfEventsTruncated(raw, alert);
 
             Alert.WorkloadInfo workload = alert.getWorkloadInfo();
             String filtered = filterEventsByEntityLabel(raw, workload.namespace() + "/" + workload.podName());
@@ -238,6 +283,27 @@ public final class InstanaContextCollector {
                     .field("tool", tool.name())
                     .field("error", e.getMessage())
                     .log();
+        }
+    }
+
+    /**
+     * Instana applies {@code max_events} before we filter, so the alert pod's events can be
+     * missing when the cluster produced more events than the cap. Make that visible.
+     */
+    private static void warnIfEventsTruncated(String eventsJson, Alert alert) {
+        try {
+            JsonNode results = OBJECT_MAPPER.readTree(eventsJson).path("results");
+            int total = results.path("events_count").asInt(0);
+            int analyzed = results.path("events_analyzed").asInt(0);
+            if (analyzed < total) {
+                log.warn("Instana K8s events were capped before pod filtering — pod events may be incomplete")
+                        .field("eventsCount", total)
+                        .field("eventsAnalyzed", analyzed)
+                        .field("pod", alert.getWorkloadInfo().podName())
+                        .log();
+            }
+        } catch (Exception e) {
+            // best-effort diagnostic only
         }
     }
 
