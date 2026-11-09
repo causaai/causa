@@ -130,6 +130,7 @@ public final class InstanaContextCollector {
             Alert.WorkloadInfo workload = alert.getWorkloadInfo();
             String filtered = filterAlertConfigsForPod(raw, workload.podName(), workload.namespace());
             if (filtered == null) {
+                // Filter failure (already logged) — do not publish unfiltered, environment-wide configs.
                 return;
             }
             builder.put(tool.contextKey(),
@@ -146,6 +147,10 @@ public final class InstanaContextCollector {
     /**
      * Keeps alert configs whose {@code tagFilterExpression} is empty (applies to every entity)
      * or contains a tag filter whose value equals the pod name or namespace.
+     *
+     * @return the filtered JSON (with an empty {@code configs} array when nothing applies), or
+     *         {@code null} if the response could not be parsed or filtered — a failure that is
+     *         logged here, as opposed to a valid empty result
      */
     static String filterAlertConfigsForPod(String alertsJson, String podName, String namespace) {
         try {
@@ -153,6 +158,10 @@ public final class InstanaContextCollector {
             JsonNode resultsNode = root.path("results");
             JsonNode configs = resultsNode.path("configs");
             if (!resultsNode.isObject() || !configs.isArray()) {
+                log.warn("Infra alert response has no results.configs array — dropping INSTANA_INFRA_ALERTS")
+                        .field("pod", podName)
+                        .field("namespace", namespace)
+                        .log();
                 return null;
             }
             ArrayNode kept = OBJECT_MAPPER.createArrayNode();
@@ -167,6 +176,11 @@ public final class InstanaContextCollector {
             results.put("total", kept.size());
             return OBJECT_MAPPER.writeValueAsString(root);
         } catch (Exception e) {
+            log.warn("Infra alert filtering failed — dropping INSTANA_INFRA_ALERTS")
+                    .field("pod", podName)
+                    .field("namespace", namespace)
+                    .field("error", e.getMessage())
+                    .log();
             return null;
         }
     }
