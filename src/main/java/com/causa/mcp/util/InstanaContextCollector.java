@@ -13,6 +13,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Handles Instana tools that require chaining or post-processing — all other
@@ -21,7 +22,7 @@ import java.util.Map;
  *
  * <p>Special handling:
  * <ul>
- *   <li>{@code get_kubernetes_info_events} → client-side namespace filtering</li>
+ *   <li>{@code get_kubernetes_info_events} → client-side filtering to the alert pod</li>
  *   <li>{@code get_snapshots} → extract {@code snapshotId} → {@code get_snapshot}</li>
  *   <li>{@code get_all} (SLO configurations) → extract {@code sloId} → {@code get} (SLO report)</li>
  * </ul>
@@ -35,7 +36,20 @@ public final class InstanaContextCollector {
 
     private InstanaContextCollector() {}
 
+    /** Context keys that must be scoped to the alert pod; skipped when the pod identity is unknown. */
+    private static final Set<String> POD_SCOPED_KEYS = Set.of(
+            "INSTANA_K8S_EVENTS", "INSTANA_SNAPSHOTS", "INSTANA_SNAPSHOT_DETAIL", "INSTANA_JVM_METRICS",
+            "INSTANA_INFRA_ALERTS");
+
     public static void collect(McpClient client, Alert alert, DiagnosticContext.Builder builder) {
+        Alert.WorkloadInfo workload = alert.getWorkloadInfo();
+        boolean podKnown = workload != null
+                && workload.podName() != null && !workload.podName().isBlank()
+                && workload.namespace() != null && !workload.namespace().isBlank();
+        if (!podKnown) {
+            log.warn("Alert has no pod/namespace — skipping pod-scoped Instana tools").log();
+        }
+
         String snapshotsResult = null;
         McpSettings.ToolConfig snapshotDetailTool = null;
 
@@ -44,6 +58,10 @@ public final class InstanaContextCollector {
 
         for (McpSettings.ToolConfig tool : client.getConfig().tools()) {
             String operation = getOperation(tool);
+
+            if (!podKnown && POD_SCOPED_KEYS.contains(tool.contextKey())) {
+                continue;
+            }
 
             if (McpConstants.Instana.OP_GET_SNAPSHOT.equals(operation)) {
                 snapshotDetailTool = tool;
@@ -61,6 +79,12 @@ public final class InstanaContextCollector {
                 continue;
             }
 
+            if (McpConstants.Instana.OP_FIND_ACTIVE.equals(operation)
+                    && McpConstants.Tools.INSTANA_MANAGE_INFRASTRUCTURE.equals(tool.name())) {
+                processInfraAlerts(client, tool, alert, builder);
+                continue;
+            }
+
             String raw = McpRegistry.processTool(client, tool, alert, Map.of(), builder);
 
             if (McpConstants.Instana.OP_GET_SNAPSHOTS.equals(operation)) {
@@ -72,7 +96,7 @@ public final class InstanaContextCollector {
             }
         }
 
-        if (snapshotDetailTool != null && snapshotsResult != null) {
+        if (podKnown && snapshotDetailTool != null && snapshotsResult != null) {
             String snapshotId = extractSnapshotId(snapshotsResult);
             if (snapshotId != null) {
                 McpRegistry.processTool(client, snapshotDetailTool, alert,
@@ -90,10 +114,90 @@ public final class InstanaContextCollector {
     }
 
     /**
+     * Calls {@code find_active} for infra smart alert configs, then keeps only configs that
+     * apply to the alert pod. The API has no server-side entity filter and returns
+     * environment-wide configs.
+     */
+    private static void processInfraAlerts(McpClient client, McpSettings.ToolConfig tool,
+            Alert alert, DiagnosticContext.Builder builder) {
+        try {
+            Map<String, Object> args = McpRegistry.resolveArguments(
+                    tool.arguments(), alert, client.getConfig(), Map.of());
+            String raw = client.callTool(tool.name(), args);
+            if (raw == null) {
+                return;
+            }
+            Alert.WorkloadInfo workload = alert.getWorkloadInfo();
+            String filtered = filterAlertConfigsForPod(raw, workload.podName(), workload.namespace());
+            if (filtered == null) {
+                return;
+            }
+            builder.put(tool.contextKey(),
+                    McpResponseFormatter.format(client.getServerName(), tool.name(), filtered));
+        } catch (Exception e) {
+            log.warn("MCP tool processing failed")
+                    .field("server", client.getServerName())
+                    .field("tool", tool.name())
+                    .field("error", e.getMessage())
+                    .log();
+        }
+    }
+
+    /**
+     * Keeps alert configs whose {@code tagFilterExpression} is empty (applies to every entity)
+     * or contains a tag filter whose value equals the pod name or namespace.
+     */
+    static String filterAlertConfigsForPod(String alertsJson, String podName, String namespace) {
+        try {
+            JsonNode root = OBJECT_MAPPER.readTree(alertsJson);
+            JsonNode resultsNode = root.path("results");
+            JsonNode configs = resultsNode.path("configs");
+            if (!resultsNode.isObject() || !configs.isArray()) {
+                return null;
+            }
+            ArrayNode kept = OBJECT_MAPPER.createArrayNode();
+            for (JsonNode config : configs) {
+                if (appliesToPod(config.path("tagFilterExpression"), podName, namespace)) {
+                    kept.add(config);
+                }
+            }
+            ObjectNode results = (ObjectNode) resultsNode;
+            results.set("configs", kept);
+            results.put("count", kept.size());
+            results.put("total", kept.size());
+            return OBJECT_MAPPER.writeValueAsString(root);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static boolean appliesToPod(JsonNode expression, String podName, String namespace) {
+        boolean noFilter = expression.isMissingNode() || expression.isNull()
+                || ("EXPRESSION".equals(expression.path("type").asText())
+                        && expression.path("elements").isEmpty());
+        return noFilter || hasPodTarget(expression, podName, namespace);
+    }
+
+    private static boolean hasPodTarget(JsonNode node, String podName, String namespace) {
+        if ("EXPRESSION".equals(node.path("type").asText())) {
+            for (JsonNode element : node.path("elements")) {
+                if (hasPodTarget(element, podName, namespace)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        String value = node.path("value").asText(node.path("stringValue").asText(""));
+        return value.equals(podName) || value.equals(namespace);
+    }
+
+    /**
      * Calls the K8s events tool, then filters the response to keep only events
-     * whose {@code entityLabel} contains the alert's namespace. The Instana
+     * whose {@code entityLabel} is exactly {@code namespace/podName}. The Instana
      * {@code get_kubernetes_info_events} API returns cluster-wide events with no
-     * server-side namespace filter, so we scope them client-side.
+     * server-side pod/namespace filter (its {@code query} param is ignored), so we
+     * scope them client-side. The tool's {@code max_events} must be large enough that
+     * the cap does not drop the alert pod's events before this filter runs.
      */
     private static void processK8sEvents(McpClient client, McpSettings.ToolConfig tool,
             Alert alert, DiagnosticContext.Builder builder) {
@@ -105,10 +209,8 @@ public final class InstanaContextCollector {
                 return;
             }
 
-            String namespace = alert.getWorkloadInfo().namespace();
-            String filtered = (namespace != null && !namespace.isEmpty())
-                    ? filterEventsByNamespace(raw, namespace)
-                    : raw;
+            Alert.WorkloadInfo workload = alert.getWorkloadInfo();
+            String filtered = filterEventsByEntityLabel(raw, workload.namespace() + "/" + workload.podName());
             if (filtered == null) {
                 return;
             }
@@ -125,7 +227,7 @@ public final class InstanaContextCollector {
         }
     }
 
-    static String filterEventsByNamespace(String eventsJson, String namespace) {
+    static String filterEventsByEntityLabel(String eventsJson, String entityLabel) {
         try {
             JsonNode root = OBJECT_MAPPER.readTree(eventsJson);
             JsonNode resultsNode = root.path("results");
@@ -134,8 +236,8 @@ public final class InstanaContextCollector {
             }
             ObjectNode results = (ObjectNode) resultsNode;
 
-            filterArray(results, "events", namespace);
-            filterProblemAnalyses(results, namespace);
+            filterArray(results, "events", entityLabel);
+            filterProblemAnalyses(results, entityLabel);
 
             return OBJECT_MAPPER.writeValueAsString(root);
         } catch (Exception e) {
@@ -143,22 +245,21 @@ public final class InstanaContextCollector {
         }
     }
 
-    private static void filterArray(ObjectNode results, String field, String namespace) {
+    private static void filterArray(ObjectNode results, String field, String entityLabel) {
         JsonNode arr = results.path(field);
         if (!arr.isArray()) {
             return;
         }
         ArrayNode filtered = OBJECT_MAPPER.createArrayNode();
         for (JsonNode event : arr) {
-            String label = event.path("entityLabel").asText("");
-            if (label.startsWith(namespace + "/")) {
+            if (entityLabel.equals(event.path("entityLabel").asText(""))) {
                 filtered.add(event);
             }
         }
         results.set(field, filtered);
     }
 
-    private static void filterProblemAnalyses(ObjectNode results, String namespace) {
+    private static void filterProblemAnalyses(ObjectNode results, String entityLabel) {
         JsonNode analyses = results.path("problem_analyses");
         if (!analyses.isArray()) {
             return;
@@ -171,8 +272,7 @@ public final class InstanaContextCollector {
             }
             ArrayNode filteredSamples = OBJECT_MAPPER.createArrayNode();
             for (JsonNode sample : sampleEventsNode) {
-                String label = sample.path("entityLabel").asText("");
-                if (label.startsWith(namespace + "/")) {
+                if (entityLabel.equals(sample.path("entityLabel").asText(""))) {
                     filteredSamples.add(sample);
                 }
             }
