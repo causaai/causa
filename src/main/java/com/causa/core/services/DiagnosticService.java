@@ -38,4 +38,14 @@ public interface DiagnosticService {
      * Returns a single diagnostic by its ID.
      */
     Optional<Diagnostic> getDiagnosticById(String diagnosticId);
+
+    /**
+     * Creates a Jira ticket for the alert behind the diagnostic, or returns the one that already
+     * exists for that alert. Throws {@link com.causa.common.exceptions.DiagnosticException} with
+     * errorType {@code JIRA_NOT_CONFIGURED}, {@code NOT_FOUND} or {@code JIRA_API_ERROR}.
+     */
+    JiraTicket createOrGetJiraTicket(String diagnosticId);
+
+    /** Jira ticket URL and whether it existed before this call. */
+    record JiraTicket(String url, boolean alreadyExisted) {}
 }

@@ -205,6 +205,23 @@ class JiraClientTest {
     }
 
     @Test
+    @DisplayName("Project name that is not a valid Jira project key is rejected before any request is sent")
+    void invalidProjectKeyRejected() {
+        ExternalConfig cfg = ExternalConfig.builder()
+                .id("cfg-1").name("jira").category(PlatformCategory.INTEGRATION).platform("JIRA")
+                .url(baseUrl)
+                .authConfig(new AuthConfig("PAT", null, null, "tok", null, null, null, null))
+                .additionalConfig(Map.of("projectName", "OPS\" OR project = \"SECRET"))
+                .build();
+
+        DiagnosticException ex = assertThrows(DiagnosticException.class,
+                () -> client.findTicketByAlertId(cfg, "alrt 1"));
+
+        assertEquals("JIRA_CONFIG_INVALID", ex.getErrorType());
+        assertNull(path.get());
+    }
+
+    @Test
     @DisplayName("Cloud config without username is rejected")
     void cloudRequiresUsername() {
         DiagnosticException ex = assertThrows(DiagnosticException.class,

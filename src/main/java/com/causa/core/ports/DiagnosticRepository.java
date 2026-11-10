@@ -42,5 +42,5 @@ public interface DiagnosticRepository {
     Optional<String> findTicketLinkByAlertId(String alertId);
 
     /** Stores the Jira URL on the diagnostic row only if {@code ticket_link} is still NULL. */
-    void updateTicketLink(String diagnosticId, String ticketUrl);
+    void updateTicketLink(String diagnosticId, String ticketLink);
 }

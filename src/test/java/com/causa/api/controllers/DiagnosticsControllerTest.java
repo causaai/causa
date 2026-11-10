@@ -2,10 +2,12 @@ package com.causa.api.controllers;
 
 import com.causa.api.dto.response.DiagnosticDetailResponse;
 import com.causa.api.dto.response.DiagnosticListItemResponse;
+import com.causa.api.dto.response.JiraTicketResponse;
 import com.causa.common.constants.AlertConstants.AlertSeverity;
 import com.causa.common.constants.AlertConstants.AlertStatus;
 import com.causa.common.constants.ConfigConstants.PlatformCategory;
 import com.causa.common.constants.DiagnosticConstants.DiagnosticStatus;
+import com.causa.common.exceptions.DiagnosticException;
 import com.causa.config.ExternalConfigCache;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.AuthConfig;
@@ -290,6 +292,83 @@ class DiagnosticsControllerTest {
 
             DiagnosticDetailResponse body = (DiagnosticDetailResponse) response.getEntity();
             assertEquals(CLUSTER_NAME, body.workloadInfo().clusterName());
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // POST /api/v1/diagnostics/{id}/ticket
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("POST /api/v1/diagnostics/{id}/ticket")
+    class CreateJiraTicketTests {
+
+        private static final String URL = "https://acme.atlassian.net/browse/OPS-1";
+
+        @Test
+        @DisplayName("Should return 201 when a new ticket was created")
+        void shouldReturn201ForNewTicket() {
+            when(diagnosticService.createOrGetJiraTicket("d1"))
+                    .thenReturn(new DiagnosticService.JiraTicket(URL, false));
+
+            Response response = controller.createJiraTicket("d1");
+
+            assertEquals(201, response.getStatus());
+            assertEquals(JiraTicketResponse.created(URL), response.getEntity());
+        }
+
+        @Test
+        @DisplayName("Should return 200 when the ticket already existed")
+        void shouldReturn200ForExistingTicket() {
+            when(diagnosticService.createOrGetJiraTicket("d1"))
+                    .thenReturn(new DiagnosticService.JiraTicket(URL, true));
+
+            Response response = controller.createJiraTicket("d1");
+
+            assertEquals(200, response.getStatus());
+            assertEquals(JiraTicketResponse.existing(URL), response.getEntity());
+        }
+
+        @Test
+        @DisplayName("Should serialize the ticket URL as ticket_link")
+        void shouldSerializeTicketLink() throws Exception {
+            String json = new com.fasterxml.jackson.databind.ObjectMapper()
+                    .writeValueAsString(JiraTicketResponse.created(URL));
+
+            assertTrue(json.contains("\"ticket_link\":\"" + URL + "\""));
+            assertFalse(json.contains("ticket_url"));
+        }
+
+        @Test
+        @DisplayName("Should map Jira config errors to 422 and hide upstream details on 502")
+        void shouldMapConfigErrorsAndHideUpstreamDetails() {
+            when(diagnosticService.createOrGetJiraTicket("incomplete"))
+                    .thenThrow(new DiagnosticException("missing url", "JIRA_CONFIG_INCOMPLETE"));
+            when(diagnosticService.createOrGetJiraTicket("invalid"))
+                    .thenThrow(new DiagnosticException("bad url", "JIRA_CONFIG_INVALID"));
+            when(diagnosticService.createOrGetJiraTicket("leaky"))
+                    .thenThrow(new DiagnosticException("upstream body: secret-detail", "JIRA_API_ERROR"));
+
+            assertEquals(422, controller.createJiraTicket("incomplete").getStatus());
+            assertEquals(422, controller.createJiraTicket("invalid").getStatus());
+            Response leaky = controller.createJiraTicket("leaky");
+            assertEquals(502, leaky.getStatus());
+            assertFalse(leaky.getEntity().toString().contains("secret-detail"));
+        }
+
+        @Test
+        @DisplayName("Should map DiagnosticException error types to 404, 422 and 502")
+        void shouldMapErrorsToStatusCodes() {
+            when(diagnosticService.createOrGetJiraTicket("missing"))
+                    .thenThrow(new DiagnosticException("not found", "NOT_FOUND"));
+            when(diagnosticService.createOrGetJiraTicket("nojira"))
+                    .thenThrow(new DiagnosticException("not configured", "JIRA_NOT_CONFIGURED"));
+            when(diagnosticService.createOrGetJiraTicket("broken"))
+                    .thenThrow(new DiagnosticException("Jira down", "JIRA_API_ERROR"));
+
+            assertEquals(404, controller.createJiraTicket("missing").getStatus());
+            assertEquals(422, controller.createJiraTicket("nojira").getStatus());
+            assertEquals(502, controller.createJiraTicket("broken").getStatus());
         }
     }
 }
