@@ -140,7 +140,7 @@ public class DiagnosticEntity extends BaseEntity {
      * {@code updatable = false} keeps this column out of JPA {@code UPDATE}
      * statements, so {@code merge()} of a diagnostic rebuilt without a
      * ticket link can never overwrite a stored value with NULL. The link is
-     * written only through the dedicated native-SQL update in the repository.
+     * written only through the dedicated Panache bulk update in the repository.
      */
     @Column(columnDefinition = "TEXT", updatable = false)
     private String ticketLink;

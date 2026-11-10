@@ -16,6 +16,7 @@ import jakarta.persistence.NoResultException;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -127,12 +128,10 @@ public class DiagnosticRepositoryImpl implements DiagnosticRepository {
     @Override
     @Transactional
     public void updateTicketLink(String diagnosticId, String ticketLink) {
-        em.createNativeQuery(
-                "UPDATE diagnostics SET ticket_link = :url, updated_at = CURRENT_TIMESTAMP " +
-                "WHERE id = :id AND ticket_link IS NULL")
-            .setParameter("url", ticketLink)
-            .setParameter("id", diagnosticId)
-            .executeUpdate();
+        // Bulk HQL bypasses @UpdateTimestamp, so updatedAt is set explicitly
+        DiagnosticEntity.update(
+            "ticketLink = ?1, updatedAt = ?2 where id = ?3 and ticketLink is null",
+            ticketLink, OffsetDateTime.now(), diagnosticId);
     }
 
     private static boolean isBlank(String s) {
