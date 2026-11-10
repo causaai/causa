@@ -1,17 +1,11 @@
 name: Prepare release
 
 on:
-  push:
-    branches:
-      - '**'
-      # Avoid re-triggering on the branches this workflow itself creates.
-      - '!bump-version-**'
   workflow_dispatch:
     inputs:
       version:
         description: 'New Causa version (e.g., 0.12 or 0.0.8)'
         required: true
-        default: '0.0.8'
         type: string
 
 permissions:
@@ -21,7 +15,7 @@ permissions:
 # One queue per requested version, so runs for different versions are never
 # replaced by a newer pending dispatch.
 concurrency:
-  group: prepare-release-${{ inputs.version || '0.0.8' }}
+  group: prepare-release-${{ inputs.version }}
   cancel-in-progress: false
 
 jobs:
@@ -31,7 +25,7 @@ jobs:
     steps:
       - name: Validate version input
         env:
-          VERSION: ${{ inputs.version || '0.0.8' }}
+          VERSION: ${{ inputs.version }}
         run: |
           if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?(-[0-9A-Za-z.-]+)?$ ]]; then
             echo "::error::Invalid version '$VERSION'. Expected format: MAJOR.MINOR[.PATCH] (e.g., 0.12 or 0.0.8)"
@@ -65,7 +59,7 @@ jobs:
       # could otherwise read it).
       - name: Ensure requested version is newer
         env:
-          VERSION: ${{ inputs.version || '0.0.8' }}
+          VERSION: ${{ inputs.version }}
         run: |
           CURRENT=$(mvn -B -ntp -q -DforceStdout -Dexpression=project.version help:evaluate)
           echo "Current version: $CURRENT, requested version: $VERSION"
@@ -77,7 +71,7 @@ jobs:
 
       - name: Ensure no other version bump PR is open
         env:
-          VERSION: ${{ inputs.version || '0.0.8' }}
+          VERSION: ${{ inputs.version }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           OTHER=$(gh pr list --repo "$GITHUB_REPOSITORY" --base mvp_demo --state open --json number,headRefName \
@@ -89,7 +83,7 @@ jobs:
 
       - name: Update pom.xml version
         env:
-          VERSION: ${{ inputs.version || '0.0.8' }}
+          VERSION: ${{ inputs.version }}
         run: |
           mvn -B -ntp versions:set -DnewVersion="$VERSION" -DgenerateBackupPoms=false
 
@@ -102,12 +96,12 @@ jobs:
         with:
           token: ${{ secrets.RELEASE_PR_TOKEN || secrets.GITHUB_TOKEN }}
           base: mvp_demo
-          branch: "bump-version-${{ inputs.version || '0.0.8' }}"
-          commit-message: "chore(release): bump pom.xml version to ${{ inputs.version || '0.0.8' }}"
+          branch: "bump-version-${{ inputs.version }}"
+          commit-message: "chore(release): bump pom.xml version to ${{ inputs.version }}"
           committer: "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
           author: "github-actions[bot] <github-actions[bot]@users.noreply.github.com>"
-          title: "chore: update pom.xml version to ${{ inputs.version || '0.0.8' }}"
-          body: "Automated PR updating Causa version to `${{ inputs.version || '0.0.8' }}` targeting `mvp_demo`."
+          title: "chore: update pom.xml version to ${{ inputs.version }}"
+          body: "Automated PR updating Causa version to `${{ inputs.version }}` targeting `mvp_demo`."
           add-paths: pom.xml
           sign-commits: true
           delete-branch: true
@@ -118,7 +112,7 @@ jobs:
       - name: Create PR to main
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PR_TOKEN || secrets.GITHUB_TOKEN }}
-          VERSION: ${{ inputs.version || '0.0.8' }}
+          VERSION: ${{ inputs.version }}
           BUMP_BRANCH: ${{ steps.cpr.outputs.pull-request-branch }}
         run: |
           HEAD_BRANCH="${BUMP_BRANCH:-mvp_demo}"
