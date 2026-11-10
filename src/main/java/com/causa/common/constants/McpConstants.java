@@ -308,11 +308,16 @@ public final class McpConstants {
         public static final String OP_GET_SNAPSHOTS = "get_snapshots";
         public static final String OP_GET_SNAPSHOT = "get_snapshot";
         public static final String OP_GET_KUBERNETES_INFO_EVENTS = "get_kubernetes_info_events";
+        public static final String OP_FIND_ACTIVE = "find_active";
+        public static final String OP_GET_ENTITIES = "get_entities";
         public static final String OP_GET_ALL = "get_all";
         public static final String OP_GET = "get";
 
         public static final String HEADER_API_TOKEN = "instana-api-token";
         public static final String HEADER_BASE_URL = "instana-base-url";
+
+        /** Server metadata key: {@code seconds} makes timestamp tokens whole-second (Instana rejects fractions). */
+        public static final String METADATA_TIMESTAMP_PRECISION = "timestampPrecision";
 
         public static final String PLATFORM = "INSTANA";
         public static final String CONFIG_NAME = "mcp";

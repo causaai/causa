@@ -98,16 +98,16 @@
       "alwaysAllow": ["manage_events", "manage_releases", "manage_applications", "manage_infrastructure", "manage_synthetics", "manage_slo"],
       "healthCheck": { "url": "http://instana-mcp-server:8080/mcp", "timeoutMs": 10000 },
       "timeoutMs": 30000,
-      "metadata": {},
+      "metadata": { "timestampPrecision": "seconds" },
       "description": "Instana MCP — K8s events, Golden Signals, JVM snapshots, infra metrics, releases, SLO reports, synthetic tests from IBM Instana APM",
       "tools": [
         {
           "name": "manage_events",
           "contextKey": "INSTANA_K8S_EVENTS",
-          "description": "Kubernetes warning/info events with automated analysis",
+          "description": "Kubernetes events for the alert pod only (1h window ending at the alert; filtered to the pod client-side)",
           "arguments": {
             "operation": "get_kubernetes_info_events",
-            "params": { "time_range": "24h", "max_events": 10 }
+            "params": { "from_time": "${alertTimestampMinus1h}", "to_time": "${alertTimestamp}", "max_events": 500 }
           }
         },
         {
@@ -180,11 +180,15 @@
         {
           "name": "manage_infrastructure",
           "contextKey": "INSTANA_SNAPSHOTS",
-          "description": "Infrastructure snapshots for the service JVM",
+          "description": "Infrastructure snapshots for the alert pod's JVM (pod name AND namespace)",
           "arguments": {
             "resource_type": "resources",
             "operation": "get_snapshots",
-            "params": { "plugin": "jvmRuntimePlatform", "query": "${containerName}", "size": 5 }
+            "params": {
+              "plugin": "jvmRuntimePlatform",
+              "query": "entity.kubernetes.pod.name:\"${podName}\" AND entity.kubernetes.namespace:\"${namespace}\"",
+              "size": 5
+            }
           }
         },
         {
@@ -213,9 +217,19 @@
                   { "metric": "threads.waiting", "granularity": 60000, "aggregation": "SUM" }
                 ],
                 "tagFilterExpression": {
-                  "type": "TAG_FILTER", "entity": "NOT_APPLICABLE",
-                  "name": "kubernetes.namespace.name", "operator": "EQUALS",
-                  "value": "${namespace}"
+                  "type": "EXPRESSION", "logicalOperator": "AND",
+                  "elements": [
+                    {
+                      "type": "TAG_FILTER", "entity": "NOT_APPLICABLE",
+                      "name": "kubernetes.namespace.name", "operator": "EQUALS",
+                      "value": "${namespace}"
+                    },
+                    {
+                      "type": "TAG_FILTER", "entity": "NOT_APPLICABLE",
+                      "name": "kubernetes.pod.name", "operator": "EQUALS",
+                      "value": "${podName}"
+                    }
+                  ]
                 },
                 "timeFrame": { "windowSize": 3600000 },
                 "pagination": { "retrievalSize": 5 }
@@ -226,10 +240,11 @@
         {
           "name": "manage_infrastructure",
           "contextKey": "INSTANA_INFRA_ALERTS",
-          "description": "Active infrastructure smart alert configurations",
+          "description": "Active infrastructure smart alert configurations that apply to the alert pod (filtered client-side)",
           "arguments": {
             "resource_type": "alert_config",
-            "operation": "find_active"
+            "operation": "find_active",
+            "params": { "page_size": 1000 }
           }
         },
         {

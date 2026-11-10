@@ -232,6 +232,25 @@ Two tools require chaining (handled by `InstanaContextCollector`):
 
 All other tools are processed automatically from `mcp.json`.
 
+### Pod-scoped filtering
+
+Every Instana tool that returns infrastructure data is restricted to the alert pod, so the LLM
+never sees data from other workloads in the cluster:
+
+| Context key | Scope |
+|---|---|
+| `INSTANA_K8S_EVENTS` | `from_time`/`to_time` = 1h before the alert → alert time. `get_kubernetes_info_events` has no server-side pod filter (its `query` is ignored), so `max_events` is set to 500 and `InstanaContextCollector` keeps only events whose `entityLabel` is exactly `namespace/podName`. |
+| `INSTANA_SNAPSHOTS` | Query `entity.kubernetes.pod.name:"<pod>" AND entity.kubernetes.namespace:"<ns>"` |
+| `INSTANA_SNAPSHOT_DETAIL` | Chained from the pod-scoped `INSTANA_SNAPSHOTS` result |
+| `INSTANA_JVM_METRICS` | `kubernetes.namespace.name` AND `kubernetes.pod.name` tag filters |
+| `INSTANA_INFRA_ALERTS` | `find_active` has no server-side entity filter, so `InstanaContextCollector` keeps only configs with an empty `tagFilterExpression` (apply to all entities) or a tag filter whose value equals the alert pod name or namespace. |
+
+If the alert has no pod name or namespace, these five tools are skipped rather than falling back
+to a broader query.
+
+The snapshot `query` field uses `entity.kubernetes.namespace` (not `.namespace.name`); the latter
+is rejected by Instana with HTTP 400.
+
 | Tunable | Where | Default | Description |
 |---|---|---|---|
 | MCP endpoint | `mcp.json` `url` | `http://instana-mcp-server:8080/mcp` | MCP endpoint |
