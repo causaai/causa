@@ -109,6 +109,7 @@ jobs:
           title: "chore: update pom.xml version to ${{ inputs.version || '0.0.8' }}"
           body: "Automated PR updating Causa version to `${{ inputs.version || '0.0.8' }}` targeting `mvp_demo`."
           add-paths: pom.xml
+          sign-commits: true
           delete-branch: true
 
       # Opens downstream PR into main if not already present. The head is the version-bump
