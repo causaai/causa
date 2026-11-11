@@ -11,7 +11,7 @@ deployment profiles ship out of the box:
 
 | Profile | File | Servers included |
 |---|---|---|
-| Cluster (default) | `mcp-cluster-default.json` | Kubernetes, Kruize, Cryostat |
+| Cluster (default) | `mcp-cluster-default.json` | Kubernetes, Kruize, Cryostat, Instana |
 | Developer Persona | `mcp-developer-default.json` | Kubernetes, Kruize, Quarkus, Async Profiler |
 | VM | `mcp-vm-default.json` | JMX, Filesystem |
 
@@ -189,6 +189,81 @@ call passes the pod name plus an ISO-8601 window ending at the alert timestamp.
 | Analysis lookback | `mcp.json` `metadata.analysisLookbackMinutes` | `15` | Minutes before the alert timestamp used as `fromTimestamp` |
 
 Tools used: `getDiscoveryTree` · `getAnalysisReport`
+
+---
+
+## Instana MCP
+
+Provides IBM Instana APM observability data: Kubernetes events, Golden Signals (service and
+endpoint-level), JVM infrastructure snapshots, time-series metrics, releases, synthetic test
+summaries, and SLO reports.
+
+Instana is `optional: true` — if not configured or unreachable, it does not affect overall
+system health.
+
+### Credentials
+
+The Instana MCP server is deployed without embedded credentials. The API key and instance URL
+are stored in the `external_configs` database table:
+
+| Column | Value |
+|---|---|
+| `platform` | `INSTANA` |
+| `category` | `OBSERVABILITY` |
+| `name` | `mcp` |
+| `url` | Instana instance URL (e.g. `https://maroon-tenant.instana.io/`) |
+| `authConfig.token` | Instana API key (AES-256-GCM encrypted in DB) |
+
+On startup, `McpRegistry.refreshInstanaHeaders()` reads the config from `ExternalConfigCache`,
+decrypts the token, and sets `instana-api-token` and `instana-base-url` as runtime HTTP headers on
+the Instana `McpClient`. When the config is updated in the database, PostgreSQL LISTEN/NOTIFY
+triggers `ConfigCacheListener`, which refreshes the cache and updates the headers — no pod
+restart required.
+
+### Tool chaining
+
+Two tools require chaining (handled by `InstanaContextCollector`):
+
+1. **Snapshot chaining**: `get_snapshots` discovers infrastructure snapshot IDs →
+   `get_snapshot` fetches JVM command-line args, GC config, and memory pools for the first
+   matching snapshot.
+2. **SLO chaining**: `get_all` (SLO configurations) discovers SLO IDs → `get` (SLO report)
+   fetches compliance status and error budget for the first SLO.
+
+All other tools are processed automatically from `mcp.json`.
+
+### Pod-scoped filtering
+
+Every Instana tool that returns infrastructure data is restricted to the alert pod, so the LLM
+never sees data from other workloads in the cluster:
+
+| Context key | Scope |
+|---|---|
+| `INSTANA_K8S_EVENTS` | `from_time`/`to_time` = 1h before the alert → alert time. `get_kubernetes_info_events` has no server-side pod filter (its `query` is ignored), so `max_events` is set to 500 and `InstanaContextCollector` keeps only events whose `entityLabel` is exactly `namespace/podName`. |
+| `INSTANA_SNAPSHOTS` | Query `entity.kubernetes.pod.name:"<pod>" AND entity.kubernetes.namespace:"<ns>"` |
+| `INSTANA_SNAPSHOT_DETAIL` | Chained from the pod-scoped `INSTANA_SNAPSHOTS` result |
+| `INSTANA_JVM_METRICS` | `kubernetes.namespace.name` AND `kubernetes.pod.name` tag filters |
+| `INSTANA_INFRA_ALERTS` | `find_active` has no server-side entity filter, so `InstanaContextCollector` keeps only configs with an empty `tagFilterExpression` (apply to all entities) or a tag filter whose value equals the alert pod name or namespace. |
+
+If the alert has no pod name or namespace, these five tools are skipped rather than falling back
+to a broader query.
+
+The snapshot `query` field uses `entity.kubernetes.namespace` (not `.namespace.name`); the latter
+is rejected by Instana with HTTP 400.
+
+| Tunable | Where | Default | Description |
+|---|---|---|---|
+| MCP endpoint | `mcp.json` `url` | `http://instana-mcp-server:8080/mcp` | MCP endpoint |
+| Health endpoint | `mcp.json` `healthCheck.url` | `http://instana-mcp-server:8080/mcp` | Health probe (POST-only — GET returns 405, accepted as healthy for Instana only) |
+| Request timeout | `mcp.json` `timeoutMs` | `30000` | Milliseconds — Instana API queries can be slow |
+
+Tools used: `manage_events` · `manage_releases` · `manage_applications` (×2) ·
+`manage_infrastructure` (×5) · `manage_synthetics` · `manage_slo` (×2)
+
+Context keys: `INSTANA_K8S_EVENTS` · `INSTANA_RELEASES` · `INSTANA_SERVICE_METRICS` ·
+`INSTANA_ENDPOINT_METRICS` · `INSTANA_INFRA_METRIC_CATALOG` · `INSTANA_SNAPSHOTS` ·
+`INSTANA_SNAPSHOT_DETAIL` · `INSTANA_JVM_METRICS` · `INSTANA_INFRA_ALERTS` ·
+`INSTANA_SYNTHETIC_TESTS` · `INSTANA_SLO_CONFIGS` · `INSTANA_SLO_REPORT`
 
 ---
 
