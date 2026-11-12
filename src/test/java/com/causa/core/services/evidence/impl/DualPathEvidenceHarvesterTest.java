@@ -7,7 +7,7 @@ import com.causa.core.domain.validation.Assertion;
 import com.causa.core.domain.validation.Assertion.AssertionSource;
 import com.causa.core.domain.validation.Assertion.AssertionType;
 import com.causa.core.domain.validation.DualValidationResult;
-import com.causa.core.domain.validation.Evidence;
+import com.causa.core.domain.validation.ValidationEvidence;
 import com.causa.core.domain.validation.EvidenceItem;
 import com.causa.core.domain.validation.ValidatedRCA;
 import com.causa.core.domain.validation.ValidationResult;
@@ -129,7 +129,7 @@ class DualPathEvidenceHarvesterTest {
             Assertion.of("a1", "Container was OOMKilled",
                 AssertionType.OBSERVATION, AssertionSource.ROOT_CAUSE),
             0.9,
-            List.of(Evidence.of("POD_STATUS", Evidence.EvidenceType.KUBERNETES_EVENT,
+            List.of(ValidationEvidence.of("POD_STATUS", ValidationEvidence.EvidenceType.KUBERNETES_EVENT,
                 "Exit Code: 137", 0.9)),
             "exit code 137 observed");
     }
