@@ -105,6 +105,9 @@ public class BobShellPromptSender implements PromptSender {
             return llmResponse;
 
         } catch (Exception e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
             long latencyMs = (System.nanoTime() - startNanos) / 1_000_000;
             log.error(LogMessages.LLM.LLM_ERROR)
                 .field(LLMConstants.Fields.ERROR_TYPE, e.getClass().getSimpleName())
@@ -143,31 +146,40 @@ public class BobShellPromptSender implements PromptSender {
         try {
             ProcessBuilder pb = new ProcessBuilder(resolveBobShellPath(), LLMConstants.BobShell.VERSION_FLAG);
             pb.environment().putAll(buildSubprocessEnv(resolveApiKey()));
-            Process process = pb.start();
-            boolean completed = process.waitFor(
-                LLMConstants.BobShell.VERSION_CHECK_TIMEOUT_SECONDS,
-                TimeUnit.SECONDS
-            );
-            
-            if (!completed) {
-                process.destroyForcibly();
-                log.warn(LogMessages.LLM.BOB_VERSION_CHECK_TIMEOUT).log();
-                return false;
-            }
-            
-            int exitCode = process.exitValue();
-            if (exitCode == 0) {
-                log.info(LogMessages.LLM.BOB_SHELL_AVAILABLE)
-                    .field(LLMConstants.BobShell.LOG_FIELD_SHELL_PATH, resolveBobShellPath())
-                    .log();
-                return true;
-            } else {
+            return BobProcessRunner.run(pb, process -> {
+                boolean completed = process.waitFor(
+                    LLMConstants.BobShell.VERSION_CHECK_TIMEOUT_SECONDS,
+                    TimeUnit.SECONDS
+                );
+
+                if (!completed) {
+                    log.warn(LogMessages.LLM.BOB_VERSION_CHECK_TIMEOUT).log();
+                    return false;
+                }
+
+                int exitCode = process.exitValue();
+                if (exitCode == 0) {
+                    log.info(LogMessages.LLM.BOB_SHELL_AVAILABLE)
+                        .field(LLMConstants.BobShell.LOG_FIELD_SHELL_PATH, resolveBobShellPath())
+                        .log();
+                    return true;
+                }
+
                 log.warn(LogMessages.LLM.BOB_SHELL_NOT_AVAILABLE)
                     .field(LLMConstants.BobShell.LOG_FIELD_EXIT_CODE, exitCode)
                     .log();
                 return false;
-            }
-        } catch (IOException | InterruptedException e) {
+            });
+        } catch (BobProcessRunner.SaturatedException e) {
+            log.warn("BOB process concurrency limit reached").log();
+            return false;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn(LogMessages.LLM.BOB_AVAILABILITY_CHECK_FAILED)
+                .exception(e)
+                .log();
+            return false;
+        } catch (IOException e) {
             log.warn(LogMessages.LLM.BOB_AVAILABILITY_CHECK_FAILED)
                 .exception(e)
                 .log();
@@ -229,62 +241,58 @@ public class BobShellPromptSender implements PromptSender {
             
             pb.redirectErrorStream(true);
             
-            Process process = pb.start();
-            
-            // Write prompt to stdin
-            try (OutputStreamWriter writer = new OutputStreamWriter(
-                    process.getOutputStream(), StandardCharsets.UTF_8)) {
-                writer.write(prompt);
-                writer.flush();
-            }
-            
-            // Wait for completion with timeout
-            int timeoutSeconds = llmConfigCache.getActive()
-                .map(a -> a.getTimeoutMs() != null ? a.getTimeoutMs() / 1000 : 180)
-                .orElse(180);
-            boolean completed = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
-            
-            if (!completed) {
-                process.destroyForcibly();
-                throw new LLMException(
-                    String.format(LogMessages.LLM.BOB_TIMEOUT_TEMPLATE, timeoutSeconds),
-                    LLMConstants.ErrorTypes.LLM_REQUEST_FAILED
-                );
-            }
-            
-            // Read output
-            StringBuilder output = new StringBuilder();
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    output.append(line).append(System.lineSeparator());
+            return BobProcessRunner.run(pb, process -> {
+                try (OutputStreamWriter writer = new OutputStreamWriter(
+                        process.getOutputStream(), StandardCharsets.UTF_8)) {
+                    writer.write(prompt);
+                    writer.flush();
                 }
-            }
-            
-            int exitCode = process.exitValue();
-            String responseText = output.toString().trim();
-            
-            if (exitCode != 0) {
-                log.error(LogMessages.LLM.BOB_SHELL_FAILED)
-                    .field(LLMConstants.BobShell.LOG_FIELD_EXIT_CODE, exitCode)
-                    .field(LLMConstants.BobShell.LOG_FIELD_OUTPUT, responseText.length() > LLMConstants.BobShell.OUTPUT_TRUNCATE_LENGTH ?
-                        responseText.substring(0, LLMConstants.BobShell.OUTPUT_TRUNCATE_LENGTH) : responseText)
-                    .log();
-                throw new LLMException(
-                    String.format(LogMessages.LLM.BOB_EXIT_CODE_TEMPLATE, exitCode),
-                    LLMConstants.ErrorTypes.LLM_REQUEST_FAILED
-                );
-            }
-            
-            if (responseText.isEmpty()) {
-                throw new LLMException(
-                    LogMessages.LLM.BOB_EMPTY_RESPONSE,
-                    LLMConstants.ErrorTypes.LLM_REQUEST_FAILED
-                );
-            }
 
-            return responseText;
+                int timeoutSeconds = llmConfigCache.getActive()
+                    .map(a -> a.getTimeoutMs() != null ? a.getTimeoutMs() / 1000 : 180)
+                    .orElse(180);
+                boolean completed = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
+
+                if (!completed) {
+                    throw new LLMException(
+                        String.format(LogMessages.LLM.BOB_TIMEOUT_TEMPLATE, timeoutSeconds),
+                        LLMConstants.ErrorTypes.LLM_REQUEST_FAILED
+                    );
+                }
+
+                StringBuilder output = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        output.append(line).append(System.lineSeparator());
+                    }
+                }
+
+                int exitCode = process.exitValue();
+                String responseText = output.toString().trim();
+
+                if (exitCode != 0) {
+                    log.error(LogMessages.LLM.BOB_SHELL_FAILED)
+                        .field(LLMConstants.BobShell.LOG_FIELD_EXIT_CODE, exitCode)
+                        .field(LLMConstants.BobShell.LOG_FIELD_OUTPUT, responseText.length() > LLMConstants.BobShell.OUTPUT_TRUNCATE_LENGTH ?
+                            responseText.substring(0, LLMConstants.BobShell.OUTPUT_TRUNCATE_LENGTH) : responseText)
+                        .log();
+                    throw new LLMException(
+                        String.format(LogMessages.LLM.BOB_EXIT_CODE_TEMPLATE, exitCode),
+                        LLMConstants.ErrorTypes.LLM_REQUEST_FAILED
+                    );
+                }
+
+                if (responseText.isEmpty()) {
+                    throw new LLMException(
+                        LogMessages.LLM.BOB_EMPTY_RESPONSE,
+                        LLMConstants.ErrorTypes.LLM_REQUEST_FAILED
+                    );
+                }
+
+                return responseText;
+            });
         } catch (IOException e) {
             throw new LLMException(
                 String.format(LLMConstants.ErrorMessages.REQUEST_FAILED_TEMPLATE, e.getMessage()),
