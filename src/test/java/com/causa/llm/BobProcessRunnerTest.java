@@ -76,7 +76,7 @@ class BobProcessRunnerTest {
         }));
 
         assertFalse(process.isAlive());
-        assertCanStartConfiguredNumberOfProcesses();
+        assertAllConfiguredSlotsCanBeReusedConcurrently();
     }
 
     @Test
@@ -91,7 +91,7 @@ class BobProcessRunnerTest {
 
         assertEquals("finished", result);
         assertFalse(startedProcess.get().isAlive());
-        assertCanStartConfiguredNumberOfProcesses();
+        assertAllConfiguredSlotsCanBeReusedConcurrently();
     }
 
     @Test
@@ -105,7 +105,7 @@ class BobProcessRunnerTest {
         }));
 
         assertFalse(startedProcess.get().isAlive());
-        assertCanStartConfiguredNumberOfProcesses();
+        assertAllConfiguredSlotsCanBeReusedConcurrently();
     }
 
     @Test
@@ -113,7 +113,7 @@ class BobProcessRunnerTest {
         assertThrows(IOException.class, () -> BobProcessRunner.run(processBuilder(), ignored -> {
             throw new IOException("simulated process startup failure");
         }, ignored -> "unexpected"));
-        assertCanStartConfiguredNumberOfProcesses();
+        assertAllConfiguredSlotsCanBeReusedConcurrently();
     }
 
     @Test
@@ -124,12 +124,46 @@ class BobProcessRunnerTest {
         }));
 
         assertFalse(process.isAlive());
-        assertCanStartConfiguredNumberOfProcesses();
+        assertAllConfiguredSlotsCanBeReusedConcurrently();
     }
 
-    private static void assertCanStartConfiguredNumberOfProcesses() throws Exception {
-        for (int i = 0; i < BobProcessRunner.MAX_CONCURRENT_PROCESSES; i++) {
-            assertEquals("finished", BobProcessRunner.run(processBuilder(), ignored -> new FakeProcess(), ignored -> "finished"));
+    private static void assertAllConfiguredSlotsCanBeReusedConcurrently() throws Exception {
+        CountDownLatch started = new CountDownLatch(BobProcessRunner.MAX_CONCURRENT_PROCESSES);
+        CountDownLatch release = new CountDownLatch(1);
+        AtomicInteger starts = new AtomicInteger();
+        ExecutorService executor = Executors.newFixedThreadPool(BobProcessRunner.MAX_CONCURRENT_PROCESSES);
+        List<Future<String>> calls = new ArrayList<>();
+
+        try {
+            for (int i = 0; i < BobProcessRunner.MAX_CONCURRENT_PROCESSES; i++) {
+                calls.add(executor.submit(() -> BobProcessRunner.run(processBuilder(), builder -> {
+                    starts.incrementAndGet();
+                    return new FakeProcess();
+                }, process -> {
+                    started.countDown();
+                    if (!release.await(5, TimeUnit.SECONDS)) {
+                        throw new AssertionError("Timed out waiting to release the Bob process");
+                    }
+                    return "finished";
+                })));
+            }
+
+            assertTrue(started.await(5, TimeUnit.SECONDS));
+            assertThrows(BobProcessRunner.SaturatedException.class,
+                    () -> BobProcessRunner.run(processBuilder(), builder -> {
+                        starts.incrementAndGet();
+                        return new FakeProcess();
+                    }, process -> "unexpected"));
+            assertEquals(BobProcessRunner.MAX_CONCURRENT_PROCESSES, starts.get());
+
+            release.countDown();
+            for (Future<String> call : calls) {
+                assertEquals("finished", call.get(5, TimeUnit.SECONDS));
+            }
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
         }
     }
 

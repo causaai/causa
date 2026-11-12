@@ -18,6 +18,8 @@ import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -42,10 +44,18 @@ public class BobShellPromptSender implements PromptSender {
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     private final LlmConfigCache llmConfigCache;
+    private final BobProcessRunner.ProcessStarter processStarter;
     private final AtomicBoolean ready = new AtomicBoolean(false);
+    private final Object availabilityLock = new Object();
+    private CompletableFuture<Boolean> availabilityCheck;
 
     public BobShellPromptSender(LlmConfigCache llmConfigCache) {
+        this(llmConfigCache, ProcessBuilder::start);
+    }
+
+    BobShellPromptSender(LlmConfigCache llmConfigCache, BobProcessRunner.ProcessStarter processStarter) {
         this.llmConfigCache = llmConfigCache;
+        this.processStarter = processStarter;
         if (resolveApiKey().isBlank()) {
             log.warn(LogMessages.LLM.MISSING_CONFIGURATION)
                 .field(LLMConstants.ConfigKeys.MISSING_CONFIG, LLMConstants.ConfigKeys.LLM_API_KEY)
@@ -124,17 +134,60 @@ public class BobShellPromptSender implements PromptSender {
 
     @Override
     public boolean isReady() {
-        // If already marked as ready, return immediately
         if (ready.get()) {
             return true;
         }
-        
-        // Otherwise, check availability and cache the result
-        boolean available = checkAvailability();
-        if (available) {
-            ready.set(true);
+
+        CompletableFuture<Boolean> check;
+        boolean ownsCheck = false;
+        synchronized (availabilityLock) {
+            if (ready.get()) {
+                return true;
+            }
+            check = availabilityCheck;
+            if (check == null) {
+                check = new CompletableFuture<>();
+                availabilityCheck = check;
+                ownsCheck = true;
+            }
         }
-        return available;
+
+        if (!ownsCheck) {
+            return awaitAvailabilityCheck(check);
+        }
+
+        try {
+            boolean available = checkAvailability();
+            if (available) {
+                ready.set(true);
+            }
+            check.complete(available);
+            return available;
+        } catch (RuntimeException | Error e) {
+            check.completeExceptionally(e);
+            throw e;
+        } finally {
+            synchronized (availabilityLock) {
+                if (availabilityCheck == check) {
+                    availabilityCheck = null;
+                }
+            }
+        }
+    }
+
+    private static boolean awaitAvailabilityCheck(CompletableFuture<Boolean> check) {
+        try {
+            return check.join();
+        } catch (CompletionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException) {
+                throw (RuntimeException) cause;
+            }
+            if (cause instanceof Error) {
+                throw (Error) cause;
+            }
+            throw e;
+        }
     }
 
     /**
@@ -146,7 +199,7 @@ public class BobShellPromptSender implements PromptSender {
         try {
             ProcessBuilder pb = new ProcessBuilder(resolveBobShellPath(), LLMConstants.BobShell.VERSION_FLAG);
             pb.environment().putAll(buildSubprocessEnv(resolveApiKey()));
-            return BobProcessRunner.run(pb, process -> {
+            return BobProcessRunner.run(pb, processStarter, process -> {
                 boolean completed = process.waitFor(
                     LLMConstants.BobShell.VERSION_CHECK_TIMEOUT_SECONDS,
                     TimeUnit.SECONDS
@@ -241,7 +294,7 @@ public class BobShellPromptSender implements PromptSender {
             
             pb.redirectErrorStream(true);
             
-            return BobProcessRunner.run(pb, process -> {
+            return BobProcessRunner.run(pb, processStarter, process -> {
                 try (OutputStreamWriter writer = new OutputStreamWriter(
                         process.getOutputStream(), StandardCharsets.UTF_8)) {
                     writer.write(prompt);
