@@ -780,11 +780,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             // Rank and deduplicate the harvested evidence (if ranker available)
             if (evidenceRanker.isPresent() && harvestedEvidence != null && !harvestedEvidence.isEmpty()) {
                 try {
-                    // Get validation score and status
-                    double validationScore = validatedRCA.dualValidation() != null ?
-                        validatedRCA.dualValidation().finalVerdict().confidence() :
-                        validatedRCA.summary().averageConfidence();
-
+                    // Validation status drives the ranker's refuting-priority rule.
                     String validationStatus = determineValidationResult(validatedRCA);
 
                     // Build RCA summary
@@ -797,18 +793,28 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                     // preserving their IDs so rankedEvidenceIds resolve against allEvidence above.
                     List<ValidationEvidence> rankable = toRankableEvidence(harvestedEvidence);
 
+                    // Carry each item's hypothesis alignment (SUPPORTS/REFUTES) into the ranker so it
+                    // can give refuting evidence higher relevance when the RCA is UNSUPPORTED. The
+                    // alignment lives on the harvested EvidenceItem but not on ValidationEvidence, so
+                    // it is passed as a side map keyed by the preserved id.
+                    java.util.Map<String, String> alignmentById = new java.util.HashMap<>();
+                    for (EvidenceItem item : harvestedEvidence) {
+                        if (item.evidenceHypothesisAlignment() != null) {
+                            alignmentById.put(item.id(), item.evidenceHypothesisAlignment().name());
+                        }
+                    }
+
                     // Call evidence ranker
                     log.info("Ranking evidence")
                         .field("totalEvidence", rankable.size())
-                        .field("validationScore", validationScore)
                         .field("validationStatus", validationStatus)
                         .log();
 
                     EvidenceRankingResponse rankingResponse = evidenceRanker.get().rankAndDeduplicate(
                         rcaSummary,
                         rankable,
-                        validationScore,
-                        validationStatus
+                        validationStatus,
+                        alignmentById
                     );
 
                     // Add ranked evidence IDs to validation data

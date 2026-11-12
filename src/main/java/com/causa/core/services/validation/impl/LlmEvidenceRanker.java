@@ -89,8 +89,8 @@ public class LlmEvidenceRanker implements EvidenceRanker {
     public EvidenceRankingResponse rankAndDeduplicate(
             RcaSummary rca,
             List<ValidationEvidence> evidenceList,
-            double validationScore,
-            String validationStatus) {
+            String validationStatus,
+            Map<String, String> alignmentById) {
 
         // Filter evidence with statements only
         List<ValidationEvidence> statementEvidence = evidenceList.stream()
@@ -122,7 +122,7 @@ public class LlmEvidenceRanker implements EvidenceRanker {
 
         // Every non-empty set is deduplicated and ranked by the LLM — no item-count shortcut,
         // since a pair of identical facts is exactly where deduplication matters.
-        return rankWithLlm(rca, statementEvidence, validationScore, validationStatus);
+        return rankWithLlm(rca, statementEvidence, validationStatus, alignmentById);
     }
 
     /**
@@ -133,13 +133,13 @@ public class LlmEvidenceRanker implements EvidenceRanker {
     private EvidenceRankingResponse rankWithLlm(
             RcaSummary rca,
             List<ValidationEvidence> evidenceList,
-            double validationScore,
-            String validationStatus) {
+            String validationStatus,
+            Map<String, String> alignmentById) {
 
         try {
             String provider = resolveProvider();
             PromptTemplateLoader.PromptTemplate template = promptTemplateLoader.loadTemplate(provider, "");
-            String compactPrompt = buildCompactPrompt(template, rca, evidenceList, validationScore, validationStatus);
+            String compactPrompt = buildCompactPrompt(template, rca, evidenceList, validationStatus, alignmentById);
 
             // Record exactly which prompt was resolved — proof of identity, so a provider mismatch or
             // silent fallback can never be mistaken for a passing run.
@@ -235,19 +235,25 @@ public class LlmEvidenceRanker implements EvidenceRanker {
             PromptTemplateLoader.PromptTemplate template,
             RcaSummary rca,
             List<ValidationEvidence> evidenceList,
-            double validationScore,
-            String validationStatus) {
+            String validationStatus,
+            Map<String, String> alignmentById) {
 
-        // Evidence format: "ID: statement [strength: score]"
-        // Strength = assertion-level relevanceScore (used in formula: 0.2 × strength + 0.8 × relevance)
+        // Evidence format: "ID [align=SUPPORTS|REFUTES]: statement [strength: score]"
+        // Alignment lets the model apply the refuting-priority rule deterministically: when the RCA
+        // is UNSUPPORTED, REFUTES evidence should score higher. Strength = assertion-level
+        // relevanceScore (used in formula: 0.2 × strength + 0.8 × relevance).
         String evidenceCompact = evidenceList.stream()
-            .map(ev -> String.format("%s: %s [strength: %.2f]", ev.id(), ev.statement(), ev.relevanceScore()))
+            .map(ev -> {
+                String align = alignmentById.getOrDefault(ev.id(), "");
+                String alignTag = align.isBlank() ? "" : " [align=" + align + "]";
+                return String.format("%s%s: %s [strength: %.2f]",
+                    ev.id(), alignTag, ev.statement(), ev.relevanceScore());
+            })
             .collect(Collectors.joining("\n"));
 
         return template.userPrompt()
             .replace("{{rca_summary}}", truncate(rca.rootCause(), 150))
             .replace("{{validation_status}}", validationStatus)
-            .replace("{{validation_score}}", String.format("%.0f", validationScore * 100))
             .replace("{{evidence_compact}}", evidenceCompact);
     }
 

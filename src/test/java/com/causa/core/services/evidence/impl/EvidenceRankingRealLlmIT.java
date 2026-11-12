@@ -88,7 +88,7 @@ class EvidenceRankingRealLlmIT {
         System.out.println(compact);
 
         EvidenceRankingResponse response =
-            ranker.rankAndDeduplicate(c.rca(), c.evidence(), c.validationScore(), c.validationStatus());
+            ranker.rankAndDeduplicate(c.rca(), c.evidence(), c.validationStatus());
 
         System.out.println("── RANKER OUTPUT (" + response.rankedEvidenceIds().size() + " items) ──");
         int rank = 1;
