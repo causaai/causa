@@ -153,7 +153,7 @@ class ValidationPipelineRealLlmIT {
 
         RcaSummary summary = new RcaSummary(rca.issueSummary(), rca.rootCause());
         EvidenceRankingResponse ranked =
-            evidenceRanker.rankAndDeduplicate(summary, rankable, finalConfidence, finalStatus);
+            evidenceRanker.rankAndDeduplicate(summary, rankable, finalStatus);
 
         System.out.println("── STAGE 3: RANK ──");
         System.out.println("  rankable in: " + rankable.size()

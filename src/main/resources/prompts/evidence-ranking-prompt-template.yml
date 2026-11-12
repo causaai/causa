@@ -88,15 +88,22 @@ prompts:
 
       SPECIAL RULE - REFUTING EVIDENCE:
       ─────────────────────────────────────────────────────────────
+      Each evidence line may carry an explicit tag: [align=SUPPORTS] or [align=REFUTES].
+      Use it directly — do not re-infer alignment from the text.
+
       When validation status is UNSUPPORTED or CONTRADICTED:
-        → Evidence that REFUTES the RCA gets HIGHER relevance
-        → It directly shows the RCA is contradicted
+        → Every [align=REFUTES] item gets Very High (1.0) relevance — it directly shows
+          the RCA is contradicted, so it must rank at the top
+        → [align=SUPPORTS] items are scored normally per STEP 2
         → Exclusion rules that fired are Very High relevance
+
+      When validation status is SUPPORTED:
+        → Score normally per STEP 2; alignment does not boost.
 
       Example:
         RCA: "Memory leak caused OOM"
         Validation: UNSUPPORTED
-        Evidence: "Memory usage was stable at 60%" → Very High (refutes claim)
+        Evidence: "Memory usage was stable at 60% [align=REFUTES]" → Very High (refutes claim)
 
 
       STEP 3: OUTPUT RELEVANCE (do NOT sort, do NOT cap)
@@ -126,9 +133,9 @@ prompts:
 
     user_prompt: |
       RCA Summary: {{rca_summary}}
-      Validation Status: {{validation_status}} ({{validation_score}}% confidence)
+      Validation Status: {{validation_status}}
 
-      Evidence to rank (format: id: statement [strength: score]):
+      Evidence to rank (format: id [align=SUPPORTS|REFUTES]: statement [strength: score]):
       {{evidence_compact}}
 
       Deduplicate the evidence, then assign each remaining item an RCA relevance
