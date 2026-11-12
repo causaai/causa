@@ -6,6 +6,7 @@ import com.causa.common.constants.EvidenceConstants.Snippet;
 import com.causa.common.constants.EvidenceConstants.StrengthBands;
 import com.causa.core.domain.validation.ValidationEvidence;
 import com.causa.core.domain.validation.EvidenceItem;
+import com.causa.core.domain.validation.EvidenceItem.EvidenceHypothesisAlignment;
 import com.causa.core.domain.validation.EvidenceItem.EvidenceStrength;
 import com.causa.core.domain.validation.ValidationResult;
 import com.causa.core.services.evidence.McpSourceResolver;
@@ -13,7 +14,6 @@ import com.causa.core.services.evidence.RcaFinding;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -51,43 +51,70 @@ public class PathAEvidenceMapper {
     }
 
     /**
-     * Maps a single assertion's validation result into evidence items.
+     * Maps a single assertion's validation result into <strong>one</strong> evidence item.
+     *
+     * <p>One assertion yields one evidence item. Whether it supports or refutes the assertion is
+     * recorded as the item's {@link EvidenceHypothesisAlignment}, not as a reason to emit more than
+     * one item. The analyzer files an assertion's evidence into a single bucket by the assertion's
+     * status — supported evidence or refuting evidence, never both — so the alignment follows
+     * directly from which bucket the chosen quote came from. When a bucket holds several quotes the
+     * strongest (highest relevance) is kept.
      *
      * @param finding the RCA finding this evidence is attributed to
      * @param result  the validation result for one assertion
-     * @return one item per quoted evidence piece; empty when the assertion produced none that
-     *         rest on real source output
+     * @return a single-item list, or empty when the assertion produced no quote that rests on real
+     *         source output
      */
     public List<EvidenceItem> map(RcaFinding finding, ValidationResult result) {
         if (result == null) {
             return List.of();
         }
 
-        List<EvidenceItem> items = new ArrayList<>();
-        int index = 0;
+        ValidationEvidence supporting = strongestUsable(result.supportingEvidence());
+        ValidationEvidence refuting = strongestUsable(result.refutingEvidence());
 
-        for (ValidationEvidence evidence : result.supportingEvidence()) {
-            if (carriesNoData(evidence.snippet())) {
-                continue;
-            }
-            items.add(toItem(result, evidence, ++index));
-        }
-        for (ValidationEvidence evidence : result.refutingEvidence()) {
-            if (carriesNoData(evidence.snippet())) {
-                continue;
-            }
-            items.add(toItem(result, evidence, ++index));
+        if (supporting == null && refuting == null) {
+            return List.of();
         }
 
-        return items;
+        // An assertion's evidence is normally all one direction; if both are present, the stronger
+        // quote decides the single item and its alignment.
+        boolean useSupporting = refuting == null
+            || (supporting != null && supporting.relevanceScore() >= refuting.relevanceScore());
+
+        ValidationEvidence chosen = useSupporting ? supporting : refuting;
+        EvidenceHypothesisAlignment alignment =
+            useSupporting ? EvidenceHypothesisAlignment.SUPPORTS : EvidenceHypothesisAlignment.REFUTES;
+
+        return List.of(toItem(result, chosen, alignment));
     }
 
-    private EvidenceItem toItem(ValidationResult result, ValidationEvidence evidence, int index) {
+    /**
+     * The strongest quote in a bucket that rests on real source output, or null when the bucket is
+     * empty or only cites empty sections. Highest {@code relevanceScore} wins; ties keep the earlier
+     * item, so the choice is deterministic.
+     */
+    private ValidationEvidence strongestUsable(List<ValidationEvidence> evidence) {
+        ValidationEvidence best = null;
+        for (ValidationEvidence candidate : evidence) {
+            if (carriesNoData(candidate.snippet())) {
+                continue;
+            }
+            if (best == null || candidate.relevanceScore() > best.relevanceScore()) {
+                best = candidate;
+            }
+        }
+        return best;
+    }
+
+    private EvidenceItem toItem(
+            ValidationResult result, ValidationEvidence evidence, EvidenceHypothesisAlignment alignment) {
         return EvidenceItem.builder()
-            .id(evidenceId(result, index))
+            .id(evidenceId(result))
             .source(sourceResolver.resolve(evidence.source()))
             .type(typeOf(evidence.type()))
             .strength(strengthOf(evidence.relevanceScore()))
+            .evidenceHypothesisAlignment(alignment)
             .rawSnippet(truncate(evidence.snippet()))
             .statement(evidence.statement())
             .explanation(explanationOf(evidence, result))
@@ -95,11 +122,11 @@ public class PathAEvidenceMapper {
             .build();
     }
 
-    private String evidenceId(ValidationResult result, int index) {
+    private String evidenceId(ValidationResult result) {
         return Ids.PATH_A_PREFIX
             + result.assertion().id()
             + Ids.EVIDENCE_INFIX
-            + String.format(Ids.EVIDENCE_INDEX_FORMAT, index);
+            + String.format(Ids.EVIDENCE_INDEX_FORMAT, 1);
     }
 
     /**
