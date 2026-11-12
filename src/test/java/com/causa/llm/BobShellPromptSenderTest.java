@@ -17,7 +17,18 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -135,6 +146,144 @@ class BobShellPromptSenderTest {
             setupDefaultMocks();
             bobShellPromptSender = new BobShellPromptSender(llmConfigCache);
             assertDoesNotThrow(() -> bobShellPromptSender.isReady());
+        }
+
+        @Test
+        @DisplayName("Concurrent availability checks share one process and can retry after failure")
+        void coalescesConcurrentAvailabilityChecks() throws Exception {
+            setupDefaultMocks();
+            AtomicInteger starts = new AtomicInteger();
+            CountDownLatch callersReady = new CountDownLatch(5);
+            CountDownLatch beginChecks = new CountDownLatch(1);
+            CountDownLatch processStarted = new CountDownLatch(1);
+            BlockingVersionProcess failedProcess = new BlockingVersionProcess();
+            BlockingVersionProcess successfulProcess = new BlockingVersionProcess();
+            successfulProcess.finish(0);
+            BobShellPromptSender sender = new BobShellPromptSender(llmConfigCache, builder -> {
+                if (starts.incrementAndGet() == 1) {
+                    processStarted.countDown();
+                    return failedProcess;
+                }
+                return successfulProcess;
+            });
+            ExecutorService executor = Executors.newFixedThreadPool(5);
+            AtomicReferenceArray<Thread> callerThreads = new AtomicReferenceArray<>(5);
+            AtomicInteger callerIndex = new AtomicInteger();
+            java.util.List<Future<Boolean>> calls = new java.util.ArrayList<>();
+
+            try {
+                for (int i = 0; i < 5; i++) {
+                    calls.add(executor.submit(() -> {
+                        callerThreads.set(callerIndex.getAndIncrement(), Thread.currentThread());
+                        callersReady.countDown();
+                        if (!beginChecks.await(5, TimeUnit.SECONDS)) {
+                            throw new AssertionError("Timed out waiting to start availability checks");
+                        }
+                        return sender.isReady();
+                    }));
+                }
+
+                assertTrue(callersReady.await(5, TimeUnit.SECONDS));
+                beginChecks.countDown();
+                assertTrue(processStarted.await(5, TimeUnit.SECONDS));
+                awaitAllCallersWaiting(callerThreads);
+                assertEquals(1, starts.get());
+
+                failedProcess.finish(1);
+                for (Future<Boolean> call : calls) {
+                    assertFalse(call.get(5, TimeUnit.SECONDS));
+                }
+                assertEquals(1, starts.get());
+                assertTrue(sender.isReady());
+                assertEquals(2, starts.get());
+                assertTrue(sender.isReady());
+                assertEquals(2, starts.get());
+            } finally {
+                beginChecks.countDown();
+                failedProcess.finish(1);
+                executor.shutdownNow();
+                assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+            }
+        }
+
+        private static void awaitAllCallersWaiting(AtomicReferenceArray<Thread> threads) throws InterruptedException {
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            while (System.nanoTime() < deadline) {
+                boolean allWaiting = true;
+                for (int i = 0; i < threads.length(); i++) {
+                    Thread thread = threads.get(i);
+                    Thread.State state = thread == null ? null : thread.getState();
+                    if (state != Thread.State.WAITING && state != Thread.State.TIMED_WAITING) {
+                        allWaiting = false;
+                        break;
+                    }
+                }
+                if (allWaiting) {
+                    return;
+                }
+                Thread.sleep(5);
+            }
+            fail("Concurrent callers did not all wait on the shared availability check");
+        }
+
+        private static final class BlockingVersionProcess extends Process {
+            private final CountDownLatch finished = new CountDownLatch(1);
+            private volatile int exitCode;
+
+            void finish(int exitCode) {
+                this.exitCode = exitCode;
+                finished.countDown();
+            }
+
+            @Override
+            public OutputStream getOutputStream() {
+                return new ByteArrayOutputStream();
+            }
+
+            @Override
+            public InputStream getInputStream() {
+                return new ByteArrayInputStream(new byte[0]);
+            }
+
+            @Override
+            public InputStream getErrorStream() {
+                return new ByteArrayInputStream(new byte[0]);
+            }
+
+            @Override
+            public int waitFor() throws InterruptedException {
+                finished.await();
+                return exitCode;
+            }
+
+            @Override
+            public boolean waitFor(long timeout, TimeUnit unit) throws InterruptedException {
+                return finished.await(timeout, unit);
+            }
+
+            @Override
+            public int exitValue() {
+                if (isAlive()) {
+                    throw new IllegalThreadStateException("Process is still running");
+                }
+                return exitCode;
+            }
+
+            @Override
+            public void destroy() {
+                finish(143);
+            }
+
+            @Override
+            public Process destroyForcibly() {
+                destroy();
+                return this;
+            }
+
+            @Override
+            public boolean isAlive() {
+                return finished.getCount() != 0;
+            }
         }
     }
 
