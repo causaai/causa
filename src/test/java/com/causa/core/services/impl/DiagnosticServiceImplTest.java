@@ -71,6 +71,9 @@ class DiagnosticServiceImplTest {
     private jakarta.enterprise.inject.Instance<com.causa.core.services.validation.RcaValidator> rcaValidatorInstance;
 
     @Mock
+    private jakarta.enterprise.inject.Instance<com.causa.core.services.validation.EvidenceRanker> evidenceRankerInstance;
+
+    @Mock
     private jakarta.enterprise.inject.Instance<com.causa.core.services.evidence.EvidenceHarvester> evidenceHarvesters;
 
     private DiagnosticServiceImpl diagnosticService;
@@ -78,6 +81,7 @@ class DiagnosticServiceImplTest {
     @BeforeEach
     void setUp() {
         org.mockito.Mockito.when(rcaValidatorInstance.isResolvable()).thenReturn(false);
+        org.mockito.Mockito.when(evidenceRankerInstance.isResolvable()).thenReturn(false);
         diagnosticService = new DiagnosticServiceImpl(
                 diagnosticRepository,
                 alertRepository,
@@ -88,6 +92,7 @@ class DiagnosticServiceImplTest {
                 objectMapper,
                 validator,
                 rcaValidatorInstance,
+                evidenceRankerInstance,
                 evidenceHarvesters
         );
     }

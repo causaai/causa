@@ -22,6 +22,10 @@ import com.causa.core.domain.LLMRequest;
 import com.causa.core.domain.LLMResponse;
 import com.causa.core.domain.RootCauseAnalysis;
 import com.causa.core.domain.RootCauseAnalysis.AnomalyType;
+import com.causa.core.domain.validation.EvidenceItem;
+import com.causa.core.domain.validation.ValidationEvidence;
+import com.causa.core.domain.validation.EvidenceRankingRequest.RcaSummary;
+import com.causa.core.domain.validation.EvidenceRankingResponse;
 import com.causa.core.domain.validation.ValidatedRCA;
 import com.causa.core.domain.validation.ValidationResult;
 import com.causa.core.ports.AlertRepository;
@@ -32,6 +36,7 @@ import com.causa.core.services.RcaPromptBuilder;
 import com.causa.core.services.evidence.EvidenceCollectionResult;
 import com.causa.core.services.evidence.EvidenceHarvester;
 import com.causa.core.services.evidence.RcaFinding;
+import com.causa.core.services.validation.EvidenceRanker;
 import com.causa.core.services.validation.RcaValidator;
 import com.causa.infrastructure.persistence.mappers.AlertEntityMapper;
 import com.causa.mcp.McpRegistry;
@@ -43,6 +48,8 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -77,6 +84,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     private final Validator validator;
     private final ExecutorService pipelineExecutor;
     private final Optional<RcaValidator> rcaValidator;
+    private final Optional<EvidenceRanker> evidenceRanker;
     private final Instance<EvidenceHarvester> evidenceHarvesters;
 
     @Inject
@@ -89,6 +97,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                                   ObjectMapper objectMapper,
                                   Validator validator,
                                   Instance<RcaValidator> rcaValidatorInstance,
+                                  Instance<EvidenceRanker> evidenceRankerInstance,
                                   Instance<EvidenceHarvester> evidenceHarvesters) {
         this.diagnosticRepository = diagnosticRepository;
         this.alertRepository      = alertRepository;
@@ -101,6 +110,8 @@ public class DiagnosticServiceImpl implements DiagnosticService {
         this.pipelineExecutor     = Executors.newCachedThreadPool();
         this.rcaValidator         = rcaValidatorInstance.isResolvable() ?
             Optional.of(rcaValidatorInstance.get()) : Optional.empty();
+        this.evidenceRanker       = evidenceRankerInstance.isResolvable() ?
+            Optional.of(evidenceRankerInstance.get()) : Optional.empty();
         this.evidenceHarvesters   = evidenceHarvesters;
     }
 
@@ -597,14 +608,14 @@ public class DiagnosticServiceImpl implements DiagnosticService {
      *
      * @return the harvest as JSON, or null when nothing was collected
      */
-    private String collectEvidence(
+    private List<EvidenceItem> collectEvidence(
         String diagnosticId,
         RootCauseAnalysis rca,
         ValidatedRCA validatedRCA
     ) {
         RcaFinding finding = RcaFinding.from(diagnosticId, rca);
         if (finding == null) {
-            return null;
+            return List.of();
         }
 
         try {
@@ -621,19 +632,72 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                     .field(LogFields.DIAGNOSTIC_ID, diagnosticId)
                     .field("anomalyType", finding.anomalyType())
                     .log();
-                return null;
+                return List.of();
             }
 
             EvidenceCollectionResult result = harvester.harvest(finding, validatedRCA);
 
-            return result.isEmpty() ? null : objectMapper.writeValueAsString(result.items());
+            return result.isEmpty() ? List.of() : result.items();
         } catch (Exception e) {
             log.error(LogMessages.Evidence.COLLECTION_FAILED)
                 .field(LogFields.DIAGNOSTIC_ID, diagnosticId)
                 .exception(e)
                 .log();
-            return null;
+            return List.of();
         }
+    }
+
+    /**
+     * Adapts harvested {@link EvidenceItem}s into the {@link ValidationEvidence} model the ranker
+     * consumes, preserving each item's ID so the resulting {@code rankedEvidenceIds} resolve back
+     * to the persisted {@code allEvidence}.
+     *
+     * <p>Items without a usable snippet are dropped (ValidationEvidence requires a non-blank
+     * snippet). Rule-derived PATH B items have no statement and are filtered out of ranking by the
+     * ranker itself; the detail response re-attaches them so they are never lost.
+     */
+    private List<ValidationEvidence> toRankableEvidence(List<EvidenceItem> items) {
+        List<ValidationEvidence> rankable = new ArrayList<>();
+        for (EvidenceItem item : items) {
+            String snippet = (item.rawSnippet() != null && !item.rawSnippet().isBlank())
+                ? item.rawSnippet()
+                : item.statement();
+            if (snippet == null || snippet.isBlank()) {
+                continue;  // ValidationEvidence requires a non-blank snippet
+            }
+            String source = (item.source() != null && !item.source().isBlank()) ? item.source() : "unknown";
+            double score = Math.max(0.0, Math.min(1.0, item.confidence()));
+            rankable.add(new ValidationEvidence(
+                item.id(),
+                source,
+                toValidationType(item.type()),
+                snippet,
+                item.statement(),
+                item.explanation(),
+                score,
+                Optional.empty()
+            ));
+        }
+        return rankable;
+    }
+
+    private ValidationEvidence.EvidenceType toValidationType(EvidenceItem.EvidenceType type) {
+        if (type == null) {
+            return ValidationEvidence.EvidenceType.OTHER;
+        }
+        return switch (type) {
+            case KUBERNETES_EVENT -> ValidationEvidence.EvidenceType.KUBERNETES_EVENT;
+            case POD_STATUS -> ValidationEvidence.EvidenceType.POD_STATUS;
+            case CONTAINER_STATUS -> ValidationEvidence.EvidenceType.CONTAINER_STATUS;
+            case METRIC, TIME_SERIES -> ValidationEvidence.EvidenceType.METRIC;
+            case LOG_ENTRY, LOG_PATTERN -> ValidationEvidence.EvidenceType.POD_LOG;
+            case GC_ANALYSIS -> ValidationEvidence.EvidenceType.GC_ANALYSIS;
+            case MEMORY_ANALYSIS, HEAP_DUMP_ANALYSIS -> ValidationEvidence.EvidenceType.MEMORY_ANALYSIS;
+            case THREAD_ANALYSIS -> ValidationEvidence.EvidenceType.THREAD_ANALYSIS;
+            case JVM_ANALYSIS -> ValidationEvidence.EvidenceType.CRYOSTAT_ANALYSIS;
+            case RECOMMENDATION, OPTIMIZATION_SUGGESTION -> ValidationEvidence.EvidenceType.KRUIZE_RECOMMENDATION;
+            case OTHER -> ValidationEvidence.EvidenceType.OTHER;
+        };
     }
 
     /**
@@ -705,6 +769,71 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             // Add validated timestamp
             validationDataNode.put("validatedAt", validatedRCA.validatedAt().toString());
 
+            // Harvest the evidence behind this finding (PATH A + PATH B). This single harvest is
+            // both persisted to Diagnostic.allEvidence AND ranked, so the ranked IDs resolve back
+            // to the stored items when building the detail response.
+            List<EvidenceItem> harvestedEvidence = collectEvidence(base.getDiagnosticId(), rca, validatedRCA);
+            String allEvidence = (harvestedEvidence == null || harvestedEvidence.isEmpty())
+                ? null
+                : objectMapper.writeValueAsString(harvestedEvidence);
+
+            // Rank and deduplicate the harvested evidence (if ranker available)
+            if (evidenceRanker.isPresent() && harvestedEvidence != null && !harvestedEvidence.isEmpty()) {
+                try {
+                    // Validation status drives the ranker's refuting-priority rule.
+                    String validationStatus = determineValidationResult(validatedRCA);
+
+                    // Build RCA summary
+                    RcaSummary rcaSummary = new RcaSummary(
+                        rca.issueSummary(),
+                        rca.rootCause()
+                    );
+
+                    // The ranker operates on ValidationEvidence; adapt the harvested items while
+                    // preserving their IDs so rankedEvidenceIds resolve against allEvidence above.
+                    List<ValidationEvidence> rankable = toRankableEvidence(harvestedEvidence);
+
+                    // Carry each item's hypothesis alignment (SUPPORTS/REFUTES) into the ranker so it
+                    // can give refuting evidence higher relevance when the RCA is UNSUPPORTED. The
+                    // alignment lives on the harvested EvidenceItem but not on ValidationEvidence, so
+                    // it is passed as a side map keyed by the preserved id.
+                    java.util.Map<String, String> alignmentById = new java.util.HashMap<>();
+                    for (EvidenceItem item : harvestedEvidence) {
+                        if (item.evidenceHypothesisAlignment() != null) {
+                            alignmentById.put(item.id(), item.evidenceHypothesisAlignment().name());
+                        }
+                    }
+
+                    // Call evidence ranker
+                    log.info("Ranking evidence")
+                        .field("totalEvidence", rankable.size())
+                        .field("validationStatus", validationStatus)
+                        .log();
+
+                    EvidenceRankingResponse rankingResponse = evidenceRanker.get().rankAndDeduplicate(
+                        rcaSummary,
+                        rankable,
+                        validationStatus,
+                        alignmentById
+                    );
+
+                    // Add ranked evidence IDs to validation data
+                    validationDataNode.set("rankedEvidenceIds",
+                        objectMapper.valueToTree(rankingResponse.rankedEvidenceIds()));
+
+                    log.info("Evidence ranking completed")
+                        .field("inputCount", rankable.size())
+                        .field("rankedCount", rankingResponse.rankedEvidenceIds().size())
+                        .field("rankingMethod", rankingResponse.reasoning())
+                        .log();
+                } catch (Exception e) {
+                    log.warn("Evidence ranking failed - continuing without ranked evidence")
+                        .exception(e)
+                        .log();
+                    // Continue without ranked evidence (non-blocking)
+                }
+            }
+
             // Convert validation data to JSON string (compact for DB)
             String validationDataString = objectMapper.writeValueAsString(validationDataNode);
 
@@ -761,9 +890,6 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                         .log();
                 }
             }
-
-            // Harvest the evidence behind this finding from the validation results above
-            String allEvidence = collectEvidence(base.getDiagnosticId(), rca, validatedRCA);
 
             // Layer validation fields on top of the already-persisted base diagnostic
             Diagnostic updated = Diagnostic.builder()
@@ -953,4 +1079,5 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     public Optional<Diagnostic> getDiagnosticById(String diagnosticId) {
         return diagnosticRepository.findById(diagnosticId);
     }
+
 }

@@ -123,6 +123,13 @@ prompts:
       - If you cannot tell which artifact a snippet came from, use OTHER. Do not guess
         from the content.
 
+      ONE EVIDENCE PER ASSERTION:
+      Return EXACTLY ONE evidence item — the single most relevant snippet for this
+      assertion. When several snippets could apply, pick the most specific and directly
+      relevant one (highest relevance; prefer concrete values, names, timestamps). Do NOT
+      return multiple snippets. If no snippet supports the assertion, return an empty
+      evidence array.
+
       IMPORTANT: Respond with ONLY a JSON object, no explanatory text before or after.
 
       JSON format:

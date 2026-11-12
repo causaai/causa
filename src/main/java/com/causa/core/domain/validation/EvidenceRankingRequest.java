@@ -12,7 +12,7 @@ import java.util.List;
  */
 public record EvidenceRankingRequest(
     RcaSummary rca,
-    List<Evidence> evidenceList,
+    List<ValidationEvidence> evidenceList,
     double validationScore,
     String validationStatus
 ) {
