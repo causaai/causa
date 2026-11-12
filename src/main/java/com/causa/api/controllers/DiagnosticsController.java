@@ -1,9 +1,11 @@
 package com.causa.api.controllers;
 
+import com.causa.api.dto.request.JiraTicketRequest;
 import com.causa.api.dto.response.DiagnosticDetailResponse;
 import com.causa.api.dto.response.DiagnosticListItemResponse;
 import com.causa.api.dto.response.ErrorResponse;
 import com.causa.api.dto.response.JiraTicketResponse;
+import com.causa.api.dto.response.JiraUserResponse;
 import com.causa.common.constants.ApiConstants;
 import com.causa.common.constants.ConfigConstants.IntegrationPlatform;
 import com.causa.common.constants.ConfigConstants.PlatformCategory;
@@ -14,6 +16,7 @@ import com.causa.config.ExternalConfigCache;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
 import com.causa.core.domain.ExternalConfig;
+import com.causa.core.domain.JiraTicketOptions;
 import com.causa.core.domain.PageRequest;
 import com.causa.core.domain.PageResult;
 import com.causa.core.ports.AlertRepository;
@@ -41,6 +44,8 @@ import java.util.stream.Collectors;
  *
  * <p>GET /api/v1/diagnostics        — paginated list of diagnostics (summary)
  * <p>GET /api/v1/diagnostics/{id}   — full diagnostic detail
+ * <p>POST /api/v1/diagnostics/{id}/ticket — create or return existing Jira ticket
+ * <p>GET /api/v1/diagnostics/jira/users — search assignable Jira users
  *
  * @since 0.0.1
  */
@@ -151,14 +156,16 @@ public class DiagnosticsController {
     @POST
     @Path(ApiConstants.Paths.Diagnostics.TICKET)
     public Response createJiraTicket(
-            @PathParam(ApiConstants.Paths.Diagnostics.PATH_PARAM) String diagnosticId) {
+            @PathParam(ApiConstants.Paths.Diagnostics.PATH_PARAM) String diagnosticId,
+            JiraTicketRequest request) {
 
         log.info(LogMessages.Diagnostic.JIRA_TICKET_REQUEST)
             .field("diagnosticId", diagnosticId)
             .log();
 
         try {
-            DiagnosticService.JiraTicket ticket = diagnosticService.createOrGetJiraTicket(diagnosticId);
+            DiagnosticService.JiraTicket ticket = diagnosticService.createOrGetJiraTicket(
+                diagnosticId, request == null ? JiraTicketOptions.defaults() : request.toOptions());
 
             return ticket.alreadyExisted()
                 ? Response.ok(JiraTicketResponse.existing(ticket.url())).build()
@@ -184,6 +191,9 @@ public class DiagnosticsController {
                         .entity(ErrorResponse.of(422, "Unprocessable Entity", e.getMessage()))
                         .build();
                 }
+                case "INVALID_REQUEST" -> Response.status(Response.Status.BAD_REQUEST)
+                    .entity(ErrorResponse.of(400, "Bad Request", e.getMessage()))
+                    .build();
                 case "NOT_FOUND" -> Response.status(Response.Status.NOT_FOUND)
                     .entity(ErrorResponse.of(404, "Not Found", e.getMessage()))
                     .build();
@@ -200,6 +210,39 @@ public class DiagnosticsController {
                         .build();
                 }
             };
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // GET /api/v1/diagnostics/jira/users
+    // -------------------------------------------------------------------------
+
+    @GET
+    @Path(ApiConstants.Paths.Diagnostics.JIRA_USERS)
+    public Response searchJiraUsers(
+            @QueryParam(ApiConstants.Paths.Diagnostics.QUERY_TEXT) @Size(max = 255) String query) {
+
+        log.info(LogMessages.Diagnostic.JIRA_USERS_REQUEST).log();
+
+        try {
+            List<JiraUserResponse> users = diagnosticService.searchJiraUsers(query).stream()
+                .map(JiraUserResponse::from)
+                .toList();
+            return Response.ok(users).build();
+
+        } catch (DiagnosticException e) {
+            if ("JIRA_NOT_CONFIGURED".equals(e.getErrorType())) {
+                return Response.status(422)
+                    .entity(ErrorResponse.of(422, "Unprocessable Entity", e.getMessage()))
+                    .build();
+            }
+            log.warn(LogMessages.Diagnostic.JIRA_USERS_FAILED)
+                .field("errorType", e.getErrorType())
+                .field("message", e.getMessage())
+                .log();
+            return Response.status(502)
+                .entity(ErrorResponse.of(502, "Bad Gateway", e.getMessage()))
+                .build();
         }
     }
 

@@ -20,6 +20,8 @@ import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
 import com.causa.core.domain.DiagnosticContext;
 import com.causa.core.domain.ExternalConfig;
+import com.causa.core.domain.JiraTicketOptions;
+import com.causa.core.domain.JiraUser;
 import com.causa.core.domain.PageRequest;
 import com.causa.core.domain.PageResult;
 import com.causa.core.domain.LLMRequest;
@@ -49,6 +51,7 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
@@ -969,10 +972,12 @@ public class DiagnosticServiceImpl implements DiagnosticService {
     /** One transaction holds the per-alert lock throughout, so concurrent requests for an alert queue up. */
     @Override
     @Transactional
-    public JiraTicket createOrGetJiraTicket(String diagnosticId) {
+    public JiraTicket createOrGetJiraTicket(String diagnosticId, JiraTicketOptions options) {
         log.info(LogMessages.Diagnostic.JIRA_TICKET_REQUEST)
             .field("diagnosticId", diagnosticId)
             .log();
+
+        JiraTicketOptions ticketOptions = validateTicketOptions(options);
 
         Diagnostic diagnostic = diagnosticRepository.findById(diagnosticId)
             .orElseThrow(() -> new DiagnosticException(
@@ -991,22 +996,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
         }
 
         // Only creating (or recovering) a ticket needs Jira; an already-stored link is returned above
-        ExternalConfig jiraConfig = externalConfigCache
-            .getByCategory(PlatformCategory.INTEGRATION)
-            .stream()
-            .filter(c -> "JIRA".equals(c.getPlatform()) && c.isActive())
-            .findFirst()
-            .orElse(null);
-
-        if (jiraConfig == null) {
-            log.warn(LogMessages.Diagnostic.JIRA_NOT_CONFIGURED)
-                .field("diagnosticId", diagnosticId)
-                .log();
-            throw new DiagnosticException(
-                "Jira integration is not configured. "
-                + "Set it up via PUT /api/v1/configs/integrations/JIRA.",
-                "JIRA_NOT_CONFIGURED");
-        }
+        ExternalConfig jiraConfig = requireJiraConfig();
 
         // Jira may already hold a ticket whose URL was never saved (e.g. crash after creating it)
         Optional<String> inJira = jiraClient.findTicketByAlertId(jiraConfig, alertId);
@@ -1020,7 +1010,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             return new JiraTicket(inJira.get(), true);
         }
 
-        String ticketLink = jiraClient.createTicket(jiraConfig, diagnostic);
+        String ticketLink = jiraClient.createTicket(jiraConfig, diagnostic, ticketOptions);
         diagnosticRepository.updateTicketLink(diagnosticId, ticketLink);
 
         log.info(LogMessages.Diagnostic.JIRA_TICKET_CREATED)
@@ -1029,5 +1019,44 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             .log();
 
         return new JiraTicket(ticketLink, false);
+    }
+
+    @Override
+    public List<JiraUser> searchJiraUsers(String query) {
+        return jiraClient.searchAssignableUsers(requireJiraConfig(), query);
+    }
+
+    private static JiraTicketOptions validateTicketOptions(JiraTicketOptions options) {
+        if (options == null) {
+            return JiraTicketOptions.defaults();
+        }
+        if (options.additionalNotes() != null
+                && options.additionalNotes().length() > JiraTicketOptions.MAX_NOTES_LENGTH) {
+            throw new DiagnosticException(
+                "additional_notes must be at most " + JiraTicketOptions.MAX_NOTES_LENGTH + " characters.",
+                "INVALID_REQUEST");
+        }
+        if (options.assigneeId() != null
+                && options.assigneeId().length() > JiraTicketOptions.MAX_ASSIGNEE_LENGTH) {
+            throw new DiagnosticException(
+                "assignee_id must be at most " + JiraTicketOptions.MAX_ASSIGNEE_LENGTH + " characters.",
+                "INVALID_REQUEST");
+        }
+        return options;
+    }
+
+    private ExternalConfig requireJiraConfig() {
+        return externalConfigCache
+            .getByCategory(PlatformCategory.INTEGRATION)
+            .stream()
+            .filter(c -> "JIRA".equals(c.getPlatform()) && c.isActive())
+            .findFirst()
+            .orElseThrow(() -> {
+                log.warn(LogMessages.Diagnostic.JIRA_NOT_CONFIGURED).log();
+                return new DiagnosticException(
+                    "Jira integration is not configured. "
+                    + "Set it up via PUT /api/v1/configs/integrations/JIRA.",
+                    "JIRA_NOT_CONFIGURED");
+            });
     }
 }

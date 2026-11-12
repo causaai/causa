@@ -5,19 +5,25 @@ import com.causa.common.exceptions.DiagnosticException;
 import com.causa.common.logging.CausaLogger;
 import com.causa.core.domain.Diagnostic;
 import com.causa.core.domain.ExternalConfig;
+import com.causa.core.domain.JiraTicketOptions;
+import com.causa.core.domain.JiraUser;
 import com.causa.core.domain.RootCauseAnalysis;
+import com.causa.core.domain.RootCauseAnalysis.Recommendation;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -44,17 +50,22 @@ public class JiraClient {
     private static final String       ALERT_LABEL_PREFIX = "causa-alert-";
     private static final String       DEFAULT_ISSUE_TYPE = "Task";
     private static final Pattern      PROJECT_KEY_PATTERN = Pattern.compile("[A-Za-z][A-Za-z0-9_]{0,254}");
+    private static final int          USER_SEARCH_LIMIT = 20;
 
     private enum Flavor {
-        CLOUD("/rest/api/3", "/search/jql"),
-        SERVER("/rest/api/2", "/search");
+        CLOUD("/rest/api/3", "/search/jql", "query", "accountId"),
+        SERVER("/rest/api/2", "/search", "username", "name");
 
         final String apiPath;
         final String searchPath;
+        final String userQueryParam;
+        final String userIdField;
 
-        Flavor(String apiPath, String searchPath) {
+        Flavor(String apiPath, String searchPath, String userQueryParam, String userIdField) {
             this.apiPath = apiPath;
             this.searchPath = searchPath;
+            this.userQueryParam = userQueryParam;
+            this.userIdField = userIdField;
         }
 
         static Flavor of(ExternalConfig config) {
@@ -82,13 +93,14 @@ public class JiraClient {
      *
      * @throws DiagnosticException if the config is incomplete or the Jira call fails
      */
-    public String createTicket(ExternalConfig jiraConfig, Diagnostic diagnostic) {
+    public String createTicket(ExternalConfig jiraConfig, Diagnostic diagnostic, JiraTicketOptions options) {
         Flavor flavor     = Flavor.of(jiraConfig);
         String baseUrl    = resolveBaseUrl(jiraConfig);
         String authHeader = buildAuthHeader(jiraConfig, flavor);
         String projectKey = resolveProjectKey(jiraConfig);
 
-        String requestBody = buildRequestBody(projectKey, resolveIssueType(jiraConfig), diagnostic, flavor);
+        String requestBody = buildRequestBody(
+            projectKey, resolveIssueType(jiraConfig), diagnostic, options, flavor);
 
         log.info("Creating Jira ticket")
             .field("project", projectKey)
@@ -130,6 +142,37 @@ public class JiraClient {
         }
     }
 
+    /**
+     * Returns users assignable in the configured project whose name or email matches {@code query}
+     * (all assignable users when blank), capped at {@value #USER_SEARCH_LIMIT}.
+     */
+    public List<JiraUser> searchAssignableUsers(ExternalConfig jiraConfig, String query) {
+        Flavor flavor     = Flavor.of(jiraConfig);
+        String baseUrl    = resolveBaseUrl(jiraConfig);
+        String authHeader = buildAuthHeader(jiraConfig, flavor);
+        String projectKey = resolveProjectKey(jiraConfig);
+
+        String url = baseUrl.stripTrailing() + flavor.apiPath + "/user/assignable/search"
+            + "?project=" + encode(projectKey)
+            + "&" + flavor.userQueryParam + "=" + encode(query == null ? "" : query.trim())
+            + "&maxResults=" + USER_SEARCH_LIMIT;
+
+        String responseBody = send(HttpRequest.newBuilder().uri(URI.create(url)).GET(), authHeader);
+        try {
+            List<JiraUser> users = new ArrayList<>();
+            for (JsonNode node : MAPPER.readTree(responseBody)) {
+                String id = node.path(flavor.userIdField).asText();
+                if (!id.isBlank()) {
+                    users.add(new JiraUser(id, node.path("displayName").asText(), node.path("emailAddress").asText(null)));
+                }
+            }
+            return users;
+        } catch (Exception e) {
+            throw new DiagnosticException(
+                "Failed to parse Jira user search response: " + e.getMessage(), "JIRA_API_ERROR", e);
+        }
+    }
+
     /** Label put on every ticket; Jira labels cannot contain whitespace, so other characters are replaced. */
     private static String alertLabel(String alertId) {
         return ALERT_LABEL_PREFIX + alertId.replaceAll("[^A-Za-z0-9_.-]", "_");
@@ -140,14 +183,18 @@ public class JiraClient {
     // -------------------------------------------------------------------------
 
     private String post(String apiUrl, String authHeader, String requestBody) {
+        return send(HttpRequest.newBuilder()
+            .uri(URI.create(apiUrl))
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(requestBody, StandardCharsets.UTF_8)), authHeader);
+    }
+
+    private String send(HttpRequest.Builder builder, String authHeader) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(apiUrl))
+            HttpRequest request = builder
                 .header("Authorization", authHeader)
-                .header("Content-Type", "application/json")
                 .header("Accept", "application/json")
                 .timeout(TIMEOUT)
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody, StandardCharsets.UTF_8))
                 .build();
 
             HttpResponse<String> response = httpClient.send(request,
@@ -158,17 +205,30 @@ public class JiraClient {
                     .field("status", response.statusCode())
                     .field("body", truncate(response.body(), 300))
                     .log();
-                throw new DiagnosticException(
-                    "Jira API error: HTTP " + response.statusCode(),
-                    "JIRA_API_ERROR");
+                throw new DiagnosticException(describeFailure(response.statusCode()), "JIRA_API_ERROR");
             }
             return response.body();
 
         } catch (DiagnosticException de) {
             throw de;
         } catch (Exception e) {
-            throw new DiagnosticException("Jira API call failed: " + e.getMessage(), "JIRA_API_ERROR", e);
+            throw new DiagnosticException("Could not reach Jira: " + e.getMessage(), "JIRA_API_ERROR", e);
         }
+    }
+
+    private static String describeFailure(int status) {
+        return switch (status) {
+            case 401 -> "Jira rejected the credentials (HTTP 401). Check auth_config.authType "
+                + "(PAT for Server/Data Center, API_TOKEN for Cloud), username and token.";
+            case 403 -> "The Jira account is not allowed to perform this action (HTTP 403).";
+            case 404 -> "Jira resource not found (HTTP 404). Check the Jira url and additional_config.projectName.";
+            case 400 -> "Jira rejected the request (HTTP 400). Check the project, issue type and required fields.";
+            default -> "Jira API error: HTTP " + status;
+        };
+    }
+
+    private static String encode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
     /**
@@ -256,17 +316,17 @@ public class JiraClient {
         return type == null || type.toString().isBlank() ? DEFAULT_ISSUE_TYPE : type.toString().strip();
     }
 
-    /** Issue payload; Cloud needs the description as Atlassian Document Format, Server as plain text. */
-    private static String buildRequestBody(String projectKey, String issueType,
-                                           Diagnostic diagnostic, Flavor flavor) {
+    /** One block of the description; {@code heading} is null for the opening block. */
+    private record Section(String heading, List<String> lines) {}
+
+    /** Issue payload; Cloud needs the description as Atlassian Document Format, Server as wiki-markup text. */
+    private static String buildRequestBody(String projectKey, String issueType, Diagnostic diagnostic,
+                                           JiraTicketOptions options, Flavor flavor) {
         try {
             RootCauseAnalysis rca = diagnostic.getRca();
-            String summary     = rca != null && !isBlank(rca.issueTitle())
+            String summary = rca != null && !isBlank(rca.issueTitle())
                 ? rca.issueTitle()
                 : "Causa diagnostic: " + diagnostic.getDiagnosticId();
-            String description = rca != null && !isBlank(rca.rootCause())
-                ? rca.rootCause()
-                : "See Causa diagnostic: " + diagnostic.getDiagnosticId();
 
             ObjectNode body   = MAPPER.createObjectNode();
             ObjectNode fields = body.putObject("fields");
@@ -274,10 +334,15 @@ public class JiraClient {
             fields.put("summary", summary);
             fields.putArray("labels").add(alertLabel(diagnostic.getAlertId()));
             fields.putObject("issuetype").put("name", issueType);
+
+            List<Section> sections = descriptionSections(diagnostic, options);
             if (flavor == Flavor.CLOUD) {
-                fields.set("description", adfDocument(description));
+                fields.set("description", adfDocument(sections));
             } else {
-                fields.put("description", description);
+                fields.put("description", wikiText(sections));
+            }
+            if (!isBlank(options.assigneeId())) {
+                fields.putObject("assignee").put(flavor.userIdField, options.assigneeId().trim());
             }
 
             return MAPPER.writeValueAsString(body);
@@ -287,16 +352,94 @@ public class JiraClient {
         }
     }
 
-    private static ObjectNode adfDocument(String text) {
+    private static List<Section> descriptionSections(Diagnostic diagnostic, JiraTicketOptions options) {
+        RootCauseAnalysis rca = diagnostic.getRca();
+        List<Section> sections = new ArrayList<>();
+
+        String rootCause = rca != null && !isBlank(rca.rootCause())
+            ? rca.rootCause()
+            : "See Causa diagnostic: " + diagnostic.getDiagnosticId();
+        sections.add(new Section(null, List.of(rootCause)));
+
+        if (rca != null && options.includeIssueDetail()) {
+            addSection(sections, "Issue detail", nonBlank(rca.issueSummary(), rca.issueDescription()));
+        }
+        if (rca != null && options.includeRecommendations() && rca.recommendations() != null) {
+            List<String> lines = new ArrayList<>();
+            for (Recommendation r : rca.recommendations()) {
+                lines.add(joinNonBlank(" - ", r.solutionTitle(), r.solutionDescription()));
+            }
+            addSection(sections, "Recommendations", lines);
+        }
+        if (rca != null && options.includeImplementationSteps() && rca.recommendations() != null) {
+            List<String> lines = new ArrayList<>();
+            for (Recommendation r : rca.recommendations()) {
+                if (!isBlank(r.implementationNotes())) {
+                    lines.add(joinNonBlank(": ", r.solutionTitle(), r.implementationNotes()));
+                }
+            }
+            addSection(sections, "Implementation steps", lines);
+        }
+        if (!isBlank(options.additionalNotes())) {
+            addSection(sections, "Additional notes", List.of(options.additionalNotes().trim()));
+        }
+        return sections;
+    }
+
+    private static void addSection(List<Section> sections, String heading, List<String> lines) {
+        List<String> kept = lines.stream().filter(l -> !isBlank(l)).toList();
+        if (!kept.isEmpty()) {
+            sections.add(new Section(heading, kept));
+        }
+    }
+
+    private static List<String> nonBlank(String... values) {
+        List<String> out = new ArrayList<>();
+        for (String v : values) {
+            if (!isBlank(v)) out.add(v);
+        }
+        return out;
+    }
+
+    private static String joinNonBlank(String separator, String first, String second) {
+        return String.join(separator, nonBlank(first, second));
+    }
+
+    private static String wikiText(List<Section> sections) {
+        StringBuilder sb = new StringBuilder();
+        for (Section s : sections) {
+            if (sb.length() > 0) sb.append("\n\n");
+            if (s.heading() != null) sb.append("h3. ").append(s.heading()).append("\n");
+            sb.append(String.join("\n", s.lines()));
+        }
+        return sb.toString();
+    }
+
+    private static ObjectNode adfDocument(List<Section> sections) {
         ObjectNode doc = MAPPER.createObjectNode();
         doc.put("type", "doc");
         doc.put("version", 1);
-        ObjectNode para = doc.putArray("content").addObject();
-        para.put("type", "paragraph");
-        ObjectNode textNode = para.putArray("content").addObject();
+        var content = doc.putArray("content");
+        for (Section s : sections) {
+            if (s.heading() != null) {
+                ObjectNode heading = content.addObject();
+                heading.put("type", "heading");
+                heading.putObject("attrs").put("level", 3);
+                addText(heading, s.heading());
+            }
+            for (String line : s.lines()) {
+                ObjectNode para = content.addObject();
+                para.put("type", "paragraph");
+                addText(para, line);
+            }
+        }
+        return doc;
+    }
+
+    private static void addText(ObjectNode parent, String text) {
+        ObjectNode textNode = parent.putArray("content").addObject();
         textNode.put("type", "text");
         textNode.put("text", text);
-        return doc;
     }
 
     private static String extractBrowseUrl(String baseUrl, String responseBody) {
