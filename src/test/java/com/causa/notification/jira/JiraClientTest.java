@@ -6,6 +6,7 @@ import com.causa.common.exceptions.DiagnosticException;
 import com.causa.core.domain.AuthConfig;
 import com.causa.core.domain.Diagnostic;
 import com.causa.core.domain.ExternalConfig;
+import com.causa.core.domain.JiraUser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
@@ -18,6 +19,7 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
@@ -34,6 +36,7 @@ class JiraClientTest {
     private HttpServer server;
     private String baseUrl;
     private final AtomicReference<String> path = new AtomicReference<>();
+    private final AtomicReference<String> query = new AtomicReference<>();
     private final AtomicReference<String> authHeader = new AtomicReference<>();
     private final AtomicReference<String> body = new AtomicReference<>();
     private volatile int status = 200;
@@ -44,6 +47,7 @@ class JiraClientTest {
         server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
         server.createContext("/", exchange -> {
             path.set(exchange.getRequestURI().getPath());
+            query.set(exchange.getRequestURI().getRawQuery());
             authHeader.set(exchange.getRequestHeaders().getFirst("Authorization"));
             body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             byte[] out = responseJson.getBytes(StandardCharsets.UTF_8);
@@ -228,5 +232,42 @@ class JiraClientTest {
                 () -> client.createTicket(config("API_TOKEN", null), diagnostic()));
 
         assertEquals("JIRA_CONFIG_INCOMPLETE", ex.getErrorType());
+    }
+
+    @Test
+    @DisplayName("Cloud user search sends 'query' and maps accountId")
+    void cloudUserSearch() {
+        responseJson = "[{\"accountId\":\"abc\",\"displayName\":\"Ann Lee\",\"emailAddress\":\"ann@x.com\"}]";
+
+        List<JiraUser> users = client.searchAssignableUsers(config("API_TOKEN", "me@example.com"), "ann lee");
+
+        assertEquals(List.of(new JiraUser("abc", "Ann Lee", "ann@x.com")), users);
+        assertEquals("/rest/api/3/user/assignable/search", path.get());
+        assertEquals("project=KRUIZE&query=ann+lee&maxResults=20", query.get());
+    }
+
+    @Test
+    @DisplayName("Server user search sends 'username' and maps name; blank query lists everyone")
+    void serverUserSearch() {
+        responseJson = "[{\"name\":\"alee\",\"displayName\":\"Ann Lee\"}]";
+
+        List<JiraUser> users = client.searchAssignableUsers(config("PAT", null), null);
+
+        assertEquals(List.of(new JiraUser("alee", "Ann Lee", null)), users);
+        assertEquals("/rest/api/2/user/assignable/search", path.get());
+        assertEquals("project=KRUIZE&username=&maxResults=20", query.get());
+        assertEquals("Bearer tok", authHeader.get());
+    }
+
+    @Test
+    @DisplayName("HTTP failures carry a specific, actionable message")
+    void failureMessages() {
+        status = 401;
+        assertTrue(assertThrows(DiagnosticException.class,
+                () -> client.searchAssignableUsers(config("PAT", null), "a")).getMessage().contains("credentials"));
+
+        status = 404;
+        assertTrue(assertThrows(DiagnosticException.class,
+                () -> client.searchAssignableUsers(config("PAT", null), "a")).getMessage().contains("projectName"));
     }
 }
