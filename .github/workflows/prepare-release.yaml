@@ -112,9 +112,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PR_TOKEN || secrets.GITHUB_TOKEN }}
           VERSION: ${{ inputs.version }}
-          BUMP_BRANCH: mvp_demo
         run: |
-          HEAD_BRANCH="$BUMP_BRANCH"
+          HEAD_BRANCH="mvp_demo"
           # Checkout did not persist credentials, so authenticate git via gh for fetching.
           gh auth setup-git
           git fetch origin main "$HEAD_BRANCH"
