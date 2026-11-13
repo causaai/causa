@@ -21,8 +21,13 @@ public interface DiagnosticRepository {
     /** Merges an existing diagnostic row (status updates, RCA, validation). */
     Diagnostic update(Diagnostic diagnostic);
 
-    /** Returns diagnostics whose pipeline was active when the previous process stopped. */
-    List<Diagnostic> findUnfinished();
+    /**
+     * Returns one bounded page of diagnostics whose alert still needs finalization.
+     *
+     * <p>The result includes active diagnostics and terminal diagnostics whose alert
+     * status is still {@code PROCESSING}, so restart recovery can complete both paths.
+     */
+    List<Diagnostic> findUnfinished(PageRequest pageRequest);
 
     /** Updates a diagnostic only when its current status still matches the observed status. */
     boolean updateStatusIfCurrent(String diagnosticId, DiagnosticStatus currentStatus, DiagnosticStatus newStatus);

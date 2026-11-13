@@ -1,5 +1,6 @@
 package com.causa.infrastructure.persistence.repositories;
 
+import com.causa.common.constants.AlertConstants.AlertStatus;
 import com.causa.common.constants.DiagnosticConstants.DiagnosticStatus;
 import com.causa.common.exceptions.DiagnosticException;
 import com.causa.common.logging.LogMessages;
@@ -59,13 +60,22 @@ public class DiagnosticRepositoryImpl implements DiagnosticRepository {
     }
 
     @Override
-    public List<Diagnostic> findUnfinished() {
-        List<String> unfinishedStatuses = List.of(
+    public List<Diagnostic> findUnfinished(PageRequest pageRequest) {
+        List<String> recoverableStatuses = List.of(
             DiagnosticStatus.PENDING.getValue(),
             DiagnosticStatus.IN_PROGRESS.getValue(),
-            DiagnosticStatus.VALIDATING.getValue());
+            DiagnosticStatus.PROCESSING.getValue(),
+            DiagnosticStatus.VALIDATING.getValue(),
+            DiagnosticStatus.COMPLETED.getValue(),
+            DiagnosticStatus.FAILED.getValue());
 
-        return DiagnosticEntity.<DiagnosticEntity>list("status in ?1", unfinishedStatuses)
+        return DiagnosticEntity.<DiagnosticEntity>find(
+                "status in ?1 and alert.status = ?2",
+                Sort.by("createdAt").ascending(),
+                recoverableStatuses,
+                AlertStatus.PROCESSING.getValue())
+            .page(Page.of(pageRequest.panachePage(), pageRequest.size()))
+            .list()
             .stream()
             .map(DiagnosticEntityMapper::toDomain)
             .toList();
