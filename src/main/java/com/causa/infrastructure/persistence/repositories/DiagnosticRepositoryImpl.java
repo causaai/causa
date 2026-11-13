@@ -1,5 +1,6 @@
 package com.causa.infrastructure.persistence.repositories;
 
+import com.causa.common.constants.DiagnosticConstants.DiagnosticStatus;
 import com.causa.common.exceptions.DiagnosticException;
 import com.causa.common.logging.LogMessages;
 import com.causa.core.domain.Diagnostic;
@@ -55,6 +56,30 @@ public class DiagnosticRepositoryImpl implements DiagnosticRepository {
                 LogMessages.Diagnostic.DIAGNOSTIC_UPDATE_FAILED + ": " + diagnostic.getDiagnosticId(),
                 "UpdateError", e);
         }
+    }
+
+    @Override
+    public List<Diagnostic> findUnfinished() {
+        List<String> unfinishedStatuses = List.of(
+            DiagnosticStatus.PENDING.getValue(),
+            DiagnosticStatus.IN_PROGRESS.getValue(),
+            DiagnosticStatus.VALIDATING.getValue());
+
+        return DiagnosticEntity.<DiagnosticEntity>list("status in ?1", unfinishedStatuses)
+            .stream()
+            .map(DiagnosticEntityMapper::toDomain)
+            .toList();
+    }
+
+    @Override
+    @Transactional
+    public boolean updateStatusIfCurrent(String diagnosticId,
+                                        DiagnosticStatus currentStatus,
+                                        DiagnosticStatus newStatus) {
+        int updated = DiagnosticEntity.update(
+            "status = ?1, updatedAt = CURRENT_TIMESTAMP where id = ?2 and status = ?3",
+            newStatus.getValue(), diagnosticId, currentStatus.getValue());
+        return updated == 1;
     }
 
     @Override

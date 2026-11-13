@@ -33,6 +33,9 @@ public final class AppConstants {
 
         /** MCP registry initialization priority — after config loading. */
         public static final int MCP_PRIORITY = 25;
+
+        /** Diagnostic recovery priority — after database, configuration, and MCP initialization. */
+        public static final int DIAGNOSTIC_RECOVERY_PRIORITY = 30;
     }
 
     /**
