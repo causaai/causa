@@ -87,14 +87,23 @@ jobs:
         run: |
           mvn -B -ntp versions:set -DnewVersion="$VERSION" -DgenerateBackupPoms=false
 
+      # PRs created with GITHUB_TOKEN do not trigger other workflows (e.g. compile/test checks)
+      # and may be blocked by branch protection, so use a GitHub App installation token.
+      # Requires the RELEASE_APP_ID variable and RELEASE_APP_PRIVATE_KEY secret. The app needs
+      # Contents: write and Pull requests: write on this repository.
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
       # Uses peter-evans/create-pull-request to detect pom.xml changes, commit, and create the PR.
-      # PRs created with GITHUB_TOKEN do not trigger other workflows (e.g. compile/test checks),
-      # so configure a PAT or GitHub App token as the RELEASE_PR_TOKEN secret.
       - name: Create Pull Request to mvp_demo
         id: cpr
         uses: peter-evans/create-pull-request@v8
         with:
-          token: ${{ secrets.RELEASE_PR_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
           base: mvp_demo
           branch: "bump-version-${{ inputs.version }}"
           commit-message: "chore(release): bump pom.xml version to ${{ inputs.version }}"
@@ -106,16 +115,14 @@ jobs:
           sign-commits: true
           delete-branch: true
 
-      # Opens downstream PR into main if not already present. The head is the version-bump
-      # branch when one was created, so the requested version is included even before the
-      # bump PR is merged into mvp_demo.
+      # Opens downstream PR from mvp_demo into main if not already present.
+      # The version bump PR is expected to be merged into mvp_demo first.
       - name: Create PR to main
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_PR_TOKEN || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           VERSION: ${{ inputs.version }}
-          BUMP_BRANCH: ${{ steps.cpr.outputs.pull-request-branch }}
         run: |
-          HEAD_BRANCH="${BUMP_BRANCH:-mvp_demo}"
+          HEAD_BRANCH="mvp_demo"
           # Checkout did not persist credentials, so authenticate git via gh for fetching.
           gh auth setup-git
           git fetch origin main "$HEAD_BRANCH"
