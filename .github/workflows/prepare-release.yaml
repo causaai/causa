@@ -106,16 +106,14 @@ jobs:
           sign-commits: true
           delete-branch: true
 
-      # Opens downstream PR into main if not already present. The head is the version-bump
-      # branch when one was created, so the requested version is included even before the
-      # bump PR is merged into mvp_demo.
+      # Opens downstream PR from mvp_demo into main if not already present.
+      # The version bump PR is expected to be merged into mvp_demo first.
       - name: Create PR to main
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PR_TOKEN || secrets.GITHUB_TOKEN }}
           VERSION: ${{ inputs.version }}
-          BUMP_BRANCH: ${{ steps.cpr.outputs.pull-request-branch }}
         run: |
-          HEAD_BRANCH="${BUMP_BRANCH:-mvp_demo}"
+          HEAD_BRANCH="mvp_demo"
           # Checkout did not persist credentials, so authenticate git via gh for fetching.
           gh auth setup-git
           git fetch origin main "$HEAD_BRANCH"
