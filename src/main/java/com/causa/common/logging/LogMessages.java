@@ -198,6 +198,8 @@ public final class LogMessages {
         public static final String JIRA_TICKET_RECOVERED     = "Existing Jira ticket found for alert — persisted its URL instead of creating a duplicate";
         public static final String JIRA_NOT_CONFIGURED       = "Jira ticket creation refused — no active Jira integration configured";
         public static final String JIRA_TICKET_FAILED        = "Jira ticket creation failed";
+        public static final String JIRA_USERS_REQUEST        = "GET /api/v1/diagnostics/jira/users request received";
+        public static final String JIRA_USERS_FAILED         = "Jira user search failed";
     }
 
     /**
