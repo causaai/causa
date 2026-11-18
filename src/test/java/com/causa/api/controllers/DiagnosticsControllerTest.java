@@ -18,19 +18,27 @@ import com.causa.core.domain.PageRequest;
 import com.causa.core.domain.PageResult;
 import com.causa.core.ports.AlertRepository;
 import com.causa.core.services.DiagnosticService;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validation;
+import jakarta.validation.constraints.Size;
 import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -399,6 +407,45 @@ class DiagnosticsControllerTest {
 
             assertEquals(422, controller.searchJiraUsers("nojira").getStatus());
             assertEquals(502, controller.searchJiraUsers("broken").getStatus());
+        }
+
+        @ParameterizedTest(name = "[{index}] query=\"{0}\"")
+        @NullSource
+        @ValueSource(strings = {"", "   ", "\t \n"})
+        @DisplayName("Should accept a null, empty or whitespace-only query and pass it to the service")
+        void shouldAcceptBlankQuery(String blank) throws Exception {
+            when(diagnosticService.searchJiraUsers(blank)).thenReturn(List.of());
+
+            assertTrue(validateQueryParam(blank).isEmpty());
+            Response response = controller.searchJiraUsers(blank);
+
+            assertEquals(200, response.getStatus());
+            assertEquals(List.of(), response.getEntity());
+            verify(diagnosticService).searchJiraUsers(blank);
+        }
+
+        @Test
+        @DisplayName("Should accept a query of exactly 255 characters")
+        void shouldAcceptQueryAtMaxLength() throws Exception {
+            assertTrue(validateQueryParam("a".repeat(255)).isEmpty());
+        }
+
+        @Test
+        @DisplayName("Should reject a query longer than 255 characters")
+        void shouldRejectQueryOverMaxLength() throws Exception {
+            Set<ConstraintViolation<DiagnosticsController>> violations = validateQueryParam("a".repeat(256));
+
+            assertEquals(1, violations.size());
+            assertEquals(Size.class, violations.iterator().next()
+                    .getConstraintDescriptor().getAnnotation().annotationType());
+        }
+
+        /** Runs the bean-validation constraints on {@code searchJiraUsers}'s parameter, as the REST layer does. */
+        private Set<ConstraintViolation<DiagnosticsController>> validateQueryParam(String query)
+                throws NoSuchMethodException {
+            Method method = DiagnosticsController.class.getMethod("searchJiraUsers", String.class);
+            return Validation.buildDefaultValidatorFactory().getValidator().forExecutables()
+                    .validateParameters(controller, method, new Object[] {query});
         }
     }
 }
