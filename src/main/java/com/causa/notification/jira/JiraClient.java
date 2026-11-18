@@ -5,6 +5,7 @@ import com.causa.common.exceptions.DiagnosticException;
 import com.causa.common.logging.CausaLogger;
 import com.causa.core.domain.Diagnostic;
 import com.causa.core.domain.ExternalConfig;
+import com.causa.core.domain.JiraUser;
 import com.causa.core.domain.RootCauseAnalysis;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,12 +13,15 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -44,17 +48,22 @@ public class JiraClient {
     private static final String       ALERT_LABEL_PREFIX = "causa-alert-";
     private static final String       DEFAULT_ISSUE_TYPE = "Task";
     private static final Pattern      PROJECT_KEY_PATTERN = Pattern.compile("[A-Za-z][A-Za-z0-9_]{0,254}");
+    private static final int          USER_SEARCH_LIMIT = 20;
 
     private enum Flavor {
-        CLOUD("/rest/api/3", "/search/jql"),
-        SERVER("/rest/api/2", "/search");
+        CLOUD("/rest/api/3", "/search/jql", "query", "accountId"),
+        SERVER("/rest/api/2", "/search", "username", "name");
 
         final String apiPath;
         final String searchPath;
+        final String userQueryParam;
+        final String userIdField;
 
-        Flavor(String apiPath, String searchPath) {
+        Flavor(String apiPath, String searchPath, String userQueryParam, String userIdField) {
             this.apiPath = apiPath;
             this.searchPath = searchPath;
+            this.userQueryParam = userQueryParam;
+            this.userIdField = userIdField;
         }
 
         static Flavor of(ExternalConfig config) {
@@ -130,6 +139,37 @@ public class JiraClient {
         }
     }
 
+    /**
+     * Returns users assignable in the configured project whose name or email matches {@code query}
+     * (all assignable users when blank), capped at {@value #USER_SEARCH_LIMIT}.
+     */
+    public List<JiraUser> searchAssignableUsers(ExternalConfig jiraConfig, String query) {
+        Flavor flavor     = Flavor.of(jiraConfig);
+        String baseUrl    = resolveBaseUrl(jiraConfig);
+        String authHeader = buildAuthHeader(jiraConfig, flavor);
+        String projectKey = resolveProjectKey(jiraConfig);
+
+        String url = baseUrl.stripTrailing() + flavor.apiPath + "/user/assignable/search"
+            + "?project=" + encode(projectKey)
+            + "&" + flavor.userQueryParam + "=" + encode(query == null ? "" : query.trim())
+            + "&maxResults=" + USER_SEARCH_LIMIT;
+
+        String responseBody = send(HttpRequest.newBuilder().uri(URI.create(url)).GET(), authHeader);
+        try {
+            List<JiraUser> users = new ArrayList<>();
+            for (JsonNode node : MAPPER.readTree(responseBody)) {
+                String id = node.path(flavor.userIdField).asText();
+                if (!id.isBlank()) {
+                    users.add(new JiraUser(id, node.path("displayName").asText(), node.path("emailAddress").asText(null)));
+                }
+            }
+            return users;
+        } catch (Exception e) {
+            throw new DiagnosticException(
+                "Failed to parse Jira user search response: " + e.getMessage(), "JIRA_API_ERROR", e);
+        }
+    }
+
     /** Label put on every ticket; Jira labels cannot contain whitespace, so other characters are replaced. */
     private static String alertLabel(String alertId) {
         return ALERT_LABEL_PREFIX + alertId.replaceAll("[^A-Za-z0-9_.-]", "_");
@@ -140,14 +180,18 @@ public class JiraClient {
     // -------------------------------------------------------------------------
 
     private String post(String apiUrl, String authHeader, String requestBody) {
+        return send(HttpRequest.newBuilder()
+            .uri(URI.create(apiUrl))
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(requestBody, StandardCharsets.UTF_8)), authHeader);
+    }
+
+    private String send(HttpRequest.Builder builder, String authHeader) {
         try {
-            HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(apiUrl))
+            HttpRequest request = builder
                 .header("Authorization", authHeader)
-                .header("Content-Type", "application/json")
                 .header("Accept", "application/json")
                 .timeout(TIMEOUT)
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody, StandardCharsets.UTF_8))
                 .build();
 
             HttpResponse<String> response = httpClient.send(request,
@@ -158,17 +202,30 @@ public class JiraClient {
                     .field("status", response.statusCode())
                     .field("body", truncate(response.body(), 300))
                     .log();
-                throw new DiagnosticException(
-                    "Jira API error: HTTP " + response.statusCode(),
-                    "JIRA_API_ERROR");
+                throw new DiagnosticException(describeFailure(response.statusCode()), "JIRA_API_ERROR");
             }
             return response.body();
 
         } catch (DiagnosticException de) {
             throw de;
         } catch (Exception e) {
-            throw new DiagnosticException("Jira API call failed: " + e.getMessage(), "JIRA_API_ERROR", e);
+            throw new DiagnosticException("Could not reach Jira: " + e.getMessage(), "JIRA_API_ERROR", e);
         }
+    }
+
+    private static String describeFailure(int status) {
+        return switch (status) {
+            case 401 -> "Jira rejected the credentials (HTTP 401). Check auth_config.authType "
+                + "(PAT for Server/Data Center, API_TOKEN for Cloud), username and token.";
+            case 403 -> "The Jira account is not allowed to perform this action (HTTP 403).";
+            case 404 -> "Jira resource not found (HTTP 404). Check the Jira url and additional_config.projectName.";
+            case 400 -> "Jira rejected the request (HTTP 400). Check the project, issue type and required fields.";
+            default -> "Jira API error: HTTP " + status;
+        };
+    }
+
+    private static String encode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
     /**
