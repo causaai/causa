@@ -265,9 +265,10 @@ public record DiagnosticDetailResponse(
             }
         }
 
-        // Re-attach remaining unranked items (e.g. PATH B rule evidence) so they are not lost
+        // Re-attach only unranked items (items lacking statements, such as rule-derived PATH B evidence)
+        // so they are not lost, while preserving the ranker's deduplication and top-N cap for rankable items.
         for (EvidenceItem item : allEvidence) {
-            if (!addedIds.contains(item.id())) {
+            if (!addedIds.contains(item.id()) && (item.statement() == null || item.statement().isBlank())) {
                 rankedEvidence.add(toEvidence(item));
                 addedIds.add(item.id());
             }

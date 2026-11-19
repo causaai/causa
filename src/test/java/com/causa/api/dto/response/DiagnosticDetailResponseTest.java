@@ -287,15 +287,17 @@ class DiagnosticDetailResponseTest {
         }
 
         @Test
-        @DisplayName("re-attaches unranked PATH B evidence items after ranked items")
+        @DisplayName("re-attaches unranked PATH B evidence items after ranked items and omits deduplicated rankable items")
         void shouldReattachUnrankedEvidenceAfterRanked() {
             String stored = """
                 [
                   {"id": "ev-1", "statement": "Statement 1", "rawSnippet": "snippet 1"},
                   {"id": "ev-2", "statement": "Statement 2", "rawSnippet": "snippet 2"},
+                  {"id": "ev-dup", "statement": "Duplicate Statement", "rawSnippet": "snippet dup"},
                   {"id": "ev-3-unranked", "rawSnippet": "snippet 3 unranked"}
                 ]""";
 
+            // ev-2 and ev-1 are ranked; ev-dup was dropped by ranker as duplicate; ev-3-unranked has no statement
             String validationData = """
                 {"rankedEvidenceIds": ["ev-2", "ev-1"]}""";
 
@@ -318,6 +320,7 @@ class DiagnosticDetailResponseTest {
                 DiagnosticDetailResponse.from(d, null, "cluster").diagnosis().validationEvidences();
 
             assertNotNull(evidences);
+            // ev-2 (ranked), ev-1 (ranked), ev-3-unranked (unranked re-attached) -> ev-dup omitted
             assertEquals(3, evidences.size());
             assertEquals("Statement 2", evidences.get(0).supportingEvidence());
             assertEquals("Statement 1", evidences.get(1).supportingEvidence());
