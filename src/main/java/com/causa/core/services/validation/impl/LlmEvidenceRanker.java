@@ -26,8 +26,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
-import java.util.List;
-
 /**
  * Evidence ranking and deduplication with smart routing optimization.
  *
@@ -223,11 +221,15 @@ public class LlmEvidenceRanker implements EvidenceRanker {
      * {@code "vertex-ai-anthropic"} template entry — the bare enum name ({@code "vertex-ai"}) matches
      * nothing in the template and would silently force the default fallback.
      */
-    private static String toTemplateProvider(ConfigConstants.LlmProvider provider) {
+    static String toTemplateProvider(ConfigConstants.LlmProvider provider) {
+        if (provider == null) {
+            return LLMConstants.Provider.ANTHROPIC;
+        }
         return switch (provider) {
             case VERTEX_AI -> LLMConstants.Provider.VERTEX_AI_ANTHROPIC;
             case ANTHROPIC -> LLMConstants.Provider.ANTHROPIC;
             case BOB -> LLMConstants.Provider.IBM_BOB;
+            default -> LLMConstants.Provider.ANTHROPIC;
         };
     }
 

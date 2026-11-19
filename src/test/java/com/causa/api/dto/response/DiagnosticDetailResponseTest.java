@@ -286,6 +286,44 @@ class DiagnosticDetailResponseTest {
             assertNull(diagnosisWithEvidence("{not json").validationEvidences());
         }
 
+        @Test
+        @DisplayName("re-attaches unranked PATH B evidence items after ranked items")
+        void shouldReattachUnrankedEvidenceAfterRanked() {
+            String stored = """
+                [
+                  {"id": "ev-1", "statement": "Statement 1", "rawSnippet": "snippet 1"},
+                  {"id": "ev-2", "statement": "Statement 2", "rawSnippet": "snippet 2"},
+                  {"id": "ev-3-unranked", "rawSnippet": "snippet 3 unranked"}
+                ]""";
+
+            String validationData = """
+                {"rankedEvidenceIds": ["ev-2", "ev-1"]}""";
+
+            RootCauseAnalysis rca = new RootCauseAnalysis(
+                    "Container OOM killed", null, null, null,
+                    RootCauseAnalysis.AnomalyType.OOM_KILLED, null, null, null, null,
+                    new RootCauseAnalysis.ConfidenceSummary(0.9, "summary"), null);
+
+            Diagnostic d = Diagnostic.builder()
+                    .diagnosticId("d1")
+                    .alertId("a1")
+                    .status(DiagnosticStatus.COMPLETED)
+                    .generatedAt(Instant.parse("2025-06-01T12:00:00Z"))
+                    .rca(rca)
+                    .allEvidence(stored)
+                    .validationData(validationData)
+                    .build();
+
+            List<DiagnosticDetailResponse.Evidence> evidences =
+                DiagnosticDetailResponse.from(d, null, "cluster").diagnosis().validationEvidences();
+
+            assertNotNull(evidences);
+            assertEquals(3, evidences.size());
+            assertEquals("Statement 2", evidences.get(0).supportingEvidence());
+            assertEquals("Statement 1", evidences.get(1).supportingEvidence());
+            assertEquals("snippet 3 unranked", evidences.get(2).supportingEvidence());
+        }
+
         private DiagnosticDetailResponse.DiagnosisInfo diagnosisWithEvidence(String allEvidence) {
             RootCauseAnalysis rca = new RootCauseAnalysis(
                     "Container OOM killed", null, null, null,
