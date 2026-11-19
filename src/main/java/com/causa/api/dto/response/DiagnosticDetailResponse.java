@@ -115,7 +115,7 @@ public record DiagnosticDetailResponse(
         @JsonProperty("evidences")             List<String> evidences,  // LLM-generated evidences (existing)
         @JsonProperty("validation_evidences")  List<Evidence> validationEvidences,  // Structured evidences from validation pipeline (new)
         @JsonProperty("supporting_logs")       List<String> supportingLogs,
-        @JsonProperty("rca_confidence_score")  Double rcaConfidenceScore,
+        @JsonProperty("confidence_score")      Double confidenceScore,
         @JsonProperty("confidence_summary")    String confidenceSummaryText,
         @JsonProperty("recommendations")       List<RecommendationInfo> recommendations,
         @JsonProperty("llm_notes")             String llmNotes
@@ -155,7 +155,15 @@ public record DiagnosticDetailResponse(
 
         DiagnosisInfo diagnosisInfo = null;
         if (rca != null) {
-            Double rcaScore    = rca.confidenceSummary() != null ? rca.confidenceSummary().rcaConfidenceScore() : null;
+            // Persisted score is the validation score once validation has run; before that (or if
+            // validation failed) fall back to the score the LLM generated with the RCA.
+            Double confidenceScore;
+            if (diagnostic.getConfidenceScore() != null) {
+                // Float.toString avoids float-widening noise (0.85f -> 0.8500000238...)
+                confidenceScore = Double.parseDouble(Float.toString(diagnostic.getConfidenceScore()));
+            } else {
+                confidenceScore = rca.confidenceSummary() != null ? rca.confidenceSummary().rcaConfidenceScore() : null;
+            }
             String summaryText = rca.confidenceSummary() != null ? rca.confidenceSummary().summaryText()        : null;
 
             List<RecommendationInfo> recommendations = null;
@@ -189,7 +197,7 @@ public record DiagnosticDetailResponse(
                 rca.evidences(),  // LLM-generated evidences (backward compatible)
                 validationEvidences,  // Ranked (or all) validation evidences
                 rca.supportingLogs(),
-                rcaScore,
+                confidenceScore,
                 summaryText,
                 recommendations,
                 rca.llmNotes()

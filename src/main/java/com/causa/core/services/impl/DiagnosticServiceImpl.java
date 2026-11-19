@@ -780,8 +780,10 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             // Rank and deduplicate the harvested evidence (if ranker available)
             if (evidenceRanker.isPresent() && harvestedEvidence != null && !harvestedEvidence.isEmpty()) {
                 try {
-                    // Validation status drives the ranker's refuting-priority rule.
-                    String validationStatus = determineValidationResult(validatedRCA);
+                    // Get validation score and status
+                    double validationScore = resolveValidationScore(validatedRCA)
+                        .orElse(validatedRCA.summary().averageConfidence());
+                    String validationStatus = validationResult;
 
                     // Build RCA summary
                     RcaSummary rcaSummary = new RcaSummary(
@@ -891,13 +893,20 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                 }
             }
 
+            // Validation score replaces the RCA-generation score set by persistCompletedDiagnostic;
+            // when validation produced no score, the RCA's score is kept
+            java.util.OptionalDouble validationScore = resolveValidationScore(validatedRCA);
+            Float confidenceScore = validationScore.isPresent()
+                ? Float.valueOf((float) validationScore.getAsDouble())
+                : base.getConfidenceScore();
+
             // Layer validation fields on top of the already-persisted base diagnostic
             Diagnostic updated = Diagnostic.builder()
                 .diagnosticId(base.getDiagnosticId())
                 .alertId(base.getAlertId())
                 .status(base.getStatus())
                 .generatedAt(base.getGeneratedAt())
-                .confidenceScore(base.getConfidenceScore())
+                .confidenceScore(confidenceScore)
                 .faultDomain(base.getFaultDomain())
                 .rca(base.getRca())
                 .validationResult(validationResult)
@@ -921,7 +930,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             log.info("Diagnostic updated with validation results")
                 .field(LogFields.DIAGNOSTIC_ID, diagnostic.getDiagnosticId())
                 .field(ValidationConstants.LogFields.VALIDATION_RESULT, validationResult)
-                .field(ValidationConstants.LogFields.CONFIDENCE_SCORE, validatedRCA.summary().averageConfidence())
+                .field(ValidationConstants.LogFields.CONFIDENCE_SCORE, confidenceScore)
                 .log();
 
             return updated;
@@ -1032,14 +1041,30 @@ public class DiagnosticServiceImpl implements DiagnosticService {
                 .exception(e)
                 .log();
 
-            // Return original diagnostic with FAILED status
-            return Diagnostic.builder()
-                .diagnosticId(diagnostic.getDiagnosticId())
-                .alertId(diagnostic.getAlertId())
-                .status(DiagnosticStatus.FAILED)
-                .generatedAt(diagnostic.getGeneratedAt())
-                .build();
+            // Surface the failure to the pipeline caller: the base RCA may already be persisted as
+            // COMPLETED, so returning an unpersisted FAILED object would leave the DB inconsistent.
+            // runPipelineAsync's catch block persists the FAILED status.
+            throw new IllegalStateException(
+                "Failed to persist validation results for diagnostic " + diagnostic.getDiagnosticId(), e);
         }
+    }
+
+    /**
+     * Resolves the validation score (0.0 - 1.0): the final verdict's confidence when dual
+     * validation ran, otherwise the average assertion confidence.
+     *
+     * <p>Empty when validation produced nothing to score (validator unavailable, or no
+     * assertions validated). The average of no results is 0.0, which would read as "0%
+     * confidence" rather than "not validated", so it is deliberately not returned.
+     */
+    java.util.OptionalDouble resolveValidationScore(ValidatedRCA validatedRCA) {
+        if (validatedRCA.dualValidation() != null) {
+            return java.util.OptionalDouble.of(validatedRCA.dualValidation().finalVerdict().confidence());
+        }
+        if (!validatedRCA.validationResults().isEmpty()) {
+            return java.util.OptionalDouble.of(validatedRCA.summary().averageConfidence());
+        }
+        return java.util.OptionalDouble.empty();
     }
 
     /**
