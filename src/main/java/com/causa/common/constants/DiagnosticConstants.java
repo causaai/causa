@@ -63,6 +63,8 @@ public final class DiagnosticConstants {
 
         PENDING("PENDING"),
         IN_PROGRESS("IN_PROGRESS"),
+        /** Legacy persisted value used by older diagnostic records. */
+        PROCESSING("PROCESSING"),
         VALIDATING("VALIDATING"),
         COMPLETED("COMPLETED"),
         FAILED("FAILED");
