@@ -5,6 +5,7 @@ import com.causa.common.logging.CausaLogger;
 import com.causa.config.ExternalConfigCache;
 import com.causa.config.LlmConfigCache;
 import com.causa.core.services.ConfigService;
+import com.causa.mcp.McpRegistry;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.annotation.Priority;
@@ -57,6 +58,7 @@ public class ConfigCacheListener {
     private final ConfigService configService;
     private final LlmConfigCache llmConfigCache;
     private final ExternalConfigCache externalConfigCache;
+    private final McpRegistry mcpRegistry;
     private final String jdbcUrl;
     private final String jdbcUser;
     private final String jdbcPassword;
@@ -69,10 +71,12 @@ public class ConfigCacheListener {
     public ConfigCacheListener(ConfigService configService,
                                LlmConfigCache llmConfigCache,
                                ExternalConfigCache externalConfigCache,
+                               McpRegistry mcpRegistry,
                                Config mpConfig) {
         this.configService       = configService;
         this.llmConfigCache      = llmConfigCache;
         this.externalConfigCache = externalConfigCache;
+        this.mcpRegistry         = mcpRegistry;
         this.jdbcUrl      = mpConfig.getValue("quarkus.datasource.jdbc.url", String.class);
         this.jdbcUser     = mpConfig.getValue("quarkus.datasource.username", String.class);
         this.jdbcPassword = mpConfig.getValue("quarkus.datasource.password", String.class);
@@ -166,6 +170,14 @@ public class ConfigCacheListener {
                                 externalConfigCache.refresh();
                             } catch (Exception refreshEx) {
                                 log.warn("External config cache refresh failed after notification")
+                                    .field("error", refreshEx.getClass().getSimpleName())
+                                    .field("message", refreshEx.getMessage())
+                                    .log();
+                            }
+                            try {
+                                mcpRegistry.refreshInstanaHeaders();
+                            } catch (Exception refreshEx) {
+                                log.warn("MCP Instana header refresh failed after notification")
                                     .field("error", refreshEx.getClass().getSimpleName())
                                     .field("message", refreshEx.getMessage())
                                     .log();

@@ -179,7 +179,7 @@ class PathAEvidenceMapperTest {
 
     /** A registry declaring just the sections these tests quote. */
     private static McpSourceResolver sourceResolver() {
-        McpRegistry registry = new McpRegistry(null);
+        McpRegistry registry = new McpRegistry(null, null);
         registry.init(new McpSettings(Map.of(
             "kubernetes", serverDeclaring("POD_STATUS", "POD_EVENTS", "POD_LOGS"),
             "cryostat", serverDeclaring("GC_ANALYSIS"))));

@@ -31,7 +31,7 @@ class PathBEvidenceMapperTest {
     private final PathBEvidenceMapper mapper = new PathBEvidenceMapper(new McpSourceResolver(registry()));
 
     private static McpRegistry registry() {
-        McpRegistry registry = new McpRegistry(null);
+        McpRegistry registry = new McpRegistry(null, null);
         registry.init(new McpSettings(Map.of(
             "kubernetes", server(POD_STATUS),
             "cryostat", server(CRYOSTAT_ANALYSIS),
