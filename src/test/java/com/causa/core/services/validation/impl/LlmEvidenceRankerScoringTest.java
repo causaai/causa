@@ -1,5 +1,7 @@
 package com.causa.core.services.validation.impl;
 
+import com.causa.common.constants.ConfigConstants;
+import com.causa.common.constants.LLMConstants;
 import com.causa.core.domain.validation.ValidationEvidence;
 import com.causa.core.domain.validation.ValidationEvidence.EvidenceType;
 import org.junit.jupiter.api.Test;
@@ -22,6 +24,18 @@ import static org.assertj.core.api.Assertions.within;
 class LlmEvidenceRankerScoringTest {
 
     private static final int NO_CAP = 100;
+
+    @Test
+    void toTemplateProviderResolvesCorrectlyWithNullFallback() {
+        assertThat(LlmEvidenceRanker.toTemplateProvider(null))
+            .isEqualTo(LLMConstants.Provider.ANTHROPIC);
+        assertThat(LlmEvidenceRanker.toTemplateProvider(ConfigConstants.LlmProvider.VERTEX_AI))
+            .isEqualTo(LLMConstants.Provider.VERTEX_AI_ANTHROPIC);
+        assertThat(LlmEvidenceRanker.toTemplateProvider(ConfigConstants.LlmProvider.ANTHROPIC))
+            .isEqualTo(LLMConstants.Provider.ANTHROPIC);
+        assertThat(LlmEvidenceRanker.toTemplateProvider(ConfigConstants.LlmProvider.BOB))
+            .isEqualTo(LLMConstants.Provider.IBM_BOB);
+    }
 
     /** The formula itself: strength weighted 0.2, relevance 0.8. */
     @Test

@@ -15,9 +15,11 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -253,11 +255,22 @@ public record DiagnosticDetailResponse(
                 LinkedHashMap::new
             ));
 
+        Set<String> addedIds = new HashSet<>();
         List<Evidence> rankedEvidence = new ArrayList<>();
         for (String id : rankedIds) {
             EvidenceItem item = evidenceById.get(id);
             if (item != null) {
                 rankedEvidence.add(toEvidence(item));
+                addedIds.add(id);
+            }
+        }
+
+        // Re-attach only unranked items (items lacking statements, such as rule-derived PATH B evidence)
+        // so they are not lost, while preserving the ranker's deduplication and top-N cap for rankable items.
+        for (EvidenceItem item : allEvidence) {
+            if (!addedIds.contains(item.id()) && (item.statement() == null || item.statement().isBlank())) {
+                rankedEvidence.add(toEvidence(item));
+                addedIds.add(item.id());
             }
         }
 
