@@ -128,14 +128,18 @@ Alert Webhook Endpoint is available at [`http://localhost:8080/api/v1/healthz`](
 
 ### Packaging
 
+> **Security (CVE-2026-114938 / RHSB-2026-018):** OpenJDK 17.0.6+ (including 21 and 25) on x86-64 CPUs with AVX-512 VBMI
+> is vulnerable to RCE via the Base64 decoder. Until you run a patched JDK, always start the JVM with
+> `-XX:-UseBASE64Intrinsics`, as shown below.
+
 ```bash
 # Fast-JAR (default)
 ./mvnw package
-java -jar target/quarkus-app/quarkus-run.jar
+java -XX:-UseBASE64Intrinsics -jar target/quarkus-app/quarkus-run.jar
 
 # Über-JAR
 ./mvnw package -Dquarkus.package.jar.type=uber-jar
-java -jar target/*-runner.jar
+java -XX:-UseBASE64Intrinsics -jar target/*-runner.jar
 
 ```
 
