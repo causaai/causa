@@ -90,7 +90,9 @@ COPY target/*-runner.jar /deployments/quarkus-run.jar
 
 EXPOSE 8080
 USER 185
-ENV JAVA_OPTS_APPEND="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
+# CVE-2026-114938 (RHSB-2026-018): -XX:-UseBASE64Intrinsics disables the vulnerable AVX-512 Base64 decoder path.
+# Remove once the image is rebuilt on a base image containing the OpenJDK fix.
+ENV JAVA_OPTS_APPEND="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager -XX:-UseBASE64Intrinsics"
 ENV JAVA_APP_JAR="/deployments/quarkus-run.jar"
 
 ENTRYPOINT [ "/opt/jboss/container/java/run/run-java.sh" ]
