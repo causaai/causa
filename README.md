@@ -112,7 +112,11 @@ Instead of engineers manually collecting data from multiple tools, Causa deliver
 
 Dev mode enables live-code reload and autowires **Quarkus Dev Services** — Postgres instance must be deployed to run application in dev mode. 
 
+> **Security (CVE-2026-114938 / RHSB-2026-018):** on x86-64 CPUs with AVX-512 VBMI, set
+> `JDK_JAVA_OPTIONS` before starting dev mode so the forked JVM disables the vulnerable Base64 intrinsics.
+
 ```bash
+export JDK_JAVA_OPTIONS="-XX:-UseBASE64Intrinsics"
 ./mvnw compile quarkus:dev
 # or
 quarkus dev
