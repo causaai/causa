@@ -21,7 +21,9 @@ EnvironmentFile=__VM_DIR__/.env
 Environment="JAVA_OPTS=-Xms256m -Xmx512m -XX:+UseG1GC"
 
 # __JAR_PATH__ is replaced by deploy.sh with the resolved absolute jar path
-ExecStart=java -jar __JAR_PATH__ $JAVA_OPTS
+# CVE-2026-114938 (RHSB-2026-018): -XX:-UseBASE64Intrinsics is hardcoded here (not in JAVA_OPTS)
+# so a JAVA_OPTS override in .env cannot drop it. Remove once OpenJDK is patched.
+ExecStart=java -XX:-UseBASE64Intrinsics -jar __JAR_PATH__ $JAVA_OPTS
 
 # Restart on ANY non-zero exit — covers DB connection failures,
 # missing env vars, Flyway errors, and all other startup crashes
