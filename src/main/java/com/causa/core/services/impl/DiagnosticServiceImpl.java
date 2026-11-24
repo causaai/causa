@@ -51,6 +51,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -895,7 +896,7 @@ public class DiagnosticServiceImpl implements DiagnosticService {
 
             // Validation score replaces the RCA-generation score set by persistCompletedDiagnostic;
             // when validation produced no score, the RCA's score is kept
-            java.util.OptionalDouble validationScore = resolveValidationScore(validatedRCA);
+            OptionalDouble validationScore = resolveValidationScore(validatedRCA);
             Float confidenceScore = validationScore.isPresent()
                 ? Float.valueOf((float) validationScore.getAsDouble())
                 : base.getConfidenceScore();
@@ -1057,14 +1058,14 @@ public class DiagnosticServiceImpl implements DiagnosticService {
      * assertions validated). The average of no results is 0.0, which would read as "0%
      * confidence" rather than "not validated", so it is deliberately not returned.
      */
-    java.util.OptionalDouble resolveValidationScore(ValidatedRCA validatedRCA) {
+    OptionalDouble resolveValidationScore(ValidatedRCA validatedRCA) {
         if (validatedRCA.dualValidation() != null) {
-            return java.util.OptionalDouble.of(validatedRCA.dualValidation().finalVerdict().confidence());
+            return OptionalDouble.of(validatedRCA.dualValidation().finalVerdict().confidence());
         }
         if (!validatedRCA.validationResults().isEmpty()) {
-            return java.util.OptionalDouble.of(validatedRCA.summary().averageConfidence());
+            return OptionalDouble.of(validatedRCA.summary().averageConfidence());
         }
-        return java.util.OptionalDouble.empty();
+        return OptionalDouble.empty();
     }
 
     /**
