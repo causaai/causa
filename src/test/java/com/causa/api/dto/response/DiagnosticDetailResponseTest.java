@@ -193,13 +193,13 @@ class DiagnosticDetailResponseTest {
             assertEquals("CPU Resource Exhaustion", response.diagnosis().issueTitle());
             assertEquals("Container is consistently CPU throttled", response.diagnosis().issueSummary());
             assertEquals("POSSIBLE_GC_PAUSE", response.diagnosis().anomalyType());
-            assertEquals(0.85, response.diagnosis().rcaConfidenceScore());
+            assertEquals(0.85, response.diagnosis().confidenceScore());
             assertEquals("High confidence based on evidence", response.diagnosis().confidenceSummaryText());
             assertEquals("Additional LLM notes", response.diagnosis().llmNotes());
         }
 
         @Test
-        @DisplayName("Should return the persisted validation score as rca_confidence_score")
+        @DisplayName("Should return the persisted validation score as confidence_score")
         void shouldReturnValidationScoreWhenPersisted() {
             Diagnostic d = Diagnostic.builder()
                     .diagnosticId("d1")
@@ -212,7 +212,7 @@ class DiagnosticDetailResponseTest {
 
             DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, null, "cluster");
 
-            assertEquals(0.62, response.diagnosis().rcaConfidenceScore());
+            assertEquals(0.62, response.diagnosis().confidenceScore());
         }
 
         @Test
@@ -228,7 +228,7 @@ class DiagnosticDetailResponseTest {
 
             DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, null, "cluster");
 
-            assertEquals(0.95, response.diagnosis().rcaConfidenceScore());
+            assertEquals(0.95, response.diagnosis().confidenceScore());
         }
 
         @Test
@@ -246,7 +246,7 @@ class DiagnosticDetailResponseTest {
 
             DiagnosticDetailResponse response = DiagnosticDetailResponse.from(d, null, "cluster");
 
-            assertNull(response.diagnosis().rcaConfidenceScore());
+            assertNull(response.diagnosis().confidenceScore());
         }
 
         @Test
