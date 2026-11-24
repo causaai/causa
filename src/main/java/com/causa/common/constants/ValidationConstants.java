@@ -112,8 +112,10 @@ public final class ValidationConstants {
         public static final String MEMORY_UTILIZATION_TREND = "memory.utilization.trend";
         public static final String HEAP_USAGE_TREND = "heap.usage.trend";
         public static final String HEAP_USAGE = "heap.usage";
+        public static final String HEAP_USAGE_RATIO = "heap.usage.ratio";
         public static final String MEMORY_PRESSURE_DURATION = "memory.pressure.duration";
         public static final String MEMORY_USAGE_PERCENT = "memory.usage.percent";
+        public static final String CONTAINER_RESTART_COUNT = "container.restart.count";
 
         // GC metric signals
         public static final String GC_PAUSE_MAX = "gc.pause.max";

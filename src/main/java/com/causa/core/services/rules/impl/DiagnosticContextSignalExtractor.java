@@ -17,6 +17,8 @@ import com.causa.common.logging.LogMessages;
 import com.causa.core.domain.DiagnosticContextIndex;
 import com.causa.core.services.rules.Signal;
 import com.causa.core.services.rules.SignalExtractor;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.enterprise.context.ApplicationScoped;
 
@@ -156,6 +158,7 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
         signals.addAll(extractLogPatternSignals(diagnosticContext, sections));
         signals.addAll(extractQuarkusGcPauseSignals(diagnosticContext, sections));
         signals.addAll(extractKruizeSignals(diagnosticContext, sections));
+        signals.addAll(extractInstanaSignals(diagnosticContext, sections));
 
         log.info(LogMessages.Validation.SIGNALS_EXTRACTED)
             .field("signalCount", signals.size())
@@ -264,7 +267,7 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
         Matcher restartCountMatcher = RESTART_COUNT_PATTERN.matcher(context);
         if (restartCountMatcher.find()) {
             int restartCount = Integer.parseInt(restartCountMatcher.group(1));
-            signals.add(signal(Signal.SignalType.CONTAINER_STATUS, "container.restart.count", sections, restartCountMatcher.start())
+            signals.add(signal(Signal.SignalType.METRIC, SignalNames.CONTAINER_RESTART_COUNT, sections, restartCountMatcher.start())
                 .value(restartCount)
                 .build());
         }
@@ -614,5 +617,174 @@ public class DiagnosticContextSignalExtractor implements SignalExtractor {
         }
 
         return signals;
+    }
+
+    private List<Signal> extractInstanaSignals(String context, DiagnosticContextIndex sections) {
+        List<Signal> signals = new ArrayList<>();
+
+        extractInstanaK8sEventSignals(context, sections, signals);
+        extractInstanaJvmMetricsSignals(context, sections, signals);
+
+        return signals;
+    }
+
+    private void extractInstanaK8sEventSignals(String context, DiagnosticContextIndex sections, List<Signal> signals) {
+        try {
+            // Look for INSTANA_K8S_EVENTS section
+            int instanaEventsStart = context.indexOf("--- INSTANA_K8S_EVENTS ---");
+            if (instanaEventsStart < 0) {
+                return;
+            }
+
+            // Find the end of this section (next section marker or end of string)
+            int nextSectionStart = context.indexOf("---", instanaEventsStart + 26);
+            if (nextSectionStart < 0) {
+                nextSectionStart = context.length();
+            }
+
+            String instanaEventsSection = context.substring(instanaEventsStart, nextSectionStart);
+
+            // Parse JSON from the section
+            int jsonStart = instanaEventsSection.indexOf("{");
+            if (jsonStart < 0) {
+                return;
+            }
+
+            String jsonStr = instanaEventsSection.substring(jsonStart);
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode root = mapper.readTree(jsonStr);
+
+            JsonNode events = root.path("results").path("events");
+            if (events.isArray()) {
+                for (JsonNode event : events) {
+                    String title = event.path("title").asText("");
+                    String problem = event.path("probableCause").path("problem").asText("");
+
+                    // Check for OOMKilled
+                    if ("OOMKilled".equals(title) || problem.contains("OOMKilled")) {
+                        signals.add(signal(Signal.SignalType.CONTAINER_STATUS, SignalNames.TERMINATION_REASON, sections, instanaEventsStart)
+                            .value(SignalValues.OOM_KILLED)
+                            .metadata(SignalMetadata.SOURCE, "instana_k8s_events")
+                            .build());
+
+                        // If problem mentions exit code 137, also emit that
+                        if (problem.contains("137")) {
+                            signals.add(signal(Signal.SignalType.CONTAINER_STATUS, SignalNames.EXIT_CODE, sections, instanaEventsStart)
+                                .value(137)
+                                .metadata(SignalMetadata.SOURCE, "instana_k8s_events")
+                                .build());
+                        }
+                    }
+
+                    // Check for deployment/eviction patterns in problem
+                    if (problem.toLowerCase().contains("deployment")) {
+                        signals.add(signal(Signal.SignalType.KUBERNETES_EVENT, SignalNames.DEPLOYMENT, sections, instanaEventsStart)
+                            .value(SignalValues.DEPLOYMENT_ROLLOUT_DETECTED)
+                            .metadata(SignalMetadata.SOURCE, "instana_k8s_events")
+                            .build());
+                    }
+                }
+            }
+
+            // Check problem_groups for OOMKilled
+            JsonNode problemGroups = root.path("results").path("problem_groups");
+            if (problemGroups.isArray()) {
+                for (JsonNode group : problemGroups) {
+                    String groupName = group.path("groupName").asText("");
+                    if ("OOMKilled".equals(groupName)) {
+                        signals.add(signal(Signal.SignalType.METRIC, SignalNames.MEMORY_UTILIZATION_TREND, sections, instanaEventsStart)
+                            .value(SignalValues.INCREASING)
+                            .metadata(SignalMetadata.SOURCE, "instana_problem_groups")
+                            .build());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Instana K8s events signal extraction failed")
+                .field("source", "instana_k8s_events")
+                .field("error", e.getMessage())
+                .log();
+        }
+    }
+
+    private void extractInstanaJvmMetricsSignals(String context, DiagnosticContextIndex sections, List<Signal> signals) {
+        try {
+            // Look for INSTANA_JVM_METRICS section
+            int instanaMetricsStart = context.indexOf("--- INSTANA_JVM_METRICS ---");
+            if (instanaMetricsStart < 0) {
+                return;
+            }
+
+            // Find the end of this section
+            int nextSectionStart = context.indexOf("---", instanaMetricsStart + 27);
+            if (nextSectionStart < 0) {
+                nextSectionStart = context.length();
+            }
+
+            String instanaMetricsSection = context.substring(instanaMetricsStart, nextSectionStart);
+
+            // Parse JSON from the section
+            int jsonStart = instanaMetricsSection.indexOf("{");
+            if (jsonStart < 0) {
+                return;
+            }
+
+            String jsonStr = instanaMetricsSection.substring(jsonStart);
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode root = mapper.readTree(jsonStr);
+
+            JsonNode metrics = root.path("results").path("metrics");
+            if (metrics.isArray() && metrics.size() >= 2) {
+                // Extract memory metrics from first and last data points to determine trend
+                double firstMemoryUsed = -1;
+                double lastMemoryUsed = -1;
+                double memoryMax = -1;
+
+                for (JsonNode metric : metrics) {
+                    JsonNode values = metric.path("values");
+                    if (values.isArray()) {
+                        for (JsonNode val : values) {
+                            String metricName = val.path("metric").asText("");
+                            double value = val.path("value").asDouble(-1);
+
+                            if ("memory.used".equals(metricName) && value >= 0) {
+                                if (firstMemoryUsed < 0) {
+                                    firstMemoryUsed = value;
+                                }
+                                lastMemoryUsed = value;
+                            } else if ("memory.max".equals(metricName) && value >= 0) {
+                                memoryMax = value;
+                            }
+                        }
+                    }
+                }
+
+                // Calculate heap usage ratio from latest data point
+                if (lastMemoryUsed >= 0 && memoryMax > 0) {
+                    double usageRatio = lastMemoryUsed / memoryMax;
+                    signals.add(signal(Signal.SignalType.METRIC, SignalNames.HEAP_USAGE_RATIO, sections, instanaMetricsStart)
+                        .value(usageRatio)
+                        .metadata(SignalMetadata.SOURCE, "instana_jvm_metrics")
+                        .build());
+                }
+
+                // Determine if memory trend is increasing
+                if (firstMemoryUsed > 0 && lastMemoryUsed > firstMemoryUsed) {
+                    signals.add(signal(Signal.SignalType.METRIC, SignalNames.MEMORY_UTILIZATION_TREND, sections, instanaMetricsStart)
+                        .value(SignalValues.INCREASING)
+                        .metadata(SignalMetadata.SOURCE, "instana_jvm_metrics_trend")
+                        .build());
+                    signals.add(signal(Signal.SignalType.METRIC, SignalNames.HEAP_USAGE_TREND, sections, instanaMetricsStart)
+                        .value(SignalValues.INCREASING)
+                        .metadata(SignalMetadata.SOURCE, "instana_jvm_metrics_trend")
+                        .build());
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Instana JVM metrics signal extraction failed")
+                .field("source", "instana_jvm_metrics")
+                .field("error", e.getMessage())
+                .log();
+        }
     }
 }
