@@ -187,7 +187,7 @@ Example: *"Exit code 137 — container killed by the kernel"*, *"OOMKilling even
 
 ### 📊 Confidence
 
-`rca_confidence_score` as a percentage, with `confidence_summary` if present.
+`confidence_score` as a percentage, with `confidence_summary` if present.
 Example: *"Confidence: 92% — Strong OOM signal from kernel events and memory limit gap."*
 
 ### 🛠 Recommended Fix
