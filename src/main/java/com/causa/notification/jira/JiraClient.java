@@ -5,8 +5,10 @@ import com.causa.common.exceptions.DiagnosticException;
 import com.causa.common.logging.CausaLogger;
 import com.causa.core.domain.Diagnostic;
 import com.causa.core.domain.ExternalConfig;
+import com.causa.core.domain.JiraTicketOptions;
 import com.causa.core.domain.JiraUser;
 import com.causa.core.domain.RootCauseAnalysis;
+import com.causa.core.domain.RootCauseAnalysis.Recommendation;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -91,13 +93,14 @@ public class JiraClient {
      *
      * @throws DiagnosticException if the config is incomplete or the Jira call fails
      */
-    public String createTicket(ExternalConfig jiraConfig, Diagnostic diagnostic) {
+    public String createTicket(ExternalConfig jiraConfig, Diagnostic diagnostic, JiraTicketOptions options) {
         Flavor flavor     = Flavor.of(jiraConfig);
         String baseUrl    = resolveBaseUrl(jiraConfig);
         String authHeader = buildAuthHeader(jiraConfig, flavor);
         String projectKey = resolveProjectKey(jiraConfig);
 
-        String requestBody = buildRequestBody(projectKey, resolveIssueType(jiraConfig), diagnostic, flavor);
+        String requestBody = buildRequestBody(
+            projectKey, resolveIssueType(jiraConfig), diagnostic, options, flavor);
 
         log.info("Creating Jira ticket")
             .field("project", projectKey)
@@ -202,6 +205,11 @@ public class JiraClient {
                     .field("status", response.statusCode())
                     .field("body", truncate(response.body(), 300))
                     .log();
+                if (response.statusCode() == 400 && isAssigneeRejection(response.body())) {
+                    throw new DiagnosticException(
+                        "Jira rejected the selected assignee. Pick another user who can be assigned issues "
+                        + "in this project.", "JIRA_ASSIGNEE_REJECTED");
+                }
                 throw new DiagnosticException(describeFailure(response.statusCode()), "JIRA_API_ERROR");
             }
             return response.body();
@@ -210,6 +218,15 @@ public class JiraClient {
             throw de;
         } catch (Exception e) {
             throw new DiagnosticException("Could not reach Jira: " + e.getMessage(), "JIRA_API_ERROR", e);
+        }
+    }
+
+    /** Jira reports a bad assignee as a 400 with an {@code errors.assignee} entry. */
+    private static boolean isAssigneeRejection(String responseBody) {
+        try {
+            return MAPPER.readTree(responseBody).path("errors").has("assignee");
+        } catch (Exception e) {
+            return false;
         }
     }
 
@@ -313,17 +330,21 @@ public class JiraClient {
         return type == null || type.toString().isBlank() ? DEFAULT_ISSUE_TYPE : type.toString().strip();
     }
 
-    /** Issue payload; Cloud needs the description as Atlassian Document Format, Server as plain text. */
-    private static String buildRequestBody(String projectKey, String issueType,
-                                           Diagnostic diagnostic, Flavor flavor) {
+    /** One block of the description; {@code heading} is null for the opening block. */
+    private record Section(String heading, List<String> lines, boolean userText) {
+        Section(String heading, List<String> lines) {
+            this(heading, lines, false);
+        }
+    }
+
+    /** Issue payload; Cloud needs the description as Atlassian Document Format, Server as wiki-markup text. */
+    private static String buildRequestBody(String projectKey, String issueType, Diagnostic diagnostic,
+                                           JiraTicketOptions options, Flavor flavor) {
         try {
             RootCauseAnalysis rca = diagnostic.getRca();
-            String summary     = rca != null && !isBlank(rca.issueTitle())
+            String summary = rca != null && !isBlank(rca.issueTitle())
                 ? rca.issueTitle()
                 : "Causa diagnostic: " + diagnostic.getDiagnosticId();
-            String description = rca != null && !isBlank(rca.rootCause())
-                ? rca.rootCause()
-                : "See Causa diagnostic: " + diagnostic.getDiagnosticId();
 
             ObjectNode body   = MAPPER.createObjectNode();
             ObjectNode fields = body.putObject("fields");
@@ -331,10 +352,15 @@ public class JiraClient {
             fields.put("summary", summary);
             fields.putArray("labels").add(alertLabel(diagnostic.getAlertId()));
             fields.putObject("issuetype").put("name", issueType);
+
+            List<Section> sections = descriptionSections(diagnostic, options);
             if (flavor == Flavor.CLOUD) {
-                fields.set("description", adfDocument(description));
+                fields.set("description", adfDocument(sections));
             } else {
-                fields.put("description", description);
+                fields.put("description", wikiText(sections));
+            }
+            if (!isBlank(options.assigneeId())) {
+                fields.putObject("assignee").put(flavor.userIdField, options.assigneeId().trim());
             }
 
             return MAPPER.writeValueAsString(body);
@@ -344,16 +370,126 @@ public class JiraClient {
         }
     }
 
-    private static ObjectNode adfDocument(String text) {
+    private static List<Section> descriptionSections(Diagnostic diagnostic, JiraTicketOptions options) {
+        RootCauseAnalysis rca = diagnostic.getRca();
+        List<Section> sections = new ArrayList<>();
+
+        String rootCause = rca != null && !isBlank(rca.rootCause())
+            ? rca.rootCause()
+            : "See Causa diagnostic: " + diagnostic.getDiagnosticId();
+        sections.add(new Section(null, List.of(rootCause)));
+
+        if (rca != null && options.includeIssueDetail()) {
+            addSection(sections, "Issue detail", nonBlank(rca.issueSummary(), rca.issueDescription()));
+        }
+        if (rca != null && options.includeRecommendations() && rca.recommendations() != null) {
+            List<String> lines = new ArrayList<>();
+            for (Recommendation r : rca.recommendations()) {
+                if (r != null) {
+                    lines.add(joinNonBlank(" - ", r.solutionTitle(), r.solutionDescription()));
+                }
+            }
+            addSection(sections, "Recommendations", lines);
+        }
+        if (rca != null && options.includeImplementationSteps() && rca.recommendations() != null) {
+            List<String> lines = new ArrayList<>();
+            for (Recommendation r : rca.recommendations()) {
+                if (r != null && !isBlank(r.implementationNotes())) {
+                    lines.add(joinNonBlank(": ", r.solutionTitle(), r.implementationNotes()));
+                }
+            }
+            addSection(sections, "Implementation steps", lines);
+        }
+        if (!isBlank(options.additionalNotes())) {
+            addSection(sections, "Additional notes", List.of(options.additionalNotes().trim()), true);
+        }
+        return sections;
+    }
+
+    private static void addSection(List<Section> sections, String heading, List<String> lines) {
+        addSection(sections, heading, lines, false);
+    }
+
+    private static void addSection(List<Section> sections, String heading, List<String> lines, boolean userText) {
+        List<String> kept = lines.stream().filter(l -> !isBlank(l)).toList();
+        if (!kept.isEmpty()) {
+            sections.add(new Section(heading, kept, userText));
+        }
+    }
+
+    private static List<String> nonBlank(String... values) {
+        List<String> out = new ArrayList<>();
+        for (String v : values) {
+            if (!isBlank(v)) out.add(v);
+        }
+        return out;
+    }
+
+    private static String joinNonBlank(String separator, String first, String second) {
+        return String.join(separator, nonBlank(first, second));
+    }
+
+    private static String wikiText(List<Section> sections) {
+        StringBuilder sb = new StringBuilder();
+        for (Section s : sections) {
+            if (sb.length() > 0) sb.append("\n\n");
+            if (s.heading() != null) sb.append("h3. ").append(s.heading()).append("\n");
+            sb.append(String.join("\n", s.userText()
+                ? s.lines().stream().map(JiraClient::escapeWikiMarkup).toList()
+                : s.lines()));
+        }
+        return sb.toString();
+    }
+
+    /** Characters Jira wiki markup treats as formatting, links, images, macros, tables or lists. */
+    private static final String WIKI_SPECIAL = "{}[]!|*_^~+-?#()";
+
+    /**
+     * Makes caller-supplied text render literally in a Server/Data Center description, so it cannot
+     * inject images, links, macros or headings. A backslash is replaced because {@code \\} is a line
+     * break in wiki markup and could otherwise cancel the escape of the next character.
+     */
+    private static String escapeWikiMarkup(String text) {
+        StringBuilder sb = new StringBuilder(text.length() + 8);
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '\\') {
+                sb.append('\uFF3C');
+            } else if (WIKI_SPECIAL.indexOf(c) >= 0) {
+                sb.append('\\').append(c);
+            } else {
+                sb.append(c);
+            }
+        }
+        // "h1. " / "bq. " at the start of a line are block markup; a zero-width space breaks them
+        return sb.toString().replaceAll("(?m)^(h[1-6]|bq)(?=\\.)", "$1\u200B");
+    }
+
+    private static ObjectNode adfDocument(List<Section> sections) {
         ObjectNode doc = MAPPER.createObjectNode();
         doc.put("type", "doc");
         doc.put("version", 1);
-        ObjectNode para = doc.putArray("content").addObject();
-        para.put("type", "paragraph");
-        ObjectNode textNode = para.putArray("content").addObject();
+        var content = doc.putArray("content");
+        for (Section s : sections) {
+            if (s.heading() != null) {
+                ObjectNode heading = content.addObject();
+                heading.put("type", "heading");
+                heading.putObject("attrs").put("level", 3);
+                addText(heading, s.heading());
+            }
+            for (String line : s.lines()) {
+                ObjectNode para = content.addObject();
+                para.put("type", "paragraph");
+                addText(para, line);
+            }
+        }
+        return doc;
+    }
+
+    private static void addText(ObjectNode parent, String text) {
+        ObjectNode textNode = parent.putArray("content").addObject();
         textNode.put("type", "text");
         textNode.put("text", text);
-        return doc;
     }
 
     private static String extractBrowseUrl(String baseUrl, String responseBody) {

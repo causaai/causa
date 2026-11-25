@@ -2,6 +2,7 @@ package com.causa.core.services;
 
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.Diagnostic;
+import com.causa.core.domain.JiraTicketOptions;
 import com.causa.core.domain.JiraUser;
 import com.causa.core.domain.PageRequest;
 import com.causa.core.domain.PageResult;
@@ -44,9 +45,10 @@ public interface DiagnosticService {
     /**
      * Creates a Jira ticket for the alert behind the diagnostic, or returns the one that already
      * exists for that alert. Throws {@link com.causa.common.exceptions.DiagnosticException} with
-     * errorType {@code JIRA_NOT_CONFIGURED}, {@code NOT_FOUND} or {@code JIRA_API_ERROR}.
+     * errorType {@code JIRA_NOT_CONFIGURED}, {@code INVALID_REQUEST}, {@code NOT_FOUND} or
+     * {@code JIRA_API_ERROR}. The options only apply when a new ticket is created.
      */
-    JiraTicket createOrGetJiraTicket(String diagnosticId);
+    JiraTicket createOrGetJiraTicket(String diagnosticId, JiraTicketOptions options);
 
     /**
      * Returns Jira users assignable in the configured project matching {@code query} (all when blank).

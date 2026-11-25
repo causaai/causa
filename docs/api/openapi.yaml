@@ -8,16 +8,29 @@ paths:
         in: query
         schema:
           type: string
+      - name: page
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 1
+      - name: page_size
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 20
       - name: workload_name
         in: query
         schema:
           type: string
       responses:
-        "200":
-          description: OK
+        '200':
+          description: A page of alerts
           content:
             application/json:
-              schema: {}
+              schema:
+                $ref: '#/components/schemas/PageOfAlertResponse'
       summary: Get Alerts
       tags:
       - Alerts Controller
@@ -26,16 +39,21 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AlertTriggerRequest"
+              $ref: '#/components/schemas/AlertTriggerRequest'
         required: true
       responses:
-        "200":
-          description: OK
+        '200':
+          description: Result of processing the manually triggered alert
           content:
             application/json:
-              schema: {}
-        "400":
-          description: Bad Request
+              schema:
+                $ref: '#/components/schemas/WebhookResponse'
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       summary: Create Manual Alert
       tags:
       - Alerts Controller
@@ -56,31 +74,58 @@ paths:
         schema:
           type: string
       responses:
-        "200":
-          description: OK
+        '200':
+          description: The alert
           content:
             application/json:
-              schema: {}
+              schema:
+                $ref: '#/components/schemas/AlertResponse'
+        '400':
+          description: workload_name or namespace was passed; use the list endpoint
+            to filter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: No alert with that id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       summary: Get Alert By Id
       tags:
       - Alerts Controller
   /api/v1/configs:
-    post:
+    get:
+      responses:
+        '200':
+          description: Snapshot of every configuration category
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigSettingsResponse'
+      summary: Get All Configs
+      tags:
+      - Config Controller
+  /api/v1/configs/generic:
+    put:
       requestBody:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/ConfigUpdateRequest"
+              $ref: '#/components/schemas/ConfigUpdateRequest'
         required: true
       responses:
-        "200":
-          description: OK
+        '200':
+          description: Applied and rejected keys
           content:
             application/json:
-              schema: {}
-        "400":
+              schema:
+                $ref: '#/components/schemas/ConfigUpdateResponse'
+        '400':
           description: Bad Request
-      summary: Update Configs
+      summary: Upsert Generic Configs
       tags:
       - Config Controller
     get:
@@ -90,15 +135,24 @@ paths:
         schema:
           type: string
       responses:
-        "200":
-          description: OK
+        '200':
+          description: Generic key-value configs (sensitive values masked)
           content:
             application/json:
-              schema: {}
-      summary: List Configs
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConfigResponse'
+        '400':
+          description: Unknown category
+          content: &id001
+            text/plain:
+              schema:
+                type: string
+      summary: List Generic
       tags:
       - Config Controller
-  /api/v1/configs/{key}:
+  /api/v1/configs/generic/{key}:
     get:
       parameters:
       - name: key
@@ -107,23 +161,273 @@ paths:
         schema:
           type: string
       responses:
-        "200":
-          description: OK
+        '200':
+          description: The config entry
           content:
             application/json:
-              schema: {}
-      summary: Get Config
+              schema:
+                $ref: '#/components/schemas/ConfigResponse'
+        '400':
+          description: Unknown config key
+          content: *id001
+      summary: Get Generic Config
+      tags:
+      - Config Controller
+    delete:
+      parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Deleted
+        '400':
+          description: Unknown key, or a key managed by environment variable that
+            cannot be deleted
+          content: *id001
+      summary: Delete Generic Config
+      tags:
+      - Config Controller
+  /api/v1/configs/integrations:
+    get:
+      responses:
+        '200':
+          description: Integration configs (e.g. JIRA)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExternalConfigResponse'
+      summary: List Integrations
+      tags:
+      - Config Controller
+  /api/v1/configs/integrations/{platform}:
+    put:
+      parameters:
+      - name: platform
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExternalConfigRequest'
+        required: true
+      responses:
+        '200':
+          description: The saved config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalConfigResponse'
+        '400':
+          description: Bad Request
+      summary: Upsert Integration
+      tags:
+      - Config Controller
+  /api/v1/configs/integrations/{platform}/{name}:
+    delete:
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: platform
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Deleted
+      summary: Delete Integration
+      tags:
+      - Config Controller
+  /api/v1/configs/llm:
+    get:
+      responses:
+        '200':
+          description: LLM provider configs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LlmConfigResponse'
+      summary: List Llm
+      tags:
+      - Config Controller
+  /api/v1/configs/llm/{provider}:
+    put:
+      parameters:
+      - name: provider
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LlmConfigRequest'
+        required: true
+      responses:
+        '200':
+          description: The saved config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LlmConfigResponse'
+        '400':
+          description: Bad Request
+      summary: Upsert Llm
+      tags:
+      - Config Controller
+    delete:
+      parameters:
+      - name: provider
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Deleted
+      summary: Delete Llm
+      tags:
+      - Config Controller
+  /api/v1/configs/observability:
+    get:
+      responses:
+        '200':
+          description: Observability platform configs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ExternalConfigResponse'
+      summary: List Observability
+      tags:
+      - Config Controller
+  /api/v1/configs/observability/{platform}:
+    put:
+      parameters:
+      - name: platform
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExternalConfigRequest'
+        required: true
+      responses:
+        '200':
+          description: The saved config
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExternalConfigResponse'
+        '400':
+          description: Bad Request
+      summary: Upsert Observability
+      tags:
+      - Config Controller
+  /api/v1/configs/observability/{platform}/{name}:
+    delete:
+      parameters:
+      - name: name
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: platform
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '204':
+          description: Deleted
+      summary: Delete Observability
       tags:
       - Config Controller
   /api/v1/diagnostics:
     get:
+      parameters:
+      - name: namespace
+        in: query
+        schema:
+          type: string
+          maxLength: 255
+      - name: page
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 1
+      - name: page_size
+        in: query
+        schema:
+          type: integer
+          format: int32
+          default: 20
+      - name: workload_name
+        in: query
+        schema:
+          type: string
+          maxLength: 255
       responses:
-        "200":
-          description: OK
+        '200':
+          description: A page of diagnostics
           content:
             application/json:
-              schema: {}
+              schema:
+                $ref: '#/components/schemas/PageOfDiagnosticListItemResponse'
       summary: List Diagnostics
+      tags:
+      - Diagnostics Controller
+  /api/v1/diagnostics/jira/users:
+    get:
+      parameters:
+      - name: query
+        in: query
+        schema:
+          type: string
+          maxLength: 255
+        description: Text to match against user names; blank lists everyone (first
+          20)
+      responses:
+        '200':
+          description: Users that can be assigned issues in the configured Jira project
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/JiraUserResponse'
+        '422':
+          description: Jira is not configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Jira could not be reached or returned an error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Search Jira Users
       tags:
       - Diagnostics Controller
   /api/v1/diagnostics/{id}:
@@ -135,22 +439,102 @@ paths:
         schema:
           type: string
       responses:
-        "200":
+        '200':
           description: OK
           content:
             application/json:
-              schema: {}
+              schema:
+                $ref: '#/components/schemas/DiagnosticDetailResponse'
+        '404':
+          description: Diagnostic not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       summary: Get Diagnostic
+      tags:
+      - Diagnostics Controller
+  /api/v1/diagnostics/{id}/ticket:
+    post:
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JiraTicketRequest'
+        required: false
+      responses:
+        '200':
+          description: A ticket already existed for the alert; its link is returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JiraTicketResponse'
+        '201':
+          description: Ticket created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JiraTicketResponse'
+        '400':
+          description: Invalid ticket options (additional_notes over 2000 or assignee_id
+            over 255 characters)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Diagnostic not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Jira is not configured, its configuration is incomplete or
+            invalid, or Jira rejected the selected assignee
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Jira could not be reached or returned an error (details are
+            in the server logs)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      summary: Create Jira Ticket
+      description: Creates a Jira ticket for the diagnostic's alert, or returns the
+        existing one. The request body is optional; with nothing selected the description
+        is just the root cause.
       tags:
       - Diagnostics Controller
   /api/v1/healthz:
     get:
       responses:
-        "200":
-          description: OK
+        '200':
+          description: System is UP
           content:
             application/json:
-              schema: {}
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+        '500':
+          description: The health check itself failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
+        '503':
+          description: System is DOWN or DEGRADED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthCheckResponse'
       summary: Get Health
       tags:
       - Health Check Controller
@@ -160,16 +544,21 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/AlertWebhookRequest"
+              $ref: '#/components/schemas/AlertWebhookRequest'
         required: true
       responses:
-        "200":
-          description: OK
+        '200':
+          description: Per-alert accepted/rejected result
           content:
             application/json:
-              schema: {}
-        "400":
-          description: Bad Request
+              schema:
+                $ref: '#/components/schemas/WebhookResponse'
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
       summary: Receive Alerts
       tags:
       - Webhook Controller
@@ -195,6 +584,33 @@ components:
         generatorURL:
           type: string
         fingerprint:
+          type: string
+    AlertResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        source_alert_id:
+          type: string
+        alert_name:
+          type: string
+        alert_timestamp: &id003
+          type: string
+          format: date-time
+        severity:
+          type: string
+        status:
+          type: string
+        workload_info:
+          $ref: '#/components/schemas/WorkloadInfo'
+        workload_name:
+          type: string
+        labels: &id002
+          type: object
+          additionalProperties:
+            type: string
+        annotations: *id002
+        alert_source:
           type: string
     AlertTriggerRequest:
       type: object
@@ -244,7 +660,75 @@ components:
         alerts:
           type: array
           items:
-            $ref: "#/components/schemas/AlertItem"
+            $ref: '#/components/schemas/AlertItem'
+    AuthConfig:
+      type: object
+      properties:
+        authType:
+          type: string
+        apiKey:
+          type: string
+        appKey:
+          type: string
+        token:
+          type: string
+        credentialsJson:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        username:
+          type: string
+        password:
+          type: string
+    ComponentHealth:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        latency_ms:
+          type: integer
+          format: int64
+        optional:
+          type: boolean
+        servers:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/ComponentHealth'
+    ConfigResponse:
+      type: object
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+          description: Sensitive values are masked
+        category:
+          type: string
+        encrypted:
+          type: boolean
+    ConfigSettingsResponse:
+      type: object
+      properties:
+        observability:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExternalConfigResponse'
+        integrations:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExternalConfigResponse'
+        llm:
+          type: array
+          items:
+            $ref: '#/components/schemas/LlmConfigResponse'
+        generic:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConfigResponse'
     ConfigUpdateRequest:
       type: object
       properties:
@@ -252,12 +736,368 @@ components:
           type: object
           additionalProperties:
             type: string
+    ConfigUpdateResponse:
+      type: object
+      properties:
+        updated:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConfigResponse'
+        rejected:
+          type: array
+          items:
+            $ref: '#/components/schemas/RejectedConfig'
+    DiagnosisInfo:
+      type: object
+      properties:
+        issue_title:
+          type: string
+        issue_summary:
+          type: string
+        issue_description:
+          type: string
+        technical_description:
+          type: string
+        anomaly_type:
+          type: string
+        root_cause:
+          type: string
+        evidences:
+          type: array
+          items:
+            type: string
+        validation_evidences:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiagnosticEvidence'
+        supporting_logs:
+          type: array
+          items:
+            type: string
+        rca_confidence_score:
+          type: number
+          format: double
+        confidence_summary:
+          type: string
+        recommendations:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiagnosticRecommendation'
+        llm_notes:
+          type: string
+    DiagnosticDetailResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+        alert_id:
+          type: string
+        alert_name:
+          type: string
+        severity:
+          type: string
+        alert_received_at: *id003
+        workload_info:
+          $ref: '#/components/schemas/WorkloadInfo'
+        diagnosis:
+          $ref: '#/components/schemas/DiagnosisInfo'
+        validation_result:
+          type: string
+        ticket_link: &id004
+          type: string
+          description: Jira browse URL once a ticket exists, otherwise null
+        ticket_tracker: &id005
+          type: array
+          items:
+            type: string
+          description: Active ticket-tracker integrations, e.g. ["JIRA"]; empty when
+            none
+    DiagnosticEvidence:
+      type: object
+      properties:
+        supporting_evidence:
+          type: string
+        explanation:
+          type: string
+        source:
+          type: string
+        raw_snippet:
+          type: string
+        evidence_strength:
+          type: string
+    DiagnosticListItemResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+        issue:
+          type: string
+        issue_summary:
+          type: string
+        workload_name:
+          type: string
+        namespace:
+          type: string
+        severity:
+          type: string
+        cluster_name:
+          type: string
+        date: *id003
+        ticket_link: *id004
+        ticket_tracker: *id005
+    DiagnosticRecommendation:
+      type: object
+      properties:
+        solution_type:
+          type: string
+        solution_title:
+          type: string
+        solution_description:
+          type: string
+        implementation_notes:
+          type: string
+        solution_confidence_score:
+          type: number
+          format: double
+        solution_alerts:
+          type: array
+          items:
+            type: string
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          format: int32
+        error:
+          type: string
+        message:
+          type: string
+        timestamp: *id003
+    ExternalConfigRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+        is_active:
+          type: boolean
+        auth_config:
+          $ref: '#/components/schemas/AuthConfig'
+        additional_config:
+          type: object
+          additionalProperties: {}
+    ExternalConfigResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        platform:
+          type: string
+        name:
+          type: string
+        url:
+          type: string
+        is_active: &id006
+          type: boolean
+        auth_config: &id007
+          $ref: '#/components/schemas/AuthConfig'
+        additional_config: &id008
+          type: object
+          additionalProperties: {}
+        created_at: *id003
+        updated_at: *id003
+    HealthCheckResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        timestamp:
+          type: string
+        version:
+          type: string
+        components:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/ComponentHealth'
+    JiraTicketRequest:
+      type: object
+      properties:
+        assignee_id:
+          type: string
+          maxLength: 255
+          description: Jira accountId (Cloud) or username (Server) from GET /api/v1/diagnostics/jira/users;
+            omit to leave unassigned
+        include_recommendations:
+          type: boolean
+          description: Append the recommendations to the description
+        include_implementation_steps:
+          type: boolean
+          description: Append each recommendation's implementation steps
+        include_issue_detail:
+          type: boolean
+          description: Append the issue summary and description
+        additional_notes:
+          type: string
+          maxLength: 2000
+          description: Free text appended to the description. On Jira Server/Data
+            Center it is escaped, so wiki markup renders literally
+      description: Optional body; every field may be omitted.
+    JiraTicketResponse:
+      type: object
+      properties:
+        ticket_link:
+          type: string
+        already_existed:
+          type: boolean
+    JiraUserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Jira accountId (Cloud) or username (Server)
+        display_name:
+          type: string
+        email:
+          type: string
+    LlmConfigRequest:
+      type: object
+      properties:
+        url:
+          type: string
+        models:
+          type: array
+          items:
+            type: string
+        temperature:
+          type: number
+        max_tokens:
+          type: integer
+          format: int32
+        timeout_ms:
+          type: integer
+          format: int32
+        is_active:
+          type: boolean
+        auth_config:
+          $ref: '#/components/schemas/AuthConfig'
+        additional_config:
+          type: object
+          additionalProperties: {}
+    LlmConfigResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        provider:
+          type: string
+        url:
+          type: string
+        models:
+          type: array
+          items:
+            type: string
+        temperature:
+          type: number
+        max_tokens:
+          type: integer
+          format: int32
+        timeout_ms:
+          type: integer
+          format: int32
+        is_active: *id006
+        auth_config: *id007
+        additional_config: *id008
+        created_at: *id003
+        updated_at: *id003
+    PageOfAlertResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlertResponse'
+        page:
+          type: integer
+          format: int32
+        pageSize:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    PageOfDiagnosticListItemResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiagnosticListItemResponse'
+        page:
+          type: integer
+          format: int32
+        pageSize:
+          type: integer
+          format: int32
+        total:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+    RejectedConfig:
+      type: object
+      properties:
+        key:
+          type: string
+        reason:
+          type: string
+    WebhookResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        message:
+          type: string
+        totalReceived:
+          type: integer
+          format: int32
+        totalAccepted:
+          type: integer
+          format: int32
+        totalRejected:
+          type: integer
+          format: int32
+        accepted: *id002
+        rejected: *id002
+        timestamp: *id003
+    WorkloadInfo:
+      type: object
+      properties:
+        pod_name:
+          type: string
+        container_name:
+          type: string
+        namespace:
+          type: string
+        cluster_name:
+          type: string
+        workload_type:
+          type: string
 info:
   title: Causa Backend API
   version: 0.0.1-SNAPSHOT
-  description: "AI-powered Kubernetes root-cause analysis backend. Receives Prometheus\
-    \ Alertmanager webhooks, runs LLM diagnostics, and exposes REST endpoints for\
-    \ alerts, diagnostics, and runtime configuration."
+  description: AI-powered Kubernetes root-cause analysis backend. Receives Prometheus
+    Alertmanager webhooks, runs LLM diagnostics, and exposes REST endpoints for alerts,
+    diagnostics, and runtime configuration.
 servers:
 - url: http://localhost:8080
   description: Local development
