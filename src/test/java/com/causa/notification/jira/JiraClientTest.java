@@ -91,7 +91,7 @@ class JiraClientTest {
     }
 
     @Test
-    @DisplayName("Cloud (API_TOKEN): Basic auth, REST v3, ADF description, Task type, alert label")
+    @DisplayName("Cloud (API_TOKEN): Basic auth, REST v3, ADF description, Task type, diagnosis label")
     void cloudCreatesTicketWithV3() throws Exception {
         String url = client.createTicket(config("API_TOKEN", "me@example.com"), diagnostic(), JiraTicketOptions.defaults());
 
@@ -102,7 +102,7 @@ class JiraClientTest {
 
         JsonNode fields = MAPPER.readTree(body.get()).path("fields");
         assertEquals("Task", fields.path("issuetype").path("name").asText());
-        assertEquals("causa-alert-alrt_1", fields.path("labels").get(0).asText());
+        assertEquals("causa-diagnosis", fields.path("labels").get(0).asText());
         assertEquals("doc", fields.path("description").path("type").asText());
     }
 
@@ -127,30 +127,6 @@ class JiraClientTest {
 
         assertEquals("/rest/api/3/issue", path.get());
         assertTrue(authHeader.get().startsWith("Basic "));
-    }
-
-    @Test
-    @DisplayName("Cloud search uses /rest/api/3/search/jql and returns the browse URL")
-    void cloudSearchFindsTicket() throws Exception {
-        responseJson = "{\"issues\":[{\"key\":\"KRUIZE-7\"}]}";
-
-        Optional<String> found = client.findTicketByAlertId(config("API_TOKEN", "me@example.com"), "alrt 1");
-
-        assertEquals(Optional.of(baseUrl + "/browse/KRUIZE-7"), found);
-        assertEquals("/rest/api/3/search/jql", path.get());
-        assertTrue(MAPPER.readTree(body.get()).path("jql").asText().contains("labels = \"causa-alert-alrt_1\""));
-    }
-
-    @Test
-    @DisplayName("Server search uses /rest/api/2/search with Bearer auth")
-    void serverSearchUsesV2() {
-        responseJson = "{\"issues\":[]}";
-
-        Optional<String> found = client.findTicketByAlertId(config("PAT", null), "alrt-1");
-
-        assertTrue(found.isEmpty());
-        assertEquals("/rest/api/2/search", path.get());
-        assertEquals("Bearer tok", authHeader.get());
     }
 
     @Test
@@ -224,7 +200,7 @@ class JiraClientTest {
                 .build();
 
         DiagnosticException ex = assertThrows(DiagnosticException.class,
-                () -> client.findTicketByAlertId(cfg, "alrt 1"));
+                () -> client.createTicket(cfg, diagnostic(), JiraTicketOptions.defaults()));
 
         assertEquals("JIRA_CONFIG_INVALID", ex.getErrorType());
         assertNull(path.get());
@@ -471,19 +447,6 @@ class JiraClientTest {
         responseJson = "not json";
         assertEquals("JIRA_API_ERROR", errorType(
                 () -> client.createTicket(config("PAT", null), diagnostic(), JiraTicketOptions.defaults())));
-    }
-
-    @Test
-    @DisplayName("Search treats a missing issues array or a blank key as 'not found' and invalid JSON as an error")
-    void searchEdgeCases() {
-        responseJson = "{}";
-        assertTrue(client.findTicketByAlertId(config("PAT", null), "a").isEmpty());
-
-        responseJson = "{\"issues\":[{\"key\":\"\"}]}";
-        assertTrue(client.findTicketByAlertId(config("PAT", null), "a").isEmpty());
-
-        responseJson = "not json";
-        assertEquals("JIRA_API_ERROR", errorType(() -> client.findTicketByAlertId(config("PAT", null), "a")));
     }
 
     @Test

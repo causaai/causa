@@ -24,7 +24,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
-import java.util.Optional;
 import java.util.regex.Pattern;
 
 /**
@@ -47,23 +46,21 @@ public class JiraClient {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final Duration     TIMEOUT = Duration.ofSeconds(10);
-    private static final String       ALERT_LABEL_PREFIX = "causa-alert-";
+    private static final String       DIAGNOSIS_LABEL = "causa-diagnosis";
     private static final String       DEFAULT_ISSUE_TYPE = "Task";
     private static final Pattern      PROJECT_KEY_PATTERN = Pattern.compile("[A-Za-z][A-Za-z0-9_]{0,254}");
     private static final int          USER_SEARCH_LIMIT = 20;
 
     private enum Flavor {
-        CLOUD("/rest/api/3", "/search/jql", "query", "accountId"),
-        SERVER("/rest/api/2", "/search", "username", "name");
+        CLOUD("/rest/api/3", "query", "accountId"),
+        SERVER("/rest/api/2", "username", "name");
 
         final String apiPath;
-        final String searchPath;
         final String userQueryParam;
         final String userIdField;
 
-        Flavor(String apiPath, String searchPath, String userQueryParam, String userIdField) {
+        Flavor(String apiPath, String userQueryParam, String userIdField) {
             this.apiPath = apiPath;
-            this.searchPath = searchPath;
             this.userQueryParam = userQueryParam;
             this.userIdField = userIdField;
         }
@@ -88,7 +85,7 @@ public class JiraClient {
     // -------------------------------------------------------------------------
 
     /**
-     * Creates an issue labelled with the alert id and returns its browse URL,
+     * Creates an issue labelled {@value #DIAGNOSIS_LABEL} and returns its browse URL,
      * e.g. {@code https://acme.atlassian.net/browse/OPS-123}.
      *
      * @throws DiagnosticException if the config is incomplete or the Jira call fails
@@ -109,37 +106,6 @@ public class JiraClient {
 
         String responseBody = post(baseUrl + flavor.apiPath + "/issue", authHeader, requestBody);
         return extractBrowseUrl(baseUrl, responseBody);
-    }
-
-    /**
-     * Finds an issue previously created for the alert (by label), so a ticket whose URL was
-     * never persisted is reused instead of duplicated.
-     */
-    public Optional<String> findTicketByAlertId(ExternalConfig jiraConfig, String alertId) {
-        Flavor flavor     = Flavor.of(jiraConfig);
-        String baseUrl    = resolveBaseUrl(jiraConfig);
-        String authHeader = buildAuthHeader(jiraConfig, flavor);
-        String projectKey = resolveProjectKey(jiraConfig);
-
-        ObjectNode body = MAPPER.createObjectNode();
-        body.put("jql", "project = \"" + projectKey + "\" AND labels = \"" + alertLabel(alertId) + "\"");
-        body.put("maxResults", 1);
-        body.putArray("fields").add("key");
-
-        String responseBody = post(baseUrl + flavor.apiPath + flavor.searchPath, authHeader, body.toString());
-        try {
-            JsonNode issues = MAPPER.readTree(responseBody).path("issues");
-            if (!issues.isArray() || issues.isEmpty()) {
-                return Optional.empty();
-            }
-            String issueKey = issues.get(0).path("key").asText();
-            return issueKey.isBlank()
-                ? Optional.empty()
-                : Optional.of(baseUrl + "/browse/" + issueKey);
-        } catch (Exception e) {
-            throw new DiagnosticException(
-                "Failed to parse Jira search response: " + e.getMessage(), "JIRA_API_ERROR", e);
-        }
     }
 
     /**
@@ -171,11 +137,6 @@ public class JiraClient {
             throw new DiagnosticException(
                 "Failed to parse Jira user search response: " + e.getMessage(), "JIRA_API_ERROR", e);
         }
-    }
-
-    /** Label put on every ticket; Jira labels cannot contain whitespace, so other characters are replaced. */
-    private static String alertLabel(String alertId) {
-        return ALERT_LABEL_PREFIX + alertId.replaceAll("[^A-Za-z0-9_.-]", "_");
     }
 
     // -------------------------------------------------------------------------
@@ -350,7 +311,7 @@ public class JiraClient {
             ObjectNode fields = body.putObject("fields");
             fields.putObject("project").put("key", projectKey);
             fields.put("summary", summary);
-            fields.putArray("labels").add(alertLabel(diagnostic.getAlertId()));
+            fields.putArray("labels").add(DIAGNOSIS_LABEL);
             fields.putObject("issuetype").put("name", issueType);
 
             List<Section> sections = descriptionSections(diagnostic, options);

@@ -330,48 +330,17 @@ class DiagnosticServiceImplTest {
         }
 
         @Test
-        @DisplayName("Should adopt a ticket that already exists in Jira instead of creating a duplicate")
-        void shouldRecoverTicketAlreadyInJira() {
-            when(diagnosticRepository.findById("d1"))
-                    .thenReturn(Optional.of(buildDiagnostic("d1", "alert-1", DiagnosticStatus.COMPLETED)));
-            when(diagnosticRepository.findTicketLinkByAlertId("alert-1")).thenReturn(Optional.empty());
-            when(jiraClient.findTicketByAlertId(jiraConfig, "alert-1")).thenReturn(Optional.of(TICKET_URL));
-
-            assertEquals(new DiagnosticService.JiraTicket(TICKET_URL, true),
-                    diagnosticService.createOrGetJiraTicket("d1", OPTIONS));
-
-            verify(diagnosticRepository).updateTicketLink("d1", TICKET_URL);
-            verify(jiraClient, never()).createTicket(any(), any(), any());
-        }
-
-        @Test
-        @DisplayName("Should create and persist a ticket when none exists in the DB or Jira")
+        @DisplayName("Should create and persist a ticket when none is stored for the alert")
         void shouldCreateTicketWhenNoneExists() {
             Diagnostic diagnostic = buildDiagnostic("d1", "alert-1", DiagnosticStatus.COMPLETED);
             when(diagnosticRepository.findById("d1")).thenReturn(Optional.of(diagnostic));
             when(diagnosticRepository.findTicketLinkByAlertId("alert-1")).thenReturn(Optional.empty());
-            when(jiraClient.findTicketByAlertId(jiraConfig, "alert-1")).thenReturn(Optional.empty());
             when(jiraClient.createTicket(jiraConfig, diagnostic, OPTIONS)).thenReturn(TICKET_URL);
 
             assertEquals(new DiagnosticService.JiraTicket(TICKET_URL, false),
                     diagnosticService.createOrGetJiraTicket("d1", OPTIONS));
 
             verify(diagnosticRepository).updateTicketLink("d1", TICKET_URL);
-        }
-
-        @Test
-        @DisplayName("Should not create a ticket when the Jira lookup fails")
-        void shouldNotCreateTicketWhenLookupFails() {
-            when(diagnosticRepository.findById("d1"))
-                    .thenReturn(Optional.of(buildDiagnostic("d1", "alert-1", DiagnosticStatus.COMPLETED)));
-            when(diagnosticRepository.findTicketLinkByAlertId("alert-1")).thenReturn(Optional.empty());
-            when(jiraClient.findTicketByAlertId(jiraConfig, "alert-1"))
-                    .thenThrow(new DiagnosticException("Jira API error: HTTP 500", "JIRA_API_ERROR"));
-
-            assertThrows(DiagnosticException.class, () -> diagnosticService.createOrGetJiraTicket("d1", OPTIONS));
-
-            verify(jiraClient, never()).createTicket(any(), any(), any());
-            verify(diagnosticRepository, never()).updateTicketLink(any(), any());
         }
 
         @Test
