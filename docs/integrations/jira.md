@@ -41,15 +41,9 @@ sequenceDiagram
     alt link already stored
         API-->>UI: 200, already_existed = true
     else none stored
-        API->>Jira: search by label causa-alert-{alert id}
-        alt found in Jira
-            API->>DB: store ticket_link
-            API-->>UI: 200, already_existed = true
-        else not found
-            API->>Jira: create issue
-            API->>DB: store ticket_link (only if still NULL)
-            API-->>UI: 201, already_existed = false
-        end
+        API->>Jira: create issue
+        API->>DB: store ticket_link (only if still NULL)
+        API-->>UI: 201, already_existed = false
     end
 ```
 
@@ -148,7 +142,7 @@ With no body, the ticket description is the root cause and the ticket is unassig
 | Project | `additional_config.projectName` |
 | Issue type | `additional_config.issueType`, default `Task` |
 | Summary | The diagnostic's issue title, or `Causa diagnostic: <id>` when there is no RCA |
-| Label | `causa-alert-<alert id>`, used to find the ticket again |
+| Label | `causa-diagnosis`, the same on every ticket. It marks tickets created by Causa and does not identify the alert |
 | Assignee | `assignee_id` when given |
 | Description | Root cause, followed by the sections you selected |
 
@@ -176,14 +170,15 @@ An alert maps to one ticket, even if it has several diagnostics.
 - Ticket creation takes a PostgreSQL advisory lock on the alert id inside one transaction, so concurrent
   requests for the same alert are processed one after another and only the first creates a ticket.
 - The link is written with `WHERE ticket_link IS NULL`, so a stored link is never replaced.
-- **Recovery (best effort):** if a ticket was created in Jira but the link was never saved, for example after a
-  crash, the next request searches Jira for the `causa-alert-<alert id>` label, stores the link it finds and
-  returns it instead of creating a duplicate. This can miss in two cases, and a second ticket is then created:
-  - Jira has not indexed the new label yet, so a retry sent very soon after the failure finds nothing.
-  - The search is limited to the currently configured project on the currently configured Jira instance. If
-    either was changed after the first ticket was created, the earlier ticket is not found.
 - A stored link is returned even if Jira has since been removed or deactivated. Jira is only needed to create
-  or recover a ticket.
+  a ticket.
+
+**Known gap.** Creating the issue in Jira and saving the link in Causa's database cannot be made one atomic
+step. If Jira creates the ticket but Causa does not save the link, the next request has no way to find that
+ticket and creates a second one. This can happen when the request to Jira times out after Jira has already
+created the issue, or when the database write fails. Causa does not search Jira for existing tickets, because
+the `causa-diagnosis` label is the same on every ticket. After a `502` on ticket creation, check the Jira
+project for a new ticket before retrying.
 
 ---
 
@@ -219,7 +214,6 @@ The flavour comes from `auth_config.authType`.
 | Description format | Atlassian Document Format | Wiki markup text |
 | Assignee field | `accountId` | `name` (username) |
 | User search parameter | `query` | `username` |
-| Duplicate search | `/search/jql` | `/search` |
 
 ---
 
@@ -232,7 +226,7 @@ The flavour comes from `auth_config.authType`.
 | `422` | Jira not configured | Save an **active** `JIRA` config |
 | `422` | Config incomplete or invalid | `url` is set and HTTPS, `token` and `username` are present, `projectName` is a valid key |
 | `422` | Assignee rejected | The user may be deactivated or not assignable in the project. Pick another from the user search |
-| `502` | Jira unreachable or returned an error | Look in the server log for the Jira status, for example `401` bad credentials or wrong `authType`, `403` permissions, `404` wrong URL or project |
+| `502` | Jira unreachable or returned an error | A timeout can still leave a ticket created in Jira, so check the project before retrying. Look in the server log for the Jira status, for example `401` bad credentials or wrong `authType`, `403` permissions, `404` wrong URL or project |
 
 Ticket creation returns a generic `502` message; Jira's response text is only written to the server log. The
 user search `502` returns the message from the Jira client instead, such as a status description (for example

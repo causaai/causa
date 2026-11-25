@@ -311,9 +311,10 @@ All errors use the standard error body (`status`, `error`, `message`, `timestamp
 
 ### Behaviour notes
 
-- A stored link is returned even if Jira is no longer configured; Jira is only needed to create or recover a ticket.
-- Every ticket carries a `causa-alert-<alert id>` label. If a ticket was created in Jira but its link was never
-  saved (for example after a crash), the next call finds it by that label and reuses it.
+- A stored link is returned even if Jira is no longer configured; Jira is only needed to create a ticket.
+- Every ticket carries the label `causa-diagnosis`. The label is the same on every ticket and is not used to find
+  existing tickets. If Jira creates a ticket but the link is not saved (for example after a request timeout), the
+  next call creates another ticket, so check the Jira project before retrying after a `502`.
 - On Jira Server/Data Center, `additional_notes` is escaped so Jira wiki markup in the text renders literally.
 
 ---
