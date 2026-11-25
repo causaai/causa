@@ -354,4 +354,4 @@ curl 'http://localhost:8080/api/v1/diagnostics/jira/users?query=ann'
 | Status | When |
 |---|---|
 | `422 Unprocessable Entity` | Jira is not configured |
-| `502 Bad Gateway` | Jira could not be reached or returned an error |
+| `502 Bad Gateway` | Jira could not be reached or returned an error. The `message` describes the failure, for example the Jira HTTP status or a connection error |

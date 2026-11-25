@@ -53,14 +53,22 @@ sequenceDiagram
     end
 ```
 
-The Jira integration is a normal integration config, so it is managed at runtime through the Config API and
-picked up by every pod without a restart.
+The Jira integration is a normal integration config, so it is managed at runtime through the Config API with
+no restart. Pods pick up a change through a PostgreSQL notification, so propagation is eventual: a pod whose
+listener was disconnected, or had not subscribed yet, when the change was written keeps its previous Jira
+config until the next config write or a restart.
 
 ---
 
 ## Setup
 
 Save a `JIRA` integration config. Only an **active** entry is used.
+
+The two examples below are alternatives. Keep **one** `JIRA` config active at a time. Nothing enforces this:
+the Config API allows several named `JIRA` entries (unique per `platform` and `name`) and saving one does not
+deactivate the others. Causa does not let the caller choose between active entries. It uses the first one it
+finds, and that order is not defined. Deactivate or delete the old entry before activating another, or tickets
+and assignee searches may go to the wrong Jira instance or project.
 
 **Atlassian Cloud** (API token):
 
@@ -168,9 +176,12 @@ An alert maps to one ticket, even if it has several diagnostics.
 - Ticket creation takes a PostgreSQL advisory lock on the alert id inside one transaction, so concurrent
   requests for the same alert are processed one after another and only the first creates a ticket.
 - The link is written with `WHERE ticket_link IS NULL`, so a stored link is never replaced.
-- **Recovery:** if a ticket was created in Jira but the link was never saved, for example after a crash, the
-  next request searches Jira for the `causa-alert-<alert id>` label, stores the link it finds and returns it
-  instead of creating a duplicate.
+- **Recovery (best effort):** if a ticket was created in Jira but the link was never saved, for example after a
+  crash, the next request searches Jira for the `causa-alert-<alert id>` label, stores the link it finds and
+  returns it instead of creating a duplicate. This can miss in two cases, and a second ticket is then created:
+  - Jira has not indexed the new label yet, so a retry sent very soon after the failure finds nothing.
+  - The search is limited to the currently configured project on the currently configured Jira instance. If
+    either was changed after the first ticket was created, the earlier ticket is not found.
 - A stored link is returned even if Jira has since been removed or deactivated. Jira is only needed to create
   or recover a ticket.
 
@@ -223,7 +234,9 @@ The flavour comes from `auth_config.authType`.
 | `422` | Assignee rejected | The user may be deactivated or not assignable in the project. Pick another from the user search |
 | `502` | Jira unreachable or returned an error | Look in the server log for the Jira status, for example `401` bad credentials or wrong `authType`, `403` permissions, `404` wrong URL or project |
 
-`502` responses deliberately return a generic message; Jira's response text is only written to the server log.
+Ticket creation returns a generic `502` message; Jira's response text is only written to the server log. The
+user search `502` returns the message from the Jira client instead, such as a status description (for example
+"Jira rejected the credentials (HTTP 401)") or a connection error, so treat it as visible to API callers.
 
 ---
 

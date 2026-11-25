@@ -107,7 +107,7 @@ Both tables extend the existing `LISTEN/NOTIFY` mechanism via new triggers (`trg
 
 How the column is used:
 
-- **One ticket per alert.** The link is stored on a diagnostic row, but the "does a ticket exist?" check looks at every diagnostic with the same `alert_id`, so an alert never gets a second ticket.
+- **One ticket per alert.** The link is stored on a diagnostic row, but the "does a ticket exist?" check looks at every diagnostic with the same `alert_id`, so a stored link prevents a second ticket for the alert.
 - **Written once.** The update is `... WHERE id = :id AND ticket_link IS NULL`, so a stored link is never overwritten, including by two requests racing each other.
 - **Not touched by normal updates.** The JPA column is `updatable = false`, so saving a diagnostic that was rebuilt without a link cannot blank out a stored one. Only the dedicated update writes it.
 - **Serialised per alert.** Ticket creation takes a PostgreSQL transaction-level advisory lock (`pg_advisory_xact_lock`) on the alert id, so concurrent requests for the same alert queue up instead of both calling Jira.
