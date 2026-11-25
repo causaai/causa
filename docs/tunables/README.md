@@ -46,6 +46,6 @@ Each tunable in the guides below lists **every layer it is available at** so you
 |---|---|---|
 | `generic_configs` | `PUT /api/v1/configs/generic` | Alert tuning, cluster identity, data retention days |
 | `llm_configs` | `PUT /api/v1/configs/llm/{provider}` | LLM provider settings, credentials, inference params |
-| `external_configs` | `PUT /api/v1/configs/observability/{platform}` and `PUT /api/v1/configs/integrations/{platform}` | Observability (Datadog, Instana) and integration (Slack, Jira, GitHub) configs |
+| `external_configs` | `PUT /api/v1/configs/observability/{platform}` and `PUT /api/v1/configs/integrations/{platform}` | Observability (Datadog, Instana) and integration (Slack, Jira, GitHub) configs. Jira is configured only here (no env var or `application.yml` layer); see [Jira integration guide](../integrations/jira.md) |
 
 All three tables are backed by in-memory caches (`AppConfig`, `LlmConfigCache`, `ExternalConfigCache`). Any write triggers a PostgreSQL `LISTEN/NOTIFY` on `config_cache_channel`, which refreshes the cache on all running pods without a restart.

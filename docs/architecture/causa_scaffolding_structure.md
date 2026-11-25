@@ -687,15 +687,9 @@ common/
 
 ```
 src/main/resources/db/migration/
-├── V1.0.0__create_alerts_table.sql
-├── V1.0.1__create_diagnostics_table.sql
-├── V1.0.2__create_recommendations_table.sql
-├── V1.0.3__create_system_health_table.sql
-├── V1.0.4__create_causa_configs_table.sql
-├── V1.0.5__enable_pgvector_extension.sql
-├── V1.0.6__create_vector_embeddings_table.sql
-├── V1.0.7__create_indexes.sql
-└── V1.0.8__seed_default_configs.sql
+├── V1__initial_schema.sql
+├── V2__settings_api_and_diagnostics_evidence.sql
+└── V3__diagnostics_ticket_link.sql   # adds diagnostics.ticket_link (Jira ticket URL)
 ```
 
 </details>

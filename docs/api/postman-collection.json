@@ -87,7 +87,7 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{baseUrl}}/api/v1/diagnostics",
+              "raw": "{{baseUrl}}/api/v1/diagnostics?page=1&page_size=20",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -95,7 +95,8 @@
                 "api",
                 "v1",
                 "diagnostics"
-              ]
+              ],
+              "query": [{"key": "page", "value": "1"}, {"key": "page_size", "value": "20"}]
             }
           }
         },
@@ -114,6 +115,45 @@
                 "diagnostics",
                 "diag_6YuCDWBMfwzWoMhY"
               ]
+            }
+          }
+        },
+        {
+          "name": "Create Jira Ticket (no options)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/diagnostics/diag_6YuCDWBMfwzWoMhY/ticket",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "diagnostics", "diag_6YuCDWBMfwzWoMhY", "ticket"]
+            }
+          }
+        },
+        {
+          "name": "Create Jira Ticket (with options)",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"assignee_id\": \"5b10ac8d82e05b22cc7d4ef5\",\n  \"include_issue_detail\": true,\n  \"include_recommendations\": true,\n  \"include_implementation_steps\": false,\n  \"additional_notes\": \"Please look at this today.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/diagnostics/diag_6YuCDWBMfwzWoMhY/ticket",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "diagnostics", "diag_6YuCDWBMfwzWoMhY", "ticket"]
+            }
+          }
+        },
+        {
+          "name": "Search Jira Users",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/diagnostics/jira/users?query=ann",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "diagnostics", "jira", "users"],
+              "query": [{"key": "query", "value": "ann"}]
             }
           }
         }
@@ -305,6 +345,49 @@
               "raw": "{{baseUrl}}/api/v1/configs/integrations/SLACK/my-slack",
               "host": ["{{baseUrl}}"],
               "path": ["api", "v1", "configs", "integrations", "SLACK", "my-slack"]
+            }
+          }
+        },
+        {
+          "name": "Integrations — Upsert (JIRA Cloud)",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"jira-prod\",\n  \"url\": \"https://your-org.atlassian.net\",\n  \"is_active\": true,\n  \"auth_config\": {\n    \"authType\": \"API_TOKEN\",\n    \"username\": \"bot@example.com\",\n    \"token\": \"<JIRA_API_TOKEN>\"\n  },\n  \"additional_config\": {\n    \"projectName\": \"OPS\",\n    \"issueType\": \"Bug\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/integrations/JIRA",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "integrations", "JIRA"]
+            }
+          }
+        },
+        {
+          "name": "Integrations — Upsert (JIRA Server PAT)",
+          "request": {
+            "method": "PUT",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"jira-onprem\",\n  \"url\": \"https://jira.example.com\",\n  \"is_active\": true,\n  \"auth_config\": {\n    \"authType\": \"PAT\",\n    \"username\": \"bot\",\n    \"token\": \"<JIRA_PERSONAL_ACCESS_TOKEN>\"\n  },\n  \"additional_config\": {\n    \"projectName\": \"OPS\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/integrations/JIRA",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "integrations", "JIRA"]
+            }
+          }
+        },
+        {
+          "name": "Integrations — Delete (JIRA/jira-prod)",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/configs/integrations/JIRA/jira-prod",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "configs", "integrations", "JIRA", "jira-prod"]
             }
           }
         }

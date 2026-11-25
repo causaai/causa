@@ -406,6 +406,8 @@ curl -X PUT http://localhost:8080/api/v1/configs/integrations/SLACK \
   }'
 ```
 
+Jira, Atlassian Cloud (API token):
+
 ```bash
 curl -X PUT http://localhost:8080/api/v1/configs/integrations/JIRA \
   -H 'Content-Type: application/json' \
@@ -424,6 +426,43 @@ curl -X PUT http://localhost:8080/api/v1/configs/integrations/JIRA \
     }
   }'
 ```
+
+Jira Server / Data Center (personal access token):
+
+```bash
+curl -X PUT http://localhost:8080/api/v1/configs/integrations/JIRA \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "jira-onprem",
+    "url": "https://jira.example.com",
+    "is_active": true,
+    "auth_config": {
+      "authType": "PAT",
+      "username": "bot",
+      "token": "<JIRA_PERSONAL_ACCESS_TOKEN>"
+    },
+    "additional_config": {
+      "projectName": "OPS"
+    }
+  }'
+```
+
+#### Jira config rules
+
+These fields drive ticket creation and assignee search (see the [Jira integration guide](../integrations/jira.md)).
+
+| Field | Required | Notes |
+|---|---|---|
+| `name` | yes | Label, unique per platform |
+| `url` | yes | Jira base URL. Must be `https://`; plain `http://` is accepted only for `localhost`, `127.0.0.1` and `::1`, so credentials are never sent unencrypted |
+| `auth_config.authType` | no | `PAT` selects Jira Server/Data Center; anything else, such as `API_TOKEN`, selects Atlassian Cloud |
+| `auth_config.username` | yes | Cloud account email (used for Basic auth). Required by validation for both flavours |
+| `auth_config.token` | yes | API token (Cloud) or personal access token (Server). Stored encrypted and masked in responses |
+| `additional_config.projectName` | yes | Jira project key such as `OPS`. Must start with a letter and contain only letters, digits and `_` |
+| `additional_config.issueType` | no | Issue type name for new tickets. Defaults to `Task` |
+
+Only an **active** `JIRA` entry is used. Saving or activating one is also what makes `"JIRA"` appear in
+`ticket_tracker` on the diagnostics endpoints.
 
 ### DELETE `/api/v1/configs/integrations/{platform}/{name}`
 

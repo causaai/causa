@@ -1,6 +1,8 @@
 # Diagnostics API
 
-This document covers the diagnostic listing and diagnostic detail endpoints.
+This document covers the diagnostic listing and detail endpoints, and the Jira endpoints that create a
+ticket from a diagnostic and search assignable users. For the Jira setup and design, see the
+[Jira integration guide](../integrations/jira.md).
 
 **Base URLs:** `{{BASE_URL}}` or `http://localhost:8080`
 
@@ -8,14 +10,25 @@ This document covers the diagnostic listing and diagnostic detail endpoints.
 
 | Endpoint | Purpose | Success response code | Error response codes |
 |---|---|---|---|
-| `GET /api/v1/diagnostics` | List diagnostic summaries | `200 OK` | `500 Server Error` |
+| `GET /api/v1/diagnostics` | List diagnostic summaries (paginated) | `200 OK` | `500 Server Error` |
 | `GET /api/v1/diagnostics/{id}` | Fetch full diagnostic detail by id | `200 OK` | `404 Not Found` |
+| `POST /api/v1/diagnostics/{id}/ticket` | Create a Jira ticket for the diagnostic's alert, or return the existing one | `201 Created`, `200 OK` (already existed) | `400`, `404`, `422`, `502` |
+| `GET /api/v1/diagnostics/jira/users` | Search Jira users that can be assigned the ticket | `200 OK` | `422`, `502` |
 
 ---
 
 ## GET `/api/v1/diagnostics`
 
-Returns a summary list of diagnostics.
+Returns a paginated summary list of diagnostics, newest first.
+
+### Query parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `page` | integer | `1` | 1-based page number |
+| `page_size` | integer | `20` | Items per page |
+| `workload_name` | string (max 255) | — | Only diagnostics for this workload |
+| `namespace` | string (max 255) | — | Only diagnostics in this namespace |
 
 ### Request Example (cURL)
 
@@ -23,30 +36,40 @@ Returns a summary list of diagnostics.
 
 ```bash
 curl {{BASE_URL}}/api/v1/diagnostics
+curl '{{BASE_URL}}/api/v1/diagnostics?page=2&page_size=10&namespace=openshift-tuning'
 ```
 
 **Using `localhost:8080`:**
 
 ```bash
 curl http://localhost:8080/api/v1/diagnostics
+curl 'http://localhost:8080/api/v1/diagnostics?page=2&page_size=10&namespace=openshift-tuning'
 ```
 
 ### Response Example
 
 ```json
-[
- {
-  "id": "diag_iYRpHr6rt8kkXgBu",
-  "status": "COMPLETED",
-  "issue": "auth-cache pod in Unknown state with no resource limits and repeated short-lived container cycles",
-  "issue_summary": "The auth-cache application pod is in an Unknown state and its containers were started and stopped repeatedly in very short windows, suggesting the workload was being redeployed or reconfigured rapidly without any memory or CPU limits set to protect it.",
-  "workload_name": "auth-cache-1",
-  "namespace": "openshift-tuning",
-  "severity": "critical",
-  "cluster_name": "default",
-  "date": "2026-08-05T12:56:01.073Z"
- }
-]
+{
+  "items": [
+    {
+      "id": "diag_iYRpHr6rt8kkXgBu",
+      "status": "COMPLETED",
+      "issue": "auth-cache pod in Unknown state with no resource limits and repeated short-lived container cycles",
+      "issue_summary": "The auth-cache application pod is in an Unknown state and its containers were started and stopped repeatedly in very short windows, suggesting the workload was being redeployed or reconfigured rapidly without any memory or CPU limits set to protect it.",
+      "workload_name": "auth-cache-1",
+      "namespace": "openshift-tuning",
+      "severity": "critical",
+      "cluster_name": "default",
+      "date": "2026-08-05T12:56:01.073Z",
+      "ticket_link": "https://acme.atlassian.net/browse/OPS-42",
+      "ticket_tracker": ["JIRA"]
+    }
+  ],
+  "page": 1,
+  "pageSize": 20,
+  "total": 1,
+  "totalPages": 1
+}
 ```
 
 ### Response notes
@@ -54,6 +77,10 @@ curl http://localhost:8080/api/v1/diagnostics
 - `status` is the diagnostic pipeline status.
 - `issue` and `issue_summary` can be `null` when generation failed or has not produced RCA content yet.
 - `cluster_name` is populated from runtime configuration and currently returns `default` locally.
+- `ticket_link` is the Jira browse URL once a ticket exists for the diagnostic's alert, otherwise `null`.
+- `ticket_tracker` lists the active ticket-tracker integrations (today only `"JIRA"`), and is empty when none is
+  configured. Use the pair to pick a button: `[]` shows nothing, `["JIRA"]` with a `null` link shows
+  **Create Jira ticket**, and `["JIRA"]` with a link shows **View Jira ticket**.
 
 ---
 
@@ -173,12 +200,15 @@ curl http://localhost:8080/api/v1/diagnostics/diag_6YuCDWBMfwzWoMhY
     ],
     "llm_notes": "Analysis began with the available signals: POD_STATUS showing Unknown phase with 0 restarts, a rich but namespace-broad POD_EVENTS stream, failed log retrieval for both current and previous container, Kruize cost and performance recommendations with 24-hour memory data, and entirely empty JFR analysis sections. The first notable finding was the image tag 'quay.io/causa-ai-hub/quarkus-gc-pause:promotion-pressure-nd' — the workload name 'auth-cache' combined with this tag makes it highly likely this is a demonstration or test application deliberately simulating GC promotion pressure, not a production workload with an organic bug. The pod event stream required careful filtering since it contains events from many different workloads in the openshift-tuning namespace (heap-oom, cryostat, kruize, cnpg, etc.); I isolated only events referencing auth-cache-1 pods. The key pattern that emerged was rapid ReplicaSet cycling: six different ReplicaSets for auth-cache-1 were created and destroyed between 12:31 and 12:55 UTC, with individual pod lifetimes ranging from under 15 seconds to about 4 minutes — this is not consistent with normal OOMKilled behavior (which typically shows exit code 137 and an OOMKilled reason) but is consistent with either liveness/readiness probe failures during GC pauses or an automated rolling-update experiment. The absence of any OOMKilled or exit code 137 events was the primary reason I chose POSSIBLE_GC_PAUSE over POSSIBLE_OOM_KILLED or OOM_KILLED, despite the memory usage reaching ~736 MiB max according to Kruize. The Kruize data was the only quantitative memory signal available and was used to anchor the resource limit recommendation at 883 MiB. I considered POSSIBLE_OOM_KILLED as an alternative but the lack of exit code 137 events, combined with the explicit GC-pause-themed image name, made POSSIBLE_GC_PAUSE the more defensible classification. The Unknown pod phase adds another layer of ambiguity — it could mean node-level communication failure rather than application-level crash. All solution confidence scores are below 0.7 because the three most diagnostic signal types (application logs, JFR data, and Prometheus metrics) are all unavailable, leaving the analysis heavily dependent on indirect indicators."
   },
-  "validation_result": null
+  "validation_result": null,
+  "ticket_link": null,
+  "ticket_tracker": ["JIRA"]
 }
 ```
 
 ### Response notes
 
+- `ticket_link` and `ticket_tracker` have the same meaning as on the list endpoint.
 - `evidences` is the free-text list the LLM wrote while generating the RCA.
 - `validation_evidences` is the structured evidence harvested by the validation pipeline. It is
   `null` when no evidence was collected for the diagnostic; otherwise each item carries:
@@ -197,8 +227,131 @@ If the diagnostic id does not exist, the API returns `404` with this shape:
 
 ```json
 {
-  "statusCode": 404,
+  "status": 404,
   "error": "Not Found",
-  "message": "No diagnostic found with id: <id>"
+  "message": "No diagnostic found with id: <id>",
+  "timestamp": "2026-11-25T10:15:30.123Z"
 }
 ```
+
+---
+
+## POST `/api/v1/diagnostics/{id}/ticket`
+
+Creates a Jira ticket for the diagnostic's alert and stores its link on the diagnostic. The call is
+**idempotent per alert**: if a ticket already exists for the alert (even one created through another
+diagnostic), its link is returned instead of creating a duplicate.
+
+The request body is optional. With no body, the ticket description is just the root cause and the ticket
+is left unassigned.
+
+### Request body (optional)
+
+| Field | Type | Description |
+|---|---|---|
+| `assignee_id` | string (max 255) | Jira `accountId` (Cloud) or username (Server/Data Center), taken from `GET /api/v1/diagnostics/jira/users`. Omit to leave unassigned. |
+| `include_issue_detail` | boolean | Append an **Issue detail** section (issue summary and description) |
+| `include_recommendations` | boolean | Append a **Recommendations** section |
+| `include_implementation_steps` | boolean | Append an **Implementation steps** section for each recommendation that has one |
+| `additional_notes` | string (max 2000) | Free text appended as an **Additional notes** section |
+
+All fields default to off. The options only apply when a new ticket is created; they are ignored when a
+ticket already exists.
+
+### Request Example (cURL)
+
+```bash
+curl -X POST http://localhost:8080/api/v1/diagnostics/diag_iYRpHr6rt8kkXgBu/ticket \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "assignee_id": "5b10ac8d82e05b22cc7d4ef5",
+    "include_issue_detail": true,
+    "include_recommendations": true,
+    "include_implementation_steps": false,
+    "additional_notes": "Please look at this today."
+  }'
+```
+
+Without options:
+
+```bash
+curl -X POST http://localhost:8080/api/v1/diagnostics/diag_iYRpHr6rt8kkXgBu/ticket
+```
+
+### Response Example
+
+`201 Created` when a ticket was just created, `200 OK` when one already existed:
+
+```json
+{
+  "ticket_link": "https://acme.atlassian.net/browse/OPS-123",
+  "already_existed": false
+}
+```
+
+### Errors
+
+All errors use the standard error body (`status`, `error`, `message`, `timestamp`).
+
+| Status | When |
+|---|---|
+| `400 Bad Request` | `additional_notes` is longer than 2000 characters or `assignee_id` is longer than 255 |
+| `404 Not Found` | No diagnostic with that id |
+| `422 Unprocessable Entity` | Jira is not configured, its configuration is incomplete or invalid (for example a non-HTTPS URL or a bad project key), or Jira rejected the selected assignee |
+| `502 Bad Gateway` | Jira could not be reached or returned an error. The details are logged on the server, not returned |
+
+```json
+{
+  "status": 422,
+  "error": "Unprocessable Entity",
+  "message": "Jira integration is not configured. Set it up via PUT /api/v1/configs/integrations/JIRA.",
+  "timestamp": "2026-11-25T10:15:30.123Z"
+}
+```
+
+### Behaviour notes
+
+- A stored link is returned even if Jira is no longer configured; Jira is only needed to create or recover a ticket.
+- Every ticket carries a `causa-alert-<alert id>` label. If a ticket was created in Jira but its link was never
+  saved (for example after a crash), the next call finds it by that label and reuses it.
+- On Jira Server/Data Center, `additional_notes` is escaped so Jira wiki markup in the text renders literally.
+
+---
+
+## GET `/api/v1/diagnostics/jira/users`
+
+Returns users that can be assigned issues in the configured Jira project, for an assignee picker. At most
+20 users are returned.
+
+### Query parameters
+
+| Parameter | Type | Description |
+|---|---|---|
+| `query` | string (max 255) | Text matched against user names and email. Blank or omitted lists the first 20 assignable users |
+
+### Request Example (cURL)
+
+```bash
+curl 'http://localhost:8080/api/v1/diagnostics/jira/users?query=ann'
+```
+
+### Response Example
+
+```json
+[
+  {
+    "id": "5b10ac8d82e05b22cc7d4ef5",
+    "display_name": "Ann Lee",
+    "email": "ann@example.com"
+  }
+]
+```
+
+`id` is the value to send as `assignee_id` when creating a ticket. `email` can be `null` when the user hides it.
+
+### Errors
+
+| Status | When |
+|---|---|
+| `422 Unprocessable Entity` | Jira is not configured |
+| `502 Bad Gateway` | Jira could not be reached or returned an error |

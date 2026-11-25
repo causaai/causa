@@ -97,6 +97,23 @@ Both tables extend the existing `LISTEN/NOTIFY` mechanism via new triggers (`trg
 
 **Table rename** — `configurations` renamed to `generic_configs`. All constraints, indexes, and the `trg_config_notify` trigger follow the table by OID automatically.
 
+### V3 — diagnostics ticket link
+
+`V3__diagnostics_ticket_link.sql` adds one column to `diagnostics`:
+
+| Column | Type | Notes |
+|---|---|---|
+| `ticket_link` | `TEXT` | Nullable. Full Jira browse URL, e.g. `https://acme.atlassian.net/browse/OPS-123`. `NULL` until a ticket is created |
+
+How the column is used:
+
+- **One ticket per alert.** The link is stored on a diagnostic row, but the "does a ticket exist?" check looks at every diagnostic with the same `alert_id`, so an alert never gets a second ticket.
+- **Written once.** The update is `... WHERE id = :id AND ticket_link IS NULL`, so a stored link is never overwritten, including by two requests racing each other.
+- **Not touched by normal updates.** The JPA column is `updatable = false`, so saving a diagnostic that was rebuilt without a link cannot blank out a stored one. Only the dedicated update writes it.
+- **Serialised per alert.** Ticket creation takes a PostgreSQL transaction-level advisory lock (`pg_advisory_xact_lock`) on the alert id, so concurrent requests for the same alert queue up instead of both calling Jira.
+
+The column is exposed as `ticket_link` on the diagnostics API; see the [Jira integration guide](../integrations/jira.md).
+
 ---
 
 ## Connection Pool (Agroal)
