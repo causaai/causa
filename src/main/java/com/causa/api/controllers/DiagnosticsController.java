@@ -182,7 +182,7 @@ public class DiagnosticsController {
                         .build();
                 }
                 // These messages are fixed strings built by JiraClient, so they are safe to return.
-                case "JIRA_CONFIG_INCOMPLETE", "JIRA_CONFIG_INVALID" -> {
+                case "JIRA_CONFIG_INCOMPLETE", "JIRA_CONFIG_INVALID", "JIRA_ASSIGNEE_REJECTED" -> {
                     log.warn(LogMessages.Diagnostic.JIRA_TICKET_FAILED)
                         .field("diagnosticId", diagnosticId)
                         .field("errorType", e.getErrorType())

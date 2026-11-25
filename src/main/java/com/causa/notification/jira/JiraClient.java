@@ -205,6 +205,11 @@ public class JiraClient {
                     .field("status", response.statusCode())
                     .field("body", truncate(response.body(), 300))
                     .log();
+                if (response.statusCode() == 400 && isAssigneeRejection(response.body())) {
+                    throw new DiagnosticException(
+                        "Jira rejected the selected assignee. Pick another user who can be assigned issues "
+                        + "in this project.", "JIRA_ASSIGNEE_REJECTED");
+                }
                 throw new DiagnosticException(describeFailure(response.statusCode()), "JIRA_API_ERROR");
             }
             return response.body();
@@ -213,6 +218,15 @@ public class JiraClient {
             throw de;
         } catch (Exception e) {
             throw new DiagnosticException("Could not reach Jira: " + e.getMessage(), "JIRA_API_ERROR", e);
+        }
+    }
+
+    /** Jira reports a bad assignee as a 400 with an {@code errors.assignee} entry. */
+    private static boolean isAssigneeRejection(String responseBody) {
+        try {
+            return MAPPER.readTree(responseBody).path("errors").has("assignee");
+        } catch (Exception e) {
+            return false;
         }
     }
 
@@ -317,7 +331,11 @@ public class JiraClient {
     }
 
     /** One block of the description; {@code heading} is null for the opening block. */
-    private record Section(String heading, List<String> lines) {}
+    private record Section(String heading, List<String> lines, boolean userText) {
+        Section(String heading, List<String> lines) {
+            this(heading, lines, false);
+        }
+    }
 
     /** Issue payload; Cloud needs the description as Atlassian Document Format, Server as wiki-markup text. */
     private static String buildRequestBody(String projectKey, String issueType, Diagnostic diagnostic,
@@ -367,29 +385,35 @@ public class JiraClient {
         if (rca != null && options.includeRecommendations() && rca.recommendations() != null) {
             List<String> lines = new ArrayList<>();
             for (Recommendation r : rca.recommendations()) {
-                lines.add(joinNonBlank(" - ", r.solutionTitle(), r.solutionDescription()));
+                if (r != null) {
+                    lines.add(joinNonBlank(" - ", r.solutionTitle(), r.solutionDescription()));
+                }
             }
             addSection(sections, "Recommendations", lines);
         }
         if (rca != null && options.includeImplementationSteps() && rca.recommendations() != null) {
             List<String> lines = new ArrayList<>();
             for (Recommendation r : rca.recommendations()) {
-                if (!isBlank(r.implementationNotes())) {
+                if (r != null && !isBlank(r.implementationNotes())) {
                     lines.add(joinNonBlank(": ", r.solutionTitle(), r.implementationNotes()));
                 }
             }
             addSection(sections, "Implementation steps", lines);
         }
         if (!isBlank(options.additionalNotes())) {
-            addSection(sections, "Additional notes", List.of(options.additionalNotes().trim()));
+            addSection(sections, "Additional notes", List.of(options.additionalNotes().trim()), true);
         }
         return sections;
     }
 
     private static void addSection(List<Section> sections, String heading, List<String> lines) {
+        addSection(sections, heading, lines, false);
+    }
+
+    private static void addSection(List<Section> sections, String heading, List<String> lines, boolean userText) {
         List<String> kept = lines.stream().filter(l -> !isBlank(l)).toList();
         if (!kept.isEmpty()) {
-            sections.add(new Section(heading, kept));
+            sections.add(new Section(heading, kept, userText));
         }
     }
 
@@ -410,9 +434,35 @@ public class JiraClient {
         for (Section s : sections) {
             if (sb.length() > 0) sb.append("\n\n");
             if (s.heading() != null) sb.append("h3. ").append(s.heading()).append("\n");
-            sb.append(String.join("\n", s.lines()));
+            sb.append(String.join("\n", s.userText()
+                ? s.lines().stream().map(JiraClient::escapeWikiMarkup).toList()
+                : s.lines()));
         }
         return sb.toString();
+    }
+
+    /** Characters Jira wiki markup treats as formatting, links, images, macros, tables or lists. */
+    private static final String WIKI_SPECIAL = "{}[]!|*_^~+-?#()";
+
+    /**
+     * Makes caller-supplied text render literally in a Server/Data Center description, so it cannot
+     * inject images, links, macros or headings. A backslash is replaced because {@code \\} is a line
+     * break in wiki markup and could otherwise cancel the escape of the next character.
+     */
+    private static String escapeWikiMarkup(String text) {
+        StringBuilder sb = new StringBuilder(text.length() + 8);
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '\\') {
+                sb.append('\uFF3C');
+            } else if (WIKI_SPECIAL.indexOf(c) >= 0) {
+                sb.append('\\').append(c);
+            } else {
+                sb.append(c);
+            }
+        }
+        // "h1. " / "bq. " at the start of a line are block markup; a zero-width space breaks them
+        return sb.toString().replaceAll("(?m)^(h[1-6]|bq)(?=\\.)", "$1\u200B");
     }
 
     private static ObjectNode adfDocument(List<Section> sections) {

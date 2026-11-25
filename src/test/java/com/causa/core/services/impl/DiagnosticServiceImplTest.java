@@ -384,7 +384,7 @@ class DiagnosticServiceImplTest {
                     () -> diagnosticService.createOrGetJiraTicket("d1", tooLong));
 
             assertEquals("INVALID_REQUEST", ex.getErrorType());
-            verify(diagnosticRepository, never()).lockAlertForTicketCreation(any());
+            verifyNoInteractions(diagnosticRepository);
             verifyNoInteractions(jiraClient);
         }
 

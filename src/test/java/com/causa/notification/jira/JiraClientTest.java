@@ -22,6 +22,8 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -318,9 +320,91 @@ class JiraClientTest {
         JsonNode fields = MAPPER.readTree(body.get()).path("fields");
         JsonNode content = fields.path("description").path("content");
         assertEquals("paragraph", content.get(0).path("type").asText());
+        assertEquals("Root cause text", content.get(0).path("content").get(0).path("text").asText());
         assertEquals("heading", content.get(1).path("type").asText());
         assertEquals("Recommendations", content.get(1).path("content").get(0).path("text").asText());
         assertEquals("abc", fields.path("assignee").path("accountId").asText());
+
+        List<String> headings = new ArrayList<>();
+        content.forEach(n -> {
+            if ("heading".equals(n.path("type").asText())) {
+                headings.add(n.path("content").get(0).path("text").asText());
+            }
+        });
+        assertEquals(List.of("Recommendations"), headings, "unselected sections must not be sent");
+        assertFalse(fields.path("description").toString().contains("Summary text"));
+        assertFalse(fields.path("description").toString().contains("kubectl set resources"));
+    }
+
+    @Test
+    @DisplayName("Server: additional notes are escaped so wiki markup renders as literal text")
+    void serverEscapesAdditionalNotes() throws Exception {
+        String notes = "!http://evil.example/p.png! [click|http://evil.example] {code}x{code} *b* \\ \nh1. title\n- item";
+
+        client.createTicket(config("PAT", null), diagnosticWithRca(),
+                new JiraTicketOptions(null, false, false, false, notes));
+
+        String description = MAPPER.readTree(body.get()).path("fields").path("description").asText();
+        String escapedNotes = description.substring(description.indexOf("h3. Additional notes\n")
+                + "h3. Additional notes\n".length());
+
+        assertTrue(escapedNotes.contains("\\!http://evil.example/p.png\\!"));
+        assertTrue(escapedNotes.contains("\\[click\\|http://evil.example\\]"));
+        assertTrue(escapedNotes.contains("\\{code\\}x\\{code\\}"));
+        assertTrue(escapedNotes.contains("\\*b\\*"));
+        assertFalse(escapedNotes.contains("\\\\"), "a raw backslash could cancel an escape");
+        assertFalse(escapedNotes.contains("\nh1."), "line-start heading markup must be neutralised");
+        assertTrue(escapedNotes.contains("\n\\- item"));
+        // the section heading itself is ours and stays real markup
+        assertTrue(description.contains("h3. Additional notes"));
+    }
+
+    @Test
+    @DisplayName("Cloud: additional notes are sent as plain ADF text, untouched")
+    void cloudNotesAreNotEscaped() throws Exception {
+        client.createTicket(config("API_TOKEN", "me@example.com"), diagnosticWithRca(),
+                new JiraTicketOptions(null, false, false, false, "use *this* [x]"));
+
+        assertTrue(body.get().contains("use *this* [x]"));
+    }
+
+    @Test
+    @DisplayName("A null recommendation entry is skipped instead of aborting ticket creation")
+    void nullRecommendationIsSkipped() throws Exception {
+        RootCauseAnalysis rca = new RootCauseAnalysis("Title", "Summary text", "Issue description", null, null,
+                "Root cause text", null, null,
+                Arrays.asList(null, new Recommendation("Fix", "Raise limit", "Bump memory", "kubectl set", 0.9, null)),
+                null, null);
+        Diagnostic diagnostic = Diagnostic.builder()
+                .diagnosticId("diag-1").alertId("alrt-1")
+                .status(DiagnosticStatus.COMPLETED).generatedAt(Instant.now()).rca(rca).build();
+
+        assertEquals(baseUrl + "/browse/KRUIZE-1", client.createTicket(config("PAT", null), diagnostic,
+                new JiraTicketOptions(null, true, true, false, null)));
+
+        String description = MAPPER.readTree(body.get()).path("fields").path("description").asText();
+        assertTrue(description.contains("h3. Recommendations\nRaise limit - Bump memory"));
+        assertTrue(description.contains("h3. Implementation steps\nRaise limit: kubectl set"));
+    }
+
+    @Test
+    @DisplayName("Jira rejecting the assignee is reported as JIRA_ASSIGNEE_REJECTED, other 400s stay JIRA_API_ERROR")
+    void rejectedAssigneeIsDistinguished() {
+        status = 400;
+        responseJson = "{\"errorMessages\":[],\"errors\":{\"assignee\":\"User 'bob' does not exist.\"}}";
+
+        DiagnosticException ex = assertThrows(DiagnosticException.class, () -> client.createTicket(
+                config("PAT", null), diagnosticWithRca(), new JiraTicketOptions("bob", false, false, false, null)));
+        assertEquals("JIRA_ASSIGNEE_REJECTED", ex.getErrorType());
+        assertFalse(ex.getMessage().contains("does not exist"), "upstream text must not leak");
+
+        responseJson = "{\"errors\":{\"summary\":\"required\"}}";
+        assertEquals("JIRA_API_ERROR", errorType(() -> client.createTicket(
+                config("PAT", null), diagnosticWithRca(), JiraTicketOptions.defaults())));
+
+        responseJson = "not json";
+        assertEquals("JIRA_API_ERROR", errorType(() -> client.createTicket(
+                config("PAT", null), diagnosticWithRca(), JiraTicketOptions.defaults())));
     }
 
     private static String errorType(Runnable call) {

@@ -360,6 +360,12 @@ class DiagnosticsControllerTest {
             when(diagnosticService.createOrGetJiraTicket(eq("leaky"), any()))
                     .thenThrow(new DiagnosticException("upstream body: secret-detail", "JIRA_API_ERROR"));
 
+            when(diagnosticService.createOrGetJiraTicket(eq("badassignee"), any()))
+                    .thenThrow(new DiagnosticException("Jira rejected the selected assignee.", "JIRA_ASSIGNEE_REJECTED"));
+
+            Response rejected = controller.createJiraTicket("badassignee", null);
+            assertEquals(422, rejected.getStatus());
+            assertTrue(rejected.getEntity().toString().contains("selected assignee"));
             assertEquals(422, controller.createJiraTicket("incomplete", null).getStatus());
             assertEquals(422, controller.createJiraTicket("invalid", null).getStatus());
             Response leaky = controller.createJiraTicket("leaky", null);
