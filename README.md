@@ -194,7 +194,7 @@ Project Link: [https://github.com/causaai/causa](https://github.com/causaai/caus
 [license-shield]: https://img.shields.io/github/license/causaai/causa.svg?style=for-the-badge
 [license-url]: https://github.com/causaai/causa/blob/main/LICENSE
 
-[quarkus-shield]: https://img.shields.io/badge/Quarkus-3.36.1-4695EB?style=for-the-badge&logo=quarkus&logoColor=white
+[quarkus-shield]: https://img.shields.io/badge/Quarkus-3.36.3-4695EB?style=for-the-badge&logo=quarkus&logoColor=white
 [quarkus-url]: https://quarkus.io/
 [java-shield]: https://img.shields.io/badge/Java-21-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white
 [java-url]: https://adoptium.net/
