@@ -199,8 +199,8 @@ sequenceDiagram
 | **LangChain4J Core** | 1.15.1 | AI orchestration framework, unified ChatModel interface | `dev.langchain4j:langchain4j:1.15.1` |
 | **LangChain4J Anthropic** | 1.15.1 | Direct Anthropic API integration (uses HTTP + API key) | `dev.langchain4j:langchain4j-anthropic:1.15.1` |
 | **LangChain4J Vertex AI Anthropic** | 1.15.1-beta25 | Google Cloud Vertex AI integration for Claude (uses Google ADC) | `dev.langchain4j:langchain4j-vertex-ai-anthropic:1.15.1-beta25` |
-| **Quarkus SmallRye Config** | 3.36.1 | Type-safe configuration via @ConfigMapping | Built-in to Quarkus platform |
-| **Quarkus SmallRye Health** | 3.36.1 | MicroProfile Health checks for readiness probes | Built-in to Quarkus platform |
+| **Quarkus SmallRye Config** | 3.36.3 | Type-safe configuration via @ConfigMapping | Built-in to Quarkus platform |
+| **Quarkus SmallRye Health** | 3.36.3 | MicroProfile Health checks for readiness probes | Built-in to Quarkus platform |
 
 ### Why LangChain4J?
 
