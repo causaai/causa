@@ -71,6 +71,8 @@ Instead of engineers manually collecting data from multiple tools, Causa deliver
 
 - ⚙️ **Dynamic Configuration** – Update operational settings securely without restarting the application.
 
+- 🎫 **Jira Ticket Creation** – Creates a Jira ticket from a diagnostic with an optional assignee, and reuses the existing ticket if one was already created for the alert. Works with Jira Cloud and Jira Server/Data Center. See the [Jira integration guide](docs/integrations/jira.md).
+
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
