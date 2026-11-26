@@ -19,10 +19,17 @@
         <langchain4j.version>1.15.1</langchain4j.version>
         <langchain4j-vertex-anthropic.version>1.15.1-beta25</langchain4j-vertex-anthropic.version>
         <hibernate.version>7.3.6.Final</hibernate.version>
+        <guava.version>33.7.2-jre</guava.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
+            <!-- Override Guava version from the Quarkus BOM -->
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>${guava.version}</version>
+            </dependency>
             <dependency>
                 <groupId>${quarkus.platform.group-id}</groupId>
                 <artifactId>${quarkus.platform.artifact-id}</artifactId>
