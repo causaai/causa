@@ -995,20 +995,8 @@ public class DiagnosticServiceImpl implements DiagnosticService {
             return new JiraTicket(existing.get(), true);
         }
 
-        // Only creating (or recovering) a ticket needs Jira; an already-stored link is returned above
+        // Only creating a ticket needs Jira; an already-stored link is returned above
         ExternalConfig jiraConfig = requireJiraConfig();
-
-        // Jira may already hold a ticket whose URL was never saved (e.g. crash after creating it)
-        Optional<String> inJira = jiraClient.findTicketByAlertId(jiraConfig, alertId);
-        if (inJira.isPresent()) {
-            diagnosticRepository.updateTicketLink(diagnosticId, inJira.get());
-            log.info(LogMessages.Diagnostic.JIRA_TICKET_RECOVERED)
-                .field("diagnosticId", diagnosticId)
-                .field("alertId", alertId)
-                .field("ticketLink", inJira.get())
-                .log();
-            return new JiraTicket(inJira.get(), true);
-        }
 
         String ticketLink = jiraClient.createTicket(jiraConfig, diagnostic, ticketOptions);
         diagnosticRepository.updateTicketLink(diagnosticId, ticketLink);
