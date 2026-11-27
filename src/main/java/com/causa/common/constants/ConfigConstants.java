@@ -57,6 +57,9 @@ public final class ConfigConstants {
      */
     public record KeyDef(String name, String category, ValueType type, boolean sensitive, String mpConfigPath) {}
 
+    /** Public address of the Causa UI, used to build links in notifications. */
+    public static final String UI_BASE_URL_KEY = "UI_BASE_URL";
+
     /**
      * Central registry of all known configuration keys.
      * Adding a new key = one line here.
@@ -68,9 +71,10 @@ public final class ConfigConstants {
         key("ALERT_IGNORE_NAMESPACES",         "alerts", ValueType.STRING,  false, "causa.alerts.ignore-namespaces"),
         key("ALERT_COOLDOWN_CLEANUP_INTERVAL", "alerts", ValueType.STRING,  false, "causa.alerts.cooldown-cleanup-interval"),
 
-        // Cluster Configuration (2 keys)
+        // Cluster Configuration (3 keys)
         key("CLUSTER_NAME",                    "cluster", ValueType.STRING, false, "causa.cluster.name"),
         key("CLUSTER_TYPE",                    "cluster", ValueType.STRING, false, "causa.cluster.target-cluster-type"),
+        key(UI_BASE_URL_KEY,                   "cluster", ValueType.STRING, false, "causa.ui.base-url"),
 
         // Data Configuration (1 key)
         key("DATA_RETENTION_DAYS",             "data",    ValueType.INTEGER, false, "causa.data.retention-days")
