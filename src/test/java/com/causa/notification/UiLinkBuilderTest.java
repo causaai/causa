@@ -51,12 +51,39 @@ class UiLinkBuilderTest {
     }
 
     @Test
+    @DisplayName("Base address that is not an absolute http(s) URL with a host gives no link")
+    void invalidBaseAddress() {
+        for (String bad : new String[] {"ui.example.com", "javascript:alert(1)", "ftp://ui.example.com",
+                "https://", "https:/ui.example.com", "https://ui example.com"}) {
+            baseUrlIs(bad);
+            assertTrue(builder.diagnosisLink("abc").isEmpty(), "Expected no link for: " + bad);
+        }
+    }
+
+    @Test
+    @DisplayName("http base address, a port and a path prefix are accepted")
+    void validBaseAddresses() {
+        baseUrlIs("http://ui.example.com");
+        assertEquals(Optional.of("http://ui.example.com/active-issues/abc"), builder.diagnosisLink("abc"));
+        baseUrlIs("https://ui.example.com:8443/causa");
+        assertEquals(Optional.of("https://ui.example.com:8443/causa/active-issues/abc"), builder.diagnosisLink("abc"));
+    }
+
+    @Test
     @DisplayName("Empty, blank or null id gives no link")
     void noId() {
         baseUrlIs("https://ui.example.com");
         assertTrue(builder.diagnosisLink("").isEmpty());
         assertTrue(builder.diagnosisLink("  ").isEmpty());
         assertTrue(builder.diagnosisLink(null).isEmpty());
+    }
+
+    @Test
+    @DisplayName("Reserved characters in the id are percent-encoded and stay in one path segment")
+    void encodesId() {
+        baseUrlIs("https://ui.example.com");
+        assertEquals(Optional.of("https://ui.example.com/active-issues/a%2Fb%3Fc%23d%20e"),
+                builder.diagnosisLink("a/b?c#d e"));
     }
 
     @Test
