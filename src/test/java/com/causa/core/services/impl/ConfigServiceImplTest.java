@@ -92,7 +92,7 @@ class ConfigServiceImplTest {
 
             assertFalse(result.isEmpty());
             result.forEach(e -> assertTrue(
-                    e.key().equals("CLUSTER_NAME") || e.key().equals("CLUSTER_TYPE"),
+                    e.key().equals("CLUSTER_NAME") || e.key().equals("CLUSTER_TYPE") || e.key().equals("UI_BASE_URL"),
                     "Unexpected key in cluster category: " + e.key()));
         }
 
@@ -135,8 +135,8 @@ class ConfigServiceImplTest {
             List<ConfigurationRepository.ConfigEntry> result = configService.getAll();
 
             assertFalse(result.isEmpty());
-            // 4 alerts keys + 2 cluster keys + 1 data key = 7 total (LLM keys moved to llm_configs table)
-            assertEquals(7, result.size());
+            // 4 alerts keys + 3 cluster keys + 1 data key = 8 total (LLM keys moved to llm_configs table)
+            assertEquals(8, result.size());
         }
 
         @Test

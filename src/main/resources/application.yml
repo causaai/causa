@@ -104,6 +104,11 @@ causa:
     name: ${CAUSA_CLUSTER_NAME:default}
     target-cluster-type: ${CAUSA_CLUSTER_TARGET_TYPE:cluster}
 
+  # Public address of the Causa UI, used to build the link in notifications.
+  # Set by the installer (CAUSA_UI_BASE_URL in the causa-config ConfigMap). Empty = message is sent without a link.
+  ui:
+    base-url: ${CAUSA_UI_BASE_URL:}
+
   # LLM Configuration (LangChain4J)
   llm:
     provider: ${LLM_PROVIDER:}
