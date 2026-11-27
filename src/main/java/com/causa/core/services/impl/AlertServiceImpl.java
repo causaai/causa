@@ -1,8 +1,6 @@
 package com.causa.core.services.impl;
 
-import com.causa.common.constants.ApiConstants;
 import com.causa.common.constants.AlertConstants.AlertSeverity;
-import com.causa.common.exceptions.InvalidPaginationException;
 import com.causa.common.logging.CausaLogger;
 import com.causa.common.logging.LogMessages;
 import com.causa.config.AppConfig;
@@ -150,13 +148,7 @@ public class AlertServiceImpl implements AlertService {
 
     @Override
     public PageResult<Alert> listAlerts(Alert.Filter filter, PageRequest pageRequest) {
-        int size = pageRequest.size() <= 0 ? Integer.parseInt(ApiConstants.Paths.Pagination.DEFAULT_PAGE_SIZE) : pageRequest.size();
-        if (size > ApiConstants.Paths.Pagination.MAX_PAGE_SIZE) {
-            throw new InvalidPaginationException(
-                "page_size must be between 1 and " + ApiConstants.Paths.Pagination.MAX_PAGE_SIZE);
-        }
-        int page = pageRequest.page() <= 0 ? 1 : pageRequest.page();
-        return alertRepository.search(filter, PageRequest.of(page, size));
+        return alertRepository.search(filter, pageRequest.normalized());
     }
 
     private boolean passesSeverityFilter(Alert alert) {
