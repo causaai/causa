@@ -15,8 +15,6 @@ import jakarta.ws.rs.Consumes;
 import com.causa.core.domain.Alert;
 import com.causa.core.domain.PageRequest;
 import com.causa.core.domain.PageResult;
-import com.causa.core.services.AlertService;
-import jakarta.inject.Inject;
 import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
